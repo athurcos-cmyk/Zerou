@@ -95,6 +95,7 @@ docs/MANUAL_SETUP_REQUIRED.md
 | `npm run test:e2e` | passou | 1 teste Playwright da landing publica. |
 | `npx firebase-tools deploy --only firestore:rules,firestore:indexes --project zerou-26757` | passou | Firestore rules/indexes Spark publicados no projeto real. |
 | HTTP live `https://zerou-five.vercel.app/{/,login,register,forgot-password,app}` | passou | Todas as rotas responderam 200 com o bundle Spark/free `assets/index-BB2S_rbX.js`. |
+| Fix onboarding Spark apos erro `permission-denied` | passou localmente | Servico deixou de ler workspace/membership antes da criacao; agora usa leitura permitida de `/users/{uid}` e batch atomico. Bundle gerado: `assets/index-BqlIKcE_.js`. |
 
 ## Pendencias manuais externas
 

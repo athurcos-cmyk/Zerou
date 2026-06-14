@@ -1,5 +1,5 @@
 import type { User } from 'firebase/auth';
-import { doc, getDoc, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { getFirebaseDb } from '../firebase/config';
 import type { AppearancePreferences } from '../theme/theme.types';
 
@@ -42,32 +42,20 @@ export async function ensurePersonalFoundation({
   const workspaceRef = doc(db, 'workspaces', workspaceId);
   const memberRef = doc(db, 'workspaces', workspaceId, 'members', user.uid);
   const workspaceRefForUser = doc(db, 'users', user.uid, 'workspaceRefs', workspaceId);
+  const existingUser = await getDoc(userRef);
 
-  return runTransaction(db, async (transaction) => {
-    const [userSnapshot, workspaceSnapshot, memberSnapshot, refSnapshot] = await Promise.all([
-      transaction.get(userRef),
-      transaction.get(workspaceRef),
-      transaction.get(memberRef),
-      transaction.get(workspaceRefForUser)
-    ]);
-
-    if (
-      userSnapshot.exists() &&
-      workspaceSnapshot.exists() &&
-      memberSnapshot.exists() &&
-      refSnapshot.exists() &&
-      userSnapshot.get('defaultWorkspaceId') === workspaceId
-    ) {
+  if (existingUser.exists()) {
+    if (existingUser.get('defaultWorkspaceId') === workspaceId) {
       return { workspaceId, created: false };
     }
 
-    if (userSnapshot.exists() || workspaceSnapshot.exists() || memberSnapshot.exists() || refSnapshot.exists()) {
-      throw new Error('A fundacao da conta esta incompleta. Tente sair e entrar novamente antes de continuar.');
-    }
+    throw new Error('A fundacao da conta esta incompleta. Tente sair e entrar novamente antes de continuar.');
+  }
 
-    const now = serverTimestamp();
+  const now = serverTimestamp();
+  const batch = writeBatch(db);
 
-    transaction.set(userRef, {
+  batch.set(userRef, {
       id: user.uid,
       name: displayName,
       email: user.email ?? '',
@@ -81,9 +69,9 @@ export async function ensurePersonalFoundation({
       ...appearance,
       createdAt: now,
       updatedAt: now
-    });
+  });
 
-    transaction.set(workspaceRef, {
+  batch.set(workspaceRef, {
       id: workspaceId,
       type: 'personal',
       name: 'Meu espaco pessoal',
@@ -94,9 +82,9 @@ export async function ensurePersonalFoundation({
       timezone: 'America/Sao_Paulo',
       createdAt: now,
       updatedAt: now
-    });
+  });
 
-    transaction.set(memberRef, {
+  batch.set(memberRef, {
       userId: user.uid,
       workspaceId,
       role: 'owner',
@@ -104,29 +92,27 @@ export async function ensurePersonalFoundation({
       joinedAt: now,
       createdAt: now,
       updatedAt: now
-    });
+  });
 
-    transaction.set(workspaceRefForUser, {
+  batch.set(workspaceRefForUser, {
       workspaceId,
       type: 'personal',
       role: 'owner',
       status: 'active',
       createdAt: now,
       updatedAt: now
-    });
-
-    return { workspaceId, created: true };
   });
-}
 
-export async function hasPersonalFoundation(uid: string) {
-  const db = getFirebaseDb();
-  const workspaceId = getPersonalWorkspaceId(uid);
-  const [userSnapshot, workspaceSnapshot, memberSnapshot] = await Promise.all([
-    getDoc(doc(db, 'users', uid)),
-    getDoc(doc(db, 'workspaces', workspaceId)),
-    getDoc(doc(db, 'workspaces', workspaceId, 'members', uid))
-  ]);
+  try {
+    await batch.commit();
+    return { workspaceId, created: true };
+  } catch (error) {
+    const refreshedUser = await getDoc(userRef);
 
-  return userSnapshot.exists() && workspaceSnapshot.exists() && memberSnapshot.exists();
+    if (refreshedUser.exists() && refreshedUser.get('defaultWorkspaceId') === workspaceId) {
+      return { workspaceId, created: false };
+    }
+
+    throw error;
+  }
 }
