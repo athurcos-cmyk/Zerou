@@ -32,6 +32,8 @@ Gate da Fase 1: passou
 - Onboarding básico com aceite versionado, criação de perfil e workspace pessoal por callable Functions.
 - Callable Functions v2 `ensureUserProfile` e `ensurePersonalWorkspace`, idempotentes e em `southamerica-east1`.
 - App shell autenticado com sidebar desktop, bottom navigation mobile e dashboard vazio pós-login.
+- Ajuste pós-QA do deploy: Firebase agora inicializa de forma lazy, a landing não quebra quando `VITE_FIREBASE_*` está ausente/inválido e as telas de auth exibem erro acionável de configuração.
+- Landing pública da Fase 1 refinada para mobile/desktop, usando símbolo oficial sem retângulo de imagem negativa no hero.
 - Sistema de temas completo: Paper, Sakura, Obsidian, Midnight, Aurora e Rose Gold.
 - Modo `system`, prepaint script antes do render, persistência em `localStorage` e sincronização em `/users/{uid}`.
 - Tela `Configurações -> Aparência` em `/app/settings/appearance`.
@@ -93,6 +95,8 @@ docs/MANUAL_SETUP_REQUIRED.md
 | `npm run test:rules` | passou | 2 arquivos, 6 testes em Firestore/Storage emulators. Java JetBrains JBR foi usado no PATH local. |
 | `npm run test:e2e` | passou | 1 teste Playwright; Chromium instalado com `npx playwright install chromium`. |
 | `npm run build` em `functions/` | passou | `tsc` das Functions. |
+| `@chrome` em `https://zerou-five.vercel.app/` | falhou antes do ajuste | Console mostrou `FirebaseError: auth/invalid-api-key`, deixando `#root` vazio. |
+| Chrome/local em `http://127.0.0.1:4175/` | passou | Landing nova renderizada sem erros no cadastro local. |
 
 ## Pendências manuais externas
 
@@ -113,6 +117,8 @@ docs/MANUAL_SETUP_REQUIRED.md
 - O dashboard está vazio por decisão de escopo; não há motor financeiro nem dados financeiros persistidos.
 - A primeira conta opcional do onboarding ficou apenas sinalizada para a Fase 2 para não antecipar o motor financeiro.
 - Rotas públicas de pricing, legal, ajuda e afins são placeholders; landing completa pertence à Fase 6.
+- O deploy Vercel ainda depende de variáveis reais `VITE_FIREBASE_*` e domínio autorizado no Firebase Auth para Google funcionar em produção.
+- As callable Functions `ensureUserProfile` e `ensurePersonalWorkspace` precisam estar implantadas no Firebase real para o onboarding concluir fora dos emuladores.
 - O build mostra aviso de chunk inicial > 500 kB por causa do bundle com SDKs; otimizar com code splitting depois.
 - `npm audit` reportou vulnerabilidades moderadas transitivas em dependências de ferramentas; não foi aplicado `audit fix --force`.
 ```

@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { z } from 'zod';
 import { AuthLayout } from '../components/AuthLayout';
 import { FormMessage } from '../components/FormMessage';
+import { useAuth } from '../auth/AuthContext';
 import { getAuthErrorMessage } from '../auth/authErrors';
 import { sendResetEmail } from '../auth/authService';
 
@@ -16,6 +17,7 @@ type ResetForm = z.infer<typeof resetSchema>;
 
 export function ForgotPasswordPage() {
   const [message, setMessage] = useState<string | null>(null);
+  const { firebaseError } = useAuth();
   const [success, setSuccess] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const form = useForm<ResetForm>({
@@ -45,6 +47,7 @@ export function ForgotPasswordPage() {
       description="Informe o email usado na Zerou para receber o link de redefinição."
     >
       <form className="form-stack" onSubmit={form.handleSubmit(onSubmit)}>
+        <FormMessage>{firebaseError}</FormMessage>
         <FormMessage>{message}</FormMessage>
         <FormMessage type="success">{success}</FormMessage>
         <div className="field">
@@ -52,7 +55,7 @@ export function ForgotPasswordPage() {
           <input className="input" id="email" type="email" autoComplete="email" {...form.register('email')} />
           <span className="text-muted">{form.formState.errors.email?.message}</span>
         </div>
-        <button className="button button--primary" type="submit" disabled={busy}>
+        <button className="button button--primary" type="submit" disabled={busy || Boolean(firebaseError)}>
           Enviar link
         </button>
         <Link className="inline-link" to="/login">

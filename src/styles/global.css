@@ -94,6 +94,36 @@ html[data-reduce-motion='true'] *::after {
   width: 2.375rem;
 }
 
+.brand-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8rem;
+  color: var(--text-primary);
+}
+
+.brand-lockup img {
+  width: 2.65rem;
+  height: 2.65rem;
+  object-fit: contain;
+}
+
+.brand-lockup strong,
+.brand-lockup span {
+  display: block;
+}
+
+.brand-lockup strong {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.brand-lockup span {
+  margin-top: 0.18rem;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.25;
+}
+
 .brand-logo-light,
 .brand-logo-dark {
   display: block;
@@ -123,6 +153,145 @@ html[data-reduce-motion='true'] *::after {
   grid-template-columns: minmax(0, 1fr);
   place-items: center;
   padding: 2rem;
+}
+
+.marketing-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 12% 8%, var(--action-primary-soft), transparent 22rem),
+    radial-gradient(circle at 88% 22%, var(--info-soft), transparent 26rem),
+    var(--bg-page);
+}
+
+.marketing-hero {
+  display: grid;
+  min-height: 100svh;
+  align-content: center;
+  gap: clamp(2rem, 5vw, 4rem);
+  width: min(100% - 2rem, 76rem);
+  margin: 0 auto;
+  padding: 1.25rem 0 2rem;
+}
+
+.marketing-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.marketing-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(18rem, 0.72fr);
+  gap: clamp(2rem, 6vw, 5rem);
+  align-items: center;
+}
+
+.marketing-copy .headline {
+  max-width: 12ch;
+  font-size: clamp(3rem, 7vw, 5.9rem);
+  letter-spacing: -0.04em;
+}
+
+.marketing-copy .subtitle {
+  max-width: 38rem;
+  font-size: clamp(1.05rem, 2vw, 1.35rem);
+}
+
+.marketing-actions {
+  margin-top: 1.65rem;
+}
+
+.marketing-proof {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 1.5rem;
+  color: var(--text-secondary);
+}
+
+.marketing-proof span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--bg-surface);
+  padding: 0.55rem 0.75rem;
+  box-shadow: var(--shadow-xs);
+}
+
+.marketing-proof svg {
+  color: var(--success);
+}
+
+.app-preview {
+  display: grid;
+  gap: 1.25rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 1.4rem;
+  background:
+    linear-gradient(160deg, var(--bg-surface), var(--bg-surface-subtle)),
+    var(--bg-surface);
+  padding: clamp(1rem, 3vw, 1.5rem);
+  box-shadow: var(--shadow-md);
+}
+
+.app-preview-top {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.app-preview-top strong {
+  display: block;
+  font-size: clamp(1.35rem, 2.5vw, 2rem);
+  line-height: 1.05;
+}
+
+.app-preview-list {
+  display: grid;
+  gap: 0.7rem;
+  padding: 1rem 0;
+}
+
+.app-preview-list span {
+  height: 0.85rem;
+  border-radius: 999px;
+  background: var(--bg-surface-muted);
+}
+
+.app-preview-list span:nth-child(1) {
+  width: 82%;
+}
+
+.app-preview-list span:nth-child(2) {
+  width: 58%;
+}
+
+.app-preview-list span:nth-child(3) {
+  width: 70%;
+}
+
+.app-preview-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 1rem;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  padding: 1rem;
+  line-height: 1.5;
+}
+
+.app-preview-card svg {
+  color: var(--action-primary);
+  flex: 0 0 auto;
+}
+
+.app-preview-card p {
+  margin: 0;
 }
 
 .public-shell {
@@ -566,6 +735,34 @@ html[data-reduce-motion='true'] *::after {
 }
 
 @media (max-width: 900px) {
+  .marketing-hero {
+    width: min(100% - 1.25rem, 42rem);
+    align-content: start;
+    padding-top: 1rem;
+  }
+
+  .marketing-nav .button {
+    display: none;
+  }
+
+  .marketing-hero-grid {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .marketing-copy .headline {
+    max-width: 11ch;
+    font-size: clamp(2.65rem, 13vw, 4.2rem);
+  }
+
+  .marketing-proof {
+    display: grid;
+  }
+
+  .app-preview {
+    border-radius: 1rem;
+  }
+
   .public-shell {
     grid-template-columns: 1fr;
   }

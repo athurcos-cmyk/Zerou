@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { auth, db } from '../firebase/config';
+import { FirebaseConfigurationError, getFirebaseAuth, getFirebaseDb, isFirebaseConfigured } from '../firebase/config';
 import { useAppearanceStore } from '../theme/appearance.store';
 import type { UserProfile } from '../types/contracts';
 
@@ -10,6 +10,7 @@ interface AuthContextValue {
   profile: UserProfile | null;
   loading: boolean;
   profileLoading: boolean;
+  firebaseError: string | null;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -19,19 +20,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [firebaseError, setFirebaseError] = useState<string | null>(null);
   const hydrateFromProfile = useAppearanceStore((state) => state.hydrateFromProfile);
 
   useEffect(() => {
-    return onAuthStateChanged(auth, (nextUser) => {
-      setUser(nextUser);
-      setProfile(null);
-      setProfileLoading(Boolean(nextUser));
+    if (!isFirebaseConfigured) {
+      setFirebaseError('Firebase não configurado neste deploy. Configure as variáveis VITE_FIREBASE_* na Vercel.');
       setLoading(false);
-    });
+      return undefined;
+    }
+
+    try {
+      return onAuthStateChanged(getFirebaseAuth(), (nextUser) => {
+        setUser(nextUser);
+        setProfile(null);
+        setProfileLoading(Boolean(nextUser));
+        setLoading(false);
+      });
+    } catch (error) {
+      setFirebaseError(
+        error instanceof FirebaseConfigurationError ? error.message : 'Não foi possível iniciar o Firebase Auth.'
+      );
+      setLoading(false);
+      return undefined;
+    }
   }, []);
 
   useEffect(() => {
-    if (!user) {
+    if (!user || firebaseError) {
       setProfile(null);
       setProfileLoading(false);
       return undefined;
@@ -39,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setProfileLoading(true);
     return onSnapshot(
-      doc(db, 'users', user.uid),
+      doc(getFirebaseDb(), 'users', user.uid),
       (snapshot) => {
         const nextProfile = snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() } as UserProfile) : null;
         setProfile(nextProfile);
@@ -60,11 +76,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfileLoading(false);
       }
     );
-  }, [hydrateFromProfile, user]);
+  }, [firebaseError, hydrateFromProfile, user]);
 
   const value = useMemo(
-    () => ({ user, profile, loading, profileLoading }),
-    [user, profile, loading, profileLoading]
+    () => ({ user, profile, loading, profileLoading, firebaseError }),
+    [user, profile, loading, profileLoading, firebaseError]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

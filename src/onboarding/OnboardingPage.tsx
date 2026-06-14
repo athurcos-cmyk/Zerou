@@ -20,7 +20,7 @@ type OnboardingForm = z.infer<typeof onboardingSchema>;
 
 export function OnboardingPage() {
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { firebaseError, user, profile } = useAuth();
   const preferences = useAppearanceStore((state) => state.preferences);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -70,6 +70,7 @@ export function OnboardingPage() {
       <div className="settings-grid">
         <form className="surface surface-pad form-stack" onSubmit={form.handleSubmit(onSubmit)}>
           <FormMessage>{message}</FormMessage>
+          <FormMessage>{firebaseError}</FormMessage>
           {pendingInvite ? (
             <p className="notice">
               Convite preservado: {pendingInvite}. O vínculo de espaço compartilhado será tratado na fase própria.
@@ -89,7 +90,7 @@ export function OnboardingPage() {
             <strong>Primeira conta opcional:</strong> preparada para a próxima fase, sem criar dados financeiros antes do
             motor oficial.
           </div>
-          <button className="button button--primary" type="submit" disabled={busy}>
+          <button className="button button--primary" type="submit" disabled={busy || Boolean(firebaseError)}>
             <CheckCircle2 size={18} aria-hidden="true" /> Criar fundação
           </button>
         </form>

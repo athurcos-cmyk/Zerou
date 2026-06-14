@@ -1,7 +1,15 @@
 export function getAuthErrorMessage(error: unknown) {
+  if (error instanceof Error && error.name === 'FirebaseConfigurationError') {
+    return error.message;
+  }
+
   const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : '';
 
   switch (code) {
+    case 'auth/invalid-api-key':
+      return 'A chave Firebase do deploy está inválida. Revise VITE_FIREBASE_API_KEY na Vercel.';
+    case 'auth/unauthorized-domain':
+      return 'Este domínio ainda não está autorizado no Firebase Auth. Adicione zerou-five.vercel.app em Authorized domains.';
     case 'auth/invalid-credential':
     case 'auth/wrong-password':
     case 'auth/user-not-found':
@@ -19,9 +27,9 @@ export function getAuthErrorMessage(error: unknown) {
     case 'functions/failed-precondition':
     case 'functions/invalid-argument':
     case 'functions/unauthenticated':
-      return typeof error === 'object' && error && 'message' in error
-        ? String(error.message)
-        : 'Não foi possível concluir esta etapa.';
+    case 'functions/not-found':
+    case 'functions/unavailable':
+      return 'A fundação Firebase ainda não está pronta neste ambiente. Verifique se as Functions foram implantadas e se as variáveis da Vercel estão corretas.';
     default:
       return 'Não foi possível concluir esta ação agora. Tente novamente.';
   }

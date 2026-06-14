@@ -1,15 +1,15 @@
 import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
-import { db } from '../firebase/config';
+import { getFirebaseDb, isFirebaseConfigured } from '../firebase/config';
 import type { AppearancePreferences } from '../theme/theme.types';
 
 export async function syncAppearanceForUser(user: User | null, preferences: AppearancePreferences) {
-  if (!user) {
+  if (!user || !isFirebaseConfigured) {
     return;
   }
 
   await setDoc(
-    doc(db, 'users', user.uid),
+    doc(getFirebaseDb(), 'users', user.uid),
     {
       themeMode: preferences.themeMode,
       themeId: preferences.themeId,

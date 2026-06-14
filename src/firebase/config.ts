@@ -19,6 +19,13 @@ interface FirebaseServices {
   storage: FirebaseStorage;
 }
 
+export class FirebaseConfigurationError extends Error {
+  constructor(message = 'Firebase não configurado para este ambiente.') {
+    super(message);
+    this.name = 'FirebaseConfigurationError';
+  }
+}
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -30,34 +37,71 @@ const firebaseConfig = {
 };
 
 function hasMinimumFirebaseConfig() {
-  return Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId && firebaseConfig.appId);
+  const requiredValues = [
+    firebaseConfig.apiKey,
+    firebaseConfig.authDomain,
+    firebaseConfig.projectId,
+    firebaseConfig.storageBucket,
+    firebaseConfig.messagingSenderId,
+    firebaseConfig.appId
+  ];
+
+  return requiredValues.every((value) => typeof value === 'string' && value.trim().length > 0);
 }
 
 function shouldUseEmulators() {
   return import.meta.env.DEV && import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true';
 }
 
-const app = initializeApp(firebaseConfig);
+let firebaseServices: FirebaseServices | null = null;
 
-let dbInstance: Firestore;
+export const isFirebaseConfigured = hasMinimumFirebaseConfig();
 
-try {
-  dbInstance = initializeFirestore(app, {
-    localCache: persistentLocalCache({
-      tabManager: persistentMultipleTabManager()
-    })
-  });
-} catch {
-  dbInstance = getFirestore(app);
+export function getFirebaseServices() {
+  if (!isFirebaseConfigured) {
+    throw new FirebaseConfigurationError(
+      'Firebase não está configurado neste deploy. Confira as variáveis VITE_FIREBASE_* na Vercel.'
+    );
+  }
+
+  if (firebaseServices) {
+    return firebaseServices;
+  }
+
+  try {
+    const app = initializeApp(firebaseConfig);
+    let dbInstance: Firestore;
+
+    try {
+      dbInstance = initializeFirestore(app, {
+        localCache: persistentLocalCache({
+          tabManager: persistentMultipleTabManager()
+        })
+      });
+    } catch {
+      dbInstance = getFirestore(app);
+    }
+
+    firebaseServices = {
+      app,
+      auth: getAuth(app),
+      db: dbInstance,
+      functions: getFunctions(app, 'southamerica-east1'),
+      storage: getStorage(app)
+    };
+
+    return firebaseServices;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    const isInvalidApiKey = message.includes('invalid-api-key');
+
+    throw new FirebaseConfigurationError(
+      isInvalidApiKey
+        ? 'A chave Firebase do deploy está inválida. Revise VITE_FIREBASE_API_KEY na Vercel.'
+        : 'Não foi possível inicializar o Firebase neste ambiente.'
+    );
+  }
 }
-
-export const firebaseServices: FirebaseServices = {
-  app,
-  auth: getAuth(app),
-  db: dbInstance,
-  functions: getFunctions(app, 'southamerica-east1'),
-  storage: getStorage(app)
-};
 
 let emulatorsConnected = false;
 
@@ -66,10 +110,11 @@ export function connectFirebaseEmulators() {
     return;
   }
 
-  connectAuthEmulator(firebaseServices.auth, 'http://127.0.0.1:9099', { disableWarnings: true });
-  connectFirestoreEmulator(firebaseServices.db, '127.0.0.1', 8080);
-  connectFunctionsEmulator(firebaseServices.functions, '127.0.0.1', 5001);
-  connectStorageEmulator(firebaseServices.storage, '127.0.0.1', 9199);
+  const services = getFirebaseServices();
+  connectAuthEmulator(services.auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+  connectFirestoreEmulator(services.db, '127.0.0.1', 8080);
+  connectFunctionsEmulator(services.functions, '127.0.0.1', 5001);
+  connectStorageEmulator(services.storage, '127.0.0.1', 9199);
   emulatorsConnected = true;
 }
 
@@ -81,15 +126,25 @@ export async function initializeOptionalAnalytics() {
   try {
     const { getAnalytics, isSupported } = await import('firebase/analytics');
     if (await isSupported()) {
-      getAnalytics(app);
+      getAnalytics(getFirebaseServices().app);
     }
   } catch {
     // Analytics is optional in this phase and must not break local dev or build.
   }
 }
 
-export const auth = firebaseServices.auth;
-export const db = firebaseServices.db;
-export const functions = firebaseServices.functions;
-export const storage = firebaseServices.storage;
-export const isFirebaseConfigured = hasMinimumFirebaseConfig();
+export function getFirebaseAuth() {
+  return getFirebaseServices().auth;
+}
+
+export function getFirebaseDb() {
+  return getFirebaseServices().db;
+}
+
+export function getFirebaseFunctions() {
+  return getFirebaseServices().functions;
+}
+
+export function getFirebaseStorage() {
+  return getFirebaseServices().storage;
+}

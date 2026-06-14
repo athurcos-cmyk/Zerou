@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { BrandLogo } from './BrandLogo';
+import { BrandLockup } from './BrandLogo';
 
 interface AuthLayoutProps {
   eyebrow: string;
@@ -16,7 +16,7 @@ export function AuthLayout({ eyebrow, title, description, children }: AuthLayout
         <aside className="public-panel public-panel--hero">
           <div>
             <Link to="/" aria-label="Ir para início">
-              <BrandLogo />
+              <BrandLockup />
             </Link>
             <p className="eyebrow">{eyebrow}</p>
             <h1 className="headline">{title}</h1>

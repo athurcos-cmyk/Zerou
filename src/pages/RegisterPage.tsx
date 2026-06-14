@@ -6,6 +6,7 @@ import { CircleUserRound } from 'lucide-react';
 import { z } from 'zod';
 import { AuthLayout } from '../components/AuthLayout';
 import { FormMessage } from '../components/FormMessage';
+import { useAuth } from '../auth/AuthContext';
 import { getAuthErrorMessage } from '../auth/authErrors';
 import { loginWithGoogle, registerWithEmail } from '../auth/authService';
 
@@ -21,6 +22,7 @@ type RegisterForm = z.infer<typeof registerSchema>;
 
 export function RegisterPage() {
   const navigate = useNavigate();
+  const { firebaseError } = useAuth();
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const form = useForm<RegisterForm>({
@@ -63,6 +65,7 @@ export function RegisterPage() {
       description="A Zerou separa o que é individual do que pode ser compartilhado depois."
     >
       <form className="form-stack" onSubmit={form.handleSubmit(onSubmit)}>
+        <FormMessage>{firebaseError}</FormMessage>
         <FormMessage>{message}</FormMessage>
         <div className="field">
           <label htmlFor="name">Nome</label>
@@ -90,10 +93,10 @@ export function RegisterPage() {
           <span>Li e aceito os termos da Zerou para criar meu perfil e workspace pessoal.</span>
         </label>
         <span className="text-muted">{form.formState.errors.terms?.message}</span>
-        <button className="button button--primary" type="submit" disabled={busy}>
+        <button className="button button--primary" type="submit" disabled={busy || Boolean(firebaseError)}>
           Criar conta Zerou
         </button>
-        <button className="button button--secondary" type="button" onClick={onGoogle} disabled={busy}>
+        <button className="button button--secondary" type="button" onClick={onGoogle} disabled={busy || Boolean(firebaseError)}>
           <CircleUserRound size={18} aria-hidden="true" /> Continuar com Google
         </button>
         <p className="text-secondary">

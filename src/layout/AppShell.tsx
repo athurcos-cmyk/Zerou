@@ -1,6 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { Home, LogOut, Palette, Plus, ReceiptText, Shield, WalletCards } from 'lucide-react';
-import { BrandLogo } from '../components/BrandLogo';
+import { BrandLockup, BrandLogo } from '../components/BrandLogo';
 import { logout } from '../auth/authService';
 import { useAuth } from '../auth/AuthContext';
 
@@ -14,7 +14,7 @@ export function AppShell() {
   return (
     <div className="app-layout">
       <aside className="sidebar" aria-label="Navegação principal">
-        <BrandLogo />
+        <BrandLockup />
         <nav className="sidebar-nav">
           <NavLink className={getNavClass} to="/app" end>
             <Home size={19} aria-hidden="true" /> Início

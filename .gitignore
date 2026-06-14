@@ -35,6 +35,7 @@ Thumbs.db
 .vscode/
 .idea/
 Novo Documento de Texto.txt
+.codex-remote-attachments/
 
 # Test / coverage
 coverage/

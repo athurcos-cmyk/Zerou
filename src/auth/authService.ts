@@ -14,12 +14,13 @@ import {
   updateProfile,
   type User
 } from 'firebase/auth';
-import { auth } from '../firebase/config';
+import { getFirebaseAuth } from '../firebase/config';
 
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 export async function registerWithEmail(name: string, email: string, password: string) {
+  const auth = getFirebaseAuth();
   const credential = await createUserWithEmailAndPassword(auth, email, password);
   await updateProfile(credential.user, { displayName: name });
   await sendEmailVerification(credential.user);
@@ -27,21 +28,23 @@ export async function registerWithEmail(name: string, email: string, password: s
 }
 
 export async function loginWithEmail(email: string, password: string) {
+  const auth = getFirebaseAuth();
   const credential = await signInWithEmailAndPassword(auth, email, password);
   return credential.user;
 }
 
 export async function loginWithGoogle() {
+  const auth = getFirebaseAuth();
   const credential = await signInWithPopup(auth, googleProvider);
   return credential.user;
 }
 
 export async function sendResetEmail(email: string) {
-  await sendPasswordResetEmail(auth, email);
+  await sendPasswordResetEmail(getFirebaseAuth(), email);
 }
 
 export async function logout() {
-  await signOut(auth);
+  await signOut(getFirebaseAuth());
 }
 
 export async function sendVerification(user: User) {

@@ -30,3 +30,15 @@ export function BrandLogo({ compact = false }: BrandLogoProps) {
     </>
   );
 }
+
+export function BrandLockup() {
+  return (
+    <div className="brand-lockup" aria-label="Zerou">
+      <img src="/brand/zerou-symbol.png" alt="" width="48" height="48" aria-hidden="true" />
+      <div>
+        <strong>Zerou</strong>
+        <span>Controle individual. Organização a dois.</span>
+      </div>
+    </div>
+  );
+}
