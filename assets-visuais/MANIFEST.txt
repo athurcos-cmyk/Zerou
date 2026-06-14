@@ -1,0 +1,10 @@
+Zerou Brand Assets
+==================
+
+Logo principal: 02-logo-primary/zerou-logo-principal-transparente.png
+Logo principal fundo claro: 02-logo-primary/zerou-logo-principal-fundo-claro.png
+Assinatura compacta: 03-logo-secondary/zerou-assinatura-horizontal-transparente.png
+Símbolo isolado: 04-symbol/zerou-simbolo-transparente.png
+App icon recomendado: 05-app-icons/zerou-app-icon-512x512.png
+Favicon: 06-favicons/favicon.ico
+Versão negativa: 07-negative/zerou-logo-versao-negativa-fundo-grafite.png
