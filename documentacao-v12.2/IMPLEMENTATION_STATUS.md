@@ -9,7 +9,7 @@ Fase atual: 1 implementada em modo Spark/free
 Ultima fase concluida: 1. Fundacao SaaS
 Ambiente validado: local com emuladores; Vercel publico sem erro de render
 Ultima atualizacao: 2026-06-14
-Gate da Fase 1: passou localmente; producao serve bundle Spark/free e aguarda validacao manual do onboarding com conta real
+Gate da Fase 1: passou localmente; producao serve bundle Spark/free e onboarding foi desbloqueado apos rules Spark. Auto-refresh PWA adicionado e aguardando deploy.
 ```
 
 ## Estado por fase
@@ -41,6 +41,9 @@ Gate da Fase 1: passou localmente; producao serve bundle Spark/free e aguarda va
 - Tela `Seguranca -> Metodos de login` em `/app/settings/security/login-methods`.
 - Assets oficiais copiados de `assets-visuais/` para `public/brand/`.
 - PWA basico com manifest, service worker gerado pelo Vite PWA Plugin e icones oficiais.
+- Auto-refresh de versao do PWA inspirado no app Plantao: `registerSW` imediato, checagem ao abrir/focar/voltar online/voltar de aba oculta e a cada 30 minutos.
+- Service worker configurado com `skipWaiting`, `clientsClaim` e limpeza de caches antigos.
+- Headers Vercel sem cache para `sw.js` e `workbox-*.js`, evitando que usuarios fiquem presos em versoes antigas.
 - Firestore Rules com isolamento por membership e bloqueio de campos protegidos.
 - Storage Rules inicialmente fechadas.
 - `.env.example`, `.firebaserc.example`, `firebase.json`, `firestore.rules`, `storage.rules`, indexes e docs locais.
@@ -66,6 +69,8 @@ storage.rules
 vercel.json
 public/brand/*
 src/main.tsx
+src/pwa/registerServiceWorker.ts
+src/vite-env.d.ts
 src/App.tsx
 src/firebase/config.ts
 src/auth/*
@@ -96,6 +101,12 @@ docs/MANUAL_SETUP_REQUIRED.md
 | `npx firebase-tools deploy --only firestore:rules,firestore:indexes --project zerou-26757` | passou | Firestore rules/indexes Spark publicados no projeto real. |
 | HTTP live `https://zerou-five.vercel.app/{/,login,register,forgot-password,app}` | passou | Todas as rotas responderam 200 com o bundle Spark/free `assets/index-BB2S_rbX.js`. |
 | Fix onboarding Spark apos erro `permission-denied` | passou localmente | Servico deixou de ler workspace/membership antes da criacao; agora usa leitura permitida de `/users/{uid}` e batch atomico. Bundle gerado: `assets/index-BqlIKcE_.js`. |
+| `npm run typecheck` apos auto-refresh PWA | passou | TypeScript strict validado. |
+| `npm run lint` apos auto-refresh PWA | passou | ESLint sem erros apos ajustar `registerServiceWorker`. |
+| `npm test` apos auto-refresh PWA | passou | 2 arquivos, 5 testes unitarios. |
+| `npm run build` apos auto-refresh PWA | passou | Bundle gerado: `assets/index-34_EQCq0.js`, `sw.js` e `workbox-9c191d2f.js`; aviso de chunk inicial > 500 kB permanece. |
+| `npm run test:e2e` apos auto-refresh PWA | passou | 1 teste Playwright da landing publica. |
+| `npm run test:rules` apos auto-refresh PWA | bloqueado por ambiente | Firebase CLI falhou antes dos emuladores: `java -version` saiu com codigo 3221226505; Java local/PATH precisa ser corrigido para reexecutar emuladores. Rules nao foram alteradas nesta mudanca. |
 
 ## Pendencias manuais externas
 
@@ -109,6 +120,7 @@ docs/MANUAL_SETUP_REQUIRED.md
 - [ ] Criar bucket Storage em Firebase Console -> Storage -> Get Started, quando a fase que usar Storage chegar.
 - [x] Fazer novo deploy Vercel com o bundle Spark/free deste commit.
 - [ ] Validar onboarding em producao ate cair no dashboard vazio.
+- [ ] Corrigir instalacao Java/PATH local para permitir `firebase emulators:exec` novamente.
 ```
 
 ## Limitacoes conhecidas
