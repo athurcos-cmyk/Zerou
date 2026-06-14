@@ -9,7 +9,7 @@ Fase atual: 1 implementada em modo Spark/free
 Ultima fase concluida: 1. Fundacao SaaS
 Ambiente validado: local com emuladores; Vercel publico sem erro de render
 Ultima atualizacao: 2026-06-14
-Gate da Fase 1: passou localmente; producao aguardando deploy do bundle Vercel com onboarding Firestore client-side
+Gate da Fase 1: passou localmente; producao serve bundle Spark/free e aguarda validacao manual do onboarding com conta real
 ```
 
 ## Estado por fase
@@ -94,6 +94,7 @@ docs/MANUAL_SETUP_REQUIRED.md
 | `npm run test:rules` | passou | 2 arquivos, 9 testes em Firestore/Storage emulators; cobre criacao Spark e bloqueios de fraude. |
 | `npm run test:e2e` | passou | 1 teste Playwright da landing publica. |
 | `npx firebase-tools deploy --only firestore:rules,firestore:indexes --project zerou-26757` | passou | Firestore rules/indexes Spark publicados no projeto real. |
+| HTTP live `https://zerou-five.vercel.app/{/,login,register,forgot-password,app}` | passou | Todas as rotas responderam 200 com o bundle Spark/free `assets/index-BB2S_rbX.js`. |
 
 ## Pendencias manuais externas
 
@@ -105,7 +106,7 @@ docs/MANUAL_SETUP_REQUIRED.md
 - [x] Configurar Vercel com as variaveis `VITE_FIREBASE_*`.
 - [x] Autorizar `zerou-five.vercel.app` em Firebase Auth -> Settings -> Authorized domains.
 - [ ] Criar bucket Storage em Firebase Console -> Storage -> Get Started, quando a fase que usar Storage chegar.
-- [ ] Fazer novo deploy Vercel com o bundle Spark/free deste commit. O push na `main` deve disparar a Vercel.
+- [x] Fazer novo deploy Vercel com o bundle Spark/free deste commit.
 - [ ] Validar onboarding em producao ate cair no dashboard vazio.
 ```
 
