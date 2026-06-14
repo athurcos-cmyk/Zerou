@@ -5,18 +5,18 @@
 ## Resumo
 
 ```text
-Fase atual: 1 concluída
-Última fase concluída: 1. Fundação SaaS
-Ambiente validado: local com emuladores
+Fase atual: 1 implementada; produção aguardando deploy das Functions
+Última fase concluída: 1. Fundação SaaS em ambiente local/emuladores
+Ambiente validado: local com emuladores; Vercel público sem erro de render
 Última atualização: 2026-06-14
-Gate da Fase 1: passou
+Gate da Fase 1: passou localmente; produção bloqueada por callable Functions 404
 ```
 
 ## Estado por fase
 
 | Fase | Status | Gate | Observações |
 |---|---|---|---|
-| 1. Fundação SaaS | completed | login + workspace pessoal isolado + seis temas persistidos por usuário | Fundação React/Firebase/PWA entregue. Rules testadas em emuladores. |
+| 1. Fundação SaaS | implemented / deploy blocked | local passou; produção pendente Functions | Fundação React/Firebase/PWA entregue. Rules testadas em emuladores. Onboarding em produção depende do deploy das callable Functions. |
 | 2. Motor financeiro essencial | pending | transação offline sincroniza sem duplicar | Não iniciar antes do prompt da Fase 2. |
 | 3. Cartões e faturas | pending | ledger parcial e dupla contagem testados | Não iniciado. |
 | 4. Espaço compartilhado | pending | casal sem vazamento pessoal | Convite pendente só é preservado localmente. |
@@ -101,6 +101,7 @@ docs/MANUAL_SETUP_REQUIRED.md
 | Playwright live em `https://zerou-five.vercel.app/register` | falhou antes do ajuste | Vercel retornava 404 por falta de rewrite SPA. Corrigido com `vercel.json`. |
 | Playwright live no botão Google | passou após configuração externa | O dono do projeto autorizou `zerou-five.vercel.app` em Firebase Auth -> Settings -> Authorized domains e confirmou login Google funcionando. |
 | Chrome live em `https://zerou-five.vercel.app/` após autorização do domínio | passou | Landing, `/login`, `/register`, `/forgot-password` e redirect protegido de `/app` carregaram com bundle novo e sem erros de console em aba limpa. |
+| POST anônimo nos endpoints `ensureUserProfile` e `ensurePersonalWorkspace` em `southamerica-east1` | falhou produção | Ambos retornaram 404, indicando que as callable Functions ainda não estão implantadas no Firebase real. |
 
 ## Pendências manuais externas
 
@@ -108,11 +109,13 @@ docs/MANUAL_SETUP_REQUIRED.md
 - [ ] Criar projeto Firebase Dev real.
 - [ ] Habilitar Email/Senha e Google no Firebase Auth.
 - [ ] Criar Firestore Native Mode e Storage bucket.
-- [ ] Preencher `.env.local` com as chaves reais do app web Firebase.
+- [x] Preencher `.env.local` com as chaves reais do app web Firebase.
 - [ ] Configurar `.firebaserc` real a partir de `.firebaserc.example`.
 - [ ] Instalar Java no PATH padrão da máquina; o PATH atual tinha Oracle Java quebrando `java -version`, mas o JBR do PyCharm funcionou.
 - [ ] Autenticar Firebase CLI se for usar recursos cloud fora dos emuladores.
 - [ ] Configurar Vercel com as variáveis `VITE_FIREBASE_*`.
+- [x] Autorizar `zerou-five.vercel.app` em Firebase Auth -> Settings -> Authorized domains.
+- [ ] Fazer deploy das Functions `ensureUserProfile` e `ensurePersonalWorkspace` no Firebase real.
 ```
 
 ## Limitações conhecidas
@@ -122,7 +125,7 @@ docs/MANUAL_SETUP_REQUIRED.md
 - A primeira conta opcional do onboarding ficou apenas sinalizada para a Fase 2 para não antecipar o motor financeiro.
 - Rotas públicas de pricing, legal, ajuda e afins são placeholders; landing completa pertence à Fase 6.
 - O deploy Vercel ainda depende das variáveis reais `VITE_FIREBASE_*`; o domínio `zerou-five.vercel.app` já foi autorizado no Firebase Auth para Google em produção.
-- As callable Functions `ensureUserProfile` e `ensurePersonalWorkspace` precisam estar implantadas no Firebase real para o onboarding concluir fora dos emuladores.
+- As callable Functions `ensureUserProfile` e `ensurePersonalWorkspace` ainda retornam 404 no Firebase real; precisam ser implantadas para o onboarding concluir fora dos emuladores.
 - O build mostra aviso de chunk inicial > 500 kB por causa do bundle com SDKs; otimizar com code splitting depois.
 - `npm audit` reportou vulnerabilidades moderadas transitivas em dependências de ferramentas; não foi aplicado `audit fix --force`.
 ```
@@ -148,7 +151,7 @@ docs/MANUAL_SETUP_REQUIRED.md
 
 ```text
 Prompt a executar: documentacao-v12.2/prompts/02-MOTOR-FINANCEIRO-ESSENCIAL.md
-Pré-condições: Firebase Dev real configurado, Auth providers habilitados, `.env.local` preenchido.
+Pré-condições: Firebase Dev real configurado, Auth providers habilitados, `.env.local` preenchido, Functions implantadas e onboarding validado no deploy público.
 Arquivos que o próximo agente deve ler: README-START-HERE.md, documentacao-v12.2/README.md, ZEROU-V12.2-ESPECIFICACAO-MESTRA.md, CONTRATOS-CANONICOS.md, THEME-SYSTEM.md, BRAND-GUIDELINES.md, BRAND-ASSET-INTEGRATION.md, PRODUCT-COPY-CANONICAL.md, IMPLEMENTATION_STATUS.md e o prompt da Fase 2.
 ```
 
