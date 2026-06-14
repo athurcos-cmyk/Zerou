@@ -99,7 +99,8 @@ docs/MANUAL_SETUP_REQUIRED.md
 | `@chrome` em `https://zerou-five.vercel.app/` | falhou antes do ajuste | Console mostrou `FirebaseError: auth/invalid-api-key`, deixando `#root` vazio. |
 | Chrome/local em `http://127.0.0.1:4175/` | passou | Landing nova renderizada sem erros no cadastro local. |
 | Playwright live em `https://zerou-five.vercel.app/register` | falhou antes do ajuste | Vercel retornava 404 por falta de rewrite SPA. Corrigido com `vercel.json`. |
-| Playwright live no botão Google | bloqueado por configuração externa | Firebase retornou `auth/unauthorized-domain`; adicionar `zerou-five.vercel.app` em Firebase Auth -> Settings -> Authorized domains. |
+| Playwright live no botão Google | passou após configuração externa | O dono do projeto autorizou `zerou-five.vercel.app` em Firebase Auth -> Settings -> Authorized domains e confirmou login Google funcionando. |
+| Chrome live em `https://zerou-five.vercel.app/` após autorização do domínio | passou | Landing, `/login`, `/register`, `/forgot-password` e redirect protegido de `/app` carregaram com bundle novo e sem erros de console em aba limpa. |
 
 ## Pendências manuais externas
 
@@ -120,7 +121,7 @@ docs/MANUAL_SETUP_REQUIRED.md
 - O dashboard está vazio por decisão de escopo; não há motor financeiro nem dados financeiros persistidos.
 - A primeira conta opcional do onboarding ficou apenas sinalizada para a Fase 2 para não antecipar o motor financeiro.
 - Rotas públicas de pricing, legal, ajuda e afins são placeholders; landing completa pertence à Fase 6.
-- O deploy Vercel ainda depende de variáveis reais `VITE_FIREBASE_*` e domínio autorizado no Firebase Auth para Google funcionar em produção.
+- O deploy Vercel ainda depende das variáveis reais `VITE_FIREBASE_*`; o domínio `zerou-five.vercel.app` já foi autorizado no Firebase Auth para Google em produção.
 - As callable Functions `ensureUserProfile` e `ensurePersonalWorkspace` precisam estar implantadas no Firebase real para o onboarding concluir fora dos emuladores.
 - O build mostra aviso de chunk inicial > 500 kB por causa do bundle com SDKs; otimizar com code splitting depois.
 - `npm audit` reportou vulnerabilidades moderadas transitivas em dependências de ferramentas; não foi aplicado `audit fix --force`.
