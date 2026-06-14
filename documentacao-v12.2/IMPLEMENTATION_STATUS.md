@@ -9,7 +9,7 @@ Fase atual: 1 implementada em modo Spark/free
 Ultima fase concluida: 1. Fundacao SaaS
 Ambiente validado: local com emuladores; Vercel publico sem erro de render
 Ultima atualizacao: 2026-06-14
-Gate da Fase 1: passou localmente; producao serve bundle Spark/free e onboarding foi desbloqueado apos rules Spark. Auto-refresh PWA adicionado e aguardando deploy.
+Gate da Fase 1: passou localmente; producao serve bundle Spark/free, onboarding foi desbloqueado apos rules Spark e auto-refresh PWA esta publicado.
 ```
 
 ## Estado por fase
@@ -107,6 +107,7 @@ docs/MANUAL_SETUP_REQUIRED.md
 | `npm run build` apos auto-refresh PWA | passou | Bundle gerado: `assets/index-34_EQCq0.js`, `sw.js` e `workbox-9c191d2f.js`; aviso de chunk inicial > 500 kB permanece. |
 | `npm run test:e2e` apos auto-refresh PWA | passou | 1 teste Playwright da landing publica. |
 | `npm run test:rules` apos auto-refresh PWA | bloqueado por ambiente | Firebase CLI falhou antes dos emuladores: `java -version` saiu com codigo 3221226505; Java local/PATH precisa ser corrigido para reexecutar emuladores. Rules nao foram alteradas nesta mudanca. |
+| HTTP live `https://zerou-five.vercel.app` apos auto-refresh PWA | passou | HTML publico serve `assets/index-34_EQCq0.js`; `sw.js` responde 200 com `Cache-Control: no-cache, no-store, must-revalidate`, `skipWaiting` e `clientsClaim`. |
 
 ## Pendencias manuais externas
 
