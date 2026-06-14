@@ -1,0 +1,86 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function validThemeFields() {
+      return request.resource.data.themeMode in ['manual', 'system']
+        && request.resource.data.themeId in ['paper', 'sakura', 'obsidian', 'midnight', 'aurora', 'rose-gold']
+        && request.resource.data.density in ['comfortable', 'compact']
+        && request.resource.data.fontScale in ['sm', 'md', 'lg']
+        && request.resource.data.reduceMotion is bool;
+    }
+
+    function onlyAppearanceChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'themeMode',
+        'themeId',
+        'density',
+        'fontScale',
+        'reduceMotion',
+        'updatedAt'
+      ]);
+    }
+
+    function memberDoc(workspaceId) {
+      return /databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid);
+    }
+
+    function isActiveMember(workspaceId) {
+      return signedIn()
+        && exists(memberDoc(workspaceId))
+        && get(memberDoc(workspaceId)).data.status == 'active';
+    }
+
+    match /users/{uid} {
+      allow read: if isSelf(uid);
+      allow create: if false;
+      allow update: if isSelf(uid) && onlyAppearanceChanged() && validThemeFields();
+      allow delete: if false;
+
+      match /workspaceRefs/{workspaceId} {
+        allow read: if isSelf(uid);
+        allow write: if false;
+      }
+    }
+
+    match /workspaces/{workspaceId} {
+      allow read: if isActiveMember(workspaceId);
+      allow create, update, delete: if false;
+
+      match /members/{uid} {
+        allow read: if isActiveMember(workspaceId);
+        allow write: if false;
+      }
+
+      match /{document=**} {
+        allow read: if isActiveMember(workspaceId);
+        allow write: if false;
+      }
+    }
+
+    match /coupleInvites/{inviteId} {
+      allow read, write: if false;
+    }
+
+    match /billingAccounts/{billingAccountId}/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /planCatalog/{planId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /privacyRequests/{requestId} {
+      allow read, write: if false;
+    }
+  }
+}

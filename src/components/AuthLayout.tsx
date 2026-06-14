@@ -1,0 +1,34 @@
+import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+import { BrandLogo } from './BrandLogo';
+
+interface AuthLayoutProps {
+  eyebrow: string;
+  title: string;
+  description: string;
+  children: ReactNode;
+}
+
+export function AuthLayout({ eyebrow, title, description, children }: AuthLayoutProps) {
+  return (
+    <main className="public-page">
+      <section className="public-shell" aria-label="Acesso Zerou">
+        <aside className="public-panel public-panel--hero">
+          <div>
+            <Link to="/" aria-label="Ir para início">
+              <BrandLogo />
+            </Link>
+            <p className="eyebrow">{eyebrow}</p>
+            <h1 className="headline">{title}</h1>
+            <p className="subtitle">{description}</p>
+          </div>
+          <p className="notice">
+            Controle individual. Organização a dois. Seu espaço pessoal nasce privado; o que for compartilhado fica
+            claro quando chegar a hora.
+          </p>
+        </aside>
+        <div className="form-card">{children}</div>
+      </section>
+    </main>
+  );
+}
