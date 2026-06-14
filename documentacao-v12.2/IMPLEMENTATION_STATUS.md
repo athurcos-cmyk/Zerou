@@ -34,6 +34,7 @@ Gate da Fase 1: passou
 - App shell autenticado com sidebar desktop, bottom navigation mobile e dashboard vazio pós-login.
 - Ajuste pós-QA do deploy: Firebase agora inicializa de forma lazy, a landing não quebra quando `VITE_FIREBASE_*` está ausente/inválido e as telas de auth exibem erro acionável de configuração.
 - Landing pública da Fase 1 refinada para mobile/desktop, usando símbolo oficial sem retângulo de imagem negativa no hero.
+- `vercel.json` adicionado para fallback SPA em rotas como `/register`, `/login` e `/app/onboarding`.
 - Sistema de temas completo: Paper, Sakura, Obsidian, Midnight, Aurora e Rose Gold.
 - Modo `system`, prepaint script antes do render, persistência em `localStorage` e sincronização em `/users/{uid}`.
 - Tela `Configurações -> Aparência` em `/app/settings/appearance`.
@@ -97,6 +98,7 @@ docs/MANUAL_SETUP_REQUIRED.md
 | `npm run build` em `functions/` | passou | `tsc` das Functions. |
 | `@chrome` em `https://zerou-five.vercel.app/` | falhou antes do ajuste | Console mostrou `FirebaseError: auth/invalid-api-key`, deixando `#root` vazio. |
 | Chrome/local em `http://127.0.0.1:4175/` | passou | Landing nova renderizada sem erros no cadastro local. |
+| Playwright live em `https://zerou-five.vercel.app/register` | falhou antes do ajuste | Vercel retornava 404 por falta de rewrite SPA. Corrigido com `vercel.json`. |
 
 ## Pendências manuais externas
 
