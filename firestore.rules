@@ -10,6 +10,30 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
+    function personalWorkspaceId(uid) {
+      return 'personal_' + uid;
+    }
+
+    function userDoc(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    function workspaceDoc(workspaceId) {
+      return /databases/$(database)/documents/workspaces/$(workspaceId);
+    }
+
+    function memberDoc(workspaceId, uid) {
+      return /databases/$(database)/documents/workspaces/$(workspaceId)/members/$(uid);
+    }
+
+    function workspaceRefDoc(uid, workspaceId) {
+      return /databases/$(database)/documents/users/$(uid)/workspaceRefs/$(workspaceId);
+    }
+
+    function currentMemberDoc(workspaceId) {
+      return memberDoc(workspaceId, request.auth.uid);
+    }
+
     function validThemeFields() {
       return request.resource.data.themeMode in ['manual', 'system']
         && request.resource.data.themeId in ['paper', 'sakura', 'obsidian', 'midnight', 'aurora', 'rose-gold']
@@ -29,35 +53,174 @@ service cloud.firestore {
       ]);
     }
 
-    function memberDoc(workspaceId) {
-      return /databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid);
+    function validUserFoundationCreate(uid) {
+      let workspaceId = personalWorkspaceId(uid);
+
+      return isSelf(uid)
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'name',
+          'email',
+          'avatarUrl',
+          'locale',
+          'timezone',
+          'termsAccepted',
+          'termsVersion',
+          'termsAcceptedAt',
+          'defaultWorkspaceId',
+          'themeMode',
+          'themeId',
+          'density',
+          'fontScale',
+          'reduceMotion',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'id',
+          'name',
+          'email',
+          'locale',
+          'timezone',
+          'termsAccepted',
+          'termsVersion',
+          'termsAcceptedAt',
+          'defaultWorkspaceId',
+          'themeMode',
+          'themeId',
+          'density',
+          'fontScale',
+          'reduceMotion',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.id == uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 80
+        && request.resource.data.email is string
+        && request.resource.data.email.size() <= 254
+        && (!request.resource.data.keys().hasAny(['avatarUrl']) || request.resource.data.avatarUrl is string)
+        && request.resource.data.locale == 'pt-BR'
+        && request.resource.data.timezone == 'America/Sao_Paulo'
+        && request.resource.data.termsAccepted == true
+        && request.resource.data.termsVersion == 'zerou-v12.2-foundation'
+        && request.resource.data.termsAcceptedAt == request.time
+        && request.resource.data.defaultWorkspaceId == workspaceId
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && validThemeFields()
+        && getAfter(workspaceDoc(workspaceId)).data.ownerUserId == uid
+        && getAfter(memberDoc(workspaceId, uid)).data.role == 'owner'
+        && getAfter(workspaceRefDoc(uid, workspaceId)).data.role == 'owner';
+    }
+
+    function validWorkspaceFoundationCreate(workspaceId) {
+      let uid = request.auth.uid;
+
+      return signedIn()
+        && workspaceId == personalWorkspaceId(uid)
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'type',
+          'name',
+          'ownerUserId',
+          'status',
+          'currency',
+          'locale',
+          'timezone',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.id == workspaceId
+        && request.resource.data.type == 'personal'
+        && request.resource.data.name == 'Meu espaco pessoal'
+        && request.resource.data.ownerUserId == uid
+        && request.resource.data.status == 'active'
+        && request.resource.data.currency == 'BRL'
+        && request.resource.data.locale == 'pt-BR'
+        && request.resource.data.timezone == 'America/Sao_Paulo'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && getAfter(userDoc(uid)).data.defaultWorkspaceId == workspaceId
+        && getAfter(memberDoc(workspaceId, uid)).data.userId == uid
+        && getAfter(workspaceRefDoc(uid, workspaceId)).data.workspaceId == workspaceId;
+    }
+
+    function validMemberFoundationCreate(workspaceId, uid) {
+      return isSelf(uid)
+        && workspaceId == personalWorkspaceId(uid)
+        && request.resource.data.keys().hasOnly([
+          'userId',
+          'workspaceId',
+          'role',
+          'status',
+          'joinedAt',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.userId == uid
+        && request.resource.data.workspaceId == workspaceId
+        && request.resource.data.role == 'owner'
+        && request.resource.data.status == 'active'
+        && request.resource.data.joinedAt == request.time
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && getAfter(userDoc(uid)).data.defaultWorkspaceId == workspaceId
+        && getAfter(workspaceDoc(workspaceId)).data.ownerUserId == uid
+        && getAfter(workspaceRefDoc(uid, workspaceId)).data.role == 'owner';
+    }
+
+    function validWorkspaceRefFoundationCreate(uid, workspaceId) {
+      return isSelf(uid)
+        && workspaceId == personalWorkspaceId(uid)
+        && request.resource.data.keys().hasOnly([
+          'workspaceId',
+          'type',
+          'role',
+          'status',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.workspaceId == workspaceId
+        && request.resource.data.type == 'personal'
+        && request.resource.data.role == 'owner'
+        && request.resource.data.status == 'active'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && getAfter(userDoc(uid)).data.defaultWorkspaceId == workspaceId
+        && getAfter(workspaceDoc(workspaceId)).data.ownerUserId == uid
+        && getAfter(memberDoc(workspaceId, uid)).data.role == 'owner';
     }
 
     function isActiveMember(workspaceId) {
       return signedIn()
-        && exists(memberDoc(workspaceId))
-        && get(memberDoc(workspaceId)).data.status == 'active';
+        && exists(currentMemberDoc(workspaceId))
+        && get(currentMemberDoc(workspaceId)).data.status == 'active';
     }
 
     match /users/{uid} {
       allow read: if isSelf(uid);
-      allow create: if false;
+      allow create: if validUserFoundationCreate(uid);
       allow update: if isSelf(uid) && onlyAppearanceChanged() && validThemeFields();
       allow delete: if false;
 
       match /workspaceRefs/{workspaceId} {
         allow read: if isSelf(uid);
-        allow write: if false;
+        allow create: if validWorkspaceRefFoundationCreate(uid, workspaceId);
+        allow update, delete: if false;
       }
     }
 
     match /workspaces/{workspaceId} {
       allow read: if isActiveMember(workspaceId);
-      allow create, update, delete: if false;
+      allow create: if validWorkspaceFoundationCreate(workspaceId);
+      allow update, delete: if false;
 
       match /members/{uid} {
         allow read: if isActiveMember(workspaceId);
-        allow write: if false;
+        allow create: if validMemberFoundationCreate(workspaceId, uid);
+        allow update, delete: if false;
       }
 
       match /{document=**} {

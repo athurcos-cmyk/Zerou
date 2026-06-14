@@ -2,13 +2,93 @@ import {
   assertFails,
   assertSucceeds,
   initializeTestEnvironment,
+  type RulesTestContext,
   type RulesTestEnvironment
 } from '@firebase/rules-unit-testing';
 import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 
 let testEnv: RulesTestEnvironment;
+type TestFirestore = ReturnType<RulesTestContext['firestore']>;
+
+function foundationPayload(uid: string) {
+  const workspaceId = `personal_${uid}`;
+  const now = serverTimestamp();
+
+  return {
+    workspaceId,
+    user: {
+      id: uid,
+      name: `${uid} Zerou`,
+      email: `${uid}@zerou.test`,
+      avatarUrl: '',
+      locale: 'pt-BR',
+      timezone: 'America/Sao_Paulo',
+      termsAccepted: true,
+      termsVersion: 'zerou-v12.2-foundation',
+      termsAcceptedAt: now,
+      defaultWorkspaceId: workspaceId,
+      themeMode: 'system',
+      themeId: 'paper',
+      density: 'comfortable',
+      fontScale: 'md',
+      reduceMotion: false,
+      createdAt: now,
+      updatedAt: now
+    },
+    workspace: {
+      id: workspaceId,
+      type: 'personal',
+      name: 'Meu espaco pessoal',
+      ownerUserId: uid,
+      status: 'active',
+      currency: 'BRL',
+      locale: 'pt-BR',
+      timezone: 'America/Sao_Paulo',
+      createdAt: now,
+      updatedAt: now
+    },
+    member: {
+      userId: uid,
+      workspaceId,
+      role: 'owner',
+      status: 'active',
+      joinedAt: now,
+      createdAt: now,
+      updatedAt: now
+    },
+    workspaceRef: {
+      workspaceId,
+      type: 'personal',
+      role: 'owner',
+      status: 'active',
+      createdAt: now,
+      updatedAt: now
+    }
+  };
+}
+
+function createFoundationBatch(db: TestFirestore, uid: string, overrides: Record<string, unknown> = {}) {
+  const payload = foundationPayload(uid);
+  const modularDb = db as unknown as Parameters<typeof writeBatch>[0];
+  const userOverrides = (overrides.user ?? {}) as Record<string, unknown>;
+  const workspaceOverrides = (overrides.workspace ?? {}) as Record<string, unknown>;
+  const memberOverrides = (overrides.member ?? {}) as Record<string, unknown>;
+  const workspaceRefOverrides = (overrides.workspaceRef ?? {}) as Record<string, unknown>;
+  const batch = writeBatch(modularDb);
+  batch.set(doc(modularDb, 'users', uid), { ...payload.user, ...userOverrides });
+  batch.set(doc(modularDb, 'workspaces', payload.workspaceId), { ...payload.workspace, ...workspaceOverrides });
+  batch.set(doc(modularDb, 'workspaces', payload.workspaceId, 'members', uid), {
+    ...payload.member,
+    ...memberOverrides
+  });
+  batch.set(doc(modularDb, 'users', uid, 'workspaceRefs', payload.workspaceId), {
+    ...payload.workspaceRef,
+    ...workspaceRefOverrides
+  });
+  return batch;
+}
 
 describe('firestore security rules', () => {
   beforeAll(async () => {
@@ -92,6 +172,33 @@ describe('firestore security rules', () => {
 
     await assertSucceeds(getDoc(doc(aliceDb, 'users/alice')));
     await assertSucceeds(getDoc(doc(aliceDb, 'workspaces/workspaceA')));
+  });
+
+  it('allows a signed-in user to create their own Spark foundation atomically', async () => {
+    const charlieDb = testEnv.authenticatedContext('charlie').firestore();
+
+    await assertSucceeds(createFoundationBatch(charlieDb, 'charlie').commit());
+    await assertSucceeds(getDoc(doc(charlieDb, 'users/charlie')));
+    await assertSucceeds(getDoc(doc(charlieDb, 'workspaces/personal_charlie')));
+  });
+
+  it('blocks forged Spark foundation owner and workspace references', async () => {
+    const charlieDb = testEnv.authenticatedContext('charlie').firestore();
+
+    await assertFails(
+      createFoundationBatch(charlieDb, 'charlie', {
+        user: { defaultWorkspaceId: 'personal_bob' },
+        workspace: { ownerUserId: 'bob' },
+        member: { role: 'partner' },
+        workspaceRef: { workspaceId: 'personal_bob' }
+      }).commit()
+    );
+  });
+
+  it('blocks creating foundation documents for another uid', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertFails(createFoundationBatch(aliceDb, 'mallory').commit());
   });
 
   it('blocks a user from reading another user workspace', async () => {

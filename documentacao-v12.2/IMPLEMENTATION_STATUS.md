@@ -1,49 +1,56 @@
 # Zerou - Implementation Status
 
-> Atualizar obrigatoriamente ao fim de cada fase. Este arquivo e o handoff entre execuções.
+> Atualizar obrigatoriamente ao fim de cada fase. Este arquivo e o handoff entre execucoes.
 
 ## Resumo
 
 ```text
-Fase atual: 1 implementada; produção aguardando plano Blaze e deploy das Functions
-Última fase concluída: 1. Fundação SaaS em ambiente local/emuladores
-Ambiente validado: local com emuladores; Vercel público sem erro de render
-Última atualização: 2026-06-14
-Gate da Fase 1: passou localmente; produção bloqueada por Firebase Functions sem Blaze
+Fase atual: 1 implementada em modo Spark/free
+Ultima fase concluida: 1. Fundacao SaaS
+Ambiente validado: local com emuladores; Vercel publico sem erro de render
+Ultima atualizacao: 2026-06-14
+Gate da Fase 1: passou localmente; producao aguardando deploy do bundle Vercel com onboarding Firestore client-side
 ```
 
 ## Estado por fase
 
-| Fase | Status | Gate | Observações |
+| Fase | Status | Gate | Observacoes |
 |---|---|---|---|
-| 1. Fundação SaaS | implemented / deploy blocked | local passou; produção pendente Blaze + Functions | Fundação React/Firebase/PWA entregue. Rules testadas em emuladores e Firestore rules publicadas. Onboarding em produção depende do deploy das callable Functions. |
-| 2. Motor financeiro essencial | pending | transação offline sincroniza sem duplicar | Não iniciar antes do prompt da Fase 2. |
-| 3. Cartões e faturas | pending | ledger parcial e dupla contagem testados | Não iniciado. |
-| 4. Espaço compartilhado | pending | casal sem vazamento pessoal | Convite pendente só é preservado localmente. |
-| 5. Billing Stripe custom | pending | webhook idempotente + entitlements | Não iniciado. |
-| 6. Lançamento | pending | landing, jurídico e QA | Rotas públicas reservadas com placeholder. |
+| 1. Fundacao SaaS | implemented / Spark mode | local passou; Firestore rules publicadas | Fundacao React/Firebase/PWA entregue. Cloud Functions removidas do caminho ativo para manter plano Spark/free. |
+| 2. Motor financeiro essencial | pending | transacao offline sincroniza sem duplicar | Nao iniciar antes do prompt da Fase 2. |
+| 3. Cartoes e faturas | pending | ledger parcial e dupla contagem testados | Nao iniciado. |
+| 4. Espaco compartilhado | pending | casal sem vazamento pessoal | Convite pendente so e preservado localmente. |
+| 5. Billing Stripe custom | pending | webhook idempotente + entitlements | Nao iniciado. |
+| 6. Lancamento | pending | landing, juridico e QA | Rotas publicas reservadas com placeholder. |
 
 ## O que foi implementado
 
-- Projeto React + TypeScript strict + Vite na raiz do repositório.
-- Firebase client-side via variáveis `VITE_`, com Analytics opcional e inicialização apenas no browser.
-- Auth preparado com email/senha, Google, reset de senha, verificação de email, logout e métodos vinculados.
-- Rotas públicas e autenticadas com React Router.
-- Onboarding básico com aceite versionado, criação de perfil e workspace pessoal por callable Functions.
-- Callable Functions v2 `ensureUserProfile` e `ensurePersonalWorkspace`, idempotentes e em `southamerica-east1`.
-- App shell autenticado com sidebar desktop, bottom navigation mobile e dashboard vazio pós-login.
-- Ajuste pós-QA do deploy: Firebase agora inicializa de forma lazy, a landing não quebra quando `VITE_FIREBASE_*` está ausente/inválido e as telas de auth exibem erro acionável de configuração.
-- Landing pública da Fase 1 refinada para mobile/desktop, usando símbolo oficial sem retângulo de imagem negativa no hero.
+- Projeto React + TypeScript strict + Vite na raiz do repositorio.
+- Firebase client-side via variaveis `VITE_`, com Analytics opcional e inicializacao apenas no browser.
+- Auth preparado com email/senha, Google, reset de senha, verificacao de email, logout e metodos vinculados.
+- Rotas publicas e autenticadas com React Router.
+- Onboarding basico com aceite versionado.
+- Fundacao Spark/free: perfil, workspace pessoal, membership owner e workspaceRef sao criados em transacao client-side no Firestore.
+- Security Rules permitem somente a criacao atomica da propria fundacao em `users/{uid}`, `workspaces/personal_{uid}`, `members/{uid}` e `workspaceRefs/personal_{uid}`.
+- App shell autenticado com sidebar desktop, bottom navigation mobile e dashboard vazio pos-login.
+- Landing publica da Fase 1 refinada para mobile/desktop, usando simbolo oficial sem retangulo de imagem negativa no hero.
 - `vercel.json` adicionado para fallback SPA em rotas como `/register`, `/login` e `/app/onboarding`.
 - Sistema de temas completo: Paper, Sakura, Obsidian, Midnight, Aurora e Rose Gold.
-- Modo `system`, prepaint script antes do render, persistência em `localStorage` e sincronização em `/users/{uid}`.
-- Tela `Configurações -> Aparência` em `/app/settings/appearance`.
-- Tela `Segurança -> Métodos de login` em `/app/settings/security/login-methods`.
+- Modo `system`, prepaint script antes do render, persistencia em `localStorage` e sincronizacao em `/users/{uid}` apos perfil existir.
+- Tela `Configuracoes -> Aparencia` em `/app/settings/appearance`.
+- Tela `Seguranca -> Metodos de login` em `/app/settings/security/login-methods`.
 - Assets oficiais copiados de `assets-visuais/` para `public/brand/`.
-- PWA básico com manifest, service worker gerado pelo Vite PWA Plugin e ícones oficiais.
+- PWA basico com manifest, service worker gerado pelo Vite PWA Plugin e icones oficiais.
 - Firestore Rules com isolamento por membership e bloqueio de campos protegidos.
 - Storage Rules inicialmente fechadas.
 - `.env.example`, `.firebaserc.example`, `firebase.json`, `firestore.rules`, `storage.rules`, indexes e docs locais.
+
+## Decisao Firestore vs Realtime Database
+
+| Data | Decisao | Motivo | Impacto |
+|---|---|---|---|
+| 2026-06-14 | Manter Zerou em Cloud Firestore. | O projeto `plantao` usa Realtime Database com bons resultados para arvores simples, sync de anotacoes e codigo de dono. Zerou tera consultas financeiras por periodo, categoria, conta, workspace, colaboracao e regras por documento; Firestore e mais adequado. | Fase 1 fica no plano Spark/free sem Cloud Functions, mas preserva modelagem documental para as proximas fases. |
+| 2026-06-14 | Remover Cloud Functions do caminho ativo da Fase 1. | Evitar exigencia de plano Blaze antes do produto precisar de backend pago. | Onboarding cria documentos pelo client, com Firestore Rules rigorosas validando IDs, owner, role e referencias cruzadas. |
 
 ## Arquivos principais criados ou alterados
 
@@ -53,16 +60,11 @@ README.md
 .gitignore
 .firebaserc.example
 package.json
-vite.config.ts
-tsconfig.json
-tailwind.config.ts
-postcss.config.js
 firebase.json
 firestore.rules
-firestore.indexes.json
 storage.rules
+vercel.json
 public/brand/*
-public/favicon.ico
 src/main.tsx
 src/App.tsx
 src/firebase/config.ts
@@ -72,13 +74,9 @@ src/onboarding/OnboardingPage.tsx
 src/pages/*
 src/settings/*
 src/styles/themes.css
-src/styles/global.css
 src/theme/*
 src/types/contracts.ts
 src/workspaces/workspaceService.ts
-functions/package.json
-functions/tsconfig.json
-functions/src/index.ts
 tests/firestore.rules.test.ts
 tests/storage.rules.test.ts
 tests/e2e/public.spec.ts
@@ -87,87 +85,63 @@ docs/MANUAL_SETUP_REQUIRED.md
 
 ## Testes executados
 
-| Comando | Resultado | Observação |
+| Comando | Resultado | Observacao |
 |---|---|---|
-| `npm run lint` | passou | ESLint sem erros. |
-| `npm run typecheck` | passou | TypeScript strict do app. |
-| `npm test` | passou | 2 arquivos, 5 testes unitários. |
+| `npm run lint` | passou | ESLint sem erros; `test-results` ignorado como pasta gerada. |
+| `npm run typecheck` | passou | TypeScript strict do app e testes. |
+| `npm test` | passou | 2 arquivos, 5 testes unitarios. |
 | `npm run build` | passou | Vite/PWA build gerado; aviso de chunk inicial > 500 kB. |
-| `npm run test:rules` | passou | 2 arquivos, 6 testes em Firestore/Storage emulators. Java JetBrains JBR foi usado no PATH local. |
-| `npm run test:e2e` | passou | 1 teste Playwright; Chromium instalado com `npx playwright install chromium`. |
-| `npm run build` em `functions/` | passou | `tsc` das Functions. |
-| `@chrome` em `https://zerou-five.vercel.app/` | falhou antes do ajuste | Console mostrou `FirebaseError: auth/invalid-api-key`, deixando `#root` vazio. |
-| Chrome/local em `http://127.0.0.1:4175/` | passou | Landing nova renderizada sem erros no cadastro local. |
-| Playwright live em `https://zerou-five.vercel.app/register` | falhou antes do ajuste | Vercel retornava 404 por falta de rewrite SPA. Corrigido com `vercel.json`. |
-| Playwright live no botão Google | passou após configuração externa | O dono do projeto autorizou `zerou-five.vercel.app` em Firebase Auth -> Settings -> Authorized domains e confirmou login Google funcionando. |
-| Chrome live em `https://zerou-five.vercel.app/` após autorização do domínio | passou | Landing, `/login`, `/register`, `/forgot-password` e redirect protegido de `/app` carregaram com bundle novo e sem erros de console em aba limpa. |
-| POST anônimo nos endpoints `ensureUserProfile` e `ensurePersonalWorkspace` em `southamerica-east1` | falhou produção | Ambos retornaram 404, indicando que as callable Functions ainda não estão implantadas no Firebase real. |
-| `npx firebase-tools deploy --only firestore:rules,firestore:indexes --project zerou-26757` | passou | Firestore rules e indexes publicados no projeto real. |
-| `npx firebase-tools deploy --only functions,firestore:rules,firestore:indexes,storage --project zerou-26757` | bloqueado por configuração externa | Storage ainda não foi iniciado no Firebase Console. |
-| `npx firebase-tools deploy --only functions,firestore:rules,firestore:indexes --project zerou-26757` | bloqueado por plano Firebase | Cloud Functions v2 exige plano Blaze para habilitar Cloud Functions, Cloud Build e Artifact Registry. |
+| `npm run test:rules` | passou | 2 arquivos, 9 testes em Firestore/Storage emulators; cobre criacao Spark e bloqueios de fraude. |
+| `npm run test:e2e` | passou | 1 teste Playwright da landing publica. |
+| `npx firebase-tools deploy --only firestore:rules,firestore:indexes --project zerou-26757` | passou | Firestore rules/indexes Spark publicados no projeto real. |
 
-## Pendências manuais externas
+## Pendencias manuais externas
 
 ```text
-- [x] Criar projeto Firebase Dev real (`zerou-26757`).
-- [ ] Habilitar Email/Senha e Google no Firebase Auth.
-- [ ] Criar Firestore Native Mode e Storage bucket. Firestore já recebeu rules/indexes; Storage ainda precisa de Get Started no Console.
+- [x] Projeto Firebase real identificado (`zerou-26757`).
+- [ ] Confirmar Email/Senha e Google habilitados no Firebase Auth.
 - [x] Preencher `.env.local` com as chaves reais do app web Firebase.
-- [ ] Configurar `.firebaserc` real a partir de `.firebaserc.example`.
-- [ ] Instalar Java no PATH padrão da máquina; o PATH atual tinha Oracle Java quebrando `java -version`, mas o JBR do PyCharm funcionou.
-- [x] Autenticar Firebase CLI se for usar recursos cloud fora dos emuladores.
-- [x] Configurar Vercel com as variáveis `VITE_FIREBASE_*`.
+- [x] Autenticar Firebase CLI.
+- [x] Configurar Vercel com as variaveis `VITE_FIREBASE_*`.
 - [x] Autorizar `zerou-five.vercel.app` em Firebase Auth -> Settings -> Authorized domains.
-- [ ] Fazer deploy das Functions `ensureUserProfile` e `ensurePersonalWorkspace` no Firebase real.
-- [ ] Fazer upgrade do Firebase para o plano Blaze para permitir Functions v2.
-- [ ] Iniciar Firebase Storage no Console e publicar `storage.rules`.
+- [ ] Criar bucket Storage em Firebase Console -> Storage -> Get Started, quando a fase que usar Storage chegar.
+- [ ] Fazer novo deploy Vercel com o bundle Spark/free deste commit. O push na `main` deve disparar a Vercel.
+- [ ] Validar onboarding em producao ate cair no dashboard vazio.
 ```
 
-## Limitações conhecidas
+## Limitacoes conhecidas
 
 ```text
-- O dashboard está vazio por decisão de escopo; não há motor financeiro nem dados financeiros persistidos.
-- A primeira conta opcional do onboarding ficou apenas sinalizada para a Fase 2 para não antecipar o motor financeiro.
-- Rotas públicas de pricing, legal, ajuda e afins são placeholders; landing completa pertence à Fase 6.
-- O deploy Vercel ainda depende das variáveis reais `VITE_FIREBASE_*`; o domínio `zerou-five.vercel.app` já foi autorizado no Firebase Auth para Google em produção.
-- As callable Functions `ensureUserProfile` e `ensurePersonalWorkspace` ainda retornam 404 no Firebase real; o deploy está bloqueado até o projeto estar no plano Blaze.
-- O Firebase Storage ainda não foi iniciado no Console, então `storage.rules` não pôde ser publicado em produção.
+- O dashboard esta vazio por decisao de escopo; nao ha motor financeiro nem dados financeiros persistidos.
+- A primeira conta opcional do onboarding ficou apenas sinalizada para a Fase 2 para nao antecipar o motor financeiro.
+- Rotas publicas de pricing, legal, ajuda e afins sao placeholders; landing completa pertence a Fase 6.
 - O build mostra aviso de chunk inicial > 500 kB por causa do bundle com SDKs; otimizar com code splitting depois.
-- `npm audit` reportou vulnerabilidades moderadas transitivas em dependências de ferramentas; não foi aplicado `audit fix --force`.
+- `npm audit` reportou vulnerabilidades moderadas transitivas em dependencias de ferramentas; nao foi aplicado `audit fix --force`.
 ```
-
-## Decisões arquiteturais acumuladas
-
-| Data | Decisão | Motivo | Impacto |
-|---|---|---|---|
-| 2026-06-14 | Tema individual usa `localStorage` antes do render e sincroniza com `/users/{uid}` após login. | Evitar flash visual e preservar preferência por usuário. | Preferência visual não é salva em workspace e não afeta parceiro. |
-| 2026-06-14 | Workspace pessoal é criado server-side por callable Function idempotente. | Cliente não pode escrever membership, role, owner ou campos protegidos. | Gate de isolamento validado por Rules tests. |
-| 2026-06-14 | Storage permanece fechado na Fase 1. | Caminhos autorizados de anexos só devem existir quando o domínio for implementado. | Uploads falham até fases futuras definirem paths. |
-| 2026-06-14 | Primeira conta financeira não é persistida no onboarding. | Evitar antecipar motor financeiro da Fase 2. | Onboarding conclui com perfil e workspace pessoal apenas. |
 
 ## Contratos alterados
 
-| Data | Interface/path | Alteração | Migração necessária? |
+| Data | Interface/path | Alteracao | Migracao necessaria? |
 |---|---|---|---|
-| 2026-06-14 | `/users/{uid}` | Preferências de aparência implementadas conforme contrato. | Não. |
-| 2026-06-14 | `/workspaces/{workspaceId}` e `/members/{uid}` | Criação server-side do workspace pessoal. | Não. |
-| 2026-06-14 | `firestore.rules` | Leitura por membership ativa e updates client-side restritos à aparência. | Não. |
+| 2026-06-14 | `/users/{uid}` | Preferencias de aparencia e fundacao Spark implementadas conforme contrato da Fase 1. | Nao para usuarios novos; usuarios parciais criados antes da mudanca podem precisar recriar conta ou limpeza manual. |
+| 2026-06-14 | `/workspaces/{workspaceId}` e `/members/{uid}` | Criacao do workspace pessoal agora e client-side transacional, validada por Rules. | Nao para usuarios novos. |
+| 2026-06-14 | `firestore.rules` | Rules permitem somente criacao atomica da propria fundacao e atualizacao posterior de aparencia. | Publicar rules no Firebase real. |
 
-## Próxima fase
+## Proxima fase
 
 ```text
 Prompt a executar: documentacao-v12.2/prompts/02-MOTOR-FINANCEIRO-ESSENCIAL.md
-Pré-condições: Firebase Dev real configurado, Auth providers habilitados, `.env.local` preenchido, plano Blaze ativo, Functions implantadas, Storage iniciado e onboarding validado no deploy público.
-Arquivos que o próximo agente deve ler: README-START-HERE.md, documentacao-v12.2/README.md, ZEROU-V12.2-ESPECIFICACAO-MESTRA.md, CONTRATOS-CANONICOS.md, THEME-SYSTEM.md, BRAND-GUIDELINES.md, BRAND-ASSET-INTEGRATION.md, PRODUCT-COPY-CANONICAL.md, IMPLEMENTATION_STATUS.md e o prompt da Fase 2.
+Pre-condicoes: Auth providers habilitados, `.env.local` preenchido, Firestore rules publicadas, Vercel com bundle Spark/free e onboarding validado no deploy publico.
+Arquivos que o proximo agente deve ler: README-START-HERE.md, documentacao-v12.2/README.md, ZEROU-V12.2-ESPECIFICACAO-MESTRA.md, CONTRATOS-CANONICOS.md, THEME-SYSTEM.md, BRAND-GUIDELINES.md, BRAND-ASSET-INTEGRATION.md, PRODUCT-COPY-CANONICAL.md, IMPLEMENTATION_STATUS.md e o prompt da Fase 2.
 ```
 
-## Verificação do sistema de temas
+## Verificacao do sistema de temas
 
 ```text
-- [x] registro central contém Paper, Sakura, Obsidian, Midnight, Aurora e Rose Gold
-- [x] componentes autenticados usam tokens semânticos
-- [x] preferência aplica antes do primeiro render
+- [x] registro central contem Paper, Sakura, Obsidian, Midnight, Aurora e Rose Gold
+- [x] componentes autenticados usam tokens semanticos
+- [x] preferencia aplica antes do primeiro render
 - [x] localStorage e Firestore sincronizam sem bloquear a UI
-- [x] tema pertence ao usuário, não ao workspace
+- [x] tema pertence ao usuario, nao ao workspace
 - [x] modo system reage a prefers-color-scheme
 ```

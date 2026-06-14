@@ -7,30 +7,28 @@ export function getAuthErrorMessage(error: unknown) {
 
   switch (code) {
     case 'auth/invalid-api-key':
-      return 'A chave Firebase do deploy está inválida. Revise VITE_FIREBASE_API_KEY na Vercel.';
+      return 'A chave Firebase do deploy esta invalida. Revise VITE_FIREBASE_API_KEY na Vercel.';
     case 'auth/unauthorized-domain':
-      return 'Este domínio ainda não está autorizado no Firebase Auth. Adicione zerou-five.vercel.app em Authorized domains.';
+      return 'Este dominio ainda nao esta autorizado no Firebase Auth. Adicione zerou-five.vercel.app em Authorized domains.';
     case 'auth/invalid-credential':
     case 'auth/wrong-password':
     case 'auth/user-not-found':
       return 'Confira email e senha para entrar na Zerou.';
     case 'auth/email-already-in-use':
-      return 'Este email já tem uma conta Zerou. Tente entrar ou recuperar a senha.';
+      return 'Este email ja tem uma conta Zerou. Tente entrar ou recuperar a senha.';
     case 'auth/popup-closed-by-user':
       return 'A janela do Google foi fechada antes de concluir.';
     case 'auth/provider-already-linked':
-      return 'Este método já está vinculado à sua conta Zerou.';
+      return 'Este metodo ja esta vinculado a sua conta Zerou.';
     case 'auth/credential-already-in-use':
-      return 'Este acesso pertence a outra conta. A Zerou não mescla UIDs automaticamente.';
+      return 'Este acesso pertence a outra conta. A Zerou nao mescla UIDs automaticamente.';
     case 'auth/requires-recent-login':
-      return 'Por segurança, reautentique-se antes de alterar métodos de acesso.';
-    case 'functions/failed-precondition':
-    case 'functions/invalid-argument':
-    case 'functions/unauthenticated':
-    case 'functions/not-found':
-    case 'functions/unavailable':
-      return 'A fundação Firebase ainda não está pronta neste ambiente. Verifique se as Functions foram implantadas e se as variáveis da Vercel estão corretas.';
+      return 'Por seguranca, reautentique-se antes de alterar metodos de acesso.';
+    case 'permission-denied':
+      return 'A fundacao Firebase ainda nao permitiu esta operacao. Verifique se as regras Firestore foram publicadas.';
+    case 'unavailable':
+      return 'Sem conexao estavel com o Firebase agora. Tente novamente em instantes.';
     default:
-      return 'Não foi possível concluir esta ação agora. Tente novamente.';
+      return 'Nao foi possivel concluir esta acao agora. Tente novamente.';
   }
 }

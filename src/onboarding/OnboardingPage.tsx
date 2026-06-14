@@ -9,7 +9,7 @@ import { readPendingInvite } from '../auth/pendingInvite';
 import { getAuthErrorMessage } from '../auth/authErrors';
 import { FormMessage } from '../components/FormMessage';
 import { useAppearanceStore } from '../theme/appearance.store';
-import { ensurePersonalWorkspace, ensureUserProfile } from '../workspaces/workspaceService';
+import { ensurePersonalFoundation } from '../workspaces/workspaceService';
 
 const onboardingSchema = z.object({
   name: z.string().min(2, 'Informe seu nome.').max(80, 'Use até 80 caracteres.'),
@@ -44,12 +44,16 @@ export function OnboardingPage() {
     setMessage(null);
 
     try {
-      await ensureUserProfile({
+      if (!user) {
+        throw new Error('Entre na Zerou para continuar.');
+      }
+
+      await ensurePersonalFoundation({
+        user,
         name: values.name,
         termsVersion: 'zerou-v12.2-foundation',
         appearance: preferences
       });
-      await ensurePersonalWorkspace();
       navigate('/app', { replace: true });
     } catch (error) {
       setMessage(getAuthErrorMessage(error));

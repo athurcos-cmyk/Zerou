@@ -8,14 +8,12 @@ import {
   persistentMultipleTabManager,
   type Firestore
 } from 'firebase/firestore';
-import { getFunctions, connectFunctionsEmulator, type Functions } from 'firebase/functions';
 import { getStorage, connectStorageEmulator, type FirebaseStorage } from 'firebase/storage';
 
 interface FirebaseServices {
   app: FirebaseApp;
   auth: Auth;
   db: Firestore;
-  functions: Functions;
   storage: FirebaseStorage;
 }
 
@@ -86,7 +84,6 @@ export function getFirebaseServices() {
       app,
       auth: getAuth(app),
       db: dbInstance,
-      functions: getFunctions(app, 'southamerica-east1'),
       storage: getStorage(app)
     };
 
@@ -113,7 +110,6 @@ export function connectFirebaseEmulators() {
   const services = getFirebaseServices();
   connectAuthEmulator(services.auth, 'http://127.0.0.1:9099', { disableWarnings: true });
   connectFirestoreEmulator(services.db, '127.0.0.1', 8080);
-  connectFunctionsEmulator(services.functions, '127.0.0.1', 5001);
   connectStorageEmulator(services.storage, '127.0.0.1', 9199);
   emulatorsConnected = true;
 }
@@ -139,10 +135,6 @@ export function getFirebaseAuth() {
 
 export function getFirebaseDb() {
   return getFirebaseServices().db;
-}
-
-export function getFirebaseFunctions() {
-  return getFirebaseServices().functions;
 }
 
 export function getFirebaseStorage() {

@@ -14,7 +14,7 @@
     "test:watch": "vitest",
     "test:rules": "firebase emulators:exec --only firestore,storage \"vitest run tests/firestore.rules.test.ts tests/storage.rules.test.ts --config vite.config.ts\"",
     "test:e2e": "playwright test",
-    "emulators": "firebase emulators:start --only auth,firestore,functions,storage,hosting"
+    "emulators": "firebase emulators:start --only auth,firestore,storage,hosting"
   },
   "engines": {
     "node": ">=22.0.0"
