@@ -99,6 +99,7 @@ docs/MANUAL_SETUP_REQUIRED.md
 | `@chrome` em `https://zerou-five.vercel.app/` | falhou antes do ajuste | Console mostrou `FirebaseError: auth/invalid-api-key`, deixando `#root` vazio. |
 | Chrome/local em `http://127.0.0.1:4175/` | passou | Landing nova renderizada sem erros no cadastro local. |
 | Playwright live em `https://zerou-five.vercel.app/register` | falhou antes do ajuste | Vercel retornava 404 por falta de rewrite SPA. Corrigido com `vercel.json`. |
+| Playwright live no botão Google | bloqueado por configuração externa | Firebase retornou `auth/unauthorized-domain`; adicionar `zerou-five.vercel.app` em Firebase Auth -> Settings -> Authorized domains. |
 
 ## Pendências manuais externas
 

@@ -7,6 +7,7 @@ Estas ações dependem do dono do projeto e não foram simuladas no repositório
 - Criar projeto Firebase Dev.
 - Registrar app web `zerou-web-dev`.
 - Habilitar Authentication com Email/Senha e Google.
+- Em Authentication -> Settings -> Authorized domains, adicionar `zerou-five.vercel.app` e o domínio final de produção.
 - Criar Cloud Firestore em Native Mode.
 - Criar bucket Storage.
 - Configurar alias Firebase CLI a partir de `.firebaserc.example`.
