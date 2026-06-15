@@ -7,7 +7,8 @@ import { AuthLayout } from '../components/AuthLayout';
 export function JoinInvitePage() {
   const { code } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const hasFoundation = Boolean(profile?.defaultWorkspaceId);
 
   useEffect(() => {
     if (code) {
@@ -19,13 +20,13 @@ export function JoinInvitePage() {
     <AuthLayout
       eyebrow="Convite"
       title="Convite salvo para depois."
-      description="A Zerou preservou este codigo para voce entrar no espaco compartilhado depois do login."
+      description="Para usar o espaço compartilhado, primeiro entre na Zerou e termine seu espaço pessoal."
     >
       <div className="form-stack">
-        <p className="notice">Codigo pendente: {code}</p>
+        <p className="notice">Código pendente: {code}</p>
         {user ? (
-          <button className="button button--primary" type="button" onClick={() => navigate('/app/shared')}>
-            Abrir espaco compartilhado
+          <button className="button button--primary" type="button" onClick={() => navigate(hasFoundation ? '/app/shared' : '/app/onboarding')}>
+            {hasFoundation ? 'Abrir espaço compartilhado' : 'Concluir cadastro para usar convite'}
           </button>
         ) : (
           <>

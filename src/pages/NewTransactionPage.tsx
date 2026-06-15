@@ -8,6 +8,7 @@ import { createTransaction } from '../finance/financeService';
 import { transactionTypes, type SupportedTransactionType } from '../finance/financeSchemas';
 import { parseMoneyToCents } from '../finance/money';
 import { useFinanceData } from '../finance/useFinanceData';
+import { getUserFacingErrorMessage } from '../utils/userFacingError';
 
 function waitForLocalWrite() {
   return new Promise((resolve) => {
@@ -41,7 +42,7 @@ export function NewTransactionPage() {
     setMessage(null);
 
     if (!workspaceId || !user) {
-      setMessage('Conclua o onboarding antes de registrar transações.');
+      setMessage('Conclua seu cadastro inicial antes de registrar transações.');
       return;
     }
 
@@ -71,7 +72,7 @@ export function NewTransactionPage() {
       void write.catch(() => undefined);
       navigate('/app/transactions');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Não foi possível registrar a transação agora.');
+      setMessage(getUserFacingErrorMessage(error, 'Não foi possível registrar a transação agora.'));
     }
   }
 
@@ -79,7 +80,7 @@ export function NewTransactionPage() {
     <section className="page-content page-content--narrow">
       <p className="eyebrow">Cadastro rápido</p>
       <h1 className="page-title">Nova transação.</h1>
-      <p className="page-description">A escrita usa a fila persistente do Firestore e aparece como pendente até sincronizar.</p>
+      <p className="page-description">Registre uma entrada, gasto ou transferência. Se a internet oscilar, a Zerou tenta enviar depois.</p>
 
       <form className="surface surface-pad form-stack finance-form" onSubmit={handleSubmit}>
         <FormMessage>{message}</FormMessage>

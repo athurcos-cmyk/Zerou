@@ -9,6 +9,7 @@ import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
 import { useFinanceData } from '../finance/useFinanceData';
 import type { Bill } from '../types/contracts';
+import { getUserFacingErrorMessage } from '../utils/userFacingError';
 
 export function BillsPage() {
   const { user, profile } = useAuth();
@@ -26,7 +27,7 @@ export function BillsPage() {
     setMessage(null);
 
     if (!workspaceId || !user) {
-      setMessage('Conclua o onboarding antes de criar compromissos.');
+      setMessage('Conclua seu cadastro inicial antes de criar compromissos.');
       return;
     }
 
@@ -44,7 +45,7 @@ export function BillsPage() {
       setCategoryId('');
       setAccountId('');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Não foi possível criar o compromisso agora.');
+      setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar o compromisso agora.'));
     }
   }
 
@@ -61,8 +62,8 @@ export function BillsPage() {
       <div className="page-heading-row">
         <div>
           <p className="eyebrow">Contas a pagar</p>
-          <h1 className="page-title">Compromissos básicos.</h1>
-          <p className="page-description">Bills pendentes entram no cálculo de disponível livre v1.</p>
+          <h1 className="page-title">Contas que já têm data.</h1>
+          <p className="page-description">Anote aluguel, internet, mensalidades e outros compromissos para não se perder no mês.</p>
         </div>
         <CalendarClock size={28} aria-hidden="true" />
       </div>

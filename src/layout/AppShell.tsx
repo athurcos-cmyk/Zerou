@@ -28,11 +28,11 @@ export function AppShell() {
   const { user, profile } = useAuth();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const isOnboarding = location.pathname.startsWith('/app/onboarding');
+  const isFoundationPending = location.pathname.startsWith('/app/onboarding') || Boolean(user && !profile?.defaultWorkspaceId);
 
   async function handleClearLocalDataLogout() {
     const confirmed = window.confirm(
-      'Sair e limpar o cache local deste dispositivo? Use isso em computador compartilhado ou quando precisar descartar dados offline.'
+      'Sair e limpar os dados salvos neste dispositivo? Use isso em celular emprestado ou computador compartilhado.'
     );
 
     if (!confirmed) {
@@ -47,8 +47,8 @@ export function AppShell() {
   }
 
   return (
-    <div className={`app-layout${isOnboarding ? ' app-layout--focus' : ''}`}>
-      {!isOnboarding ? (
+    <div className={`app-layout${isFoundationPending ? ' app-layout--focus' : ''}`}>
+      {!isFoundationPending ? (
         <aside className="sidebar" aria-label="Navegação principal">
         <BrandLockup />
         <nav className="sidebar-nav">
@@ -111,7 +111,7 @@ export function AppShell() {
         <Outlet />
       </main>
 
-      {mobileMenuOpen && !isOnboarding ? (
+      {mobileMenuOpen && !isFoundationPending ? (
         <>
           <button
             className="mobile-more-backdrop"
@@ -162,7 +162,7 @@ export function AppShell() {
         </>
       ) : null}
 
-      {!isOnboarding ? (
+      {!isFoundationPending ? (
         <nav className="mobile-nav" aria-label="Navegação mobile">
         <NavLink className={getNavClass} to="/app" end aria-label="Início">
           <Home size={20} aria-hidden="true" />

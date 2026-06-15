@@ -8,6 +8,7 @@ import { updateTransaction } from '../finance/financeService';
 import { transactionTypes, type SupportedTransactionType } from '../finance/financeSchemas';
 import { centsToInputValue, parseMoneyToCents } from '../finance/money';
 import { useFinanceData } from '../finance/useFinanceData';
+import { getUserFacingErrorMessage } from '../utils/userFacingError';
 
 function waitForLocalWrite() {
   return new Promise((resolve) => {
@@ -85,7 +86,7 @@ export function EditTransactionPage() {
       void write.catch(() => undefined);
       navigate('/app/transactions');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Não foi possível atualizar a transação agora.');
+      setMessage(getUserFacingErrorMessage(error, 'Não foi possível atualizar a transação agora.'));
     }
   }
 

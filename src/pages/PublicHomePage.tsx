@@ -126,11 +126,11 @@ export function PublicHomePage() {
       <section className="public-section split-section">
         <div>
           <p className="eyebrow">Segurança</p>
-          <h2>Separação por usuário, workspace e regras Firestore.</h2>
+          <h2>Seu espaço pessoal continua separado.</h2>
         </div>
         <p>
-          A Zerou usa autenticação Firebase, regras de acesso por membership, separação por workspace e cache local
-          controlável. Dados pessoais não são vendidos, e analytics fica desligado por padrão.
+            A Zerou separa seu espaço pessoal do espaço compartilhado. Seus dados pessoais não são vendidos, e análises
+          opcionais ficam desligadas por padrão.
         </p>
       </section>
 
@@ -139,8 +139,7 @@ export function PublicHomePage() {
           <p className="eyebrow">Lançamento gratuito</p>
           <h2>Por enquanto, tudo incluso.</h2>
           <p className="text-secondary">
-            O app fica 100% gratuito nesta etapa. Billing Stripe existe como fundação técnica futura, mas checkout e planos
-            pagos não estão ativos para usuários.
+            O app fica 100% gratuito nesta etapa. Não há cobrança, assinatura ou tela de pagamento ativa para usuários.
           </p>
         </div>
         <Link className="button button--primary" to="/register">

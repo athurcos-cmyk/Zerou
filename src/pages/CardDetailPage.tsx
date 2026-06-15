@@ -9,6 +9,7 @@ import { useCardsData } from '../cards/useCardsData';
 import { fromDateInputValue, todayInputValue, toDateInputValue } from '../finance/financeDates';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { useFinanceData } from '../finance/useFinanceData';
+import { getUserFacingErrorMessage } from '../utils/userFacingError';
 
 export function CardDetailPage() {
   const { cardId } = useParams();
@@ -49,7 +50,7 @@ export function CardDetailPage() {
       setCategoryId('');
       setInstallments(1);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Não foi possível registrar a compra agora.');
+      setMessage(getUserFacingErrorMessage(error, 'Não foi possível registrar a compra agora.'));
     }
   }
 
@@ -128,7 +129,7 @@ export function CardDetailPage() {
           <div className="section-heading">
             <div>
               <p className="eyebrow">Faturas</p>
-              <h2>Ciclos do cartão</h2>
+          <h2>Faturas</h2>
             </div>
             <CalendarClock size={22} aria-hidden="true" />
           </div>

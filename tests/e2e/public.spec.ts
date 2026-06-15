@@ -40,12 +40,21 @@ test('public couple invite route preserves the Zerou join flow', async ({ page }
   await expect(page.getByRole('link', { name: /Criar conta/i })).toBeVisible();
 });
 
+test('shared space creation is not available without login', async ({ page }) => {
+  await page.goto('/app/shared');
+
+  await expect(page).toHaveURL(/\/login/);
+  await expect(page.getByRole('heading', { name: /Volte para o seu espaço Zerou/i })).toBeVisible();
+  await expect(page.getByText(/Criar espaço compartilhado/i)).toHaveCount(0);
+});
+
 test('pricing page states the free launch mode', async ({ page }) => {
   await page.goto('/pricing');
 
   await expect(page.getByRole('heading', { name: /Gratuito agora/i })).toBeVisible();
   await expect(page.getByText(/100% gratuita/i)).toBeVisible();
-  await expect(page.getByText('Gratuito', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /R\$ 0/i })).toBeVisible();
+  await expect(page.getByText(/Sem plano escondido/i)).toBeVisible();
 });
 
 test('legal pages expose launch-ready privacy text without public placeholders', async ({ page }) => {

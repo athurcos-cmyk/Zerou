@@ -9,7 +9,7 @@ Fase atual: 6 implementada em modo de lancamento gratuito
 Ultima fase concluida: 6. Lancamento gratuito com revisao mobile, legal e privacidade
 Ambiente validado: local sem emuladores por bloqueio Java; Firestore Rules ja publicadas; build/e2e/unitarios/functions passaram
 Ultima atualizacao: 2026-06-15
-Gate da Fase 6: passou para uso gratuito atual com landing clara/mobile-first, legal operacional sem placeholders publicos, sem banner de cookies, privacy center, docs operacionais e QA local; producao publica ampla ainda depende de checklist manual/juridico/App Check/backups.
+Gate da Fase 6: passou para uso gratuito atual com landing clara/mobile-first com mockup 3D leve, legal operacional sem placeholders publicos, sem banner de cookies, privacy center, mensagens de erro humanas, bloqueio de rotas privadas sem login/fundacao e QA local; producao publica ampla ainda depende de checklist manual/juridico/App Check/backups.
 ```
 
 ## Estado por fase
@@ -92,7 +92,11 @@ Gate da Fase 6: passou para uso gratuito atual com landing clara/mobile-first, l
 - Fase 6: rotas publicas reais `/features`, `/security`, `/help`, `/contact`, `/pricing`, `/privacy-center`, `/legal/terms`, `/legal/privacy`, `/legal/cookies` e `/legal/subprocessors`.
 - Fase 6: tema Paper claro virou padrao visual do app publico e do primeiro render; telas publicas e de autenticacao ficam claras mesmo quando o dispositivo esta em modo escuro.
 - Fase 6: experiencia mobile revisada com landing mais direta, bottom navigation com labels, menu "Mais", dashboard com guia inicial e resumo de gastos por categoria.
+- Fase 6: landing recebeu mockup mobile com efeito 3D leve inspirado em referencias de apps financeiros, mantendo leitura simples no celular.
 - Fase 6: onboarding autenticado usa modo foco sem sidebar/bottom navigation ate a fundacao ser concluida, hidrata nome exibido a partir do cadastro e reduz confusao no primeiro uso mobile.
+- Fase 6: app shell agora trata usuario sem fundacao como fluxo de entrada, escondendo sidebar/bottom nav e impedindo atalho visual para cartoes/duo antes da preparacao do espaco pessoal.
+- Fase 6: mensagens de erro de validacao Zod foram convertidas para copy humana; telas financeiras nao exibem payload tecnico como `too_small`, `invalid_format` ou JSON de erro.
+- Fase 6: copy publica e autenticada removeu termos tecnicos como billing, checkout, offline-first, ledger, workspace e regras Firestore de telas comuns.
 - Fase 6: area compartilhada simplificada para fluxo de casal mais claro; opcoes administrativas, comentarios e acoes avancadas ficam recolhidas.
 - Fase 6: banner de cookies removido para nao bloquear cadastro/uso; Analytics fica desligado por padrao e so pode inicializar com `VITE_ENABLE_ANALYTICS=true` mais consentimento futuro.
 - Fase 6: Centro de Privacidade cria solicitacoes rastreaveis em `privacyRequests/{requestId}` para correcao, exportacao, exclusao, revogacao de marketing e ajuda de cache.
@@ -169,6 +173,15 @@ documentacao-v12.2/QA_SCENARIOS.md
 
 | Comando | Resultado | Observacao |
 |---|---|---|
+| `npm run typecheck` na rodada UX simples/3D | passou | TypeScript strict validado apos mensagens humanas, copy limpa, bloqueio de fundacao e landing 3D. |
+| `npm run lint` na rodada UX simples/3D | passou | ESLint sem erros. |
+| `npm test` na rodada UX simples/3D | passou | 8 arquivos, 34 testes unitarios; inclui regressao para erro Zod virar mensagem de usuario. |
+| `npm run build` na rodada UX simples/3D | passou | Bundle PWA gerado: `assets/index-BLANwQCW.js`; aviso de chunk inicial > 500 kB permanece. |
+| `npm run test:e2e` na rodada UX simples/3D | passou | 9 testes Playwright; inclui rota `/app/shared` sem login redirecionando para login e sem criacao de espaco compartilhado. |
+| `npm run functions:build` na rodada UX simples/3D | passou | Functions continuam compilando. |
+| `npm run test:functions` na rodada UX simples/3D | passou | 5 arquivos, 13 testes. |
+| Screenshot Playwright mobile na rodada UX simples/3D | passou | Evidencia em `test-results/mobile-polish/landing-3d-mobile.png`; landing clara com mockup mobile 3D. |
+| `npm run test:rules` na rodada UX simples/3D | bloqueado por ambiente | Firebase CLI falhou antes dos emuladores: `java -version` saiu com codigo 3221226505. |
 | `npm run typecheck` na rodada mobile/legal | passou | TypeScript strict validado apos tema claro, legal, onboarding, dashboard e app shell mobile. |
 | `npm run lint` na rodada mobile/legal | passou | ESLint sem erros. |
 | `npm test` na rodada mobile/legal | passou | 7 arquivos, 32 testes unitarios. |

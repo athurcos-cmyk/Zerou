@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext';
 import { clearPendingInvite, readPendingInvite, savePendingInvite } from '../auth/pendingInvite';
 import { FormMessage } from '../components/FormMessage';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
+import { getUserFacingErrorMessage } from '../utils/userFacingError';
 import {
   acceptCoupleInvite,
   acceptSettlement,
@@ -83,7 +84,7 @@ export function SharedSpacePage() {
     try {
       await action();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Não foi possível concluir esta ação agora.');
+      setMessage(getUserFacingErrorMessage(error, 'Não foi possível concluir esta ação agora.'));
     }
   }
 
@@ -283,7 +284,7 @@ export function SharedSpacePage() {
               <Users size={22} aria-hidden="true" />
             </div>
             <p className="text-secondary">
-              A Zerou mantém seu workspace pessoal separado. O espaço compartilhado nasce vazio e recebe somente o que vocês decidirem lançar nele.
+              A Zerou mantém seu espaço pessoal separado. O espaço compartilhado nasce vazio e recebe somente o que vocês decidirem lançar nele.
             </p>
             <button className="button button--primary" type="button" onClick={handleCreateWorkspace}>
               Criar espaço compartilhado
@@ -300,7 +301,7 @@ export function SharedSpacePage() {
             </div>
             <form className="form-stack" onSubmit={handlePreviewInvite}>
               <label className="field">
-                <span>Código Duo</span>
+                <span>Código do convite</span>
                 <input className="input" value={pendingInviteCode} onChange={(event) => setPendingInviteCode(event.target.value)} placeholder="DUO-7X4K-92" />
               </label>
               <button className="button button--secondary" type="submit">

@@ -17,6 +17,7 @@ import { fromDateInputValue, todayInputValue, toDateInputValue } from '../financ
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { useFinanceData } from '../finance/useFinanceData';
 import type { InvoiceLedgerEntryType, InvoiceStatus } from '../types/contracts';
+import { getUserFacingErrorMessage } from '../utils/userFacingError';
 
 export function InvoicePage() {
   const { cardId, invoiceId } = useParams();
@@ -47,7 +48,7 @@ export function InvoicePage() {
     try {
       await action();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Não foi possível concluir a ação agora.');
+      setMessage(getUserFacingErrorMessage(error, 'Não foi possível concluir a ação agora.'));
     }
   }
 
@@ -135,7 +136,7 @@ export function InvoicePage() {
           <p className="eyebrow">Fatura</p>
           <h1 className="page-title">{invoice ? `Fatura ${invoice.referenceMonth}` : 'Carregando fatura'}</h1>
           <p className="page-description">
-            {card ? `${card.name}. Compras, pagamentos, créditos e tarifas calculados pelo ledger.` : 'Carregando cartão.'}
+            {card ? `${card.name}. Compras, pagamentos, créditos e tarifas em um histórico claro.` : 'Carregando cartão.'}
           </p>
         </div>
         <Link className="button button--secondary" to={`/app/cards/${cardId ?? ''}`}>
@@ -235,7 +236,7 @@ export function InvoicePage() {
               <div className="section-heading">
                 <div>
                   <p className="eyebrow">Ledger</p>
-                  <h2>Timeline imutável</h2>
+                  <h2>Histórico da fatura</h2>
                 </div>
                 <ReceiptText size={22} aria-hidden="true" />
               </div>
@@ -246,7 +247,7 @@ export function InvoicePage() {
                       <div>
                         <strong>{ledgerTypeLabels[entry.type as InvoiceLedgerEntryType]}</strong>
                         <span className="text-secondary">
-                          {toDateInputValue(entry.effectiveAt)} · {entry.idempotencyKey}
+                          {toDateInputValue(entry.effectiveAt)}
                         </span>
                       </div>
                       <strong>{formatMoney(entry.amountCents)}</strong>
@@ -254,7 +255,7 @@ export function InvoicePage() {
                   ))}
                 </div>
               ) : (
-                <p className="text-secondary">Nenhuma entrada de ledger ainda.</p>
+                <p className="text-secondary">Nenhum movimento nesta fatura ainda.</p>
               )}
             </article>
           </div>

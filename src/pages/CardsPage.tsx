@@ -8,6 +8,7 @@ import { createCreditCard } from '../cards/cardService';
 import { useCardsData } from '../cards/useCardsData';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
+import { getUserFacingErrorMessage } from '../utils/userFacingError';
 
 export function CardsPage() {
   const { user, profile } = useAuth();
@@ -26,7 +27,7 @@ export function CardsPage() {
     setMessage(null);
 
     if (!workspaceId || !user) {
-      setMessage('Conclua o onboarding antes de criar cartões.');
+      setMessage('Conclua seu cadastro inicial antes de criar cartões.');
       return;
     }
 
@@ -47,7 +48,7 @@ export function CardsPage() {
       setClosingDay(10);
       setDueDay(20);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Não foi possível criar o cartão agora.');
+      setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar o cartão agora.'));
     }
   }
 

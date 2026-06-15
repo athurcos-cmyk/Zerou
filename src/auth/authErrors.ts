@@ -25,7 +25,7 @@ export function getAuthErrorMessage(error: unknown) {
     case 'auth/requires-recent-login':
       return 'Por seguranca, reautentique-se antes de alterar metodos de acesso.';
     case 'permission-denied':
-      return 'A fundacao Firebase ainda nao permitiu esta operacao. Verifique se as regras Firestore foram publicadas.';
+      return 'Não foi possível salvar agora. Atualize o app e tente novamente. Se continuar, fale com o suporte da Zerou.';
     case 'unavailable':
       return 'Sem conexao estavel com o Firebase agora. Tente novamente em instantes.';
     default:

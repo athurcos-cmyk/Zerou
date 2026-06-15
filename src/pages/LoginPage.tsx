@@ -61,7 +61,7 @@ export function LoginPage() {
     <AuthLayout
       eyebrow="Entrar"
       title="Volte para o seu espaço Zerou."
-      description="Acesse seu workspace pessoal e continue do ponto em que parou."
+      description="Acesse seu espaço pessoal e continue do ponto em que parou."
     >
       <form className="form-stack" onSubmit={form.handleSubmit(onSubmit)}>
         <FormMessage>{firebaseError}</FormMessage>

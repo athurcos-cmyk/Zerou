@@ -9,6 +9,7 @@ import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
 import { useFinanceData } from '../finance/useFinanceData';
 import type { AccountType } from '../types/contracts';
+import { getUserFacingErrorMessage } from '../utils/userFacingError';
 
 export function AccountsPage() {
   const { user, profile } = useAuth();
@@ -25,7 +26,7 @@ export function AccountsPage() {
     setMessage(null);
 
     if (!workspaceId || !user) {
-      setMessage('Conclua o onboarding antes de criar contas.');
+      setMessage('Conclua seu cadastro inicial antes de criar contas.');
       return;
     }
 
@@ -39,7 +40,7 @@ export function AccountsPage() {
       setType('checking');
       setOpeningBalance('0,00');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Não foi possível criar a conta agora.');
+      setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar a conta agora.'));
     }
   }
 
@@ -49,7 +50,7 @@ export function AccountsPage() {
         <div>
           <p className="eyebrow">Contas</p>
           <h1 className="page-title">Onde seu dinheiro está.</h1>
-          <p className="page-description">Crie contas financeiras com saldo inicial explícito e acompanhe o saldo derivado.</p>
+          <p className="page-description">Cadastre onde seu dinheiro fica: banco, carteira, poupança ou conta digital.</p>
         </div>
         <SyncStatusBadge status={finance.pendingWrites ? 'pending' : 'synced'} />
       </div>

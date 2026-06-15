@@ -1,6 +1,6 @@
-import { CheckCircle2, Clock3 } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
-import { defaultPlanCatalog, freeBillingAccountForUser } from '../billing/billingService';
+import { freeBillingAccountForUser } from '../billing/billingService';
 
 export function BillingSettingsPage() {
   const { user } = useAuth();
@@ -12,8 +12,7 @@ export function BillingSettingsPage() {
         <p className="eyebrow">Configurações</p>
         <h1 className="page-title">Plano gratuito</h1>
         <p className="page-description">
-          A Zerou está 100% gratuita por enquanto. O billing Stripe criado na Fase 5 permanece como fundação técnica, mas
-          checkout, portal e assinaturas pagas não estão ativos para usuários.
+          A Zerou está 100% gratuita por enquanto. Não existe cobrança ativa, assinatura ou upgrade pago nesta versão.
         </p>
       </div>
 
@@ -31,20 +30,18 @@ export function BillingSettingsPage() {
         Espaço pessoal, espaço compartilhado, cartões, faturas e motor financeiro atual ficam inclusos sem cobrança.
       </div>
 
-      <section className="plan-grid" aria-label="Estrutura futura de planos">
-        {defaultPlanCatalog.map((plan) => (
-          <article className="surface surface-pad plan-card" key={plan.id}>
-            <div>
-              <p className="eyebrow">{plan.name}</p>
-              <h2>{plan.id === 'free' ? 'Ativo agora' : 'Futuro'}</h2>
-              <p className="text-secondary">{plan.description}</p>
-            </div>
-            <div className="notice">
-              {plan.active ? <CheckCircle2 size={18} aria-hidden="true" /> : <Clock3 size={18} aria-hidden="true" />}
-              {plan.active ? 'Disponível para esta conta.' : 'Sem cobrança ou upgrade ativo nesta versão.'}
-            </div>
-          </article>
-        ))}
+      <section className="plan-grid" aria-label="Plano atual">
+        <article className="surface surface-pad plan-card">
+          <div>
+            <p className="eyebrow">Incluído agora</p>
+            <h2>Uso completo gratuito</h2>
+            <p className="text-secondary">Você pode usar o app atual sem cartão de crédito e sem tela de pagamento.</p>
+          </div>
+          <div className="notice">
+            <CheckCircle2 size={18} aria-hidden="true" />
+            Qualquer mudança futura de cobrança será avisada antes.
+          </div>
+        </article>
       </section>
     </section>
   );

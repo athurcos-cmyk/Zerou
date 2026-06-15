@@ -25,13 +25,13 @@ const documents = {
     path: '/legal/privacy',
     sections: [
       ['Quem trata os dados', 'A Zerou trata dados pessoais para oferecer o app financeiro, manter contas de usuário, proteger acesso, sincronizar informações e operar recursos individuais e compartilhados.'],
-      ['Dados tratados', 'Podemos tratar nome, email, identificadores de autenticação, preferências de aparência, dados de workspace, registros financeiros que você inserir, convites, solicitações de privacidade, dados técnicos do dispositivo, logs de segurança e informações necessárias para suporte.'],
+      ['Dados tratados', 'Podemos tratar nome, email, identificadores de autenticação, preferências de aparência, dados dos seus espaços na Zerou, registros financeiros que você inserir, convites, solicitações de privacidade, dados técnicos do dispositivo, logs de segurança e informações necessárias para suporte.'],
       ['Finalidades e bases', 'Usamos dados para executar o serviço solicitado por você, cumprir obrigações legais, proteger a plataforma, prevenir abuso, responder solicitações e melhorar a operação. Consentimento é usado apenas quando uma finalidade opcional depender dele, como analytics ou marketing futuros.'],
       ['Espaço compartilhado', 'Dados lançados no espaço compartilhado ficam visíveis aos membros daquele espaço conforme o recurso usado. O que fica no espaço individual não é compartilhado automaticamente.'],
       ['Compartilhamento', 'A Zerou não vende dados pessoais. Fornecedores técnicos podem processar dados apenas para autenticação, banco de dados, hospedagem, entrega do app, suporte operacional e segurança, conforme a lista de subprocessadores.'],
       ['Retenção', 'Mantemos dados enquanto sua conta estiver ativa ou enquanto forem necessários para funcionamento do serviço, segurança, auditoria, cumprimento legal, prevenção de fraude, resolução de disputas ou exercício regular de direitos.'],
       ['Direitos LGPD', 'Você pode solicitar confirmação de tratamento, acesso, correção, anonimização, bloqueio, eliminação, portabilidade, informação sobre compartilhamentos, revogação de consentimento e revisão de decisões automatizadas quando aplicável.'],
-      ['Segurança', 'A Zerou usa autenticação Firebase, regras Firestore, separação por workspace, cache local controlável e práticas de desenvolvimento voltadas à proteção dos dados. Nenhum serviço digital consegue prometer segurança absoluta.'],
+      ['Segurança', 'A Zerou usa autenticação, regras de acesso, separação por espaço, armazenamento local controlável e práticas de desenvolvimento voltadas à proteção dos dados. Nenhum serviço digital consegue prometer segurança absoluta.'],
       ['Contato e solicitações', 'Use o Centro de privacidade para registrar pedidos vinculados à sua conta. Se não estiver logado, use os canais públicos de contato disponíveis no app.']
     ]
   },
@@ -40,7 +40,7 @@ const documents = {
     description: 'Política de cookies e armazenamento local da Zerou.',
     path: '/legal/cookies',
     sections: [
-      ['Uso atual', 'A Zerou não usa cookies opcionais de marketing ou analytics por padrão. O app usa armazenamento local necessário, como localStorage, IndexedDB, cache do PWA e mecanismos do Firebase Auth para manter login, tema, funcionamento offline e segurança básica.'],
+      ['Uso atual', 'A Zerou não usa cookies opcionais de marketing ou analytics por padrão. O app usa armazenamento local necessário para manter login, tema, funcionamento em instabilidades de conexão e segurança básica.'],
       ['Necessários', 'Recursos necessários não dependem de consentimento separado porque permitem que o app funcione, mantenha sessão, aplique preferências essenciais e proteja o acesso. Você pode limpar esses dados pelo navegador, mas isso pode encerrar sessão e remover preferências locais.'],
       ['Analytics', 'Analytics fica desligado por padrão. Se a Zerou ativar medição opcional no futuro, isso deverá ocorrer com aviso e consentimento quando exigido.'],
       ['Marketing', 'Cookies ou identificadores de marketing não estão ativos nesta etapa. Campanhas futuras deverão respeitar consentimento e opção de revogação quando aplicável.'],
@@ -52,9 +52,9 @@ const documents = {
     description: 'Subprocessadores técnicos usados ou preparados pela Zerou.',
     path: '/legal/subprocessors',
     sections: [
-      ['Firebase / Google Cloud', 'Autenticação, Firestore, Storage, infraestrutura de banco de dados, logs técnicos e recursos de backend quando configurados.'],
+      ['Firebase / Google Cloud', 'Autenticação, banco de dados, infraestrutura técnica, logs de segurança e recursos de backend quando configurados.'],
       ['Vercel', 'Hospedagem do frontend, entrega de assets, previews, produção e logs técnicos de deploy.'],
-      ['Stripe', 'Infraestrutura de billing preparada para uso futuro. Como a Zerou está gratuita nesta etapa, checkout e cobrança não ficam ativos para usuários finais.'],
+      ['Pagamento futuro', 'Fornecedor de pagamento poderá ser usado se a Zerou oferecer planos pagos no futuro. Como a Zerou está gratuita nesta etapa, não há cobrança ativa para usuários finais.'],
       ['Provedor de email', 'Envio de emails transacionais pode ser configurado no futuro para autenticação, suporte e avisos operacionais.'],
       ['Atualizações', 'A lista pode mudar quando fornecedores forem adicionados, removidos ou substituídos. Mudanças relevantes devem ser refletidas nesta página.']
     ]

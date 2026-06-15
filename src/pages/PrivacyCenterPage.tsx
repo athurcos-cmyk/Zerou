@@ -65,7 +65,7 @@ export function PrivacyCenterPage() {
       });
       setMessage({ type: 'success', text: `Solicitação registrada: ${requestId}.` });
     } catch {
-      setMessage({ type: 'danger', text: 'Não foi possível registrar a solicitação agora. Confira as regras Firestore publicadas.' });
+      setMessage({ type: 'danger', text: 'Não foi possível registrar a solicitação agora. Tente novamente em instantes.' });
     } finally {
       setLoadingAction(null);
     }
@@ -108,8 +108,8 @@ export function PrivacyCenterPage() {
         <p className="eyebrow">Centro de privacidade</p>
         <h1 className="marketing-title">Controle seus dados e preferências.</h1>
         <p className="marketing-copy">
-          A Zerou usa armazenamento local necessário para login, tema e funcionamento do PWA. Solicitações LGPD criam um
-          protocolo no Firestore quando você está logado.
+          A Zerou usa armazenamento local necessário para login, tema e funcionamento no celular. Solicitações LGPD criam um
+          protocolo quando você está logado.
         </p>
 
         {message ? <FormMessage type={message.type}>{message.text}</FormMessage> : null}
@@ -153,7 +153,7 @@ export function PrivacyCenterPage() {
               <Users size={22} aria-hidden="true" />
             </span>
             <h2>Sair do espaço compartilhado</h2>
-            <p>Essa ação fica dentro do app autenticado para preservar contexto, membership e auditoria.</p>
+            <p>Essa ação fica dentro do app para preservar o contexto da sua conta e o histórico de segurança.</p>
             <Link className="button button--secondary" to="/app/shared">
               Abrir Compartilhado
             </Link>

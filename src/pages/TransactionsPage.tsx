@@ -27,8 +27,8 @@ export function TransactionsPage() {
       <div className="page-heading-row">
         <div>
           <p className="eyebrow">Transações</p>
-          <h1 className="page-title">Movimentos do seu espaço.</h1>
-          <p className="page-description">Receitas, despesas, transferências e ajustes explícitos com escrita offline-first.</p>
+          <h1 className="page-title">Entradas e gastos.</h1>
+          <p className="page-description">Veja tudo que entrou, saiu ou foi transferido no seu espaço pessoal.</p>
         </div>
         <Link className="button button--primary" to="/app/transactions/new">
           Nova transação

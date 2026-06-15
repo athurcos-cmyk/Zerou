@@ -1221,20 +1221,56 @@ html[data-reduce-motion='true'] *::after {
   padding: clamp(2rem, 6vw, 4rem) 0 0;
 }
 
+.launch-hero .marketing-hero-grid {
+  perspective: 70rem;
+}
+
 .launch-headline {
   max-width: 13ch;
 }
 
 .launch-preview {
+  position: relative;
+  z-index: 0;
   display: grid;
   gap: 1rem;
-  border: 1px solid var(--border-subtle);
-  border-radius: 1.35rem;
+  width: min(100%, 22rem);
+  justify-self: center;
+  border: 0.55rem solid var(--text-primary);
+  border-radius: 2rem;
   background:
     linear-gradient(150deg, var(--bg-surface), var(--bg-surface-subtle)),
     var(--bg-surface);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-lg);
   padding: 1rem;
+  transform: rotateX(8deg) rotateY(-12deg) rotateZ(2deg);
+  transform-style: preserve-3d;
+}
+
+.launch-preview::before {
+  position: absolute;
+  top: -0.2rem;
+  left: 50%;
+  width: 5.5rem;
+  height: 0.7rem;
+  border-radius: 0 0 999px 999px;
+  background: var(--text-primary);
+  content: '';
+  transform: translateX(-50%);
+}
+
+.launch-preview::after {
+  position: absolute;
+  z-index: -1;
+  right: -1.3rem;
+  bottom: -1.4rem;
+  left: 1.2rem;
+  height: 4rem;
+  border-radius: 50%;
+  background: var(--bg-overlay);
+  filter: blur(1.4rem);
+  content: '';
+  transform: translateZ(-2rem);
 }
 
 .preview-phone-top,
@@ -1258,6 +1294,7 @@ html[data-reduce-motion='true'] *::after {
   border-radius: 1rem;
   background: var(--bg-surface);
   padding: 1.25rem;
+  transform: translateZ(1.25rem);
 }
 
 .preview-balance strong {
@@ -1285,6 +1322,7 @@ html[data-reduce-motion='true'] *::after {
   color: var(--text-secondary);
   padding: 0.85rem;
   font-weight: 800;
+  transform: translateZ(0.8rem);
 }
 
 .public-section {
@@ -1521,6 +1559,11 @@ html[data-reduce-motion='true'] *::after {
 
   .launch-headline {
     max-width: 12ch;
+  }
+
+  .launch-preview {
+    width: min(92vw, 21rem);
+    transform: rotateX(5deg) rotateY(-7deg) rotateZ(1deg);
   }
 
   .split-section,

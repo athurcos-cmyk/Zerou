@@ -9,6 +9,7 @@ import { recurringFrequencies, type CreateRecurringRuleInput } from '../finance/
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
 import { useFinanceData } from '../finance/useFinanceData';
+import { getUserFacingErrorMessage } from '../utils/userFacingError';
 
 export function RecurringPage() {
   const { user, profile } = useAuth();
@@ -27,7 +28,7 @@ export function RecurringPage() {
     setMessage(null);
 
     if (!workspaceId || !user) {
-      setMessage('Conclua o onboarding antes de criar recorrências.');
+      setMessage('Conclua seu cadastro inicial antes de criar recorrências.');
       return;
     }
 
@@ -47,7 +48,7 @@ export function RecurringPage() {
       setAccountId('');
       setCategoryId('');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Não foi possível criar a recorrência agora.');
+      setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar a recorrência agora.'));
     }
   }
 
@@ -56,8 +57,8 @@ export function RecurringPage() {
       <div className="page-heading-row">
         <div>
           <p className="eyebrow">Recorrências</p>
-          <h1 className="page-title">Regras simples.</h1>
-          <p className="page-description">Recorrências ativas entram como previsão no disponível livre v1.</p>
+          <h1 className="page-title">Gastos que se repetem.</h1>
+          <p className="page-description">Salve assinaturas, mensalidades e contas fixas para lembrar antes do vencimento.</p>
         </div>
         <Repeat size={28} aria-hidden="true" />
       </div>
