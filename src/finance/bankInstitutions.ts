@@ -6,10 +6,11 @@ export interface BankInstitution {
   aliases: string[];
   initials: string;
   suggestedType: AccountType;
+  logoPath?: string;
 }
 
 export const bankInstitutions: BankInstitution[] = [
-  { id: 'nubank', name: 'Nubank', aliases: ['nu', 'nuconta', 'roxinho'], initials: 'nu', suggestedType: 'digital_wallet' },
+  { id: 'nubank', name: 'Nubank', aliases: ['nu', 'nuconta', 'roxinho'], initials: 'nu', suggestedType: 'digital_wallet', logoPath: '/bank-logos/nubank.svg' },
   { id: 'itau', name: 'Itaú', aliases: ['itau', 'itaú', 'iti'], initials: 'itaú', suggestedType: 'checking' },
   { id: 'bradesco', name: 'Bradesco', aliases: ['next'], initials: 'bra', suggestedType: 'checking' },
   { id: 'banco-do-brasil', name: 'Banco do Brasil', aliases: ['bb', 'banco brasil'], initials: 'BB', suggestedType: 'checking' },
@@ -19,10 +20,10 @@ export const bankInstitutions: BankInstitution[] = [
   { id: 'c6', name: 'C6 Bank', aliases: ['c6', 'c6bank'], initials: 'C6', suggestedType: 'digital_wallet' },
   { id: 'btg', name: 'BTG Pactual', aliases: ['btg', 'btg banking', 'btg investimentos'], initials: 'btg', suggestedType: 'investment' },
   { id: 'xp', name: 'XP', aliases: ['xp investimentos'], initials: 'XP', suggestedType: 'investment' },
-  { id: 'picpay', name: 'PicPay', aliases: ['pic pay'], initials: 'pic', suggestedType: 'digital_wallet' },
-  { id: 'mercado-pago', name: 'Mercado Pago', aliases: ['mercadopago', 'mercado livre'], initials: 'mp', suggestedType: 'digital_wallet' },
+  { id: 'picpay', name: 'PicPay', aliases: ['pic pay'], initials: 'pic', suggestedType: 'digital_wallet', logoPath: '/bank-logos/picpay.svg' },
+  { id: 'mercado-pago', name: 'Mercado Pago', aliases: ['mercadopago', 'mercado livre'], initials: 'mp', suggestedType: 'digital_wallet', logoPath: '/bank-logos/mercado-pago.svg' },
   { id: 'pagbank', name: 'PagBank', aliases: ['pagseguro', 'pag seguro'], initials: 'pag', suggestedType: 'digital_wallet' },
-  { id: 'neon', name: 'Neon', aliases: ['banco neon'], initials: 'Ne', suggestedType: 'digital_wallet' },
+  { id: 'neon', name: 'Neon', aliases: ['banco neon'], initials: 'Ne', suggestedType: 'digital_wallet', logoPath: '/bank-logos/neon.svg' },
   { id: 'original', name: 'Banco Original', aliases: ['original'], initials: 'BO', suggestedType: 'checking' },
   { id: 'safra', name: 'Safra', aliases: ['banco safra'], initials: 'Sf', suggestedType: 'checking' },
   { id: 'sicoob', name: 'Sicoob', aliases: ['sicoob cooperativa'], initials: 'Sc', suggestedType: 'checking' },
@@ -30,7 +31,7 @@ export const bankInstitutions: BankInstitution[] = [
   { id: 'banrisul', name: 'Banrisul', aliases: ['banco do estado do rio grande do sul'], initials: 'Ba', suggestedType: 'checking' },
   { id: 'pan', name: 'Banco PAN', aliases: ['pan'], initials: 'PN', suggestedType: 'checking' },
   { id: 'bmg', name: 'Banco BMG', aliases: ['bmg'], initials: 'BM', suggestedType: 'checking' },
-  { id: 'modal', name: 'Modal', aliases: ['modalmais', 'modal mais'], initials: 'Mo', suggestedType: 'investment' },
+  { id: 'modal', name: 'Modal', aliases: ['modalmais', 'modal mais'], initials: 'Mo', suggestedType: 'investment', logoPath: '/bank-logos/modal.svg' },
   { id: 'will', name: 'Will Bank', aliases: ['will'], initials: 'Wi', suggestedType: 'digital_wallet' },
   { id: 'bv', name: 'Banco BV', aliases: ['bv financeira'], initials: 'BV', suggestedType: 'checking' },
   { id: 'agibank', name: 'Agibank', aliases: ['agi'], initials: 'Ag', suggestedType: 'checking' },
@@ -40,8 +41,8 @@ export const bankInstitutions: BankInstitution[] = [
   { id: 'master', name: 'Banco Master', aliases: ['master'], initials: 'Ma', suggestedType: 'investment' },
   { id: 'stone', name: 'Stone', aliases: ['stone conta'], initials: 'St', suggestedType: 'digital_wallet' },
   { id: 'infinitepay', name: 'InfinitePay', aliases: ['infinite pay'], initials: 'IP', suggestedType: 'digital_wallet' },
-  { id: 'wise', name: 'Wise', aliases: ['transferwise'], initials: 'Ws', suggestedType: 'digital_wallet' },
-  { id: 'nomad', name: 'Nomad', aliases: ['nomad global'], initials: 'No', suggestedType: 'digital_wallet' },
+  { id: 'wise', name: 'Wise', aliases: ['transferwise'], initials: 'Ws', suggestedType: 'digital_wallet', logoPath: '/bank-logos/wise.svg' },
+  { id: 'nomad', name: 'Nomad', aliases: ['nomad global'], initials: 'No', suggestedType: 'digital_wallet', logoPath: '/bank-logos/nomad.svg' },
   { id: 'avenue', name: 'Avenue', aliases: ['avenue securities'], initials: 'Av', suggestedType: 'investment' },
   { id: 'rico', name: 'Rico', aliases: ['rico investimentos'], initials: 'Rc', suggestedType: 'investment' },
   { id: 'clear', name: 'Clear', aliases: ['clear corretora'], initials: 'Cl', suggestedType: 'investment' },

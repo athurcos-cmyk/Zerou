@@ -824,6 +824,19 @@ html[data-reduce-motion='true'] *::after {
   text-transform: uppercase;
 }
 
+.bank-mark--has-logo {
+  background: var(--bg-surface);
+  border-color: var(--border-subtle);
+  color: var(--text-primary);
+}
+
+.bank-mark__logo {
+  display: block;
+  width: 1.35rem;
+  height: 1.35rem;
+  object-fit: contain;
+}
+
 .bank-mark--nubank,
 .bank-mark--xp,
 .bank-mark--rico,

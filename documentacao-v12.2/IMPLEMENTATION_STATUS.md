@@ -58,6 +58,7 @@ Gate da Fase 6: passou para uso gratuito atual com landing clara/mobile-first, m
 - Rodada pos-Fase 6: contas financeiras sem vinculos agora sao excluidas fisicamente do Firestore; se houver lancamentos, contas a pagar ou recorrencias ligadas, a UI bloqueia a exclusao e orienta remover/alterar os vinculos primeiro, sem arquivar/ocultar automaticamente.
 - Rodada pos-Fase 6: cadastro de conta financeira ganhou sugestoes de instituicao com busca por nome/alias e badge visual local preparado para evoluir para asset pack de logos oficiais.
 - Rodada pos-Fase 6: sugestoes e lista de contas financeiras ganharam marcas compactas locais por instituicao, com cores por grupo e monogramas curtos, sem carregar imagens externas.
+- Rodada pos-Fase 6: primeira leva de SVGs oficiais/locais de instituicoes em `public/bank-logos/` gerada a partir de `simple-icons@16.23.0` para Nubank, PicPay, Mercado Pago, Neon, Modal, Wise e Nomad; bancos sem SVG disponivel continuam com marcador local ate entrada de assets oficiais.
 - Fase 2: Firestore metadata `hasPendingWrites` usado para mostrar `pending` sem criar fila paralela em Dexie.
 - Fase 2: opcao de logout com limpeza de cache local do Firestore para dispositivo compartilhado.
 - Fase 2: Security Rules publicadas para accounts, categories, transactions, bills e recurring por membership ativa e campos protegidos.
@@ -210,6 +211,13 @@ documentacao-v12.2/QA_SCENARIOS.md
 | `npm test` na rodada marcas compactas de bancos | passou | 9 arquivos, 36 testes unitarios. |
 | `npm run build` na rodada marcas compactas de bancos | passou | Bundle PWA gerado: `assets/index-_2_jawYY.js`; aviso de chunk inicial > 500 kB permanece. |
 | `npm run test:e2e` na rodada marcas compactas de bancos | passou | 10 testes Playwright publicos continuam passando. |
+| `npm run generate:bank-logos` na rodada SVGs oficiais de bancos | passou | Gerou SVGs locais em `public/bank-logos/` e `SOURCES.md` com origem. |
+| `npm run typecheck` na rodada SVGs oficiais de bancos | passou | TypeScript strict validado apos `logoPath` por instituicao. |
+| `npm run lint` na rodada SVGs oficiais de bancos | passou | ESLint sem erros apos ajustar o script gerador. |
+| `npm test` na rodada SVGs oficiais de bancos | passou | 9 arquivos, 37 testes unitarios; inclui regressao para `logoPath` local. |
+| `npm run build` na rodada SVGs oficiais de bancos | passou | Bundle PWA gerado: `assets/index-Bb0GEQmA.js`; aviso de chunk inicial > 500 kB permanece. |
+| `npm run test:e2e` na rodada SVGs oficiais de bancos | passou | 10 testes Playwright publicos continuam passando. |
+| `npm audit --omit=dev` na rodada SVGs oficiais de bancos | passou | 0 vulnerabilidades em dependencias de producao; `simple-icons` fica como devDependency para geracao de assets locais. |
 | `npm run typecheck` na rodada UX simples/3D | passou | TypeScript strict validado apos mensagens humanas, copy limpa, bloqueio de fundacao e landing 3D. |
 | `npm run lint` na rodada UX simples/3D | passou | ESLint sem erros. |
 | `npm test` na rodada UX simples/3D | passou | 8 arquivos, 34 testes unitarios; inclui regressao para erro Zod virar mensagem de usuario. |

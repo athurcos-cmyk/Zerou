@@ -198,11 +198,21 @@ export function AccountsPage() {
 }
 
 function BankMark({ institution }: { institution: BankInstitution | null }) {
-  const className = institution ? `bank-mark bank-mark--${institution.id}` : 'bank-mark bank-mark--generic';
+  const className = [
+    'bank-mark',
+    institution ? `bank-mark--${institution.id}` : 'bank-mark--generic',
+    institution?.logoPath ? 'bank-mark--has-logo' : ''
+  ].filter(Boolean).join(' ');
 
   return (
     <span className={className} aria-hidden="true">
-      {institution ? <span className="bank-mark__text">{institution.initials}</span> : <Building2 size={16} />}
+      {institution?.logoPath ? (
+        <img className="bank-mark__logo" src={institution.logoPath} alt="" loading="lazy" />
+      ) : institution ? (
+        <span className="bank-mark__text">{institution.initials}</span>
+      ) : (
+        <Building2 size={16} />
+      )}
     </span>
   );
 }

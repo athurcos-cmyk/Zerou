@@ -15,6 +15,7 @@
     "test:watch": "vitest",
     "test:rules": "firebase emulators:exec --only firestore,storage \"vitest run tests/firestore.rules.test.ts tests/storage.rules.test.ts --config vite.config.ts\"",
     "test:e2e": "playwright test",
+    "generate:bank-logos": "node scripts/generate-bank-logos.mjs",
     "functions:build": "npm --prefix functions run build",
     "emulators": "firebase emulators:start --only auth,firestore,storage,functions,hosting"
   },
@@ -57,6 +58,7 @@
     "globals": "^17.6.0",
     "jsdom": "^29.1.1",
     "postcss": "^8.5.15",
+    "simple-icons": "^16.23.0",
     "tailwindcss": "^4.3.1",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.61.0",
