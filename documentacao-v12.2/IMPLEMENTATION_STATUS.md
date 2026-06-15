@@ -57,6 +57,7 @@ Gate da Fase 6: passou para uso gratuito atual com landing clara/mobile-first, m
 - Fase 2: cadastro rapido mobile de transacao com valor, tipo, descricao, categoria, conta, data e avancado recolhido.
 - Rodada pos-Fase 6: contas financeiras sem vinculos agora sao excluidas fisicamente do Firestore; se houver lancamentos, contas a pagar ou recorrencias ligadas, a UI bloqueia a exclusao e orienta remover/alterar os vinculos primeiro, sem arquivar/ocultar automaticamente.
 - Rodada pos-Fase 6: cadastro de conta financeira ganhou sugestoes de instituicao com busca por nome/alias e badge visual local preparado para evoluir para asset pack de logos oficiais.
+- Rodada pos-Fase 6: sugestoes e lista de contas financeiras ganharam marcas compactas locais por instituicao, com cores por grupo e monogramas curtos, sem carregar imagens externas.
 - Fase 2: Firestore metadata `hasPendingWrites` usado para mostrar `pending` sem criar fila paralela em Dexie.
 - Fase 2: opcao de logout com limpeza de cache local do Firestore para dispositivo compartilhado.
 - Fase 2: Security Rules publicadas para accounts, categories, transactions, bills e recurring por membership ativa e campos protegidos.
@@ -204,6 +205,11 @@ documentacao-v12.2/QA_SCENARIOS.md
 | `npm run test:functions` na rodada exclusao fisica de conta financeira | passou | 5 arquivos, 13 testes. |
 | `npm run test:rules` na rodada exclusao fisica de conta financeira | bloqueado por ambiente | Firebase CLI falhou antes dos emuladores: `java -version` saiu com codigo 3221226505. |
 | `npx firebase deploy --only firestore:rules,firestore:indexes --project zerou-26757` na rodada exclusao fisica de conta financeira | passou | Rules compilaram e foram publicadas; delete de account document agora e permitido para membro ativo no Firestore real. |
+| `npm run typecheck` na rodada marcas compactas de bancos | passou | TypeScript strict validado apos visual local por instituicao. |
+| `npm run lint` na rodada marcas compactas de bancos | passou | ESLint sem erros. |
+| `npm test` na rodada marcas compactas de bancos | passou | 9 arquivos, 36 testes unitarios. |
+| `npm run build` na rodada marcas compactas de bancos | passou | Bundle PWA gerado: `assets/index-_2_jawYY.js`; aviso de chunk inicial > 500 kB permanece. |
+| `npm run test:e2e` na rodada marcas compactas de bancos | passou | 10 testes Playwright publicos continuam passando. |
 | `npm run typecheck` na rodada UX simples/3D | passou | TypeScript strict validado apos mensagens humanas, copy limpa, bloqueio de fundacao e landing 3D. |
 | `npm run lint` na rodada UX simples/3D | passou | ESLint sem erros. |
 | `npm test` na rodada UX simples/3D | passou | 8 arquivos, 34 testes unitarios; inclui regressao para erro Zod virar mensagem de usuario. |
