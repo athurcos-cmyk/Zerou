@@ -5,11 +5,11 @@
 ## Resumo
 
 ```text
-Fase atual: 1 implementada em modo Spark/free
-Ultima fase concluida: 1. Fundacao SaaS
-Ambiente validado: local com emuladores; Vercel publico sem erro de render
+Fase atual: 2 implementada em modo Spark/free
+Ultima fase concluida: 2. Motor financeiro essencial
+Ambiente validado: local sem emuladores por bloqueio Java; Firestore Rules compiladas e publicadas; Vercel pendente deste commit
 Ultima atualizacao: 2026-06-14
-Gate da Fase 1: passou localmente; producao serve bundle Spark/free, onboarding foi desbloqueado apos rules Spark e auto-refresh PWA esta publicado.
+Gate da Fase 2: implementacao, build, dominio e deploy de rules passaram; teste automatizado de rules/offline segue bloqueado pelo Java local.
 ```
 
 ## Estado por fase
@@ -17,7 +17,7 @@ Gate da Fase 1: passou localmente; producao serve bundle Spark/free, onboarding 
 | Fase | Status | Gate | Observacoes |
 |---|---|---|---|
 | 1. Fundacao SaaS | implemented / Spark mode | local passou; Firestore rules publicadas | Fundacao React/Firebase/PWA entregue. Cloud Functions removidas do caminho ativo para manter plano Spark/free. |
-| 2. Motor financeiro essencial | pending | transacao offline sincroniza sem duplicar | Nao iniciar antes do prompt da Fase 2. |
+| 2. Motor financeiro essencial | implemented / Spark mode | build passou; rules publicadas; offline automatizado bloqueado por Java | Contas, transacoes, dashboard v1, bills, recorrencias, busca e sync status implementados sem Cloud Functions. |
 | 3. Cartoes e faturas | pending | ledger parcial e dupla contagem testados | Nao iniciado. |
 | 4. Espaco compartilhado | pending | casal sem vazamento pessoal | Convite pendente so e preservado localmente. |
 | 5. Billing Stripe custom | pending | webhook idempotente + entitlements | Nao iniciado. |
@@ -47,6 +47,17 @@ Gate da Fase 1: passou localmente; producao serve bundle Spark/free, onboarding 
 - Firestore Rules com isolamento por membership e bloqueio de campos protegidos.
 - Storage Rules inicialmente fechadas.
 - `.env.example`, `.firebaserc.example`, `firebase.json`, `firestore.rules`, `storage.rules`, indexes e docs locais.
+- Fase 2: tipos canonicos de `Account`, `Category`, `Transaction`, `Bill` e `RecurringRule`.
+- Fase 2: servicos Firestore client-side para contas, categorias padrao, transacoes, bills e recorrencias.
+- Fase 2: IDs client-side e `clientMutationId` idempotente para transacoes.
+- Fase 2: dinheiro parseado e persistido como inteiros em centavos.
+- Fase 2: saldo derivado por dominio puro, com receita, despesa, transferencia, ajuste e soft delete.
+- Fase 2: dashboard v1 com saldo total, disponivel livre v1, valor comprometido, proximos compromissos, transacoes recentes, acoes rapidas e sync status.
+- Fase 2: rotas `/app/dashboard`, `/app/transactions`, `/app/transactions/new`, `/app/transactions/:transactionId/edit`, `/app/accounts`, `/app/bills`, `/app/recurring` e `/app/search`.
+- Fase 2: cadastro rapido mobile de transacao com valor, tipo, descricao, categoria, conta, data e avancado recolhido.
+- Fase 2: Firestore metadata `hasPendingWrites` usado para mostrar `pending` sem criar fila paralela em Dexie.
+- Fase 2: opcao de logout com limpeza de cache local do Firestore para dispositivo compartilhado.
+- Fase 2: Security Rules publicadas para accounts, categories, transactions, bills e recurring por membership ativa e campos protegidos.
 
 ## Decisao Firestore vs Realtime Database
 
@@ -74,6 +85,7 @@ src/vite-env.d.ts
 src/App.tsx
 src/firebase/config.ts
 src/auth/*
+src/finance/*
 src/layout/AppShell.tsx
 src/onboarding/OnboardingPage.tsx
 src/pages/*
@@ -108,6 +120,13 @@ docs/MANUAL_SETUP_REQUIRED.md
 | `npm run test:e2e` apos auto-refresh PWA | passou | 1 teste Playwright da landing publica. |
 | `npm run test:rules` apos auto-refresh PWA | bloqueado por ambiente | Firebase CLI falhou antes dos emuladores: `java -version` saiu com codigo 3221226505; Java local/PATH precisa ser corrigido para reexecutar emuladores. Rules nao foram alteradas nesta mudanca. |
 | HTTP live `https://zerou-five.vercel.app` apos auto-refresh PWA | passou | HTML publico serve `assets/index-34_EQCq0.js`; `sw.js` responde 200 com `Cache-Control: no-cache, no-store, must-revalidate`, `skipWaiting` e `clientsClaim`. |
+| `npm run typecheck` na Fase 2 | passou | TypeScript strict validado apos dominio financeiro, telas e rules tests. |
+| `npm run lint` na Fase 2 | passou | ESLint sem erros. |
+| `npm test` na Fase 2 | passou | 3 arquivos, 10 testes unitarios; cobre dominio financeiro, temas e hardcoded colors. |
+| `npm run build` na Fase 2 | passou | Bundle gerado: `assets/index-ChTxLlxD.js`; aviso de chunk inicial > 500 kB permanece. |
+| `npm run test:e2e` na Fase 2 | passou | 1 teste Playwright da landing publica. |
+| `npm run test:rules` na Fase 2 | bloqueado por ambiente | Emulator Suite ainda falha em `java -version` com codigo 3221226505; pastas locais de JDK nao possuem `bin/java.exe` e `winget` nao esta disponivel. |
+| `npx firebase-tools deploy --only firestore:rules,firestore:indexes --project zerou-26757` na Fase 2 | passou | Rules novas compilaram e foram publicadas no Firestore real. |
 
 ## Pendencias manuais externas
 
@@ -122,13 +141,15 @@ docs/MANUAL_SETUP_REQUIRED.md
 - [x] Fazer novo deploy Vercel com o bundle Spark/free deste commit.
 - [ ] Validar onboarding em producao ate cair no dashboard vazio.
 - [ ] Corrigir instalacao Java/PATH local para permitir `firebase emulators:exec` novamente.
+- [ ] Validar manualmente em producao: criar conta financeira, registrar receita, despesa, bill e conferir dashboard.
+- [ ] Reexecutar `npm run test:rules` e um teste offline automatizado assim que Java funcional estiver no PATH.
 ```
 
 ## Limitacoes conhecidas
 
 ```text
-- O dashboard esta vazio por decisao de escopo; nao ha motor financeiro nem dados financeiros persistidos.
-- A primeira conta opcional do onboarding ficou apenas sinalizada para a Fase 2 para nao antecipar o motor financeiro.
+- O teste automatizado de regras/offline depende do Java local, que esta quebrado neste computador.
+- O dashboard agora e real, mas nao inclui cartoes/faturas; o ponto de extensao fica reservado para a Fase 3.
 - Rotas publicas de pricing, legal, ajuda e afins sao placeholders; landing completa pertence a Fase 6.
 - O build mostra aviso de chunk inicial > 500 kB por causa do bundle com SDKs; otimizar com code splitting depois.
 - `npm audit` reportou vulnerabilidades moderadas transitivas em dependencias de ferramentas; nao foi aplicado `audit fix --force`.
@@ -141,13 +162,18 @@ docs/MANUAL_SETUP_REQUIRED.md
 | 2026-06-14 | `/users/{uid}` | Preferencias de aparencia e fundacao Spark implementadas conforme contrato da Fase 1. | Nao para usuarios novos; usuarios parciais criados antes da mudanca podem precisar recriar conta ou limpeza manual. |
 | 2026-06-14 | `/workspaces/{workspaceId}` e `/members/{uid}` | Criacao do workspace pessoal agora e client-side transacional, validada por Rules. | Nao para usuarios novos. |
 | 2026-06-14 | `firestore.rules` | Rules permitem somente criacao atomica da propria fundacao e atualizacao posterior de aparencia. | Publicar rules no Firebase real. |
+| 2026-06-14 | `/workspaces/{workspaceId}/accounts/{accountId}` | Conta financeira da Fase 2 implementada conforme contrato canonico. | Nao para usuarios novos. |
+| 2026-06-14 | `/workspaces/{workspaceId}/categories/{categoryId}` | Categorias padrao idempotentes implementadas por IDs deterministico. | Nao para usuarios novos. |
+| 2026-06-14 | `/workspaces/{workspaceId}/transactions/{transactionId}` | Transacoes com `clientMutationId`, `syncStatus`, soft delete e versao implementadas. | Nao para usuarios novos. |
+| 2026-06-14 | `/workspaces/{workspaceId}/bills/{billId}` | Contas a pagar basicas entram no disponivel livre v1. | Nao. |
+| 2026-06-14 | `/workspaces/{workspaceId}/recurring/{recurringId}` | Regras recorrentes basicas entram como compromissos previstos. | Nao. |
 
 ## Proxima fase
 
 ```text
-Prompt a executar: documentacao-v12.2/prompts/02-MOTOR-FINANCEIRO-ESSENCIAL.md
-Pre-condicoes: Auth providers habilitados, `.env.local` preenchido, Firestore rules publicadas, Vercel com bundle Spark/free e onboarding validado no deploy publico.
-Arquivos que o proximo agente deve ler: README-START-HERE.md, documentacao-v12.2/README.md, ZEROU-V12.2-ESPECIFICACAO-MESTRA.md, CONTRATOS-CANONICOS.md, THEME-SYSTEM.md, BRAND-GUIDELINES.md, BRAND-ASSET-INTEGRATION.md, PRODUCT-COPY-CANONICAL.md, IMPLEMENTATION_STATUS.md e o prompt da Fase 2.
+Prompt a executar: documentacao-v12.2/prompts/03-CARTOES-E-FATURAS.md
+Pre-condicoes: Auth providers habilitados, `.env.local` preenchido, Firestore rules da Fase 2 publicadas, Vercel com bundle da Fase 2 e fluxo financeiro essencial validado manualmente.
+Arquivos que o proximo agente deve ler: README-START-HERE.md, documentacao-v12.2/README.md, ZEROU-V12.2-ESPECIFICACAO-MESTRA.md, CONTRATOS-CANONICOS.md, THEME-SYSTEM.md, BRAND-GUIDELINES.md, BRAND-ASSET-INTEGRATION.md, PRODUCT-COPY-CANONICAL.md, IMPLEMENTATION_STATUS.md e o prompt da Fase 3.
 ```
 
 ## Verificacao do sistema de temas

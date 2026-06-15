@@ -5,14 +5,21 @@ import { AppearanceSyncBridge } from './settings/AppearanceSyncBridge';
 import { ThemeRuntime } from './theme/ThemeRuntime';
 import { AppShell } from './layout/AppShell';
 import { AppearanceSettingsPage } from './settings/AppearanceSettingsPage';
+import { AccountsPage } from './pages/AccountsPage';
+import { BillsPage } from './pages/BillsPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { EditTransactionPage } from './pages/EditTransactionPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { JoinInvitePage } from './pages/JoinInvitePage';
 import { LoginMethodsPage } from './settings/LoginMethodsPage';
 import { LoginPage } from './pages/LoginPage';
+import { NewTransactionPage } from './pages/NewTransactionPage';
 import { OnboardingPage } from './onboarding/OnboardingPage';
 import { PublicHomePage } from './pages/PublicHomePage';
+import { RecurringPage } from './pages/RecurringPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { SearchPage } from './pages/SearchPage';
+import { TransactionsPage } from './pages/TransactionsPage';
 import { VerifyEmailPage } from './pages/VerifyEmailPage';
 
 export function App() {
@@ -34,6 +41,14 @@ export function App() {
             <Route path="onboarding" element={<OnboardingPage />} />
             <Route element={<RequireOnboardingComplete />}>
               <Route index element={<DashboardPage />} />
+              <Route path="dashboard" element={<DashboardPage />} />
+              <Route path="transactions" element={<TransactionsPage />} />
+              <Route path="transactions/new" element={<NewTransactionPage />} />
+              <Route path="transactions/:transactionId/edit" element={<EditTransactionPage />} />
+              <Route path="accounts" element={<AccountsPage />} />
+              <Route path="bills" element={<BillsPage />} />
+              <Route path="recurring" element={<RecurringPage />} />
+              <Route path="search" element={<SearchPage />} />
               <Route path="settings/appearance" element={<AppearanceSettingsPage />} />
               <Route path="settings/security/login-methods" element={<LoginMethodsPage />} />
             </Route>

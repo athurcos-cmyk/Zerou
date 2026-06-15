@@ -1,5 +1,16 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { Home, LogOut, Palette, Plus, ReceiptText, Shield, WalletCards } from 'lucide-react';
+import {
+  CalendarClock,
+  Home,
+  LogOut,
+  Palette,
+  Plus,
+  ReceiptText,
+  Repeat,
+  Search,
+  Shield,
+  WalletCards
+} from 'lucide-react';
 import { BrandLockup, BrandLogo } from '../components/BrandLogo';
 import { logout } from '../auth/authService';
 import { useAuth } from '../auth/AuthContext';
@@ -11,6 +22,22 @@ function getNavClass({ isActive }: { isActive: boolean }) {
 export function AppShell() {
   const { user, profile } = useAuth();
 
+  async function handleClearLocalDataLogout() {
+    const confirmed = window.confirm(
+      'Sair e limpar o cache local deste dispositivo? Use isso em computador compartilhado ou quando precisar descartar dados offline.'
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await logout({ clearLocalCache: true });
+    } catch {
+      await logout();
+    }
+  }
+
   return (
     <div className="app-layout">
       <aside className="sidebar" aria-label="Navegação principal">
@@ -18,6 +45,21 @@ export function AppShell() {
         <nav className="sidebar-nav">
           <NavLink className={getNavClass} to="/app" end>
             <Home size={19} aria-hidden="true" /> Início
+          </NavLink>
+          <NavLink className={getNavClass} to="/app/accounts">
+            <WalletCards size={19} aria-hidden="true" /> Contas
+          </NavLink>
+          <NavLink className={getNavClass} to="/app/transactions">
+            <ReceiptText size={19} aria-hidden="true" /> Transações
+          </NavLink>
+          <NavLink className={getNavClass} to="/app/bills">
+            <CalendarClock size={19} aria-hidden="true" /> Compromissos
+          </NavLink>
+          <NavLink className={getNavClass} to="/app/recurring">
+            <Repeat size={19} aria-hidden="true" /> Recorrências
+          </NavLink>
+          <NavLink className={getNavClass} to="/app/search">
+            <Search size={19} aria-hidden="true" /> Busca
           </NavLink>
           <NavLink className={getNavClass} to="/app/settings/appearance">
             <Palette size={19} aria-hidden="true" /> Aparência
@@ -28,8 +70,11 @@ export function AppShell() {
         </nav>
         <div className="sidebar-footer">
           <p className="text-secondary">{profile?.name ?? user?.email}</p>
-          <button className="button button--ghost" type="button" onClick={logout}>
+          <button className="button button--ghost" type="button" onClick={() => void logout()}>
             <LogOut size={18} aria-hidden="true" /> Sair
+          </button>
+          <button className="button button--ghost" type="button" onClick={() => void handleClearLocalDataLogout()}>
+            Limpar dados locais
           </button>
         </div>
       </aside>
@@ -52,15 +97,15 @@ export function AppShell() {
           <Home size={20} aria-hidden="true" />
           <span>Início</span>
         </NavLink>
-        <button className="nav-link" type="button" disabled title="Transações entram na Fase 2" aria-label="Transações">
+        <NavLink className={getNavClass} to="/app/transactions" aria-label="Transações">
           <ReceiptText size={20} aria-hidden="true" />
-        </button>
-        <button className="nav-link" type="button" disabled title="Ações financeiras entram na Fase 2" aria-label="Adicionar">
+        </NavLink>
+        <NavLink className={getNavClass} to="/app/transactions/new" aria-label="Adicionar transação">
           <Plus size={22} aria-hidden="true" />
-        </button>
-        <button className="nav-link" type="button" disabled title="Relatórios entram nas próximas fases" aria-label="Relatórios">
+        </NavLink>
+        <NavLink className={getNavClass} to="/app/accounts" aria-label="Contas">
           <WalletCards size={20} aria-hidden="true" />
-        </button>
+        </NavLink>
         <NavLink className={getNavClass} to="/app/settings/appearance" aria-label="Mais">
           <Palette size={20} aria-hidden="true" />
           <span>Mais</span>

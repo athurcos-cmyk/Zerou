@@ -199,6 +199,349 @@ service cloud.firestore {
         && get(currentMemberDoc(workspaceId)).data.status == 'active';
     }
 
+    function validShortText(value, minSize, maxSize) {
+      return value is string && value.size() >= minSize && value.size() <= maxSize;
+    }
+
+    function validOptionalString(fieldName, maxSize) {
+      return !request.resource.data.keys().hasAny([fieldName])
+        || (request.resource.data[fieldName] is string && request.resource.data[fieldName].size() <= maxSize);
+    }
+
+    function validMoneyCents(value) {
+      return value is int && value >= 0 && value <= 1000000000000;
+    }
+
+    function validSignedMoneyCents(value) {
+      return value is int && value >= -1000000000000 && value <= 1000000000000;
+    }
+
+    function validMonthKey(value) {
+      return value is string && value.matches('^\\d{4}-\\d{2}$');
+    }
+
+    function validTags() {
+      return request.resource.data.tags is list && request.resource.data.tags.size() <= 8;
+    }
+
+    function validAccountCreate(workspaceId, accountId) {
+      return isActiveMember(workspaceId)
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'workspaceId',
+          'name',
+          'type',
+          'openingBalanceCents',
+          'isActive',
+          'createdBy',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.id == accountId
+        && request.resource.data.workspaceId == workspaceId
+        && validShortText(request.resource.data.name, 2, 80)
+        && request.resource.data.type in ['checking', 'savings', 'wallet', 'investment', 'digital_wallet', 'cash', 'shared']
+        && validSignedMoneyCents(request.resource.data.openingBalanceCents)
+        && request.resource.data.isActive is bool
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validAccountUpdate(workspaceId) {
+      return isActiveMember(workspaceId)
+        && request.resource.data.workspaceId == resource.data.workspaceId
+        && request.resource.data.workspaceId == workspaceId
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.openingBalanceCents == resource.data.openingBalanceCents
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'type', 'isActive', 'updatedAt'])
+        && validShortText(request.resource.data.name, 2, 80)
+        && request.resource.data.type in ['checking', 'savings', 'wallet', 'investment', 'digital_wallet', 'cash', 'shared']
+        && request.resource.data.isActive is bool
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validCategoryCreate(workspaceId, categoryId) {
+      return isActiveMember(workspaceId)
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'workspaceId',
+          'name',
+          'type',
+          'parentCategoryId',
+          'icon',
+          'isDefault',
+          'isActive',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.id == categoryId
+        && request.resource.data.workspaceId == workspaceId
+        && validShortText(request.resource.data.name, 2, 80)
+        && request.resource.data.type in ['income', 'expense', 'both']
+        && validOptionalString('parentCategoryId', 120)
+        && validOptionalString('icon', 40)
+        && request.resource.data.isDefault is bool
+        && request.resource.data.isActive is bool
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validCategoryUpdate(workspaceId) {
+      return isActiveMember(workspaceId)
+        && request.resource.data.workspaceId == resource.data.workspaceId
+        && request.resource.data.workspaceId == workspaceId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name',
+          'type',
+          'parentCategoryId',
+          'icon',
+          'isActive',
+          'updatedAt'
+        ])
+        && validShortText(request.resource.data.name, 2, 80)
+        && request.resource.data.type in ['income', 'expense', 'both']
+        && validOptionalString('parentCategoryId', 120)
+        && validOptionalString('icon', 40)
+        && request.resource.data.isActive is bool
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validPhase2TransactionType() {
+      return request.resource.data.type in ['income', 'expense', 'transfer', 'adjustment', 'refund', 'reimbursement'];
+    }
+
+    function validTransactionAccounts(workspaceId) {
+      return request.resource.data.accountId is string
+        && exists(/databases/$(database)/documents/workspaces/$(workspaceId)/accounts/$(request.resource.data.accountId))
+        && (
+          request.resource.data.type != 'transfer'
+          ? !request.resource.data.keys().hasAny(['destinationAccountId'])
+          : (
+            request.resource.data.destinationAccountId is string
+            && request.resource.data.destinationAccountId != request.resource.data.accountId
+            && exists(/databases/$(database)/documents/workspaces/$(workspaceId)/accounts/$(request.resource.data.destinationAccountId))
+          )
+        );
+    }
+
+    function validTransactionCreate(workspaceId, transactionId) {
+      return isActiveMember(workspaceId)
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'workspaceId',
+          'createdBy',
+          'updatedBy',
+          'type',
+          'amountCents',
+          'description',
+          'merchant',
+          'categoryId',
+          'accountId',
+          'destinationAccountId',
+          'date',
+          'competenceMonth',
+          'cashMonth',
+          'tags',
+          'notes',
+          'isRecurring',
+          'recurringId',
+          'installmentGroupId',
+          'clientMutationId',
+          'syncStatus',
+          'version',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.id == transactionId
+        && request.resource.data.workspaceId == workspaceId
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.updatedBy == request.auth.uid
+        && validPhase2TransactionType()
+        && validMoneyCents(request.resource.data.amountCents)
+        && validShortText(request.resource.data.description, 2, 120)
+        && validOptionalString('merchant', 120)
+        && validOptionalString('categoryId', 120)
+        && validOptionalString('notes', 500)
+        && validOptionalString('recurringId', 120)
+        && validOptionalString('installmentGroupId', 120)
+        && request.resource.data.date is timestamp
+        && validMonthKey(request.resource.data.competenceMonth)
+        && validMonthKey(request.resource.data.cashMonth)
+        && validTags()
+        && request.resource.data.isRecurring is bool
+        && request.resource.data.clientMutationId == transactionId
+        && request.resource.data.syncStatus == 'synced'
+        && request.resource.data.version == 1
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && validTransactionAccounts(workspaceId);
+    }
+
+    function validTransactionUpdate(workspaceId) {
+      return isActiveMember(workspaceId)
+        && request.resource.data.workspaceId == resource.data.workspaceId
+        && request.resource.data.workspaceId == workspaceId
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.clientMutationId == resource.data.clientMutationId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'updatedBy',
+          'type',
+          'amountCents',
+          'description',
+          'merchant',
+          'categoryId',
+          'accountId',
+          'destinationAccountId',
+          'date',
+          'competenceMonth',
+          'cashMonth',
+          'tags',
+          'notes',
+          'isRecurring',
+          'recurringId',
+          'installmentGroupId',
+          'syncStatus',
+          'version',
+          'deletedAt',
+          'updatedAt'
+        ])
+        && request.resource.data.updatedBy == request.auth.uid
+        && validPhase2TransactionType()
+        && validMoneyCents(request.resource.data.amountCents)
+        && validShortText(request.resource.data.description, 2, 120)
+        && validOptionalString('merchant', 120)
+        && validOptionalString('categoryId', 120)
+        && validOptionalString('notes', 500)
+        && validOptionalString('recurringId', 120)
+        && validOptionalString('installmentGroupId', 120)
+        && request.resource.data.date is timestamp
+        && validMonthKey(request.resource.data.competenceMonth)
+        && validMonthKey(request.resource.data.cashMonth)
+        && validTags()
+        && request.resource.data.isRecurring is bool
+        && request.resource.data.syncStatus in ['synced', 'pending', 'failed']
+        && request.resource.data.version == resource.data.version + 1
+        && (!request.resource.data.keys().hasAny(['deletedAt']) || request.resource.data.deletedAt == request.time)
+        && request.resource.data.updatedAt == request.time
+        && validTransactionAccounts(workspaceId);
+    }
+
+    function validBillCreate(workspaceId, billId) {
+      return isActiveMember(workspaceId)
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'workspaceId',
+          'description',
+          'amountCents',
+          'dueDate',
+          'status',
+          'categoryId',
+          'accountId',
+          'recurringId',
+          'createdBy',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.id == billId
+        && request.resource.data.workspaceId == workspaceId
+        && validShortText(request.resource.data.description, 2, 120)
+        && validMoneyCents(request.resource.data.amountCents)
+        && request.resource.data.dueDate is timestamp
+        && request.resource.data.status in ['pending', 'paid', 'overdue', 'cancelled']
+        && validOptionalString('categoryId', 120)
+        && validOptionalString('accountId', 120)
+        && validOptionalString('recurringId', 120)
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validBillUpdate(workspaceId) {
+      return isActiveMember(workspaceId)
+        && request.resource.data.workspaceId == resource.data.workspaceId
+        && request.resource.data.workspaceId == workspaceId
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'description',
+          'amountCents',
+          'dueDate',
+          'status',
+          'categoryId',
+          'accountId',
+          'recurringId',
+          'updatedAt'
+        ])
+        && validShortText(request.resource.data.description, 2, 120)
+        && validMoneyCents(request.resource.data.amountCents)
+        && request.resource.data.dueDate is timestamp
+        && request.resource.data.status in ['pending', 'paid', 'overdue', 'cancelled']
+        && validOptionalString('categoryId', 120)
+        && validOptionalString('accountId', 120)
+        && validOptionalString('recurringId', 120)
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validRecurringCreate(workspaceId, recurringId) {
+      return isActiveMember(workspaceId)
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'workspaceId',
+          'description',
+          'amountCents',
+          'frequency',
+          'nextOccurrenceAt',
+          'accountId',
+          'categoryId',
+          'isActive',
+          'createdBy',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.id == recurringId
+        && request.resource.data.workspaceId == workspaceId
+        && validShortText(request.resource.data.description, 2, 120)
+        && (!request.resource.data.keys().hasAny(['amountCents']) || validMoneyCents(request.resource.data.amountCents))
+        && request.resource.data.frequency in ['weekly', 'monthly', 'yearly']
+        && request.resource.data.nextOccurrenceAt is timestamp
+        && validOptionalString('accountId', 120)
+        && validOptionalString('categoryId', 120)
+        && request.resource.data.isActive is bool
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validRecurringUpdate(workspaceId) {
+      return isActiveMember(workspaceId)
+        && request.resource.data.workspaceId == resource.data.workspaceId
+        && request.resource.data.workspaceId == workspaceId
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'description',
+          'amountCents',
+          'frequency',
+          'nextOccurrenceAt',
+          'accountId',
+          'categoryId',
+          'isActive',
+          'updatedAt'
+        ])
+        && validShortText(request.resource.data.description, 2, 120)
+        && (!request.resource.data.keys().hasAny(['amountCents']) || validMoneyCents(request.resource.data.amountCents))
+        && request.resource.data.frequency in ['weekly', 'monthly', 'yearly']
+        && request.resource.data.nextOccurrenceAt is timestamp
+        && validOptionalString('accountId', 120)
+        && validOptionalString('categoryId', 120)
+        && request.resource.data.isActive is bool
+        && request.resource.data.updatedAt == request.time;
+    }
+
     match /users/{uid} {
       allow read: if isSelf(uid);
       allow create: if validUserFoundationCreate(uid);
@@ -221,6 +564,41 @@ service cloud.firestore {
         allow read: if isActiveMember(workspaceId);
         allow create: if validMemberFoundationCreate(workspaceId, uid);
         allow update, delete: if false;
+      }
+
+      match /accounts/{accountId} {
+        allow read: if isActiveMember(workspaceId);
+        allow create: if validAccountCreate(workspaceId, accountId);
+        allow update: if validAccountUpdate(workspaceId);
+        allow delete: if false;
+      }
+
+      match /categories/{categoryId} {
+        allow read: if isActiveMember(workspaceId);
+        allow create: if validCategoryCreate(workspaceId, categoryId);
+        allow update: if validCategoryUpdate(workspaceId);
+        allow delete: if false;
+      }
+
+      match /transactions/{transactionId} {
+        allow read: if isActiveMember(workspaceId);
+        allow create: if validTransactionCreate(workspaceId, transactionId);
+        allow update: if validTransactionUpdate(workspaceId);
+        allow delete: if false;
+      }
+
+      match /bills/{billId} {
+        allow read: if isActiveMember(workspaceId);
+        allow create: if validBillCreate(workspaceId, billId);
+        allow update: if validBillUpdate(workspaceId);
+        allow delete: if false;
+      }
+
+      match /recurring/{recurringId} {
+        allow read: if isActiveMember(workspaceId);
+        allow create: if validRecurringCreate(workspaceId, recurringId);
+        allow update: if validRecurringUpdate(workspaceId);
+        allow delete: if false;
       }
 
       match /{document=**} {

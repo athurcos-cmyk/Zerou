@@ -14,7 +14,8 @@ import {
   updateProfile,
   type User
 } from 'firebase/auth';
-import { getFirebaseAuth } from '../firebase/config';
+import { clearIndexedDbPersistence, terminate } from 'firebase/firestore';
+import { getFirebaseAuth, getFirebaseDb } from '../firebase/config';
 
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
@@ -43,8 +44,17 @@ export async function sendResetEmail(email: string) {
   await sendPasswordResetEmail(getFirebaseAuth(), email);
 }
 
-export async function logout() {
-  await signOut(getFirebaseAuth());
+export async function logout(options?: { clearLocalCache?: boolean }) {
+  const auth = getFirebaseAuth();
+  const db = getFirebaseDb();
+
+  await signOut(auth);
+
+  if (options?.clearLocalCache) {
+    await terminate(db);
+    await clearIndexedDbPersistence(db);
+    window.location.reload();
+  }
 }
 
 export async function sendVerification(user: User) {

@@ -1,52 +1,137 @@
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight, CalendarClock, Plus, ReceiptText, Wallet } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { formatMoney } from '../finance/money';
+import { toDateInputValue } from '../finance/financeDates';
+import { transactionTypeLabels } from '../finance/financeLabels';
+import { SyncStatusBadge } from '../finance/SyncStatusBadge';
+import { useFinanceData } from '../finance/useFinanceData';
 
 export function DashboardPage() {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
+  const workspaceId = profile?.defaultWorkspaceId;
+  const finance = useFinanceData(workspaceId, user?.uid);
+
+  const syncStatus = finance.pendingWrites ? 'pending' : 'synced';
 
   return (
     <section className="page-content">
-      <p className="eyebrow">Dashboard vazio</p>
-      <h1 className="page-title">Seu espaço Zerou está pronto.</h1>
-      <p className="page-description">
-        {profile?.defaultWorkspaceId
-          ? 'A fundação foi criada com workspace pessoal isolado. Nenhum dado financeiro foi criado nesta fase.'
-          : 'Conclua o onboarding para criar seu workspace pessoal isolado.'}
-      </p>
+      <div className="page-heading-row">
+        <div>
+          <p className="eyebrow">Dashboard Zerou</p>
+          <h1 className="page-title">Seu dinheiro, seus compromissos.</h1>
+          <p className="page-description">
+            Acompanhe saldo, disponível livre e próximos vencimentos do seu espaço pessoal.
+          </p>
+        </div>
+        <SyncStatusBadge status={syncStatus} />
+      </div>
 
-      <div className="dashboard-grid">
-        <article className="surface surface-pad">
-          <p className="eyebrow">Workspace</p>
-          <h2>Privado por padrão</h2>
-          <p className="text-secondary">O acesso depende de membership ativa e regras Firestore.</p>
+      {finance.error ? <div className="notice notice--danger">{finance.error}</div> : null}
+
+      <div className="metric-grid">
+        <article className="surface surface-pad metric-card">
+          <span className="metric-icon">
+            <Wallet size={20} aria-hidden="true" />
+          </span>
+          <p className="eyebrow">Saldo total</p>
+          <strong>{formatMoney(finance.dashboard.totalBalanceCents)}</strong>
+          <span className="text-secondary">Soma das contas ativas.</span>
         </article>
-        <article className="surface surface-pad">
-          <p className="eyebrow">Temas</p>
-          <h2>Preferência individual</h2>
-          <p className="text-secondary">Cada usuário escolhe a própria aparência, inclusive em espaços compartilhados.</p>
+        <article className="surface surface-pad metric-card">
+          <span className="metric-icon">
+            <ReceiptText size={20} aria-hidden="true" />
+          </span>
+          <p className="eyebrow">Disponível livre v1</p>
+          <strong>{formatMoney(finance.dashboard.freeToSpendCents)}</strong>
+          <span className="text-secondary">Saldo menos compromissos previstos.</span>
         </article>
-        <article className="surface surface-pad">
-          <p className="eyebrow">Próximo passo</p>
-          <h2>Motor financeiro</h2>
-          <p className="text-secondary">Contas, transações e saldos entram somente na Fase 2.</p>
+        <article className="surface surface-pad metric-card">
+          <span className="metric-icon">
+            <CalendarClock size={20} aria-hidden="true" />
+          </span>
+          <p className="eyebrow">Comprometido</p>
+          <strong>{formatMoney(finance.dashboard.committedCents)}</strong>
+          <span className="text-secondary">Bills e recorrências até o próximo corte.</span>
         </article>
       </div>
 
-      <div className="surface empty-panel" style={{ marginTop: '1rem' }}>
-        <div className="empty-panel-inner">
-          <span className="empty-icon">
-            <Sparkles size={26} aria-hidden="true" />
-          </span>
-          <h2>Nada para calcular ainda.</h2>
-          <p className="text-secondary">
-            O dashboard está intencionalmente vazio: sem dados fake, sem saldos simulados e sem persistir informações
-            financeiras antes da fase correta.
-          </p>
-          <Link className="button button--primary" to="/app/settings/appearance">
-            Ajustar aparência <ArrowRight size={18} aria-hidden="true" />
-          </Link>
-        </div>
+      <div className="quick-actions">
+        <Link className="button button--primary" to="/app/transactions/new">
+          <Plus size={18} aria-hidden="true" /> Nova transação
+        </Link>
+        <Link className="button button--secondary" to="/app/accounts">
+          Criar conta
+        </Link>
+        <Link className="button button--secondary" to="/app/bills">
+          Novo compromisso
+        </Link>
+      </div>
+
+      <div className="finance-grid">
+        <article className="surface surface-pad">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Próximos compromissos</p>
+              <h2>O que vence primeiro</h2>
+            </div>
+            <Link className="inline-link" to="/app/bills">
+              Ver todos
+            </Link>
+          </div>
+          {finance.dashboard.upcomingCommitments.length > 0 ? (
+            <div className="item-list">
+              {finance.dashboard.upcomingCommitments.map((commitment) => (
+                <div className="list-row" key={`${commitment.kind}-${commitment.id}`}>
+                  <div>
+                    <strong>{commitment.description}</strong>
+                    <span className="text-secondary">
+                      {commitment.kind === 'bill' ? 'Conta a pagar' : 'Recorrência'} ·{' '}
+                      {toDateInputValue(commitment.dueAt)}
+                    </span>
+                  </div>
+                  <strong>{formatMoney(commitment.amountCents)}</strong>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-secondary">Nenhum compromisso pendente no período.</p>
+          )}
+        </article>
+
+        <article className="surface surface-pad">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Transações recentes</p>
+              <h2>Últimos movimentos</h2>
+            </div>
+            <Link className="inline-link" to="/app/transactions">
+              Ver todas
+            </Link>
+          </div>
+          {finance.dashboard.recentTransactions.length > 0 ? (
+            <div className="item-list">
+              {finance.dashboard.recentTransactions.map((transaction) => (
+                <div className="list-row" key={transaction.id}>
+                  <div>
+                    <strong>{transaction.description}</strong>
+                    <span className="text-secondary">
+                      {transactionTypeLabels[transaction.type]} · {toDateInputValue(transaction.date)}
+                    </span>
+                  </div>
+                  <strong>{formatMoney(transaction.amountCents)}</strong>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-copy">
+              <p className="text-secondary">Nenhuma transação ainda. Crie sua primeira conta e registre uma entrada.</p>
+              <Link className="inline-link" to="/app/transactions/new">
+                Começar agora <ArrowRight size={16} aria-hidden="true" />
+              </Link>
+            </div>
+          )}
+        </article>
       </div>
     </section>
   );

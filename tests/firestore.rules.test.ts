@@ -7,7 +7,7 @@ import {
 } from '@firebase/rules-unit-testing';
 import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { doc, getDoc, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
+import { Timestamp, doc, getDoc, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 
 let testEnv: RulesTestEnvironment;
 type TestFirestore = ReturnType<RulesTestContext['firestore']>;
@@ -88,6 +88,55 @@ function createFoundationBatch(db: TestFirestore, uid: string, overrides: Record
     ...workspaceRefOverrides
   });
   return batch;
+}
+
+function accountPayload(workspaceId: string, accountId: string, uid: string, overrides: Record<string, unknown> = {}) {
+  const now = serverTimestamp();
+
+  return {
+    id: accountId,
+    workspaceId,
+    name: 'Conta teste',
+    type: 'checking',
+    openingBalanceCents: 10000,
+    isActive: true,
+    createdBy: uid,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides
+  };
+}
+
+function transactionPayload(
+  workspaceId: string,
+  transactionId: string,
+  uid: string,
+  accountId: string,
+  overrides: Record<string, unknown> = {}
+) {
+  const now = serverTimestamp();
+
+  return {
+    id: transactionId,
+    workspaceId,
+    createdBy: uid,
+    updatedBy: uid,
+    type: 'expense',
+    amountCents: 12345,
+    description: 'Mercado',
+    accountId,
+    date: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
+    competenceMonth: '2026-06',
+    cashMonth: '2026-06',
+    tags: [],
+    isRecurring: false,
+    clientMutationId: transactionId,
+    syncStatus: 'synced',
+    version: 1,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides
+  };
 }
 
 describe('firestore security rules', () => {
@@ -236,5 +285,69 @@ describe('firestore security rules', () => {
     const anonymousDb = testEnv.unauthenticatedContext().firestore();
 
     await expect(assertFails(getDoc(doc(anonymousDb, 'workspaces/workspaceA')))).resolves.toBeDefined();
+  });
+
+  it('allows an active member to create a financial account in their workspace', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(
+      setDoc(doc(aliceDb, 'workspaces/workspaceA/accounts/accountA'), accountPayload('workspaceA', 'accountA', 'alice'))
+    );
+  });
+
+  it('blocks a user from writing financial accounts in another workspace', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertFails(
+      setDoc(doc(aliceDb, 'workspaces/workspaceB/accounts/accountB'), accountPayload('workspaceB', 'accountB', 'alice'))
+    );
+  });
+
+  it('allows a member to create a transaction only for an account in the same workspace', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(
+      setDoc(doc(aliceDb, 'workspaces/workspaceA/accounts/accountA'), accountPayload('workspaceA', 'accountA', 'alice'))
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/transactions/txnA'),
+        transactionPayload('workspaceA', 'txnA', 'alice', 'accountA')
+      )
+    );
+  });
+
+  it('blocks protected financial transaction fields from being forged', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(
+      setDoc(doc(aliceDb, 'workspaces/workspaceA/accounts/accountA'), accountPayload('workspaceA', 'accountA', 'alice'))
+    );
+    await assertFails(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/transactions/txnForged'),
+        transactionPayload('workspaceB', 'txnForged', 'bob', 'accountA', {
+          workspaceId: 'workspaceB',
+          createdBy: 'bob'
+        })
+      )
+    );
+  });
+
+  it('blocks cross-workspace transaction reads', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    const bobDb = testEnv.authenticatedContext('bob').firestore();
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const adminDb = context.firestore();
+      await setDoc(doc(adminDb, 'workspaces/workspaceB/transactions/txnB'), {
+        ...transactionPayload('workspaceB', 'txnB', 'bob', 'accountB'),
+        createdAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
+        updatedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00'))
+      });
+    });
+
+    await assertSucceeds(getDoc(doc(bobDb, 'workspaces/workspaceB/transactions/txnB')));
+    await assertFails(getDoc(doc(aliceDb, 'workspaces/workspaceB/transactions/txnB')));
   });
 });
