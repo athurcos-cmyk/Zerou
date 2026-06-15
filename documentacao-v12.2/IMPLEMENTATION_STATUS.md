@@ -194,6 +194,7 @@ documentacao-v12.2/QA_SCENARIOS.md
 | `npm run functions:build` na rodada contas financeiras | passou | Functions continuam compilando. |
 | `npm run test:functions` na rodada contas financeiras | passou | 5 arquivos, 13 testes. |
 | `npm run test:rules` na rodada contas financeiras | bloqueado por ambiente | Firebase CLI falhou antes dos emuladores: `java -version` saiu com codigo 3221226505. |
+| HTTP live `https://zerou-five.vercel.app` apos rodada contas financeiras | passou | Vercel serviu `assets/index-Cafo2iPN.js`; smoke validou landing e rota protegida `/app/accounts` redirecionando para login quando sem sessao. |
 | `npm run typecheck` na rodada UX simples/3D | passou | TypeScript strict validado apos mensagens humanas, copy limpa, bloqueio de fundacao e landing 3D. |
 | `npm run lint` na rodada UX simples/3D | passou | ESLint sem erros. |
 | `npm test` na rodada UX simples/3D | passou | 8 arquivos, 34 testes unitarios; inclui regressao para erro Zod virar mensagem de usuario. |
