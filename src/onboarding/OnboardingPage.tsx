@@ -39,6 +39,14 @@ export function OnboardingPage() {
     }
   }, [navigate, profile?.defaultWorkspaceId]);
 
+  useEffect(() => {
+    const nextName = profile?.name ?? user?.displayName ?? '';
+
+    if (nextName && !form.getValues('name')) {
+      form.setValue('name', nextName, { shouldDirty: false });
+    }
+  }, [form, profile?.name, user?.displayName]);
+
   async function onSubmit(values: OnboardingForm) {
     setBusy(true);
     setMessage(null);
