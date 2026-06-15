@@ -5,11 +5,11 @@
 ## Resumo
 
 ```text
-Fase atual: 5 implementada com scaffold Stripe custom; deploy cloud de Functions bloqueado por Blaze/secrets
-Ultima fase concluida: 5. Billing Stripe custom
+Fase atual: 6 implementada em modo de lancamento gratuito
+Ultima fase concluida: 6. Lancamento, landing, juridico draft e privacidade
 Ambiente validado: local sem emuladores por bloqueio Java; Firestore Rules compiladas e publicadas; build/e2e/unitarios/functions passaram
 Ultima atualizacao: 2026-06-15
-Gate da Fase 5: scaffold, testes locais, webhook signature, idempotencia documental, entitlements e Rules passaram; Checkout Test Mode real fica bloqueado ate Blaze, secrets Stripe, Price IDs e webhook externo serem configurados.
+Gate da Fase 6: passou para uso gratuito atual com landing, legal draft, cookies, privacy center, docs operacionais, QA local e rules publicadas; producao publica ampla ainda depende de checklist manual/juridico/App Check/backups.
 ```
 
 ## Estado por fase
@@ -20,8 +20,8 @@ Gate da Fase 5: scaffold, testes locais, webhook signature, idempotencia documen
 | 2. Motor financeiro essencial | implemented / Spark mode | build passou; rules publicadas; offline automatizado bloqueado por Java | Contas, transacoes, dashboard v1, bills, recorrencias, busca e sync status implementados sem Cloud Functions. |
 | 3. Cartoes e faturas | implemented / Spark mode | dominio, build, e2e e rules publicadas passaram; emulator bloqueado por Java | Ledger imutavel por rules e totais derivados no client; backend server-side fica pendente para etapa Blaze/Functions futura. |
 | 4. Espaco compartilhado | implemented / Spark mode | build, e2e, unitarios e rules publicadas passaram; emulator bloqueado por Java | Workspace do casal, convite de uso unico, QR/link, claims compartilhados e settlements implementados sem Cloud Functions. |
-| 5. Billing Stripe custom | implemented / cloud blocked | build, e2e, unitarios, functions e rules publicadas passaram; cloud E2E bloqueado por Blaze/secrets | Checkout/Portal callables, webhook assinado, billingEvents idempotentes, processor/retry, planCatalog e entitlements server-side implementados. |
-| 6. Lancamento | pending | landing, juridico e QA | Rotas publicas reservadas com placeholder. |
+| 5. Billing Stripe custom | implemented / future scaffold | build, e2e, unitarios, functions e rules publicadas passaram; cobranca ativa suspensa por decisao de produto | Checkout/Portal callables, webhook assinado, billingEvents idempotentes, processor/retry, planCatalog e entitlements server-side implementados para uso futuro. |
+| 6. Lancamento | implemented / free launch | landing, juridico draft, cookies, privacy center, docs e QA passaram; emulator bloqueado por Java | Rotas publicas reais, legal placeholders visiveis, consentimento sem analytics antes de opt-in e app 100% gratuito por enquanto. |
 
 ## O que foi implementado
 
@@ -87,6 +87,15 @@ Gate da Fase 5: scaffold, testes locais, webhook signature, idempotencia documen
 - Fase 5: Security Rules permitem leitura do proprio billing account/subscriptions, bloqueiam billingEvents ao client e impedem frontend de forjar entitlements.
 - Fase 5: criacao de workspace casal agora exige entitlement server-side `canCreateCoupleWorkspace` em `/billingAccounts/billing_{uid}`.
 - Fase 5: rota publica `/pricing` e tela autenticada `/app/settings/billing` implementadas, exibindo cobranca indisponivel quando Price IDs/secrets nao existem.
+- Decisao de lancamento: a Zerou fica 100% gratuita por enquanto; billing Stripe permanece como scaffold futuro e sem checkout ativo para usuarios.
+- Fase 6: landing publica completa em `/` com hero canonico, problema, como funciona, cartoes/faturas, pessoal/compartilhado, seguranca, planos gratuitos, FAQ, CTA final e footer.
+- Fase 6: rotas publicas reais `/features`, `/security`, `/help`, `/contact`, `/pricing`, `/privacy-center`, `/legal/terms`, `/legal/privacy`, `/legal/cookies` e `/legal/subprocessors`.
+- Fase 6: consentimento de cookies versionado com necessarios, preferencias, analytics e marketing; Analytics so inicializa apos opt-in.
+- Fase 6: Centro de Privacidade cria solicitacoes rastreaveis em `privacyRequests/{requestId}` para correcao, exportacao, exclusao, revogacao de marketing e ajuda de cache.
+- Fase 6: documentos legais draft em `docs/legal/` e UI legal com placeholders visiveis e aviso de revisao juridica pendente.
+- Fase 6: headers Vercel com CSP basica, `X-Robots-Tag` para app privado, `robots.txt`, `sitemap.xml`, meta tags e canonical.
+- Fase 6: docs operacionais criados em `ARCHITECTURE.md`, `SECURITY.md`, `PRIVACY.md`, `RUNBOOK.md` e `docs/PRODUCTION_CHECKLIST.md`.
+- Fase 6: adapter minimo de email em Functions cobre welcome, security, invite, billing failed, cancellation e LGPD request, bloqueando envio quando provider nao esta configurado.
 
 ## Decisao Firestore vs Realtime Database
 
@@ -109,9 +118,12 @@ storage.rules
 vercel.json
 functions/package.json
 functions/src/billing/*
+functions/src/email/*
 functions/src/index.ts
 functions/scripts/seedPlanCatalog.mjs
 public/brand/*
+public/robots.txt
+public/sitemap.xml
 src/main.tsx
 src/pwa/registerServiceWorker.ts
 src/vite-env.d.ts
@@ -126,6 +138,7 @@ src/domain/shared/*
 src/layout/AppShell.tsx
 src/onboarding/OnboardingPage.tsx
 src/pages/*
+src/privacy/*
 src/shared/*
 src/settings/*
 src/styles/themes.css
@@ -138,6 +151,12 @@ tests/e2e/public.spec.ts
 docs/MANUAL_SETUP_REQUIRED.md
 docs/BILLING.md
 docs/BOOTSTRAP_FIREBASE_STRIPE.md
+docs/PRODUCTION_CHECKLIST.md
+docs/legal/*
+ARCHITECTURE.md
+SECURITY.md
+PRIVACY.md
+RUNBOOK.md
 documentacao-v12.2/QA_SCENARIOS.md
 ```
 
@@ -193,6 +212,16 @@ documentacao-v12.2/QA_SCENARIOS.md
 | `npm run test:e2e` na Fase 5 | passou | 3 testes Playwright: landing, join invite e pricing. |
 | `npm run test:rules` na Fase 5 | bloqueado por ambiente | Firebase CLI falhou antes dos emuladores: `java -version` saiu com codigo 3221226505. Tests foram atualizados com billing entitlements, mas dependem do Java local funcional. |
 | `npx firebase deploy --only firestore:rules,firestore:indexes --project zerou-26757` na Fase 5 | passou | Rules de billing account, planCatalog e entitlement de casal compilaram e foram publicadas. |
+| `npm run typecheck` na Fase 6 | passou | TypeScript strict do app validado apos landing, legal, privacidade, cookies e free launch. |
+| `npm run lint` na Fase 6 | passou | ESLint sem erros. |
+| `npm test` na Fase 6 | passou | 7 arquivos, 32 testes unitarios; inclui consentimento de cookies. |
+| `npm run functions:build` na Fase 6 | passou | Functions compilam com adapter minimo de email e entitlements gratuitos. |
+| `npm run test:functions` na Fase 6 | passou | 5 arquivos, 13 testes; inclui email adapter sem fake send e free launch entitlement. |
+| `npm run build` na Fase 6 | passou | Bundle PWA gerado: `assets/index-D980VqvZ.js`; aviso de chunk inicial > 500 kB permanece. |
+| `npm run test:e2e` na Fase 6 | passou | 7 testes Playwright: landing canonica, cookies recusados sem analytics, join invite, pricing gratuito, legal placeholders, privacy center e rotas publicas. |
+| Screenshot Playwright desktop/mobile na Fase 6 | passou | Geradas em `test-results/fase6-desktop.png` e `test-results/fase6-mobile.png`; servidor temporario encerrado via script. |
+| `npm run test:rules` na Fase 6 | bloqueado por ambiente | Firebase CLI falhou antes dos emuladores: `java -version` saiu com codigo 3221226505. Tests foram atualizados para free launch e privacyRequests. |
+| `npx firebase deploy --only firestore:rules,firestore:indexes --project zerou-26757` na Fase 6 | passou | Rules de free launch e `privacyRequests` compilaram e foram publicadas no Firestore real. |
 
 ## Pendencias manuais externas
 
@@ -204,19 +233,19 @@ documentacao-v12.2/QA_SCENARIOS.md
 - [x] Configurar Vercel com as variaveis `VITE_FIREBASE_*`.
 - [x] Autorizar `zerou-five.vercel.app` em Firebase Auth -> Settings -> Authorized domains.
 - [ ] Criar bucket Storage em Firebase Console -> Storage -> Get Started, quando a fase que usar Storage chegar.
-- [x] Fazer novo deploy Vercel com o bundle Spark/free deste commit.
+- [ ] Fazer novo deploy Vercel com o bundle da Fase 6 deste commit.
 - [ ] Validar onboarding em producao ate cair no dashboard vazio.
+- [ ] Validar em producao: landing, pricing gratuito, legal, cookies e privacy center.
+- [ ] Substituir dominio/canonical `zerou-five.vercel.app` pelo dominio final quando existir.
+- [ ] Revisar juridicamente `docs/legal/*` antes de lancamento publico amplo.
+- [ ] Configurar emails oficiais de suporte e privacidade.
+- [ ] Configurar App Check, backups/restore e alertas de custo antes de producao publica ampla.
 - [ ] Corrigir instalacao Java/PATH local para permitir `firebase emulators:exec` novamente.
 - [ ] Validar manualmente em producao: criar conta financeira, registrar receita, despesa, bill e conferir dashboard.
 - [ ] Validar manualmente em producao: criar cartao, registrar compra, pagar fatura parcial e conferir saldo livre.
 - [ ] Validar manualmente em producao com dois usuarios reais: criar espaco do casal, gerar convite, aceitar, criar claim e registrar settlement.
 - [ ] Reexecutar `npm run test:rules` e um teste offline automatizado assim que Java funcional estiver no PATH.
-- [ ] Ativar Blaze antes de publicar Cloud Functions reais da Fase 5.
-- [ ] Configurar secrets `STRIPE_SECRET_KEY` e `STRIPE_WEBHOOK_SECRET`.
-- [ ] Criar produtos/precos Stripe Test Mode para Duo mensal/anual e Premium mensal/anual.
-- [ ] Popular `planCatalog` com Price IDs e precos via `npm --prefix functions run seed:plan-catalog`.
-- [ ] Deployar Functions da Fase 5 apos Blaze/secrets e cadastrar `stripeWebhook` no Stripe Dashboard.
-- [ ] Executar E2E cloud real: Checkout Test Mode, webhook, billing UI, Portal e cancelamento/alteracao.
+- [ ] Billing pago futuro: ativar Blaze, Stripe secrets, produtos/precos, `planCatalog`, Functions, webhook e E2E cloud somente se a decisao de produto mudar.
 ```
 
 ## Limitacoes conhecidas
@@ -226,11 +255,11 @@ documentacao-v12.2/QA_SCENARIOS.md
 - A Fase 3 roda em modo Spark/free: sem Cloud Functions, o client cria entradas de ledger sob Rules restritivas; uma versao backend/server-side pode substituir esse caminho quando o projeto aceitar Blaze.
 - A Fase 4 roda em modo Spark/free: convites, memberships, claims e settlements sao criados pelo client sob Rules restritivas; Cloud Functions podem endurecer rate limit, limpeza automatica e entitlement server-side no futuro.
 - Os agregados persistidos da fatura ficam protegidos por Rules e nao sao alterados pelo client; a UI deriva totais do ledger.
-- O entitlement de casal agora consulta billing server-side em `/billingAccounts/billing_{uid}`; a ativacao cloud depende do setup Stripe/Functions.
-- A Fase 5 tem scaffold real de billing, mas Checkout cloud nao foi marcado como ativo porque Blaze, secrets Stripe, Price IDs e endpoint webhook externo ainda nao estao configurados.
+- A Fase 5 tem scaffold real de billing, mas Checkout cloud nao fica ativo porque a decisao atual e manter a Zerou 100% gratuita.
 - As Cloud Functions nao foram deployadas nesta execucao para evitar ativar recurso pago sem preparacao externa. Apenas Firestore Rules/indexes foram publicados.
-- A partir da Fase 5, criar novo espaco compartilhado exige entitlement server-side Duo/Premium; usuarios Free existentes nao perdem dados, mas nao criam novo casal.
-- Rotas publicas de legal, ajuda e afins sao placeholders; `/pricing` ja exibe estrutura da Fase 5, e landing completa pertence a Fase 6.
+- Criar novo espaco compartilhado esta liberado no modo gratuito atual; billing pago futuro exigira nova decisao de produto e migracao controlada.
+- Rotas legais sao drafts com placeholders visiveis e revisao juridica pendente.
+- Privacy Center registra pedidos LGPD, mas exportacao/exclusao ainda exigem operacao manual ate automacao verificada.
 - O build mostra aviso de chunk inicial > 500 kB por causa do bundle com SDKs; otimizar com code splitting depois.
 - `npm audit` reportou vulnerabilidades moderadas transitivas em dependencias de ferramentas; nao foi aplicado `audit fix --force`.
 ```
@@ -261,14 +290,17 @@ documentacao-v12.2/QA_SCENARIOS.md
 | 2026-06-15 | `/billingAccounts/{billingAccountId}` | Billing account server-side com owner, customer Stripe, plano atual, status e entitlements. | Criado/atualizado por Functions; client nao escreve. |
 | 2026-06-15 | `/billingAccounts/{billingAccountId}/subscriptions/{subscriptionId}` | Snapshot server-side de assinatura Stripe sincronizada por webhook/processor. | Criado/atualizado por Functions. |
 | 2026-06-15 | `/billingAccounts/{billingAccountId}/billingEvents/{stripeEventId}` | Eventos Stripe persistidos uma vez, status de processamento, tentativas e erro redigido. | Client nao le; criado por webhook. |
-| 2026-06-15 | `firestore.rules` | Criacao de `couple` workspace agora exige `entitlements.canCreateCoupleWorkspace == true` no billing account server-side. | Usuarios Free nao criam novo casal; dados existentes preservados. |
+| 2026-06-15 | `firestore.rules` | Criacao de `couple` workspace agora respeita o modo gratuito de lancamento e aceita Free/no billing account, mantendo billing write fechado ao client. | Nao; usuarios Free podem criar espaco compartilhado enquanto esta decisao estiver ativa. |
+| 2026-06-15 | `/privacyRequests/{requestId}` | Solicitações LGPD client-side autenticadas com `correction`, `export`, `deletion`, `marketing_revocation` e `cache_help`; update/list/delete bloqueados ao client. | Nao; colecao nova. |
+| 2026-06-15 | `localStorage: zerou.cookieConsent.v1` | Consentimento versionado de cookies com necessarios, preferencias, analytics e marketing. | Nao; ausencia de registro equivale a sem consentimento opcional. |
+| 2026-06-15 | Rotas publicas `/features`, `/security`, `/help`, `/contact`, `/privacy-center`, `/legal/*` | Placeholders removidos; paginas reais de lancamento, privacidade e juridico draft implementadas. | Nao. |
 
-## Proxima fase
+## Proximo passo
 
 ```text
-Prompt a executar: documentacao-v12.2/prompts/06-LANCAMENTO-LANDING-JURIDICO.md
-Pre-condicoes: Auth providers habilitados, `.env.local` preenchido, Firestore rules da Fase 5 publicadas, Vercel com bundle da Fase 5, billing cloud configurado ou bloqueio externo mantido documentado.
-Arquivos que o proximo agente deve ler: README-START-HERE.md, documentacao-v12.2/README.md, ZEROU-V12.2-ESPECIFICACAO-MESTRA.md, CONTRATOS-CANONICOS.md, THEME-SYSTEM.md, BRAND-GUIDELINES.md, BRAND-ASSET-INTEGRATION.md, PRODUCT-COPY-CANONICAL.md, IMPLEMENTATION_STATUS.md, QA_SCENARIOS.md, docs/BILLING.md, docs/BOOTSTRAP_FIREBASE_STRIPE.md e o prompt da Fase 6.
+Nao avancar para novas funcionalidades antes de validar producao.
+Proximo passo recomendado: push em main, aguardar Vercel, smoke test em `https://zerou-five.vercel.app`, corrigir Java local para `npm run test:rules`, revisar checklist em `docs/PRODUCTION_CHECKLIST.md` e substituir placeholders juridicos antes de lancamento publico amplo.
+Arquivos que o proximo agente deve ler: README-START-HERE.md, documentacao-v12.2/README.md, ZEROU-V12.2-ESPECIFICACAO-MESTRA.md, CONTRATOS-CANONICOS.md, THEME-SYSTEM.md, BRAND-GUIDELINES.md, BRAND-ASSET-INTEGRATION.md, PRODUCT-COPY-CANONICAL.md, IMPLEMENTATION_STATUS.md, QA_SCENARIOS.md, ARCHITECTURE.md, SECURITY.md, PRIVACY.md, RUNBOOK.md e docs/PRODUCTION_CHECKLIST.md.
 ```
 
 ## Verificacao do sistema de temas

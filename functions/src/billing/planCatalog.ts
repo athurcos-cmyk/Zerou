@@ -4,7 +4,7 @@ export const planIds = ['free', 'duo', 'premium'] as const satisfies readonly Pl
 export const paidPlanIds = ['duo', 'premium'] as const satisfies readonly Exclude<PlanId, 'free'>[];
 
 export const freeEntitlements: Entitlements = {
-  canCreateCoupleWorkspace: false,
+  canCreateCoupleWorkspace: true,
   canUseAdvancedReports: false,
   canUseAutomationRules: false,
   canImportStatements: false,
@@ -13,7 +13,7 @@ export const freeEntitlements: Entitlements = {
   canUploadReceipts: false,
   canUseOcr: false,
   canUseAdvancedReconciliation: false,
-  maxTransactionsPerMonth: 250,
+  maxTransactionsPerMonth: 10000,
   maxReceiptStorageMb: 0,
   maxAutomationRules: 0
 };
@@ -43,8 +43,8 @@ export const premiumEntitlements: Entitlements = {
 export const defaultPlanCatalog: Record<PlanId, Omit<PlanCatalogItem, 'updatedAt'>> = {
   free: {
     id: 'free',
-    name: 'Free',
-    description: 'Base individual da Zerou para organizar o essencial.',
+    name: 'Gratuito',
+    description: 'Acesso gratuito ao app Zerou enquanto o produto amadurece.',
     active: true,
     monthlyPriceCents: 0,
     annualPriceCents: 0,
@@ -53,8 +53,8 @@ export const defaultPlanCatalog: Record<PlanId, Omit<PlanCatalogItem, 'updatedAt
   duo: {
     id: 'duo',
     name: 'Duo',
-    description: 'Espaco compartilhado para organizar a dois sem misturar o pessoal.',
-    active: true,
+    description: 'Espaco compartilhado incluso no acesso gratuito atual.',
+    active: false,
     monthlyPriceCents: 0,
     annualPriceCents: 0,
     entitlements: duoEntitlements
@@ -62,8 +62,8 @@ export const defaultPlanCatalog: Record<PlanId, Omit<PlanCatalogItem, 'updatedAt
   premium: {
     id: 'premium',
     name: 'Premium',
-    description: 'Recursos avancados para quem quer mais controle e exportacao.',
-    active: true,
+    description: 'Recursos avancados ficam reservados para uma decisao futura de produto.',
+    active: false,
     monthlyPriceCents: 0,
     annualPriceCents: 0,
     entitlements: premiumEntitlements
@@ -101,4 +101,3 @@ export async function findPlanByStripePriceId(db: FirebaseFirestore.Firestore, p
 
   return catalog.find((item) => item.stripeMonthlyPriceId === priceId || item.stripeAnnualPriceId === priceId) ?? null;
 }
-

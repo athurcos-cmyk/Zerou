@@ -10,6 +10,7 @@ import {
 } from 'firebase/firestore';
 import { getStorage, connectStorageEmulator, type FirebaseStorage } from 'firebase/storage';
 import { connectFunctionsEmulator, getFunctions, type Functions } from 'firebase/functions';
+import { hasAnalyticsConsent } from '../privacy/cookieConsent';
 
 interface FirebaseServices {
   app: FirebaseApp;
@@ -119,7 +120,7 @@ export function connectFirebaseEmulators() {
 }
 
 export async function initializeOptionalAnalytics() {
-  if (typeof window === 'undefined' || !hasMinimumFirebaseConfig() || !firebaseConfig.measurementId) {
+  if (typeof window === 'undefined' || !hasMinimumFirebaseConfig() || !firebaseConfig.measurementId || !hasAnalyticsConsent()) {
     return;
   }
 

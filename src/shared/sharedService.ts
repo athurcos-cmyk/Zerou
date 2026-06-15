@@ -166,7 +166,7 @@ export async function canCreateCoupleWorkspace(userId: string) {
   const entitlements = await getBillingEntitlementsForUser(userId);
 
   if (!entitlements.canCreateCoupleWorkspace) {
-    return { allowed: false, reason: 'O plano Duo ou Premium é necessário para criar um espaço compartilhado.' };
+    return { allowed: false, reason: 'Não foi possível liberar o espaço compartilhado gratuito para esta conta agora.' };
   }
 
   return { allowed: true };

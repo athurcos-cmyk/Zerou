@@ -190,7 +190,7 @@ html[data-reduce-motion='true'] *::after {
 .marketing-copy .headline {
   max-width: 12ch;
   font-size: clamp(3rem, 7vw, 5.9rem);
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
 }
 
 .marketing-copy .subtitle {
@@ -1044,6 +1044,296 @@ html[data-reduce-motion='true'] *::after {
   display: none;
 }
 
+.public-marketing-shell {
+  display: grid;
+  gap: clamp(2.5rem, 7vw, 5rem);
+  padding: 1.25rem;
+}
+
+.public-nav,
+.public-section,
+.public-footer {
+  width: min(100%, 76rem);
+  margin: 0 auto;
+}
+
+.public-nav {
+  position: sticky;
+  z-index: 20;
+  top: 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 1rem;
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-xs);
+  padding: 0.75rem;
+}
+
+.public-nav-links,
+.public-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.95rem;
+  color: var(--text-secondary);
+  font-weight: 800;
+}
+
+.public-nav-links a:hover,
+.public-footer-links a:hover {
+  color: var(--text-primary);
+}
+
+.launch-hero {
+  min-height: auto;
+  padding: clamp(2rem, 6vw, 4rem) 0 0;
+}
+
+.launch-headline {
+  max-width: 13ch;
+}
+
+.launch-preview {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 1.35rem;
+  background:
+    linear-gradient(150deg, var(--bg-surface), var(--bg-surface-subtle)),
+    var(--bg-surface);
+  box-shadow: var(--shadow-md);
+  padding: 1rem;
+}
+
+.preview-phone-top,
+.preview-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.preview-phone-top {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.preview-phone-top span {
+  min-height: 0.65rem;
+  border-radius: 999px;
+  background: var(--bg-surface-muted);
+}
+
+.preview-balance {
+  border: 1px solid var(--border-subtle);
+  border-radius: 1rem;
+  background: var(--bg-surface);
+  padding: 1.25rem;
+}
+
+.preview-balance strong {
+  display: block;
+  margin-top: 0.75rem;
+  font-size: clamp(1.65rem, 4vw, 2.6rem);
+  line-height: 1.05;
+}
+
+.preview-balance p:last-child {
+  color: var(--text-secondary);
+}
+
+.preview-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.preview-grid span {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.9rem;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  padding: 0.85rem;
+  font-weight: 800;
+}
+
+.public-section {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.public-section h1,
+.public-section h2,
+.public-section h3,
+.public-section p {
+  margin-top: 0;
+}
+
+.marketing-title {
+  margin: 0.75rem 0 0;
+  font-size: clamp(2.2rem, 5vw, 4.5rem);
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.marketing-copy {
+  max-width: 46rem;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  line-height: 1.7;
+}
+
+.split-section {
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
+  align-items: start;
+}
+
+.split-section > p,
+.split-section .contact-list {
+  color: var(--text-secondary);
+  font-size: 1.08rem;
+  line-height: 1.75;
+}
+
+.feature-grid,
+.privacy-action-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.feature-card,
+.privacy-action-card {
+  display: grid;
+  align-content: start;
+  gap: 0.75rem;
+}
+
+.feature-card svg,
+.privacy-action-card svg,
+.final-cta svg {
+  color: var(--action-primary);
+}
+
+.feature-card p,
+.privacy-action-card p,
+.faq-item p,
+.legal-section p {
+  color: var(--text-secondary);
+  line-height: 1.65;
+}
+
+.pricing-strip,
+.final-cta {
+  border: 1px solid var(--border-subtle);
+  border-radius: 1.25rem;
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
+  padding: clamp(1.25rem, 4vw, 2rem);
+}
+
+.pricing-strip {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.faq-grid {
+  grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr);
+  align-items: start;
+}
+
+.faq-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.faq-item summary {
+  color: var(--text-primary);
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.final-cta {
+  justify-items: start;
+  text-align: left;
+}
+
+.public-footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2rem;
+  border-top: 1px solid var(--border-subtle);
+  padding: 2rem 0;
+}
+
+.footer-cookie-button,
+.cookie-link {
+  background: transparent;
+  padding: 0;
+}
+
+.public-plan-grid {
+  width: min(100%, 76rem);
+  margin: 0 auto;
+}
+
+.legal-document {
+  max-width: 54rem;
+}
+
+.legal-section {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 1.25rem;
+}
+
+.privacy-center {
+  max-width: 76rem;
+}
+
+.contact-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.contact-list p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cookie-banner {
+  position: fixed;
+  z-index: 50;
+  right: 1rem;
+  bottom: 1rem;
+  display: grid;
+  width: min(36rem, calc(100% - 2rem));
+  gap: 1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 1rem;
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-md);
+  padding: 1rem;
+}
+
+.cookie-banner h2 {
+  margin: 0.35rem 0 0;
+}
+
+.cookie-options {
+  display: grid;
+  gap: 0.65rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.9rem;
+  background: var(--bg-surface-subtle);
+  padding: 0.85rem;
+}
+
+.cookie-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
 @media (max-width: 900px) {
   .marketing-hero {
     width: min(100% - 1.25rem, 42rem);
@@ -1063,6 +1353,45 @@ html[data-reduce-motion='true'] *::after {
   .marketing-copy .headline {
     max-width: 11ch;
     font-size: clamp(2.65rem, 13vw, 4.2rem);
+  }
+
+  .public-marketing-shell {
+    padding: 0.75rem;
+  }
+
+  .public-nav {
+    position: static;
+  }
+
+  .public-nav-links {
+    display: none;
+  }
+
+  .public-nav-actions .button--ghost {
+    display: none;
+  }
+
+  .launch-headline {
+    max-width: 12ch;
+  }
+
+  .split-section,
+  .feature-grid,
+  .privacy-action-grid,
+  .pricing-strip,
+  .faq-grid,
+  .public-footer {
+    grid-template-columns: 1fr;
+  }
+
+  .feature-grid,
+  .privacy-action-grid,
+  .public-footer {
+    display: grid;
+  }
+
+  .pricing-strip {
+    justify-items: start;
   }
 
   .marketing-proof {

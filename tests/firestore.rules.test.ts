@@ -412,6 +412,23 @@ function billingAccountPayload(uid: string, canCreateCoupleWorkspace: boolean, o
   };
 }
 
+function privacyRequestPayload(requestId: string, uid: string, overrides: Record<string, unknown> = {}) {
+  const now = serverTimestamp();
+
+  return {
+    id: requestId,
+    userId: uid,
+    email: `${uid}@zerou.test`,
+    type: 'export',
+    status: 'open',
+    notes: 'Solicitacao criada no centro de privacidade.',
+    version: 'zerou-v12.2-privacy-request',
+    createdAt: now,
+    updatedAt: now,
+    ...overrides
+  };
+}
+
 function createCoupleWorkspaceBatch(db: TestFirestore, workspaceId = 'coupleA', uid = 'alice') {
   const modularDb = db as unknown as Parameters<typeof writeBatch>[0];
   const batch = writeBatch(modularDb);
@@ -772,10 +789,27 @@ describe('firestore security rules', () => {
     await assertSucceeds(getDoc(doc(aliceDb, 'workspaces/coupleA')));
   });
 
-  it('blocks couple workspace creation without a server-side Duo entitlement', async () => {
+  it('allows couple workspace creation during the free launch mode', async () => {
     const bobDb = testEnv.authenticatedContext('bob').firestore();
 
-    await assertFails(createCoupleWorkspaceBatch(bobDb, 'coupleBob', 'bob').commit());
+    await assertSucceeds(createCoupleWorkspaceBatch(bobDb, 'coupleBob', 'bob').commit());
+  });
+
+  it('allows a user to create only their own privacy request', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(
+      setDoc(doc(aliceDb, 'privacyRequests/privacy_alice_export'), privacyRequestPayload('privacy_alice_export', 'alice'))
+    );
+    await assertFails(
+      setDoc(doc(aliceDb, 'privacyRequests/privacy_bob_export'), privacyRequestPayload('privacy_bob_export', 'bob'))
+    );
+    await assertFails(
+      setDoc(
+        doc(aliceDb, 'privacyRequests/privacy_alice_closed'),
+        privacyRequestPayload('privacy_alice_closed', 'alice', { status: 'closed' })
+      )
+    );
   });
 
   it('allows a valid couple invite to be accepted once', async () => {

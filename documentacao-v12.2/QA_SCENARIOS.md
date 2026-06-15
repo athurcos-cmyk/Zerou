@@ -51,7 +51,7 @@
 | Evento desconhecido | Evento nao suportado vira `ignored`. | Nao falhar silenciosamente nem apagar payload. |
 | Retry | Evento `failed` ou `processing` preso volta para fila. | Erro registrado sem segredo Stripe. |
 | Ordem fora de sequencia | Processor busca subscription atual na Stripe antes de recalcular entitlement. | Evento antigo nao rebaixa estado atual indevidamente. |
-| Bloqueio por plano | Free nao cria casal; Duo cria; owner controla casal. | Frontend nao consegue escrever billingAccount/entitlements. |
+| Modo gratuito de lancamento | Free cria casal enquanto a Zerou estiver 100% gratuita; owner controla casal. | Frontend nao consegue escrever billingAccount/entitlements. |
 | Partner sem Premium pessoal | Plano do owner libera casal, mas nao recursos premium pessoais do parceiro. | Parceiro nao herda Premium no workspace pessoal. |
 | Falha de pagamento | `past_due`, `cancelled` ou `expired` bloqueiam novos recursos premium. | Dados existentes permanecem, sem apagamento automatico. |
 | E2E Test Mode | Checkout, webhook, tela de billing e Portal funcionam com credenciais Test Mode. | Sem secrets/Blaze, registrar bloqueio externo real. |
@@ -61,8 +61,11 @@
 | Cenario | Caminho esperado | Erro provavel a testar |
 |---|---|---|
 | Landing publica | Rotas publicas carregam rapido, responsivas e com marca correta. | Hero quebrado, asset errado ou texto fora do canonico. |
+| Planos gratuitos | `/pricing` e `/app/settings/billing` deixam claro que nao ha cobranca ativa. | CTA nao deve induzir assinatura ou Checkout. |
+| Cookies | Recusar opcionais salva consentimento e nao carrega Analytics. | Analytics antes de consentimento bloqueia gate. |
+| Privacy Center | Usuario logado cria pedido LGPD rastreavel em `privacyRequests/{requestId}`. | Botao decorativo sem escrita real bloqueia gate. |
 | PWA update | Usuario recebe versao nova sem limpar cache manualmente. | Service worker antigo nao deve prender bundle obsoleto. |
-| Juridico | Politica, termos e contato ficam acessiveis. | Links quebrados ou texto desatualizado bloqueiam gate. |
+| Juridico | Politica, termos, cookies, subprocessadores e contato ficam acessiveis com placeholders visiveis. | Fingir revisao juridica ou esconder placeholder bloqueia gate. |
 | Acessibilidade | Navegacao por teclado, labels e contraste aceitaveis. | Modal/menu inacessivel em mobile. |
 | Producao | Build, deploy, smoke test e canary passam. | Rota SPA retorna 404 ou Auth bloqueia dominio. |
 
@@ -70,5 +73,5 @@
 
 - Fase 3 passa quando dominio de invoices, UI basica, Rules publicadas, build e testes principais passam.
 - Fase 4 passa quando convite/membership, claims e settlements funcionam sem vazar dados pessoais.
-- Fase 5 passa quando billing e webhooks sao idempotentes e seguros.
-- Fase 6 passa quando produto, legal, PWA, deploy e QA visual estao prontos para uso publico.
+- Fase 5 passa quando billing e webhooks sao idempotentes e seguros, mesmo que a ativacao cloud dependa de decisao futura/Blaze.
+- Fase 6 passa quando landing, legal draft, cookies, Privacy Center, PWA, docs operacionais e QA passam; producao publica ampla ainda depende do checklist manual.

@@ -12,7 +12,7 @@ function centsFromEnv(name) {
 }
 
 const freeEntitlements = {
-  canCreateCoupleWorkspace: false,
+  canCreateCoupleWorkspace: true,
   canUseAdvancedReports: false,
   canUseAutomationRules: false,
   canImportStatements: false,
@@ -21,7 +21,7 @@ const freeEntitlements = {
   canUploadReceipts: false,
   canUseOcr: false,
   canUseAdvancedReconciliation: false,
-  maxTransactionsPerMonth: 250,
+  maxTransactionsPerMonth: 10000,
   maxReceiptStorageMb: 0,
   maxAutomationRules: 0
 };
@@ -51,8 +51,8 @@ const premiumEntitlements = {
 const plans = [
   {
     id: 'free',
-    name: 'Free',
-    description: 'Base individual da Zerou para organizar o essencial.',
+    name: 'Gratuito',
+    description: 'Acesso gratuito ao app Zerou enquanto o produto amadurece.',
     active: true,
     monthlyPriceCents: 0,
     annualPriceCents: 0,
@@ -61,8 +61,8 @@ const plans = [
   {
     id: 'duo',
     name: 'Duo',
-    description: 'Espaco compartilhado para organizar a dois sem misturar o pessoal.',
-    active: true,
+    description: 'Espaco compartilhado incluso no acesso gratuito atual.',
+    active: false,
     monthlyPriceCents: centsFromEnv('ZEROU_DUO_MONTHLY_PRICE_CENTS'),
     annualPriceCents: centsFromEnv('ZEROU_DUO_ANNUAL_PRICE_CENTS'),
     stripeMonthlyPriceId: process.env.STRIPE_PRICE_DUO_MONTHLY || '',
@@ -72,8 +72,8 @@ const plans = [
   {
     id: 'premium',
     name: 'Premium',
-    description: 'Recursos avancados para quem quer mais controle e exportacao.',
-    active: true,
+    description: 'Recursos avancados ficam reservados para uma decisao futura de produto.',
+    active: false,
     monthlyPriceCents: centsFromEnv('ZEROU_PREMIUM_MONTHLY_PRICE_CENTS'),
     annualPriceCents: centsFromEnv('ZEROU_PREMIUM_ANNUAL_PRICE_CENTS'),
     stripeMonthlyPriceId: process.env.STRIPE_PRICE_PREMIUM_MONTHLY || '',

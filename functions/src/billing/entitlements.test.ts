@@ -3,8 +3,8 @@ import { assertEntitlement, deriveBillingState } from './entitlements.js';
 import { entitlementsForPlan } from './planCatalog.js';
 
 describe('billing entitlements', () => {
-  it('blocks couple workspace for free plan', () => {
-    expect(entitlementsForPlan('free', 'free').canCreateCoupleWorkspace).toBe(false);
+  it('allows couple workspace in the free launch mode', () => {
+    expect(entitlementsForPlan('free', 'free').canCreateCoupleWorkspace).toBe(true);
   });
 
   it('allows couple workspace for active Duo', () => {
@@ -22,4 +22,3 @@ describe('billing entitlements', () => {
     expect(() => assertEntitlement(entitlementsForPlan('free', 'free'), 'canExportPdf')).toThrow(/Entitlement insuficiente/);
   });
 });
-

@@ -3,6 +3,7 @@ import { AuthProvider } from './auth/AuthContext';
 import { PublicOnlyRoute, RequireAuth, RequireOnboardingComplete } from './auth/routeGuards';
 import { AppearanceSyncBridge } from './settings/AppearanceSyncBridge';
 import { ThemeRuntime } from './theme/ThemeRuntime';
+import { CookieConsentBanner } from './privacy/CookieConsentBanner';
 import { AppShell } from './layout/AppShell';
 import { AppearanceSettingsPage } from './settings/AppearanceSettingsPage';
 import { AccountsPage } from './pages/AccountsPage';
@@ -19,8 +20,11 @@ import { LoginMethodsPage } from './settings/LoginMethodsPage';
 import { LoginPage } from './pages/LoginPage';
 import { NewTransactionPage } from './pages/NewTransactionPage';
 import { OnboardingPage } from './onboarding/OnboardingPage';
+import { ContactPage, FeaturesPage, HelpPage, SecurityPage } from './pages/PublicPages';
 import { PublicHomePage } from './pages/PublicHomePage';
+import { CookiePolicyPage, PrivacyPolicyPage, SubprocessorsPage, TermsPage } from './pages/LegalPages';
 import { PricingPage } from './pages/PricingPage';
+import { PrivacyCenterPage } from './pages/PrivacyCenterPage';
 import { RecurringPage } from './pages/RecurringPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { SearchPage } from './pages/SearchPage';
@@ -35,6 +39,16 @@ export function App() {
       <AppearanceSyncBridge />
       <Routes>
         <Route path="/" element={<PublicHomePage />} />
+        <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/features" element={<FeaturesPage />} />
+        <Route path="/security" element={<SecurityPage />} />
+        <Route path="/help" element={<HelpPage />} />
+        <Route path="/contact" element={<ContactPage />} />
+        <Route path="/privacy-center" element={<PrivacyCenterPage />} />
+        <Route path="/legal/terms" element={<TermsPage />} />
+        <Route path="/legal/privacy" element={<PrivacyPolicyPage />} />
+        <Route path="/legal/cookies" element={<CookiePolicyPage />} />
+        <Route path="/legal/subprocessors" element={<SubprocessorsPage />} />
         <Route path="/join/:code" element={<JoinInvitePage />} />
         <Route element={<PublicOnlyRoute />}>
           <Route path="/login" element={<LoginPage />} />
@@ -65,33 +79,9 @@ export function App() {
             </Route>
           </Route>
         </Route>
-        <Route path="/pricing" element={<PricingPage />} />
-        <Route path="/features" element={<PublicPhasePlaceholder title="Funcionalidades" />} />
-        <Route path="/security" element={<PublicPhasePlaceholder title="Segurança" />} />
-        <Route path="/help" element={<PublicPhasePlaceholder title="Ajuda" />} />
-        <Route path="/contact" element={<PublicPhasePlaceholder title="Contato" />} />
-        <Route path="/legal/terms" element={<PublicPhasePlaceholder title="Termos" />} />
-        <Route path="/legal/privacy" element={<PublicPhasePlaceholder title="Privacidade" />} />
-        <Route path="/legal/cookies" element={<PublicPhasePlaceholder title="Cookies" />} />
-        <Route path="/legal/subprocessors" element={<PublicPhasePlaceholder title="Subprocessadores" />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <CookieConsentBanner />
     </AuthProvider>
-  );
-}
-
-function PublicPhasePlaceholder({ title }: { title: string }) {
-  return (
-    <main className="public-page">
-      <section className="surface surface-pad empty-panel">
-        <div className="empty-panel-inner">
-          <p className="eyebrow">Zerou</p>
-          <h1 className="page-title">{title}</h1>
-          <p className="page-description">
-            Esta rota pública foi reservada na fundação. O conteúdo completo entra na fase de lançamento.
-          </p>
-        </div>
-      </section>
-    </main>
   );
 }

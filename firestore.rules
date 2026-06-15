@@ -784,8 +784,40 @@ service cloud.firestore {
     }
 
     function canCreateCoupleWorkspaceByEntitlement(uid) {
-      return exists(billingAccountDoc(uid))
-        && get(billingAccountDoc(uid)).data.entitlements.canCreateCoupleWorkspace == true;
+      return !exists(billingAccountDoc(uid))
+        || get(billingAccountDoc(uid)).data.currentPlanId == 'free'
+        || get(billingAccountDoc(uid)).data.entitlements.canCreateCoupleWorkspace == true;
+    }
+
+    function validPrivacyRequestCreate(requestId) {
+      return signedIn()
+        && requestId.matches('^privacy_[A-Za-z0-9_]+$')
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'userId',
+          'email',
+          'type',
+          'status',
+          'notes',
+          'version',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.id == requestId
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.email is string
+        && request.resource.data.email.size() <= 254
+        && request.resource.data.type in ['correction', 'export', 'deletion', 'marketing_revocation', 'cache_help']
+        && request.resource.data.status == 'open'
+        && request.resource.data.notes is string
+        && request.resource.data.notes.size() <= 1000
+        && request.resource.data.version == 'zerou-v12.2-privacy-request'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function canReadPrivacyRequest() {
+      return signedIn() && resource.data.userId == request.auth.uid;
     }
 
     function isCoupleWorkspaceAfter(workspaceId) {
@@ -1352,7 +1384,9 @@ service cloud.firestore {
     }
 
     match /privacyRequests/{requestId} {
-      allow read, write: if false;
+      allow create: if validPrivacyRequestCreate(requestId);
+      allow get: if canReadPrivacyRequest();
+      allow list, update, delete: if false;
     }
   }
 }

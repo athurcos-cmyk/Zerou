@@ -350,3 +350,17 @@ export interface SubscriptionRecord {
   cancelAtPeriodEnd: boolean;
   updatedAt?: Timestamp;
 }
+
+export type PrivacyRequestType = 'correction' | 'export' | 'deletion' | 'marketing_revocation' | 'cache_help';
+
+export interface PrivacyRequest {
+  id: string;
+  userId: string;
+  email: string;
+  type: PrivacyRequestType;
+  status: 'open' | 'in_review' | 'completed' | 'rejected';
+  notes: string;
+  version: 'zerou-v12.2-privacy-request';
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}

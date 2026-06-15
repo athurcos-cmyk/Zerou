@@ -24,9 +24,14 @@ Estas acoes dependem do dono do projeto e nao foram simuladas no repositorio.
 - Configurar o projeto na Vercel apontando para a raiz.
 - Definir as mesmas variaveis `VITE_FIREBASE_*` no ambiente da Vercel.
 - Firestore rules/indexes ja foram publicados em `zerou-26757`.
-- A Fase 1 roda sem Cloud Functions para permanecer compativel com o plano Spark/free.
+- O lancamento atual roda gratuito e sem checkout ativo para usuarios.
+- Cloud Functions de billing continuam como scaffold futuro e nao sao obrigatorias para usar o app agora.
 - Apos criar o bucket Storage, executar `npx firebase-tools deploy --only storage --project zerou-26757`.
 
-## Fases futuras
+## Antes de producao publica ampla
 
-- Stripe/billing, espaco compartilhado, motor financeiro e landing juridica pertencem as proximas fases.
+- Revisar `docs/PRODUCTION_CHECKLIST.md`.
+- Substituir placeholders legais em `docs/legal/`.
+- Confirmar emails oficiais de suporte e privacidade.
+- Corrigir Java local para rodar `npm run test:rules`.
+- Configurar App Check, backups, alertas e dominio final.

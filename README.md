@@ -2,7 +2,7 @@
 
 Controle individual. Organizacao a dois.
 
-App React/TypeScript/Firebase do Zerou v12.2 com Fases 1, 2, 3, 4 e 5 implementadas.
+App React/TypeScript/Firebase do Zerou v12.2 com Fases 1 a 6 implementadas em modo de lancamento gratuito.
 
 ## Stack
 
@@ -12,7 +12,7 @@ App React/TypeScript/Firebase do Zerou v12.2 com Fases 1, 2, 3, 4 e 5 implementa
 - Tailwind CSS com CSS variables e tokens semanticos
 - Vite PWA Plugin
 - Vitest, Firebase Rules Unit Testing e Playwright
-- Cloud Functions v2 para billing Stripe customizado
+- Cloud Functions v2 para billing Stripe customizado futuro
 
 ## Setup local
 
@@ -53,16 +53,17 @@ O client Firebase le apenas variaveis `VITE_` e nao contem `firebaseConfig` hard
 
 A fundacao e os fluxos financeiros atuais rodam client-side com Security Rules restritivas. A Fase 5 adiciona scaffold real de Cloud Functions para Stripe Checkout, Customer Portal, webhook assinado, processamento idempotente e entitlements server-side.
 
-Billing real exige Blaze, secrets Stripe, Price IDs no `planCatalog` e webhook cadastrado. Sem isso, a UI mostra cobrança indisponivel.
+Decisao atual: a Zerou fica 100% gratuita por enquanto. Billing real exige nova decisao de produto, Blaze, secrets Stripe, Price IDs no `planCatalog` e webhook cadastrado.
 
 ## Escopo atual
 
-Implementado: autenticacao, onboarding, workspace pessoal, shell autenticado, dashboard financeiro v1, contas, transacoes, contas a pagar, recorrencias, busca, cartoes, faturas, ledger de fatura, espaco compartilhado, convites de casal, claims compartilhados, settlements, pricing, tela de cobrança, Functions Stripe custom, entitlements server-side, temas Paper/Sakura/Obsidian/Midnight/Aurora/Rose Gold, modo system, PWA basico e regras Firestore publicaveis.
+Implementado: autenticacao, onboarding, workspace pessoal, shell autenticado, dashboard financeiro v1, contas, transacoes, contas a pagar, recorrencias, busca, cartoes, faturas, ledger de fatura, espaco compartilhado, convites de casal, claims compartilhados, settlements, pricing gratuito, tela de plano, Functions Stripe custom futuro, entitlements server-side, landing publica, rotas legais com placeholders, centro de privacidade, consentimento de cookies, email adapter bloqueado sem provider, temas Paper/Sakura/Obsidian/Midnight/Aurora/Rose Gold, modo system, PWA basico e regras Firestore publicaveis.
 
-Fora do escopo atual: landing completa, rotas juridicas finais, deploy cloud das Functions sem Blaze/secrets, Pix, boleto, cupons avancados e admin completo.
+Fora do escopo atual: revisao juridica final, deploy cloud das Functions sem Blaze/secrets, Pix, boleto, cupons avancados, admin completo, automacao real de exportacao/exclusao de dados e cobranca ativa.
 
 ## QA e status
 
 O handoff das fases fica em `documentacao-v12.2/IMPLEMENTATION_STATUS.md`.
 A matriz de cenarios de sucesso/erro fica em `documentacao-v12.2/QA_SCENARIOS.md`.
-Setup de billing fica em `docs/BILLING.md` e `docs/BOOTSTRAP_FIREBASE_STRIPE.md`.
+Arquitetura, seguranca, privacidade e operacao ficam em `ARCHITECTURE.md`, `SECURITY.md`, `PRIVACY.md`, `RUNBOOK.md` e `docs/PRODUCTION_CHECKLIST.md`.
+Setup de billing futuro fica em `docs/BILLING.md` e `docs/BOOTSTRAP_FIREBASE_STRIPE.md`.

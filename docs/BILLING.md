@@ -1,6 +1,13 @@
 # Zerou Billing
 
-Fase 5 implementa billing customizado sem Firebase Stripe Extension.
+Fase 5 implementa billing customizado sem Firebase Stripe Extension, mas a decisao atual de produto e manter o app 100% gratuito por enquanto.
+
+## Estado atual
+
+- Checkout e Customer Portal nao devem ser apresentados como caminho ativo para usuarios.
+- `free` libera o uso atual do app, incluindo espaco compartilhado.
+- `duo` e `premium` ficam como estrutura tecnica futura.
+- Firestore Rules continuam bloqueando escrita de billing pelo client.
 
 ## Arquitetura
 
@@ -13,7 +20,7 @@ billingAccounts/{billingAccountId}/billingEvents/{stripeEventId}
 planCatalog/{planId}
 ```
 
-## Setup externo necessario
+## Setup externo necessario apenas se billing for reativado no futuro
 
 1. Ativar plano Blaze no Firebase antes de publicar Functions.
 2. Configurar secrets:
@@ -48,5 +55,4 @@ npm run seed:plan-catalog
 
 ## Estado sem credenciais
 
-Sem secrets/Price IDs, a UI mostra cobrança indisponivel e os callables retornam erro seguro. Isso e intencional: o app nao finge checkout ativo.
-
+Sem secrets/Price IDs, os callables retornam erro seguro. Isso e intencional: o app nao finge checkout ativo.

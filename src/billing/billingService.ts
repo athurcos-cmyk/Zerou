@@ -4,7 +4,7 @@ import { getFirebaseDb, getFirebaseFunctions } from '../firebase/config';
 import type { BillingAccount, BillingInterval, Entitlements, PlanCatalogItem, PlanId } from '../types/contracts';
 
 export const freeEntitlements: Entitlements = {
-  canCreateCoupleWorkspace: false,
+  canCreateCoupleWorkspace: true,
   canUseAdvancedReports: false,
   canUseAutomationRules: false,
   canImportStatements: false,
@@ -13,7 +13,7 @@ export const freeEntitlements: Entitlements = {
   canUploadReceipts: false,
   canUseOcr: false,
   canUseAdvancedReconciliation: false,
-  maxTransactionsPerMonth: 250,
+  maxTransactionsPerMonth: 10000,
   maxReceiptStorageMb: 0,
   maxAutomationRules: 0
 };
@@ -21,8 +21,8 @@ export const freeEntitlements: Entitlements = {
 export const defaultPlanCatalog: PlanCatalogItem[] = [
   {
     id: 'free',
-    name: 'Free',
-    description: 'Base individual da Zerou para organizar o essencial.',
+    name: 'Gratuito',
+    description: 'Acesso gratuito ao app Zerou enquanto o produto amadurece.',
     active: true,
     monthlyPriceCents: 0,
     annualPriceCents: 0,
@@ -31,8 +31,8 @@ export const defaultPlanCatalog: PlanCatalogItem[] = [
   {
     id: 'duo',
     name: 'Duo',
-    description: 'Espaço compartilhado para organizar a dois sem misturar o pessoal.',
-    active: true,
+    description: 'Espaço compartilhado incluso no acesso gratuito atual.',
+    active: false,
     monthlyPriceCents: 0,
     annualPriceCents: 0,
     entitlements: { ...freeEntitlements, canCreateCoupleWorkspace: true, canExportPdf: true, maxTransactionsPerMonth: 2000 }
@@ -40,8 +40,8 @@ export const defaultPlanCatalog: PlanCatalogItem[] = [
   {
     id: 'premium',
     name: 'Premium',
-    description: 'Recursos avançados para quem quer mais controle e exportação.',
-    active: true,
+    description: 'Recursos avançados ficam reservados para uma decisão futura de produto.',
+    active: false,
     monthlyPriceCents: 0,
     annualPriceCents: 0,
     entitlements: {
@@ -105,7 +105,14 @@ export function subscribeBillingAccount(userId: string, onNext: (account: Billin
         return;
       }
 
-      onNext({ ...freeBillingAccountForUser(userId), ...snapshot.data(), id: snapshot.id } as BillingAccount);
+      const remoteAccount = snapshot.data() as Partial<BillingAccount>;
+      const mergedAccount = { ...freeBillingAccountForUser(userId), ...remoteAccount, id: snapshot.id } as BillingAccount;
+      const launchEntitlements =
+        mergedAccount.currentPlanId === 'free' || mergedAccount.subscriptionStatus === 'free'
+          ? freeEntitlements
+          : { ...freeEntitlements, ...remoteAccount.entitlements };
+
+      onNext({ ...mergedAccount, entitlements: launchEntitlements });
     },
     (error) => onError?.(error)
   );

@@ -9,6 +9,9 @@ import './styles/global.css';
 
 connectFirebaseEmulators();
 void initializeOptionalAnalytics();
+window.addEventListener('zerou:cookie-consent-updated', () => {
+  void initializeOptionalAnalytics();
+});
 registerServiceWorkerUpdates();
 
 createRoot(document.getElementById('root')!).render(

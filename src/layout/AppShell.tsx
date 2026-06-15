@@ -73,7 +73,7 @@ export function AppShell() {
             <Palette size={19} aria-hidden="true" /> Aparência
           </NavLink>
           <NavLink className={getNavClass} to="/app/settings/billing">
-            <BadgeDollarSign size={19} aria-hidden="true" /> Cobrança
+            <BadgeDollarSign size={19} aria-hidden="true" /> Plano
           </NavLink>
           <NavLink className={getNavClass} to="/app/settings/security/login-methods">
             <Shield size={19} aria-hidden="true" /> Segurança
