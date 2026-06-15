@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import {
+  BadgeDollarSign,
   CalendarClock,
   Home,
   LogOut,
@@ -70,6 +71,9 @@ export function AppShell() {
           </NavLink>
           <NavLink className={getNavClass} to="/app/settings/appearance">
             <Palette size={19} aria-hidden="true" /> Aparência
+          </NavLink>
+          <NavLink className={getNavClass} to="/app/settings/billing">
+            <BadgeDollarSign size={19} aria-hidden="true" /> Cobrança
           </NavLink>
           <NavLink className={getNavClass} to="/app/settings/security/login-methods">
             <Shield size={19} aria-hidden="true" /> Segurança

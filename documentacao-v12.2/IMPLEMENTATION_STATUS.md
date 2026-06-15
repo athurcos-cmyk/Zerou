@@ -5,11 +5,11 @@
 ## Resumo
 
 ```text
-Fase atual: 4 implementada em modo Spark/free
-Ultima fase concluida: 4. Espaco compartilhado
-Ambiente validado: local sem emuladores por bloqueio Java; Firestore Rules compiladas e publicadas; build/e2e/unitarios passaram
+Fase atual: 5 implementada com scaffold Stripe custom; deploy cloud de Functions bloqueado por Blaze/secrets
+Ultima fase concluida: 5. Billing Stripe custom
+Ambiente validado: local sem emuladores por bloqueio Java; Firestore Rules compiladas e publicadas; build/e2e/unitarios/functions passaram
 Ultima atualizacao: 2026-06-15
-Gate da Fase 4: implementacao, dominio, build, e2e e deploy de rules passaram; teste automatizado de rules/offline segue bloqueado pelo Java local.
+Gate da Fase 5: scaffold, testes locais, webhook signature, idempotencia documental, entitlements e Rules passaram; Checkout Test Mode real fica bloqueado ate Blaze, secrets Stripe, Price IDs e webhook externo serem configurados.
 ```
 
 ## Estado por fase
@@ -20,7 +20,7 @@ Gate da Fase 4: implementacao, dominio, build, e2e e deploy de rules passaram; t
 | 2. Motor financeiro essencial | implemented / Spark mode | build passou; rules publicadas; offline automatizado bloqueado por Java | Contas, transacoes, dashboard v1, bills, recorrencias, busca e sync status implementados sem Cloud Functions. |
 | 3. Cartoes e faturas | implemented / Spark mode | dominio, build, e2e e rules publicadas passaram; emulator bloqueado por Java | Ledger imutavel por rules e totais derivados no client; backend server-side fica pendente para etapa Blaze/Functions futura. |
 | 4. Espaco compartilhado | implemented / Spark mode | build, e2e, unitarios e rules publicadas passaram; emulator bloqueado por Java | Workspace do casal, convite de uso unico, QR/link, claims compartilhados e settlements implementados sem Cloud Functions. |
-| 5. Billing Stripe custom | pending | webhook idempotente + entitlements | Nao iniciado. |
+| 5. Billing Stripe custom | implemented / cloud blocked | build, e2e, unitarios, functions e rules publicadas passaram; cloud E2E bloqueado por Blaze/secrets | Checkout/Portal callables, webhook assinado, billingEvents idempotentes, processor/retry, planCatalog e entitlements server-side implementados. |
 | 6. Lancamento | pending | landing, juridico e QA | Rotas publicas reservadas com placeholder. |
 
 ## O que foi implementado
@@ -77,6 +77,16 @@ Gate da Fase 4: implementacao, dominio, build, e2e e deploy de rules passaram; t
 - Fase 4: modulo puro `src/domain/shared/calculateSharedBalances.ts` calcula balanco por membro e sugestao de acerto com suporte a pagamento parcial/total.
 - Fase 4: Firestore Rules publicadas para couple workspace, members, workspaceRefs, coupleInvites, sharedExpenseClaims, settlements, comments e auditLogs.
 - Fase 4: entitlement preparado via `canCreateCoupleWorkspace` em modo Spark/local flag; billing real permanece para Fase 5.
+- Fase 5: scaffold versionado de `functions/` com Node 22, TypeScript strict, Firebase Functions v2, Firebase Admin, Stripe e Zod.
+- Fase 5: `createCheckoutSession` callable autenticada com validacao backend de plano/intervalo, URL segura, Price ID buscado no `planCatalog`, customer server-side e idempotency key.
+- Fase 5: `createCustomerPortalSession` callable autenticada para abrir o Portal apenas do customer do usuario.
+- Fase 5: `stripeWebhook` HTTP `onRequest` valida `stripe-signature` usando `rawBody` e persiste `billingEvents/{stripeEventId}` de forma idempotente.
+- Fase 5: processor assíncrono por Firestore trigger busca assinatura atual na Stripe, sincroniza subscription/billingAccount e recalcula entitlements server-side.
+- Fase 5: scheduler de retry para eventos `failed` e `processing` presos, com erro redigido sem segredos.
+- Fase 5: `planCatalog/{free,duo,premium}` preparado com script admin `functions/scripts/seedPlanCatalog.mjs`.
+- Fase 5: Security Rules permitem leitura do proprio billing account/subscriptions, bloqueiam billingEvents ao client e impedem frontend de forjar entitlements.
+- Fase 5: criacao de workspace casal agora exige entitlement server-side `canCreateCoupleWorkspace` em `/billingAccounts/billing_{uid}`.
+- Fase 5: rota publica `/pricing` e tela autenticada `/app/settings/billing` implementadas, exibindo cobranca indisponivel quando Price IDs/secrets nao existem.
 
 ## Decisao Firestore vs Realtime Database
 
@@ -97,6 +107,10 @@ firebase.json
 firestore.rules
 storage.rules
 vercel.json
+functions/package.json
+functions/src/billing/*
+functions/src/index.ts
+functions/scripts/seedPlanCatalog.mjs
 public/brand/*
 src/main.tsx
 src/pwa/registerServiceWorker.ts
@@ -104,6 +118,7 @@ src/vite-env.d.ts
 src/App.tsx
 src/firebase/config.ts
 src/auth/*
+src/billing/*
 src/finance/*
 src/cards/*
 src/domain/invoices/*
@@ -121,6 +136,8 @@ tests/firestore.rules.test.ts
 tests/storage.rules.test.ts
 tests/e2e/public.spec.ts
 docs/MANUAL_SETUP_REQUIRED.md
+docs/BILLING.md
+docs/BOOTSTRAP_FIREBASE_STRIPE.md
 documentacao-v12.2/QA_SCENARIOS.md
 ```
 
@@ -167,6 +184,15 @@ documentacao-v12.2/QA_SCENARIOS.md
 | `npm run test:e2e` na Fase 4 | passou | 2 testes Playwright: landing publica e rota publica `/join/DUO-7X4K-92`. |
 | `npm run test:rules` na Fase 4 | bloqueado por ambiente | Firebase CLI falhou antes dos emuladores: `java -version` saiu com codigo 3221226505. Os testes foram atualizados para Fases 3 e 4, mas precisam do Java local funcional. |
 | `npx firebase deploy --only firestore:rules,firestore:indexes --project zerou-26757` na Fase 4 | passou | Rules e indexes de coupleInvites compilaram e foram publicados no Firestore real. |
+| `npm run typecheck` na Fase 5 | passou | TypeScript strict do app validado apos rotas de pricing/billing e Firebase Functions client. |
+| `npm run lint` na Fase 5 | passou | ESLint sem erros; `functions/lib` e `functions/node_modules` ignorados. |
+| `npm test` na Fase 5 | passou | 6 arquivos, 29 testes unitarios do app. |
+| `npm run functions:build` na Fase 5 | passou | TypeScript strict das Cloud Functions v2 compilou. |
+| `npm run test:functions` na Fase 5 | passou | 4 arquivos, 11 testes; cobre entitlements, assinatura Stripe valida/invalida, payload sanitizado e URL segura. |
+| `npm run build` na Fase 5 | passou | Bundle PWA gerado; aviso de chunk inicial > 500 kB permanece. |
+| `npm run test:e2e` na Fase 5 | passou | 3 testes Playwright: landing, join invite e pricing. |
+| `npm run test:rules` na Fase 5 | bloqueado por ambiente | Firebase CLI falhou antes dos emuladores: `java -version` saiu com codigo 3221226505. Tests foram atualizados com billing entitlements, mas dependem do Java local funcional. |
+| `npx firebase deploy --only firestore:rules,firestore:indexes --project zerou-26757` na Fase 5 | passou | Rules de billing account, planCatalog e entitlement de casal compilaram e foram publicadas. |
 
 ## Pendencias manuais externas
 
@@ -185,6 +211,12 @@ documentacao-v12.2/QA_SCENARIOS.md
 - [ ] Validar manualmente em producao: criar cartao, registrar compra, pagar fatura parcial e conferir saldo livre.
 - [ ] Validar manualmente em producao com dois usuarios reais: criar espaco do casal, gerar convite, aceitar, criar claim e registrar settlement.
 - [ ] Reexecutar `npm run test:rules` e um teste offline automatizado assim que Java funcional estiver no PATH.
+- [ ] Ativar Blaze antes de publicar Cloud Functions reais da Fase 5.
+- [ ] Configurar secrets `STRIPE_SECRET_KEY` e `STRIPE_WEBHOOK_SECRET`.
+- [ ] Criar produtos/precos Stripe Test Mode para Duo mensal/anual e Premium mensal/anual.
+- [ ] Popular `planCatalog` com Price IDs e precos via `npm --prefix functions run seed:plan-catalog`.
+- [ ] Deployar Functions da Fase 5 apos Blaze/secrets e cadastrar `stripeWebhook` no Stripe Dashboard.
+- [ ] Executar E2E cloud real: Checkout Test Mode, webhook, billing UI, Portal e cancelamento/alteracao.
 ```
 
 ## Limitacoes conhecidas
@@ -194,8 +226,11 @@ documentacao-v12.2/QA_SCENARIOS.md
 - A Fase 3 roda em modo Spark/free: sem Cloud Functions, o client cria entradas de ledger sob Rules restritivas; uma versao backend/server-side pode substituir esse caminho quando o projeto aceitar Blaze.
 - A Fase 4 roda em modo Spark/free: convites, memberships, claims e settlements sao criados pelo client sob Rules restritivas; Cloud Functions podem endurecer rate limit, limpeza automatica e entitlement server-side no futuro.
 - Os agregados persistidos da fatura ficam protegidos por Rules e nao sao alterados pelo client; a UI deriva totais do ledger.
-- O entitlement de casal esta preparado por `canCreateCoupleWorkspace`, mas billing real/Stripe permanece para a Fase 5.
-- Rotas publicas de pricing, legal, ajuda e afins sao placeholders; landing completa pertence a Fase 6.
+- O entitlement de casal agora consulta billing server-side em `/billingAccounts/billing_{uid}`; a ativacao cloud depende do setup Stripe/Functions.
+- A Fase 5 tem scaffold real de billing, mas Checkout cloud nao foi marcado como ativo porque Blaze, secrets Stripe, Price IDs e endpoint webhook externo ainda nao estao configurados.
+- As Cloud Functions nao foram deployadas nesta execucao para evitar ativar recurso pago sem preparacao externa. Apenas Firestore Rules/indexes foram publicados.
+- A partir da Fase 5, criar novo espaco compartilhado exige entitlement server-side Duo/Premium; usuarios Free existentes nao perdem dados, mas nao criam novo casal.
+- Rotas publicas de legal, ajuda e afins sao placeholders; `/pricing` ja exibe estrutura da Fase 5, e landing completa pertence a Fase 6.
 - O build mostra aviso de chunk inicial > 500 kB por causa do bundle com SDKs; otimizar com code splitting depois.
 - `npm audit` reportou vulnerabilidades moderadas transitivas em dependencias de ferramentas; nao foi aplicado `audit fix --force`.
 ```
@@ -222,13 +257,18 @@ documentacao-v12.2/QA_SCENARIOS.md
 | 2026-06-15 | `/workspaces/{workspaceId}/sharedExpenseClaims/{claimId}` | Claims compartilhados com resumo, total, split, pagador, status e versao; campos pessoais bloqueados. | Nao. |
 | 2026-06-15 | `/workspaces/{workspaceId}/settlements/{settlementId}` | Settlements com devedor/credor, valor proposto, valor pago, status e historico. | Nao. |
 | 2026-06-15 | `/workspaces/{workspaceId}/comments/{commentId}` e `/auditLogs/{auditId}` | Comentarios e auditoria do espaco compartilhado sem expor token bruto de convite. | Nao. |
+| 2026-06-15 | `/planCatalog/{planId}` | Catalogo Free/Duo/Premium legivel pelo client; Price IDs/precos sao configurados por admin script, nao pela UI. | Popular documentos antes de checkout real. |
+| 2026-06-15 | `/billingAccounts/{billingAccountId}` | Billing account server-side com owner, customer Stripe, plano atual, status e entitlements. | Criado/atualizado por Functions; client nao escreve. |
+| 2026-06-15 | `/billingAccounts/{billingAccountId}/subscriptions/{subscriptionId}` | Snapshot server-side de assinatura Stripe sincronizada por webhook/processor. | Criado/atualizado por Functions. |
+| 2026-06-15 | `/billingAccounts/{billingAccountId}/billingEvents/{stripeEventId}` | Eventos Stripe persistidos uma vez, status de processamento, tentativas e erro redigido. | Client nao le; criado por webhook. |
+| 2026-06-15 | `firestore.rules` | Criacao de `couple` workspace agora exige `entitlements.canCreateCoupleWorkspace == true` no billing account server-side. | Usuarios Free nao criam novo casal; dados existentes preservados. |
 
 ## Proxima fase
 
 ```text
-Prompt a executar: documentacao-v12.2/prompts/05-BILLING-STRIPE-CUSTOM.md
-Pre-condicoes: Auth providers habilitados, `.env.local` preenchido, Firestore rules da Fase 4 publicadas, Vercel com bundle da Fase 4 e fluxo manual de casal/claim/settlement validado com dois usuarios reais.
-Arquivos que o proximo agente deve ler: README-START-HERE.md, documentacao-v12.2/README.md, ZEROU-V12.2-ESPECIFICACAO-MESTRA.md, CONTRATOS-CANONICOS.md, THEME-SYSTEM.md, BRAND-GUIDELINES.md, BRAND-ASSET-INTEGRATION.md, PRODUCT-COPY-CANONICAL.md, IMPLEMENTATION_STATUS.md, QA_SCENARIOS.md e o prompt da Fase 5.
+Prompt a executar: documentacao-v12.2/prompts/06-LANCAMENTO-LANDING-JURIDICO.md
+Pre-condicoes: Auth providers habilitados, `.env.local` preenchido, Firestore rules da Fase 5 publicadas, Vercel com bundle da Fase 5, billing cloud configurado ou bloqueio externo mantido documentado.
+Arquivos que o proximo agente deve ler: README-START-HERE.md, documentacao-v12.2/README.md, ZEROU-V12.2-ESPECIFICACAO-MESTRA.md, CONTRATOS-CANONICOS.md, THEME-SYSTEM.md, BRAND-GUIDELINES.md, BRAND-ASSET-INTEGRATION.md, PRODUCT-COPY-CANONICAL.md, IMPLEMENTATION_STATUS.md, QA_SCENARIOS.md, docs/BILLING.md, docs/BOOTSTRAP_FIREBASE_STRIPE.md e o prompt da Fase 6.
 ```
 
 ## Verificacao do sistema de temas

@@ -9,12 +9,14 @@ import {
   type Firestore
 } from 'firebase/firestore';
 import { getStorage, connectStorageEmulator, type FirebaseStorage } from 'firebase/storage';
+import { connectFunctionsEmulator, getFunctions, type Functions } from 'firebase/functions';
 
 interface FirebaseServices {
   app: FirebaseApp;
   auth: Auth;
   db: Firestore;
   storage: FirebaseStorage;
+  functions: Functions;
 }
 
 export class FirebaseConfigurationError extends Error {
@@ -84,7 +86,8 @@ export function getFirebaseServices() {
       app,
       auth: getAuth(app),
       db: dbInstance,
-      storage: getStorage(app)
+      storage: getStorage(app),
+      functions: getFunctions(app, 'southamerica-east1')
     };
 
     return firebaseServices;
@@ -111,6 +114,7 @@ export function connectFirebaseEmulators() {
   connectAuthEmulator(services.auth, 'http://127.0.0.1:9099', { disableWarnings: true });
   connectFirestoreEmulator(services.db, '127.0.0.1', 8080);
   connectStorageEmulator(services.storage, '127.0.0.1', 9199);
+  connectFunctionsEmulator(services.functions, '127.0.0.1', 5001);
   emulatorsConnected = true;
 }
 
@@ -139,4 +143,8 @@ export function getFirebaseDb() {
 
 export function getFirebaseStorage() {
   return getFirebaseServices().storage;
+}
+
+export function getFirebaseFunctions() {
+  return getFirebaseServices().functions;
 }

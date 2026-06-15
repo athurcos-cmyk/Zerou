@@ -43,10 +43,18 @@
 
 | Cenario | Caminho esperado | Erro provavel a testar |
 |---|---|---|
-| Checkout | Usuario inicia upgrade e volta com entitlement ativo. | Cancelamento no checkout nao ativa plano. |
-| Webhook idempotente | Mesmo evento Stripe processado uma vez. | Retry de webhook nao duplica assinatura. |
-| Bloqueio por plano | Recursos pagos respeitam entitlement. | Cliente nao consegue forjar entitlement no Firestore. |
-| Falha de pagamento | Plano entra em estado pendente/bloqueado conforme regra. | UI informa sem apagar dados do usuario. |
+| Checkout Duo mensal | Callable autenticada busca Price ID no `planCatalog` e retorna URL Stripe. | Plano invalido, usuario anonimo ou preco enviado pelo frontend falha. |
+| Checkout Premium anual | Backend usa Price ID anual do catalogo e idempotency key por request. | Price ID ausente mostra cobranca indisponivel. |
+| Portal do cliente | Callable retorna URL somente para customer do usuario autenticado. | Usuario sem customer recebe erro seguro. |
+| Webhook assinado | `stripeWebhook` valida `stripe-signature` com `rawBody` e persiste evento uma vez. | Assinatura invalida retorna 400 e nao grava evento. |
+| Webhook idempotente | Mesmo `stripeEventId` nao duplica efeito. | Evento duplicado nao cria segunda subscription. |
+| Evento desconhecido | Evento nao suportado vira `ignored`. | Nao falhar silenciosamente nem apagar payload. |
+| Retry | Evento `failed` ou `processing` preso volta para fila. | Erro registrado sem segredo Stripe. |
+| Ordem fora de sequencia | Processor busca subscription atual na Stripe antes de recalcular entitlement. | Evento antigo nao rebaixa estado atual indevidamente. |
+| Bloqueio por plano | Free nao cria casal; Duo cria; owner controla casal. | Frontend nao consegue escrever billingAccount/entitlements. |
+| Partner sem Premium pessoal | Plano do owner libera casal, mas nao recursos premium pessoais do parceiro. | Parceiro nao herda Premium no workspace pessoal. |
+| Falha de pagamento | `past_due`, `cancelled` ou `expired` bloqueiam novos recursos premium. | Dados existentes permanecem, sem apagamento automatico. |
+| E2E Test Mode | Checkout, webhook, tela de billing e Portal funcionam com credenciais Test Mode. | Sem secrets/Blaze, registrar bloqueio externo real. |
 
 ## Fase 6 - Lancamento
 

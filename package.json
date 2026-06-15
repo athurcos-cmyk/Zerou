@@ -11,10 +11,12 @@
     "lint": "eslint .",
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run src",
+    "test:functions": "npm --prefix functions test",
     "test:watch": "vitest",
     "test:rules": "firebase emulators:exec --only firestore,storage \"vitest run tests/firestore.rules.test.ts tests/storage.rules.test.ts --config vite.config.ts\"",
     "test:e2e": "playwright test",
-    "emulators": "firebase emulators:start --only auth,firestore,storage,hosting"
+    "functions:build": "npm --prefix functions run build",
+    "emulators": "firebase emulators:start --only auth,firestore,storage,functions,hosting"
   },
   "engines": {
     "node": ">=22.0.0"

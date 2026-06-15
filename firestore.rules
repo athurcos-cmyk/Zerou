@@ -38,6 +38,14 @@ service cloud.firestore {
       return /databases/$(database)/documents/users/$(uid)/workspaceRefs/$(workspaceId);
     }
 
+    function billingAccountIdFor(uid) {
+      return 'billing_' + uid;
+    }
+
+    function billingAccountDoc(uid) {
+      return /databases/$(database)/documents/billingAccounts/$(billingAccountIdFor(uid));
+    }
+
     function currentMemberDoc(workspaceId) {
       return memberDoc(workspaceId, request.auth.uid);
     }
@@ -775,6 +783,11 @@ service cloud.firestore {
         && get(currentMemberDoc(workspaceId)).data.role == 'owner';
     }
 
+    function canCreateCoupleWorkspaceByEntitlement(uid) {
+      return exists(billingAccountDoc(uid))
+        && get(billingAccountDoc(uid)).data.entitlements.canCreateCoupleWorkspace == true;
+    }
+
     function isCoupleWorkspaceAfter(workspaceId) {
       return getAfter(workspaceDoc(workspaceId)).data.type == 'couple';
     }
@@ -815,6 +828,7 @@ service cloud.firestore {
         && request.resource.data.timezone == 'America/Sao_Paulo'
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time
+        && canCreateCoupleWorkspaceByEntitlement(uid)
         && getAfter(memberDoc(workspaceId, uid)).data.role == 'owner'
         && getAfter(workspaceRefDoc(uid, workspaceId)).data.role == 'owner';
     }
@@ -1318,12 +1332,22 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    match /billingAccounts/{billingAccountId}/{document=**} {
-      allow read, write: if false;
+    match /billingAccounts/{billingAccountId} {
+      allow get: if signedIn() && billingAccountId == billingAccountIdFor(request.auth.uid);
+      allow list, create, update, delete: if false;
+
+      match /subscriptions/{subscriptionId} {
+        allow get, list: if signedIn() && billingAccountId == billingAccountIdFor(request.auth.uid);
+        allow create, update, delete: if false;
+      }
+
+      match /billingEvents/{stripeEventId} {
+        allow read, write: if false;
+      }
     }
 
     match /planCatalog/{planId} {
-      allow read: if signedIn();
+      allow read: if true;
       allow write: if false;
     }
 

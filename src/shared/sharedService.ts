@@ -17,6 +17,7 @@ import {
   type Unsubscribe
 } from 'firebase/firestore';
 import { addHours } from 'date-fns';
+import { getBillingEntitlementsForUser } from '../billing/billingService';
 import { getFirebaseDb } from '../firebase/config';
 import { getPersonalWorkspaceId } from '../workspaces/workspaceService';
 import {
@@ -55,8 +56,6 @@ import type {
 export type LocalSharedSynced<T> = T & {
   localSyncStatus: SyncStatus;
 };
-
-const COUPLE_ENTITLEMENT_SPARK_FLAG = true;
 
 function createId(prefix: string) {
   const randomId = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}`;
@@ -164,8 +163,10 @@ export async function canCreateCoupleWorkspace(userId: string) {
     return { allowed: false, reason: 'Você já possui um espaço compartilhado ativo.' };
   }
 
-  if (!COUPLE_ENTITLEMENT_SPARK_FLAG) {
-    return { allowed: false, reason: 'A criação de espaço compartilhado está indisponível neste ambiente.' };
+  const entitlements = await getBillingEntitlementsForUser(userId);
+
+  if (!entitlements.canCreateCoupleWorkspace) {
+    return { allowed: false, reason: 'O plano Duo ou Premium é necessário para criar um espaço compartilhado.' };
   }
 
   return { allowed: true };

@@ -387,6 +387,31 @@ function settlementPayload(workspaceId: string, settlementId: string, uid: strin
   };
 }
 
+function billingAccountPayload(uid: string, canCreateCoupleWorkspace: boolean, overrides: Record<string, unknown> = {}) {
+  return {
+    id: `billing_${uid}`,
+    ownerUserId: uid,
+    currentPlanId: canCreateCoupleWorkspace ? 'duo' : 'free',
+    subscriptionStatus: canCreateCoupleWorkspace ? 'active' : 'free',
+    entitlements: {
+      canCreateCoupleWorkspace,
+      canUseAdvancedReports: false,
+      canUseAutomationRules: false,
+      canImportStatements: false,
+      canExportXlsx: false,
+      canExportPdf: canCreateCoupleWorkspace,
+      canUploadReceipts: false,
+      canUseOcr: false,
+      canUseAdvancedReconciliation: false,
+      maxTransactionsPerMonth: canCreateCoupleWorkspace ? 2000 : 250,
+      maxReceiptStorageMb: 0,
+      maxAutomationRules: 0
+    },
+    updatedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
+    ...overrides
+  };
+}
+
 function createCoupleWorkspaceBatch(db: TestFirestore, workspaceId = 'coupleA', uid = 'alice') {
   const modularDb = db as unknown as Parameters<typeof writeBatch>[0];
   const batch = writeBatch(modularDb);
@@ -446,6 +471,8 @@ describe('firestore security rules', () => {
         fontScale: 'md',
         reduceMotion: false
       });
+      await setDoc(doc(adminDb, 'billingAccounts/billing_alice'), billingAccountPayload('alice', true));
+      await setDoc(doc(adminDb, 'billingAccounts/billing_bob'), billingAccountPayload('bob', false));
       await setDoc(doc(adminDb, 'workspaces/workspaceA'), {
         id: 'workspaceA',
         type: 'personal',
@@ -524,6 +551,14 @@ describe('firestore security rules', () => {
 
     await assertFails(getDoc(doc(aliceDb, 'users/bob')));
     await assertFails(getDoc(doc(aliceDb, 'workspaces/workspaceB')));
+  });
+
+  it('allows reading only the authenticated user billing account shell', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(getDoc(doc(aliceDb, 'billingAccounts/billing_alice')));
+    await assertFails(getDoc(doc(aliceDb, 'billingAccounts/billing_bob')));
+    await assertFails(getDoc(doc(aliceDb, 'billingAccounts/billing_alice/billingEvents/evt_test')));
   });
 
   it('allows only appearance updates on the user profile', async () => {
@@ -735,6 +770,12 @@ describe('firestore security rules', () => {
 
     await assertSucceeds(createCoupleWorkspaceBatch(aliceDb).commit());
     await assertSucceeds(getDoc(doc(aliceDb, 'workspaces/coupleA')));
+  });
+
+  it('blocks couple workspace creation without a server-side Duo entitlement', async () => {
+    const bobDb = testEnv.authenticatedContext('bob').firestore();
+
+    await assertFails(createCoupleWorkspaceBatch(bobDb, 'coupleBob', 'bob').commit());
   });
 
   it('allows a valid couple invite to be accepted once', async () => {

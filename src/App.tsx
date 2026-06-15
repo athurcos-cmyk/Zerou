@@ -6,6 +6,7 @@ import { ThemeRuntime } from './theme/ThemeRuntime';
 import { AppShell } from './layout/AppShell';
 import { AppearanceSettingsPage } from './settings/AppearanceSettingsPage';
 import { AccountsPage } from './pages/AccountsPage';
+import { BillingSettingsPage } from './pages/BillingSettingsPage';
 import { BillsPage } from './pages/BillsPage';
 import { CardDetailPage } from './pages/CardDetailPage';
 import { CardsPage } from './pages/CardsPage';
@@ -19,6 +20,7 @@ import { LoginPage } from './pages/LoginPage';
 import { NewTransactionPage } from './pages/NewTransactionPage';
 import { OnboardingPage } from './onboarding/OnboardingPage';
 import { PublicHomePage } from './pages/PublicHomePage';
+import { PricingPage } from './pages/PricingPage';
 import { RecurringPage } from './pages/RecurringPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { SearchPage } from './pages/SearchPage';
@@ -58,11 +60,12 @@ export function App() {
               <Route path="search" element={<SearchPage />} />
               <Route path="shared" element={<SharedSpacePage />} />
               <Route path="settings/appearance" element={<AppearanceSettingsPage />} />
+              <Route path="settings/billing" element={<BillingSettingsPage />} />
               <Route path="settings/security/login-methods" element={<LoginMethodsPage />} />
             </Route>
           </Route>
         </Route>
-        <Route path="/pricing" element={<PublicPhasePlaceholder title="Pricing" />} />
+        <Route path="/pricing" element={<PricingPage />} />
         <Route path="/features" element={<PublicPhasePlaceholder title="Funcionalidades" />} />
         <Route path="/security" element={<PublicPhasePlaceholder title="Segurança" />} />
         <Route path="/help" element={<PublicPhasePlaceholder title="Ajuda" />} />
