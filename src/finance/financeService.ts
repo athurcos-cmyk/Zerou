@@ -2,6 +2,7 @@ import {
   Timestamp,
   collection,
   deleteField,
+  deleteDoc,
   doc,
   getDocs,
   increment,
@@ -104,11 +105,8 @@ export async function createAccount(workspaceId: string, userId: string, input: 
   return id;
 }
 
-export async function archiveAccount(workspaceId: string, accountId: string) {
-  await updateDoc(documentRef(workspaceId, 'accounts', accountId), {
-    isActive: false,
-    updatedAt: serverTimestamp()
-  });
+export async function deleteAccount(workspaceId: string, accountId: string) {
+  await deleteDoc(documentRef(workspaceId, 'accounts', accountId));
 }
 
 export async function createTransaction(workspaceId: string, userId: string, input: CreateTransactionInput) {

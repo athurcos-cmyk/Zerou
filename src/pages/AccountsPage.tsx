@@ -4,7 +4,7 @@ import { useAuth } from '../auth/AuthContext';
 import { FormMessage } from '../components/FormMessage';
 import { findBankInstitution, searchBankInstitutions, type BankInstitution } from '../finance/bankInstitutions';
 import { accountTypeLabels } from '../finance/financeLabels';
-import { archiveAccount, createAccount } from '../finance/financeService';
+import { createAccount, deleteAccount } from '../finance/financeService';
 import { accountTypes } from '../finance/financeSchemas';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
@@ -52,18 +52,26 @@ export function AccountsPage() {
     }
   }
 
-  async function handleArchiveAccount(accountId: string, accountName: string) {
+  async function handleDeleteAccount(accountId: string, accountName: string) {
     if (!workspaceId) {
       return;
     }
 
     const hasTransactions = finance.transactions.some(
-      (transaction) => transaction.accountId === accountId || transaction.destinationAccountId === accountId
+      (transaction) => !transaction.deletedAt && (transaction.accountId === accountId || transaction.destinationAccountId === accountId)
     );
+    const hasBills = finance.bills.some((bill) => bill.accountId === accountId && bill.status !== 'cancelled');
+    const hasRecurringRules = finance.recurringRules.some((rule) => rule.accountId === accountId && rule.isActive);
+
+    if (hasTransactions || hasBills || hasRecurringRules) {
+      setMessage(
+        `Não dá para excluir "${accountName}" ainda. Ela está ligada a lançamentos, contas a pagar ou recorrências. Remova ou altere esses vínculos primeiro.`
+      );
+      return;
+    }
+
     const confirmed = window.confirm(
-      hasTransactions
-        ? `Excluir "${accountName}" da lista? Ela tem lançamentos no histórico, então a Zerou vai ocultar a conta para novos usos sem apagar os registros antigos.`
-        : `Excluir "${accountName}" da lista de contas?`
+      `Excluir "${accountName}" permanentemente? Como ela não tem histórico ligado, a Zerou vai apagar essa conta financeira do banco de dados.`
     );
 
     if (!confirmed) {
@@ -74,8 +82,8 @@ export function AccountsPage() {
     setMessage(null);
 
     try {
-      await archiveAccount(workspaceId, accountId);
-      setMessage('Conta removida da lista.');
+      await deleteAccount(workspaceId, accountId);
+      setMessage('Conta financeira excluída.');
     } catch (error) {
       setMessage(getUserFacingErrorMessage(error, 'Não foi possível excluir a conta agora.'));
     } finally {
@@ -172,7 +180,7 @@ export function AccountsPage() {
                       type="button"
                       aria-label={`Excluir ${account.name}`}
                       disabled={removingAccountId === account.id}
-                      onClick={() => void handleArchiveAccount(account.id, account.name)}
+                      onClick={() => void handleDeleteAccount(account.id, account.name)}
                     >
                       <Trash2 size={17} aria-hidden="true" />
                     </button>

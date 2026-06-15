@@ -1273,7 +1273,7 @@ service cloud.firestore {
         allow read: if isActiveMember(workspaceId);
         allow create: if validAccountCreate(workspaceId, accountId);
         allow update: if validAccountUpdate(workspaceId);
-        allow delete: if false;
+        allow delete: if isActiveMember(workspaceId);
       }
 
       match /categories/{categoryId} {
