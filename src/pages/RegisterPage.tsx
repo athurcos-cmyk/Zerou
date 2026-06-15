@@ -90,7 +90,10 @@ export function RegisterPage() {
         </div>
         <label className="checkbox-row">
           <input type="checkbox" {...form.register('terms')} />
-          <span>Li e aceito os termos da Zerou para criar meu perfil e workspace pessoal.</span>
+          <span>
+            Li e aceito os <Link className="inline-link" to="/legal/terms">termos</Link> e a{' '}
+            <Link className="inline-link" to="/legal/privacy">política de privacidade</Link> da Zerou.
+          </span>
         </label>
         <span className="text-muted">{form.formState.errors.terms?.message}</span>
         <button className="button button--primary" type="submit" disabled={busy || Boolean(firebaseError)}>

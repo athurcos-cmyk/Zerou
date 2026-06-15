@@ -152,6 +152,9 @@ html[data-reduce-motion='true'] *::after {
   min-height: 100vh;
   grid-template-columns: minmax(0, 1fr);
   place-items: center;
+  background:
+    radial-gradient(circle at top left, var(--action-primary-soft), transparent 28rem),
+    var(--bg-page);
   padding: 2rem;
 }
 
@@ -625,6 +628,68 @@ html[data-reduce-motion='true'] *::after {
   margin: 1rem 0 1.5rem;
 }
 
+.start-guide,
+.spending-summary-card {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.start-guide h2,
+.spending-summary-card h2 {
+  margin: 0.25rem 0 0;
+}
+
+.start-guide-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.start-guide-steps a {
+  display: grid;
+  gap: 0.25rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.9rem;
+  background: var(--bg-surface-subtle);
+  padding: 0.9rem;
+}
+
+.start-guide-steps span,
+.spending-row-label span {
+  color: var(--text-secondary);
+}
+
+.spending-bars {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.spending-row {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.spending-row-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.spending-bar-track {
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--bg-surface-muted);
+}
+
+.spending-bar-track span {
+  display: block;
+  height: 0.65rem;
+  border-radius: inherit;
+  background: var(--action-primary);
+}
+
 .finance-grid {
   display: grid;
   grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
@@ -791,6 +856,27 @@ html[data-reduce-motion='true'] *::after {
 }
 
 .advanced-panel .form-stack {
+  margin-top: 1rem;
+}
+
+.shared-flow-hint {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.shared-flow-hint span {
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  padding: 0.7rem 0.85rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.shared-admin-panel {
   margin-top: 1rem;
 }
 
@@ -1036,12 +1122,50 @@ html[data-reduce-motion='true'] *::after {
 }
 
 .mobile-nav .nav-link {
+  min-height: 3.35rem;
+  flex-direction: column;
+  gap: 0.2rem;
   justify-content: center;
   padding: 0.7rem 0.45rem;
 }
 
 .mobile-nav span {
-  display: none;
+  display: block;
+  font-size: 0.67rem;
+  line-height: 1;
+}
+
+.mobile-more-trigger {
+  width: 100%;
+  background: transparent;
+}
+
+.mobile-more-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 18;
+  background: var(--bg-overlay);
+}
+
+.mobile-more-sheet {
+  position: fixed;
+  right: 0.75rem;
+  bottom: 5.2rem;
+  left: 0.75rem;
+  z-index: 19;
+  display: grid;
+  gap: 1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 1.1rem;
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-md);
+  padding: 1rem;
+}
+
+.mobile-more-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
 }
 
 .public-marketing-shell {
@@ -1206,6 +1330,21 @@ html[data-reduce-motion='true'] *::after {
   gap: 0.75rem;
 }
 
+.routine-card {
+  position: relative;
+}
+
+.step-pill {
+  display: inline-grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--action-primary-soft);
+  color: var(--action-primary);
+  font-weight: 900;
+}
+
 .feature-card svg,
 .privacy-action-card svg,
 .final-cta svg {
@@ -1351,8 +1490,8 @@ html[data-reduce-motion='true'] *::after {
   }
 
   .marketing-copy .headline {
-    max-width: 11ch;
-    font-size: clamp(2.65rem, 13vw, 4.2rem);
+    max-width: 14ch;
+    font-size: clamp(2.35rem, 10vw, 3.35rem);
   }
 
   .public-marketing-shell {
@@ -1403,7 +1542,38 @@ html[data-reduce-motion='true'] *::after {
   }
 
   .public-shell {
+    min-height: auto;
     grid-template-columns: 1fr;
+    border-radius: 1rem;
+  }
+
+  .public-page {
+    min-height: 100svh;
+    place-items: start center;
+    padding: 0.75rem;
+  }
+
+  .public-panel,
+  .form-card {
+    padding: 1.25rem;
+  }
+
+  .public-panel {
+    gap: 1rem;
+  }
+
+  .public-panel .notice {
+    display: none;
+  }
+
+  .public-panel .headline {
+    max-width: 12ch;
+    font-size: clamp(2.2rem, 10vw, 3rem);
+  }
+
+  .public-panel .subtitle {
+    font-size: 1rem;
+    line-height: 1.55;
   }
 
   .app-layout {
@@ -1415,7 +1585,7 @@ html[data-reduce-motion='true'] *::after {
   }
 
   .app-main {
-    padding: 1rem 1rem 5.25rem;
+    padding: 1rem 1rem calc(5.75rem + env(safe-area-inset-bottom));
   }
 
   .mobile-nav {
@@ -1425,9 +1595,19 @@ html[data-reduce-motion='true'] *::after {
   .dashboard-grid,
   .metric-grid,
   .finance-grid,
+  .start-guide-steps,
+  .shared-flow-hint,
   .theme-grid,
   .plan-grid {
     grid-template-columns: 1fr;
+  }
+
+  .quick-actions .button {
+    flex: 1 1 12rem;
+  }
+
+  .metric-card strong {
+    font-size: clamp(1.45rem, 8vw, 1.9rem);
   }
 
   .billing-summary {

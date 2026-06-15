@@ -11,7 +11,7 @@ interface AuthLayoutProps {
 
 export function AuthLayout({ eyebrow, title, description, children }: AuthLayoutProps) {
   return (
-    <main className="public-page">
+    <main className="public-page" data-theme="paper">
       <section className="public-shell" aria-label="Acesso Zerou">
         <aside className="public-panel public-panel--hero">
           <div>

@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import {
   BadgeDollarSign,
   CalendarClock,
   Home,
   LogOut,
+  MoreHorizontal,
   Palette,
   Plus,
   ReceiptText,
@@ -11,7 +13,8 @@ import {
   Search,
   Shield,
   Users,
-  WalletCards
+  WalletCards,
+  X
 } from 'lucide-react';
 import { BrandLockup, BrandLogo } from '../components/BrandLogo';
 import { logout } from '../auth/authService';
@@ -23,6 +26,7 @@ function getNavClass({ isActive }: { isActive: boolean }) {
 
 export function AppShell() {
   const { user, profile } = useAuth();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   async function handleClearLocalDataLogout() {
     const confirmed = window.confirm(
@@ -103,24 +107,84 @@ export function AppShell() {
         <Outlet />
       </main>
 
+      {mobileMenuOpen ? (
+        <>
+          <button
+            className="mobile-more-backdrop"
+            type="button"
+            aria-label="Fechar menu"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          <section className="mobile-more-sheet" aria-label="Mais opções">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Menu</p>
+                <h2>Mais opções</h2>
+              </div>
+              <button className="icon-button" type="button" aria-label="Fechar menu" onClick={() => setMobileMenuOpen(false)}>
+                <X size={18} aria-hidden="true" />
+              </button>
+            </div>
+            <div className="mobile-more-grid">
+              <NavLink className={getNavClass} to="/app/accounts" onClick={() => setMobileMenuOpen(false)}>
+                <WalletCards size={19} aria-hidden="true" /> Contas
+              </NavLink>
+              <NavLink className={getNavClass} to="/app/transactions" onClick={() => setMobileMenuOpen(false)}>
+                <ReceiptText size={19} aria-hidden="true" /> Transações
+              </NavLink>
+              <NavLink className={getNavClass} to="/app/bills" onClick={() => setMobileMenuOpen(false)}>
+                <CalendarClock size={19} aria-hidden="true" /> Compromissos
+              </NavLink>
+              <NavLink className={getNavClass} to="/app/recurring" onClick={() => setMobileMenuOpen(false)}>
+                <Repeat size={19} aria-hidden="true" /> Recorrências
+              </NavLink>
+              <NavLink className={getNavClass} to="/app/search" onClick={() => setMobileMenuOpen(false)}>
+                <Search size={19} aria-hidden="true" /> Busca
+              </NavLink>
+              <NavLink className={getNavClass} to="/app/settings/appearance" onClick={() => setMobileMenuOpen(false)}>
+                <Palette size={19} aria-hidden="true" /> Aparência
+              </NavLink>
+              <NavLink className={getNavClass} to="/app/settings/billing" onClick={() => setMobileMenuOpen(false)}>
+                <BadgeDollarSign size={19} aria-hidden="true" /> Plano gratuito
+              </NavLink>
+              <NavLink className={getNavClass} to="/app/settings/security/login-methods" onClick={() => setMobileMenuOpen(false)}>
+                <Shield size={19} aria-hidden="true" /> Segurança
+              </NavLink>
+            </div>
+            <button className="button button--ghost" type="button" onClick={() => void logout()}>
+              <LogOut size={18} aria-hidden="true" /> Sair
+            </button>
+          </section>
+        </>
+      ) : null}
+
       <nav className="mobile-nav" aria-label="Navegação mobile">
         <NavLink className={getNavClass} to="/app" end aria-label="Início">
           <Home size={20} aria-hidden="true" />
           <span>Início</span>
         </NavLink>
-        <NavLink className={getNavClass} to="/app/transactions" aria-label="Transações">
-          <ReceiptText size={20} aria-hidden="true" />
+        <NavLink className={getNavClass} to="/app/cards" aria-label="Cartões">
+          <WalletCards size={20} aria-hidden="true" />
+          <span>Cartões</span>
         </NavLink>
         <NavLink className={getNavClass} to="/app/transactions/new" aria-label="Adicionar transação">
           <Plus size={22} aria-hidden="true" />
+          <span>Lançar</span>
         </NavLink>
-        <NavLink className={getNavClass} to="/app/accounts" aria-label="Contas">
-          <WalletCards size={20} aria-hidden="true" />
+        <NavLink className={getNavClass} to="/app/shared" aria-label="Compartilhado">
+          <Users size={20} aria-hidden="true" />
+          <span>Casal</span>
         </NavLink>
-        <NavLink className={getNavClass} to="/app/settings/appearance" aria-label="Mais">
-          <Palette size={20} aria-hidden="true" />
+        <button
+          className={`nav-link mobile-more-trigger${mobileMenuOpen ? ' active' : ''}`}
+          type="button"
+          aria-label="Mais opções"
+          aria-expanded={mobileMenuOpen}
+          onClick={() => setMobileMenuOpen((open) => !open)}
+        >
+          <MoreHorizontal size={20} aria-hidden="true" />
           <span>Mais</span>
-        </NavLink>
+        </button>
       </nav>
     </div>
   );

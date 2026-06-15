@@ -3,7 +3,6 @@ import { AuthProvider } from './auth/AuthContext';
 import { PublicOnlyRoute, RequireAuth, RequireOnboardingComplete } from './auth/routeGuards';
 import { AppearanceSyncBridge } from './settings/AppearanceSyncBridge';
 import { ThemeRuntime } from './theme/ThemeRuntime';
-import { CookieConsentBanner } from './privacy/CookieConsentBanner';
 import { AppShell } from './layout/AppShell';
 import { AppearanceSettingsPage } from './settings/AppearanceSettingsPage';
 import { AccountsPage } from './pages/AccountsPage';
@@ -81,7 +80,6 @@ export function App() {
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      <CookieConsentBanner />
     </AuthProvider>
   );
 }

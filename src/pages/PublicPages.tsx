@@ -21,9 +21,9 @@ export function FeaturesPage() {
       </section>
       <section className="public-section feature-grid">
         <Feature icon={<WalletCards size={24} />} title="Contas e transações" text="Receitas, despesas, transferências, busca e status de sincronização pelo Firestore." />
-        <Feature icon={<ReceiptText size={24} />} title="Compromissos" text="Contas a pagar e recorrências entram no disponível livre v1." />
+        <Feature icon={<ReceiptText size={24} />} title="Compromissos" text="Contas a pagar e recorrências entram no dinheiro disponível." />
         <Feature icon={<CreditCard size={24} />} title="Cartões e faturas" text="Fatura por ledger, pagamento parcial, crédito, encargos e fechamento manual." />
-        <Feature icon={<Split size={24} />} title="Espaço compartilhado" text="Convite por código/QR, claims resumidos, comentários e acertos entre duas pessoas." />
+        <Feature icon={<Split size={24} />} title="Espaço compartilhado" text="Convite por código/QR, despesas resumidas, comentários e acertos entre duas pessoas." />
         <Feature icon={<LockKeyhole size={24} />} title="Privacidade por desenho" text="Referências pessoais não entram no contrato de despesa compartilhada." />
         <Feature icon={<ShieldCheck size={24} />} title="PWA e temas" text="Seis temas oficiais, modo system, cache local controlável e atualização automática." />
       </section>
@@ -45,8 +45,8 @@ export function SecurityPage() {
           <h1 className="marketing-title">Clareza sobre proteção e limites.</h1>
         </div>
         <p>
-          A Zerou usa Firebase Auth, Firestore Security Rules, isolamento por workspace e consentimento para cookies opcionais.
-          Segurança é tratada como prática contínua, não como promessa absoluta.
+          A Zerou usa Firebase Auth, Firestore Security Rules, isolamento por workspace, cache local controlável e analytics
+          desligado por padrão. Segurança é tratada como prática contínua, não como promessa absoluta.
         </p>
       </section>
       <section className="public-section feature-grid">
@@ -56,7 +56,7 @@ export function SecurityPage() {
       </section>
       <section className="public-section final-cta">
         <h2>Quer revisar a documentação de privacidade?</h2>
-        <p>Os textos legais ainda estão marcados como rascunho pendente de revisão jurídica.</p>
+        <p>Veja como a Zerou trata dados, espaços compartilhados, retenção e solicitações LGPD.</p>
         <Link className="button button--primary" to="/legal/privacy">
           Ver política de privacidade
         </Link>

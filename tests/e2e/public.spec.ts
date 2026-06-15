@@ -3,13 +3,20 @@ import { expect, test } from '@playwright/test';
 test('public launch page presents the canonical Zerou hero', async ({ page }) => {
   await page.goto('/');
 
-  await expect(page.getByRole('heading', { name: /Organize suas finanças\. Compartilhe o que faz sentido\./i })).toBeVisible();
-  await expect(page.getByText('Controle sua vida financeira pessoal e do casal no mesmo app')).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Seu dinheiro claro no celular\./i })).toBeVisible();
+  await expect(page.getByText('Registre contas, compras, faturas e despesas a dois')).toBeVisible();
   await expect(page.getByRole('link', { name: /Começar grátis/i }).first()).toBeVisible();
   await expect(page.getByRole('link', { name: /Ver como funciona/i })).toBeVisible();
 });
 
-test('cookie banner can refuse optional cookies without enabling analytics', async ({ page }) => {
+test('public launch page stays light even when the device prefers dark', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto('/');
+
+  await expect(page.locator('.public-marketing-shell')).toHaveAttribute('data-theme', 'paper');
+});
+
+test('public pages do not block entry with a cookie banner or analytics by default', async ({ page }) => {
   const analyticsRequests: string[] = [];
   page.on('request', (request) => {
     if (/google-analytics|googletagmanager|\/g\/collect/.test(request.url())) {
@@ -18,10 +25,10 @@ test('cookie banner can refuse optional cookies without enabling analytics', asy
   });
 
   await page.goto('/');
-  await page.getByRole('button', { name: /Recusar opcionais/i }).click();
 
   const storedConsent = await page.evaluate(() => window.localStorage.getItem('zerou.cookieConsent.v1'));
-  expect(storedConsent).toContain('"analytics":false');
+  expect(storedConsent).toBeNull();
+  await expect(page.getByRole('heading', { name: /Cookies opcionais/i })).toHaveCount(0);
   expect(analyticsRequests).toEqual([]);
 });
 
@@ -41,12 +48,14 @@ test('pricing page states the free launch mode', async ({ page }) => {
   await expect(page.getByText('Gratuito', { exact: true })).toBeVisible();
 });
 
-test('legal pages expose pending review placeholders', async ({ page }) => {
+test('legal pages expose launch-ready privacy text without public placeholders', async ({ page }) => {
   await page.goto('/legal/privacy');
 
   await expect(page.getByRole('heading', { name: /Política de privacidade/i })).toBeVisible();
-  await expect(page.getByText(/pendente de revisão jurídica/i)).toBeVisible();
-  await expect(page.getByText(/\[PREENCHER controlador/i)).toBeVisible();
+  await expect(page.getByText(/Vigente desde 15\/06\/2026/i)).toBeVisible();
+  await expect(page.getByText(/Direitos LGPD/i)).toBeVisible();
+  await expect(page.getByText(/pendente de revisão jurídica/i)).toHaveCount(0);
+  await expect(page.getByText(/\[PREENCHER/i)).toHaveCount(0);
 });
 
 test('privacy center registers that login is required for account requests', async ({ page }) => {

@@ -36,12 +36,10 @@ export function PublicHomePage() {
           <div className="marketing-copy">
             <p className="eyebrow">Finanças pessoais e a dois</p>
             <h1 className="headline launch-headline">
-              Organize suas finanças.
-              <br />
-              Compartilhe o que faz sentido.
+              Seu dinheiro claro no celular.
             </h1>
             <p className="subtitle">
-              Controle sua vida financeira pessoal e do casal no mesmo app, sem misturar o que deve permanecer privado.
+              Registre contas, compras, faturas e despesas a dois sem misturar o que é pessoal com o que você decidiu compartilhar.
             </p>
             <div className="button-row marketing-actions">
               <Link className="button button--primary" to="/register">
@@ -53,13 +51,13 @@ export function PublicHomePage() {
             </div>
             <div className="marketing-proof" aria-label="Destaques do lançamento">
               <span>
-                <CheckCircle2 size={18} aria-hidden="true" /> 100% gratuito por enquanto
+                <CheckCircle2 size={18} aria-hidden="true" /> Feito para usar no celular
               </span>
               <span>
-                <CheckCircle2 size={18} aria-hidden="true" /> Pessoal separado do compartilhado
+                <CheckCircle2 size={18} aria-hidden="true" /> Cartão sem bagunçar saldo
               </span>
               <span>
-                <CheckCircle2 size={18} aria-hidden="true" /> PWA para usar no celular
+                <CheckCircle2 size={18} aria-hidden="true" /> Privado até você compartilhar
               </span>
             </div>
           </div>
@@ -72,8 +70,8 @@ export function PublicHomePage() {
             </div>
             <div className="preview-balance">
               <p className="eyebrow">Hoje na Zerou</p>
-              <strong>Seu controle continua seu.</strong>
-              <p>O que é dos dois fica claro.</p>
+              <strong>R$ 2.480,00 livres</strong>
+              <p>Depois de faturas e compromissos do mês.</p>
             </div>
             <div className="preview-grid">
               <span>
@@ -95,30 +93,33 @@ export function PublicHomePage() {
 
       <section className="public-section split-section" id="como-funciona">
         <div>
-          <p className="eyebrow">O problema</p>
-          <h2>Planilha, banco, cartão e conversa solta não combinam bem.</h2>
+          <p className="eyebrow">Como funciona</p>
+          <h2>Primeiro você entende o seu dinheiro. Depois decide o que é dos dois.</h2>
         </div>
         <p>
-          A Zerou nasceu para quem quer entender o próprio dinheiro e combinar despesas a dois sem transformar tudo em uma
-          conta única. Privacidade aqui é autonomia: cada pessoa decide o que entra no espaço compartilhado.
+          A Zerou nasceu para tirar a organização financeira da planilha e da conversa solta. Ela separa sua rotina pessoal
+          do combinado com outra pessoa, com faturas, compromissos e acertos no mesmo lugar.
         </p>
       </section>
 
-      <section className="public-section feature-grid" aria-label="Como funciona">
-        <article className="surface surface-pad feature-card">
+      <section className="public-section feature-grid routine-grid" aria-label="Rotina Zerou">
+        <article className="surface surface-pad feature-card routine-card">
+          <span className="step-pill">1</span>
           <WalletCards size={24} aria-hidden="true" />
-          <h3>Organize o individual</h3>
-          <p>Cadastre contas, receitas, despesas, compromissos e recorrências no seu espaço pessoal.</p>
+          <h3>Lance o básico</h3>
+          <p>Contas, entradas, gastos, recorrências e cartões ficam no seu espaço individual.</p>
         </article>
-        <article className="surface surface-pad feature-card">
+        <article className="surface surface-pad feature-card routine-card">
+          <span className="step-pill">2</span>
           <CreditCard size={24} aria-hidden="true" />
-          <h3>Cartões sem dupla contagem</h3>
-          <p>Compras alimentam faturas. A conta bancária só muda quando você registra o pagamento da fatura.</p>
+          <h3>Veja faturas e compromissos</h3>
+          <p>Compras alimentam faturas, e a conta só muda quando você registra o pagamento.</p>
         </article>
-        <article className="surface surface-pad feature-card">
+        <article className="surface surface-pad feature-card routine-card">
+          <span className="step-pill">3</span>
           <Split size={24} aria-hidden="true" />
-          <h3>Compartilhe o que faz sentido</h3>
-          <p>O espaço compartilhado recebe resumos, divisões e acertos, sem expor contas pessoais por padrão.</p>
+          <h3>Divida sem expor tudo</h3>
+          <p>O espaço compartilhado recebe só o resumo, a divisão e o acerto que você escolheu.</p>
         </article>
       </section>
 
@@ -128,8 +129,8 @@ export function PublicHomePage() {
           <h2>Separação por usuário, workspace e regras Firestore.</h2>
         </div>
         <p>
-          A Zerou usa autenticação Firebase, regras de acesso por membership, cache local controlável e consentimento
-          explícito para cookies opcionais. Não prometemos segurança absoluta; documentamos limites e próximos reforços.
+          A Zerou usa autenticação Firebase, regras de acesso por membership, separação por workspace e cache local
+          controlável. Dados pessoais não são vendidos, e analytics fica desligado por padrão.
         </p>
       </section>
 

@@ -28,7 +28,7 @@
         const validModes = ['manual', 'system'];
         const mode = validModes.includes(localStorage.getItem('zerou.themeMode'))
           ? localStorage.getItem('zerou.themeMode')
-          : 'system';
+          : 'manual';
         const manualTheme = validThemes.includes(localStorage.getItem('zerou.themeId'))
           ? localStorage.getItem('zerou.themeId')
           : 'paper';

@@ -120,7 +120,15 @@ export function connectFirebaseEmulators() {
 }
 
 export async function initializeOptionalAnalytics() {
-  if (typeof window === 'undefined' || !hasMinimumFirebaseConfig() || !firebaseConfig.measurementId || !hasAnalyticsConsent()) {
+  const analyticsEnabled = import.meta.env.VITE_ENABLE_ANALYTICS === 'true';
+
+  if (
+    typeof window === 'undefined' ||
+    !analyticsEnabled ||
+    !hasMinimumFirebaseConfig() ||
+    !firebaseConfig.measurementId ||
+    !hasAnalyticsConsent()
+  ) {
     return;
   }
 

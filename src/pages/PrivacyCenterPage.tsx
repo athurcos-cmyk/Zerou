@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, Cookie, Download, Eraser, LogOut, MailMinus, Pencil, Trash2, Users } from 'lucide-react';
+import { CheckCircle2, Download, Eraser, LogOut, MailMinus, Pencil, Trash2, Users } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { logout } from '../auth/authService';
 import { Seo } from '../components/Seo';
 import { FormMessage } from '../components/FormMessage';
-import { openCookiePreferences } from '../privacy/cookieConsent';
 import { createPrivacyRequest } from '../privacy/privacyRequests';
 import type { PrivacyRequestType } from '../types/contracts';
 import { PublicLayout } from './PublicLayout';
@@ -101,7 +100,7 @@ export function PrivacyCenterPage() {
     <PublicLayout>
       <Seo
         title="Centro de privacidade"
-        description="Gerencie cookies, cache local e solicitações LGPD da sua conta Zerou."
+        description="Gerencie cache local e solicitações LGPD da sua conta Zerou."
         path="/privacy-center"
         robots="noindex,nofollow"
       />
@@ -109,8 +108,8 @@ export function PrivacyCenterPage() {
         <p className="eyebrow">Centro de privacidade</p>
         <h1 className="marketing-title">Controle seus dados e preferências.</h1>
         <p className="marketing-copy">
-          Cookies opcionais podem ser revistos a qualquer momento. Solicitações LGPD criam um protocolo no Firestore quando
-          você está logado.
+          A Zerou usa armazenamento local necessário para login, tema e funcionamento do PWA. Solicitações LGPD criam um
+          protocolo no Firestore quando você está logado.
         </p>
 
         {message ? <FormMessage type={message.type}>{message.text}</FormMessage> : null}
@@ -118,7 +117,8 @@ export function PrivacyCenterPage() {
         {!loading && !user ? (
           <div className="notice">
             <CheckCircle2 size={18} aria-hidden="true" />
-            Para criar uma solicitação vinculada à sua conta, entre na Zerou. Preferências de cookies continuam disponíveis sem login.
+            Para criar uma solicitação vinculada à sua conta, entre na Zerou. Preferências locais deste navegador podem ser
+            removidas sem login.
           </div>
         ) : null}
 
@@ -138,16 +138,6 @@ export function PrivacyCenterPage() {
               </button>
             </article>
           ))}
-          <article className="surface surface-pad privacy-action-card">
-            <span className="empty-icon">
-              <Cookie size={22} aria-hidden="true" />
-            </span>
-            <h2>Gerenciar cookies</h2>
-            <p>Revise preferências, analytics e marketing. Necessários continuam ativos para o app funcionar.</p>
-            <button className="button button--secondary" type="button" onClick={openCookiePreferences}>
-              Abrir preferências
-            </button>
-          </article>
           <article className="surface surface-pad privacy-action-card">
             <span className="empty-icon">
               <Eraser size={22} aria-hidden="true" />

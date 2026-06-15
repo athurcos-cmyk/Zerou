@@ -1,18 +1,14 @@
 # Subprocessadores da Zerou
 
-Versao: `zerou-v12.2-legal-draft-2026-06-15`
+Versao: `zerou-legal-2026-06-15`
 
-Status: rascunho operacional pendente de revisao juridica. Nao usar como parecer legal final.
-
-## Lista preliminar
+Status: texto operacional vigente para o lancamento gratuito atual.
 
 | Fornecedor | Uso | Estado |
 |---|---|---|
-| Firebase / Google Cloud | Auth, Firestore, Storage, Functions futuras e infraestrutura | Ativo |
-| Vercel | Hospedagem do frontend e logs tecnicos de deploy | Ativo |
-| Stripe | Billing futuro | Preparado, sem checkout ativo no lancamento gratuito |
-| Email provider | Emails transacionais futuros | Adapter preparado, provider nao configurado |
+| Firebase / Google Cloud | Autenticacao, Firestore, Storage, infraestrutura de banco de dados, logs tecnicos e recursos de backend quando configurados | Ativo |
+| Vercel | Hospedagem do frontend, entrega de assets, previews, producao e logs tecnicos de deploy | Ativo |
+| Stripe | Infraestrutura de billing preparada para uso futuro | Preparado, sem checkout ativo no lancamento gratuito |
+| Provedor de email | Emails transacionais futuros para autenticacao, suporte e avisos operacionais | Preparado, provider nao configurado |
 
-## Placeholder juridico
-
-[PREENCHER DPA, regioes de processamento, contatos, subcontratados adicionais e politica de notificacao de mudancas].
+Esta lista pode mudar quando fornecedores forem adicionados, removidos ou substituidos. Mudancas relevantes devem ser refletidas nesta pagina.

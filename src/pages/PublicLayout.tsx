@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom';
 import { BrandLockup } from '../components/BrandLogo';
-import { openCookiePreferences } from '../privacy/cookieConsent';
 import type { ReactNode } from 'react';
 
 interface PublicLayoutProps {
@@ -9,7 +8,7 @@ interface PublicLayoutProps {
 
 export function PublicLayout({ children }: PublicLayoutProps) {
   return (
-    <main className="marketing-page public-marketing-shell">
+    <main className="marketing-page public-marketing-shell" data-theme="paper">
       <nav className="marketing-nav public-nav" aria-label="Navegação pública">
         <Link to="/" aria-label="Ir para a página inicial da Zerou">
           <BrandLockup />
@@ -48,9 +47,6 @@ export function PublicLayout({ children }: PublicLayoutProps) {
           <Link to="/legal/privacy">Privacidade</Link>
           <Link to="/legal/cookies">Cookies</Link>
           <Link to="/legal/subprocessors">Subprocessadores</Link>
-          <button className="inline-link footer-cookie-button" type="button" onClick={openCookiePreferences}>
-            Preferências de cookies
-          </button>
         </div>
       </footer>
     </main>

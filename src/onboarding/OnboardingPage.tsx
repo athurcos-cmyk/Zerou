@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { CheckCircle2 } from 'lucide-react';
 import { z } from 'zod';
 import { useAuth } from '../auth/AuthContext';
@@ -65,10 +65,10 @@ export function OnboardingPage() {
   return (
     <section className="page-content">
       <p className="eyebrow">Onboarding Zerou</p>
-      <h1 className="page-title">Vamos criar seu espaço pessoal.</h1>
+      <h1 className="page-title">Vamos preparar seu Zerou.</h1>
       <p className="page-description">
-        Nesta fase, a Zerou cria apenas o perfil e o workspace pessoal privado. A primeira conta financeira fica para o
-        motor financeiro da Fase 2.
+        Seu espaço pessoal começa privado. Depois você pode cadastrar contas, cartões e convidar outra pessoa quando fizer
+        sentido.
       </p>
 
       <div className="settings-grid">
@@ -87,15 +87,17 @@ export function OnboardingPage() {
           </div>
           <label className="checkbox-row">
             <input type="checkbox" {...form.register('terms')} />
-            <span>Aceito os termos versionados da Zerou para criar meu perfil e workspace pessoal.</span>
+            <span>
+              Aceito os <Link className="inline-link" to="/legal/terms">termos</Link> e a{' '}
+              <Link className="inline-link" to="/legal/privacy">política de privacidade</Link> da Zerou.
+            </span>
           </label>
           <span className="text-muted">{form.formState.errors.terms?.message}</span>
           <div className="notice">
-            <strong>Primeira conta opcional:</strong> preparada para a próxima fase, sem criar dados financeiros antes do
-            motor oficial.
+            <strong>Próximo passo:</strong> depois de entrar, crie uma conta ou cartão para a Zerou montar seu primeiro resumo.
           </div>
           <button className="button button--primary" type="submit" disabled={busy || Boolean(firebaseError)}>
-            <CheckCircle2 size={18} aria-hidden="true" /> Criar fundação
+            <CheckCircle2 size={18} aria-hidden="true" /> Entrar no Zerou
           </button>
         </form>
       </div>

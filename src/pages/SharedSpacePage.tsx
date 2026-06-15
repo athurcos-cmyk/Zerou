@@ -48,7 +48,7 @@ function memberLabel(member: WorkspaceMembership | undefined, currentUserId?: st
     return 'Você';
   }
 
-  return member.role === 'owner' ? 'Owner' : 'Parceiro';
+  return member.role === 'owner' ? 'Dono' : 'Parceiro';
 }
 
 export function SharedSpacePage() {
@@ -160,7 +160,7 @@ export function SharedSpacePage() {
     event.preventDefault();
 
     if (!workspaceId || !user || shared.activeMembers.length < 2) {
-      setMessage('O claim precisa de duas pessoas ativas no espaço compartilhado.');
+      setMessage('A despesa compartilhada precisa de duas pessoas ativas no espaço.');
       return;
     }
 
@@ -262,7 +262,7 @@ export function SharedSpacePage() {
           <p className="eyebrow">Espaço compartilhado</p>
           <h1 className="page-title">Duas pessoas. Dois espaços. Uma organização em comum.</h1>
           <p className="page-description">
-            Claims mostram apenas resumo, valor, divisão, pagador, status e comentários. Conta, cartão, fatura e histórico pessoal ficam privados.
+            Compartilhe apenas um resumo da despesa e o acerto combinado. Conta, cartão, fatura e histórico pessoal ficam privados.
           </p>
         </div>
         <span className={`sync-badge sync-badge--${shared.pendingWrites ? 'pending' : 'synced'}`}>
@@ -329,6 +329,12 @@ export function SharedSpacePage() {
             ))}
           </div>
 
+          <div className="shared-flow-hint">
+            <span>1. Convide a outra pessoa</span>
+            <span>2. Adicione uma despesa</span>
+            <span>3. Combine o acerto</span>
+          </div>
+
           <div className="finance-grid">
             <div className="form-stack">
               <article className="surface surface-pad form-stack">
@@ -346,22 +352,25 @@ export function SharedSpacePage() {
                 ) : (
                   <p className="text-secondary">Gere um código, link e QR Code derivados do mesmo token lógico.</p>
                 )}
-                <div className="button-row">
-                  <button className="button button--primary" type="button" onClick={handleCreateInvite}>
-                    Gerar convite
-                  </button>
-                  <button className="button button--secondary" type="button" onClick={handleRegenerateInvite}>
-                    Regenerar
-                  </button>
-                  {activeInvite ? (
-                    <button className="button button--ghost" type="button" onClick={() => handleRevokeInvite(activeInvite.id)}>
-                      Revogar
+                <button className="button button--primary" type="button" onClick={handleCreateInvite}>
+                  Gerar convite
+                </button>
+                <details className="advanced-panel">
+                  <summary>Opções do convite</summary>
+                  <div className="button-row">
+                    <button className="button button--secondary" type="button" onClick={handleRegenerateInvite}>
+                      Regenerar
                     </button>
-                  ) : null}
-                  <button className="button button--ghost" type="button" onClick={handleCleanupInvites}>
-                    Limpar expirados
-                  </button>
-                </div>
+                    {activeInvite ? (
+                      <button className="button button--ghost" type="button" onClick={() => handleRevokeInvite(activeInvite.id)}>
+                        Revogar
+                      </button>
+                    ) : null}
+                    <button className="button button--ghost" type="button" onClick={handleCleanupInvites}>
+                      Limpar expirados
+                    </button>
+                  </div>
+                </details>
                 {generatedInvite ? (
                   <div className="shared-invite-card">
                     <strong>{generatedInvite.code}</strong>
@@ -374,7 +383,7 @@ export function SharedSpacePage() {
               <form className="surface surface-pad form-stack" onSubmit={handleCreateClaim}>
                 <div className="section-heading">
                   <div>
-                    <p className="eyebrow">Claim</p>
+                    <p className="eyebrow">Despesa</p>
                     <h2>Registrar gasto compartilhado</h2>
                   </div>
                   <ShieldCheck size={22} aria-hidden="true" />
@@ -388,42 +397,45 @@ export function SharedSpacePage() {
                   <input className="input" inputMode="decimal" value={claimAmount} onChange={(event) => setClaimAmount(event.target.value)} placeholder="0,00" />
                 </label>
                 <button className="button button--primary" type="submit" disabled={shared.activeMembers.length < 2}>
-                  Criar claim resumido
+                  Adicionar despesa
                 </button>
-                <p className="text-secondary">A divisão inicial é meio a meio. Nenhuma conta, cartão ou fatura pessoal entra neste documento.</p>
+                <p className="text-secondary">A divisão inicial é meio a meio. Nenhuma conta, cartão ou fatura pessoal entra neste registro.</p>
               </form>
 
-              <form className="surface surface-pad form-stack" onSubmit={handleComment}>
-                <div className="section-heading">
-                  <div>
-                    <p className="eyebrow">Comentários</p>
-                    <h2>Conversar sobre um claim</h2>
+              <details className="advanced-panel">
+                <summary>Comentários sobre despesas</summary>
+                <form className="form-stack" onSubmit={handleComment}>
+                  <div className="section-heading">
+                    <div>
+                      <p className="eyebrow">Comentários</p>
+                      <h2>Conversar sobre uma despesa</h2>
+                    </div>
+                    <MessageSquare size={22} aria-hidden="true" />
                   </div>
-                  <MessageSquare size={22} aria-hidden="true" />
-                </div>
-                <select className="select" value={commentTargetId} onChange={(event) => setCommentTargetId(event.target.value)}>
-                  {claimOptions.length > 0 ? (
-                    claimOptions.map((claim) => (
-                      <option key={claim.id} value={claim.id}>
-                        {claim.label}
-                      </option>
-                    ))
-                  ) : (
-                    <option value="">Nenhum claim ainda</option>
-                  )}
-                </select>
-                <textarea className="input textarea" value={commentBody} onChange={(event) => setCommentBody(event.target.value)} placeholder="Escreva um comentário curto." />
-                <button className="button button--secondary" type="submit" disabled={!commentTargetId}>
-                  Comentar
-                </button>
-              </form>
+                  <select className="select" value={commentTargetId} onChange={(event) => setCommentTargetId(event.target.value)}>
+                    {claimOptions.length > 0 ? (
+                      claimOptions.map((claim) => (
+                        <option key={claim.id} value={claim.id}>
+                          {claim.label}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="">Nenhuma despesa ainda</option>
+                    )}
+                  </select>
+                  <textarea className="input textarea" value={commentBody} onChange={(event) => setCommentBody(event.target.value)} placeholder="Escreva um comentário curto." />
+                  <button className="button button--secondary" type="submit" disabled={!commentTargetId}>
+                    Comentar
+                  </button>
+                </form>
+              </details>
             </div>
 
             <div className="form-stack">
               <article className="surface surface-pad">
                 <div className="section-heading">
                   <div>
-                    <p className="eyebrow">Claims</p>
+                    <p className="eyebrow">Despesas</p>
                     <h2>Resumo compartilhado</h2>
                   </div>
                   <Handshake size={22} aria-hidden="true" />
@@ -437,7 +449,7 @@ export function SharedSpacePage() {
                           <span className="text-secondary">
                             {formatMoney(claim.totalAmountCents)} · {claimStatusLabels[claim.status]} · pago por {memberLabel(shared.activeMembers.find((member) => member.userId === claim.payerUserId), user?.uid)}
                           </span>
-                          <span className="text-muted">Visibilidade: {claim.sourceVisibility}</span>
+                          <span className="text-muted">Visibilidade: resumo compartilhado</span>
                         </div>
                         <div className="list-row-end">
                           {claim.status === 'pending' ? (
@@ -460,7 +472,7 @@ export function SharedSpacePage() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-secondary">Nenhum claim compartilhado ainda.</p>
+                  <p className="text-secondary">Nenhuma despesa compartilhada ainda.</p>
                 )}
               </article>
 
@@ -522,8 +534,8 @@ export function SharedSpacePage() {
                 </form>
               </article>
 
-              <article className="surface surface-pad">
-                <p className="eyebrow">Comentários recentes</p>
+              <details className="advanced-panel">
+                <summary>Comentários recentes</summary>
                 {shared.comments.length > 0 ? (
                   <div className="item-list">
                     {shared.comments.slice(0, 5).map((comment) => (
@@ -538,20 +550,23 @@ export function SharedSpacePage() {
                 ) : (
                   <p className="text-secondary">Sem comentários ainda.</p>
                 )}
-              </article>
+              </details>
             </div>
           </div>
 
-          <div className="quick-actions">
+          <details className="advanced-panel shared-admin-panel">
+            <summary>Gerenciar espaço</summary>
+            <div className="quick-actions">
             {canLeaveOrRemove ? (
               <button className="button button--ghost" type="button" onClick={handleLeaveOrRemove}>
                 {shared.workspace?.ownerUserId === user?.uid && partnerMember ? 'Remover parceiro' : 'Sair do espaço'}
               </button>
             ) : null}
             <span className="text-secondary">
-              Owner: {memberLabel(ownerMember, user?.uid)} · Parceiro: {partnerMember ? memberLabel(partnerMember, user?.uid) : 'aguardando convite'}
+              Dono: {memberLabel(ownerMember, user?.uid)} · Parceiro: {partnerMember ? memberLabel(partnerMember, user?.uid) : 'aguardando convite'}
             </span>
-          </div>
+            </div>
+          </details>
         </>
       )}
     </section>

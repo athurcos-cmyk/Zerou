@@ -24,8 +24,8 @@ describe('Zerou theme system', () => {
     expect(resolveThemeId('manual', 'rose-gold', true)).toBe('rose-gold');
   });
 
-  it('defaults to system mode for first render persistence', () => {
-    expect(DEFAULT_APPEARANCE.themeMode).toBe('system');
+  it('defaults to the light Paper theme for first render persistence', () => {
+    expect(DEFAULT_APPEARANCE.themeMode).toBe('manual');
     expect(DEFAULT_APPEARANCE.themeId).toBe('paper');
   });
 });

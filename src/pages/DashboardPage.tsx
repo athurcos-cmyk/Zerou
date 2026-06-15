@@ -22,6 +22,25 @@ export function DashboardPage() {
     invoices: cardsData.invoices
   });
   const syncStatus = finance.pendingWrites || cardsData.pendingWrites ? 'pending' : 'synced';
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const categoryNames = new Map(finance.categories.map((category) => [category.id, category.name]));
+  const spendingByCategory = finance.transactions
+    .filter(
+      (transaction) =>
+        !transaction.deletedAt &&
+        (transaction.type === 'expense' || transaction.type === 'card_purchase') &&
+        (transaction.cashMonth === currentMonth || transaction.competenceMonth === currentMonth)
+    )
+    .reduce((totals, transaction) => {
+      const categoryName = transaction.categoryId ? categoryNames.get(transaction.categoryId) ?? 'Sem categoria' : 'Sem categoria';
+      totals.set(categoryName, (totals.get(categoryName) ?? 0) + transaction.amountCents);
+      return totals;
+    }, new Map<string, number>());
+  const spendingRows = [...spendingByCategory.entries()]
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, 5);
+  const maxSpendingCents = Math.max(...spendingRows.map(([, amount]) => amount), 1);
+  const hasStarted = finance.accounts.length > 0 || finance.transactions.length > 0 || cardsData.cards.length > 0;
 
   return (
     <section className="page-content">
@@ -30,7 +49,7 @@ export function DashboardPage() {
           <p className="eyebrow">Dashboard Zerou</p>
           <h1 className="page-title">Seu dinheiro, seus compromissos.</h1>
           <p className="page-description">
-            Acompanhe saldo, disponível livre, faturas e próximos vencimentos do seu espaço pessoal.
+            Veja saldo, dinheiro livre, faturas e o que vence primeiro no seu espaço pessoal.
           </p>
         </div>
         <SyncStatusBadge status={syncStatus} />
@@ -51,7 +70,7 @@ export function DashboardPage() {
           <span className="metric-icon">
             <ReceiptText size={20} aria-hidden="true" />
           </span>
-          <p className="eyebrow">Disponível livre v1</p>
+          <p className="eyebrow">Disponível agora</p>
           <strong>{formatMoney(dashboard.freeToSpendCents)}</strong>
           <span className="text-secondary">Saldo menos compromissos previstos.</span>
         </article>
@@ -61,13 +80,13 @@ export function DashboardPage() {
           </span>
           <p className="eyebrow">Comprometido</p>
           <strong>{formatMoney(dashboard.committedCents)}</strong>
-          <span className="text-secondary">Bills, recorrências e faturas até o próximo corte.</span>
+          <span className="text-secondary">Contas, recorrências e faturas próximas.</span>
         </article>
       </div>
 
       <div className="quick-actions">
         <Link className="button button--primary" to="/app/transactions/new">
-          <Plus size={18} aria-hidden="true" /> Nova transação
+          <Plus size={18} aria-hidden="true" /> Lançar agora
         </Link>
         <Link className="button button--secondary" to="/app/accounts">
           Criar conta
@@ -79,6 +98,58 @@ export function DashboardPage() {
           Novo compromisso
         </Link>
       </div>
+
+      {!hasStarted ? (
+        <article className="surface surface-pad start-guide">
+          <div>
+            <p className="eyebrow">Comece em poucos minutos</p>
+            <h2>Monte seu primeiro resumo antes de explorar o resto.</h2>
+          </div>
+          <div className="start-guide-steps" aria-label="Primeiros passos">
+            <Link to="/app/accounts">
+              <strong>1. Criar conta</strong>
+              <span>Carteira, banco ou conta digital.</span>
+            </Link>
+            <Link to="/app/transactions/new">
+              <strong>2. Lançar entrada ou gasto</strong>
+              <span>Registre o primeiro movimento.</span>
+            </Link>
+            <Link to="/app/cards">
+              <strong>3. Adicionar cartão</strong>
+              <span>Faturas entram sem duplicar saldo.</span>
+            </Link>
+          </div>
+        </article>
+      ) : null}
+
+      <article className="surface surface-pad spending-summary-card">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Resumo de gastos</p>
+            <h2>Para onde foi o dinheiro este mês</h2>
+          </div>
+          <Link className="inline-link" to="/app/search">
+            Buscar
+          </Link>
+        </div>
+        {spendingRows.length > 0 ? (
+          <div className="spending-bars">
+            {spendingRows.map(([category, amount]) => (
+              <div className="spending-row" key={category}>
+                <div className="spending-row-label">
+                  <strong>{category}</strong>
+                  <span>{formatMoney(amount)}</span>
+                </div>
+                <div className="spending-bar-track" aria-hidden="true">
+                  <span style={{ width: `${Math.max(8, Math.round((amount / maxSpendingCents) * 100))}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-secondary">Quando você lançar gastos, a Zerou mostra aqui as maiores categorias do mês.</p>
+        )}
+      </article>
 
       <div className="finance-grid">
         <article className="surface surface-pad">

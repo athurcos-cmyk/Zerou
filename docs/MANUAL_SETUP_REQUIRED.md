@@ -31,7 +31,7 @@ Estas acoes dependem do dono do projeto e nao foram simuladas no repositorio.
 ## Antes de producao publica ampla
 
 - Revisar `docs/PRODUCTION_CHECKLIST.md`.
-- Substituir placeholders legais em `docs/legal/`.
+- Revisar `docs/legal/` com profissional habilitado antes de escala publica ampla.
 - Confirmar emails oficiais de suporte e privacidade.
 - Corrigir Java local para rodar `npm run test:rules`.
 - Configurar App Check, backups, alertas e dominio final.

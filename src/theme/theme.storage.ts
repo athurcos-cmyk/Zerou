@@ -10,7 +10,7 @@ const STORAGE_KEYS = {
 } as const;
 
 export const DEFAULT_APPEARANCE: AppearancePreferences = {
-  themeMode: 'system',
+  themeMode: 'manual',
   themeId: 'paper',
   density: 'comfortable',
   fontScale: 'md',

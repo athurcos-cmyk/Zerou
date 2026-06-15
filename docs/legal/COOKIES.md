@@ -1,20 +1,25 @@
-# Politica de cookies da Zerou
+# Politica de cookies e armazenamento local da Zerou
 
-Versao: `zerou-v12.2-legal-draft-2026-06-15`
+Versao: `zerou-legal-2026-06-15`
 
-Status: rascunho operacional pendente de revisao juridica. Nao usar como parecer legal final.
+Status: texto operacional vigente para o lancamento gratuito atual.
 
-## Categorias
+## Uso atual
 
-- Necessarios: autenticacao, seguranca basica, tema, PWA e funcionamento do app.
-- Preferencias: escolhas de produto e aparencia.
-- Analytics: opcional e carregado apenas apos consentimento.
-- Marketing: opcional e desativado por padrao.
+A Zerou nao usa cookies opcionais de marketing ou analytics por padrao. O app usa armazenamento local necessario, como `localStorage`, `IndexedDB`, cache do PWA e mecanismos do Firebase Auth para manter login, tema, funcionamento offline e seguranca basica.
 
-## Consentimento
+## Necessarios
 
-Aceitar e recusar opcionais devem ter relevancia visual equivalente. A versao do consentimento fica em `localStorage`.
+Recursos necessarios nao dependem de consentimento separado porque permitem que o app funcione, mantenha sessao, aplique preferencias essenciais e proteja o acesso.
 
-## Placeholder juridico
+## Analytics
 
-[PREENCHER lista final de cookies, duracao, fornecedores, bases legais e instrucoes de revogacao].
+Analytics fica desligado por padrao. Se a Zerou ativar medicao opcional no futuro, isso devera ocorrer com aviso e consentimento quando exigido.
+
+## Marketing
+
+Cookies ou identificadores de marketing nao estao ativos nesta etapa. Campanhas futuras deverao respeitar consentimento e opcao de revogacao quando aplicavel.
+
+## Controle
+
+O usuario pode remover dados locais pelo Centro de privacidade, pelo menu de seguranca do app ou pelas configuracoes do navegador.
