@@ -218,6 +218,7 @@ documentacao-v12.2/QA_SCENARIOS.md
 | `npm run build` na rodada SVGs oficiais de bancos | passou | Bundle PWA gerado: `assets/index-Bb0GEQmA.js`; aviso de chunk inicial > 500 kB permanece. |
 | `npm run test:e2e` na rodada SVGs oficiais de bancos | passou | 10 testes Playwright publicos continuam passando. |
 | `npm audit --omit=dev` na rodada SVGs oficiais de bancos | passou | 0 vulnerabilidades em dependencias de producao; `simple-icons` fica como devDependency para geracao de assets locais. |
+| HTTP live `https://zerou-five.vercel.app` apos rodada SVGs oficiais de bancos | passou | Vercel serviu `assets/index-Bb0GEQmA.js`; smoke validou landing e disponibilidade de `/bank-logos/nubank.svg`. |
 | `npm run typecheck` na rodada UX simples/3D | passou | TypeScript strict validado apos mensagens humanas, copy limpa, bloqueio de fundacao e landing 3D. |
 | `npm run lint` na rodada UX simples/3D | passou | ESLint sem erros. |
 | `npm test` na rodada UX simples/3D | passou | 8 arquivos, 34 testes unitarios; inclui regressao para erro Zod virar mensagem de usuario. |
