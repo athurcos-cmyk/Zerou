@@ -6,7 +6,6 @@ import { ThemeRuntime } from './theme/ThemeRuntime';
 import { AppShell } from './layout/AppShell';
 import { AppearanceSettingsPage } from './settings/AppearanceSettingsPage';
 import { AccountsPage } from './pages/AccountsPage';
-import { BillingSettingsPage } from './pages/BillingSettingsPage';
 import { BillsPage } from './pages/BillsPage';
 import { CardDetailPage } from './pages/CardDetailPage';
 import { CardsPage } from './pages/CardsPage';
@@ -21,8 +20,7 @@ import { NewTransactionPage } from './pages/NewTransactionPage';
 import { OnboardingPage } from './onboarding/OnboardingPage';
 import { ContactPage, FeaturesPage, HelpPage, SecurityPage } from './pages/PublicPages';
 import { PublicHomePage } from './pages/PublicHomePage';
-import { CookiePolicyPage, PrivacyPolicyPage, SubprocessorsPage, TermsPage } from './pages/LegalPages';
-import { PricingPage } from './pages/PricingPage';
+import { PrivacyPolicyPage, TermsPage } from './pages/LegalPages';
 import { PrivacyCenterPage } from './pages/PrivacyCenterPage';
 import { RecurringPage } from './pages/RecurringPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -38,7 +36,7 @@ export function App() {
       <AppearanceSyncBridge />
       <Routes>
         <Route path="/" element={<PublicHomePage />} />
-        <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/pricing" element={<Navigate to="/" replace />} />
         <Route path="/features" element={<FeaturesPage />} />
         <Route path="/security" element={<SecurityPage />} />
         <Route path="/help" element={<HelpPage />} />
@@ -46,8 +44,8 @@ export function App() {
         <Route path="/privacy-center" element={<PrivacyCenterPage />} />
         <Route path="/legal/terms" element={<TermsPage />} />
         <Route path="/legal/privacy" element={<PrivacyPolicyPage />} />
-        <Route path="/legal/cookies" element={<CookiePolicyPage />} />
-        <Route path="/legal/subprocessors" element={<SubprocessorsPage />} />
+        <Route path="/legal/cookies" element={<Navigate to="/legal/privacy" replace />} />
+        <Route path="/legal/subprocessors" element={<Navigate to="/legal/privacy" replace />} />
         <Route path="/join/:code" element={<JoinInvitePage />} />
         <Route element={<PublicOnlyRoute />}>
           <Route path="/login" element={<LoginPage />} />
@@ -73,7 +71,7 @@ export function App() {
               <Route path="search" element={<SearchPage />} />
               <Route path="shared" element={<SharedSpacePage />} />
               <Route path="settings/appearance" element={<AppearanceSettingsPage />} />
-              <Route path="settings/billing" element={<BillingSettingsPage />} />
+              <Route path="settings/billing" element={<Navigate to="/app/settings/appearance" replace />} />
               <Route path="settings/security/login-methods" element={<LoginMethodsPage />} />
             </Route>
           </Route>

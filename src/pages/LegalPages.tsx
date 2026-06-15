@@ -1,62 +1,137 @@
 import { Seo } from '../components/Seo';
 import { PublicLayout } from './PublicLayout';
 
-const legalVersion = 'zerou-legal-2026-06-15';
-
 const documents = {
   terms: {
     title: 'Termos de uso',
-    description: 'Termos de uso da Zerou para uso gratuito atual do app.',
+    description: 'Termos de uso da Zerou para organização financeira pessoal e compartilhada.',
     path: '/legal/terms',
+    updatedAt: 'Atualizado em 15/06/2026',
     sections: [
-      ['Serviço', 'A Zerou é um app de organização financeira pessoal e a dois. Ela separa o espaço individual do espaço compartilhado para que cada pessoa decida o que registrar e o que dividir.'],
-      ['Conta e acesso', 'Você é responsável por informar dados corretos, proteger seus métodos de login e revisar as informações inseridas no app. Se perceber uso indevido, altere sua senha e fale com a Zerou pelos canais públicos do app.'],
-      ['Dados financeiros', 'A Zerou organiza registros lançados pelo usuário, como contas, transações, cartões, faturas, compromissos e recorrências. O app não é banco, instituição de pagamento, consultoria financeira, contábil, jurídica ou tributária.'],
-      ['Espaço compartilhado', 'Ao criar ou aceitar um convite, você concorda que os registros lançados no espaço compartilhado poderão ser vistos pela outra pessoa participante. Contas, cartões e histórico pessoal continuam privados por padrão.'],
-      ['Uso gratuito atual', 'Nesta etapa, a Zerou é 100% gratuita para usuários finais. Qualquer cobrança futura deverá ser comunicada antes e dependerá de aceite próprio.'],
-      ['Disponibilidade e limites', 'A Zerou busca manter o app estável, mas pode passar por manutenção, atualização, falhas de rede, indisponibilidade de fornecedores ou ajustes de segurança. Você deve conferir dados importantes antes de tomar decisões financeiras.'],
-      ['Encerramento', 'Você pode parar de usar a Zerou a qualquer momento e solicitar exclusão ou exportação pelo Centro de privacidade. Algumas informações podem ser mantidas pelo período necessário para segurança, auditoria, cumprimento legal ou exercício regular de direitos.'],
-      ['Atualizações', 'Estes termos podem ser atualizados para refletir mudanças no produto, exigências legais ou melhorias operacionais. A versão vigente mostra a data de atualização nesta página.']
+      [
+        'Aceitação dos termos',
+        'Ao criar uma conta, acessar ou usar a Zerou, você declara que leu e concorda com estes Termos de uso e com a Política de privacidade. Se não concordar, não use o app.'
+      ],
+      [
+        'O que é a Zerou',
+        'A Zerou é um aplicativo web progressivo de organização financeira pessoal e compartilhada. O app ajuda a registrar contas, receitas, despesas, cartões, faturas, compromissos e combinados entre duas pessoas, mantendo separado o que é individual e o que é compartilhado.'
+      ],
+      [
+        'O que a Zerou não é',
+        'A Zerou não é banco, instituição de pagamento, carteira digital, corretora, consultoria financeira, consultoria contábil, consultoria jurídica ou consultoria tributária. As informações exibidas são organizacionais e dependem dos dados que você inserir. Antes de tomar decisões financeiras relevantes, confira os dados e, quando necessário, procure orientação profissional.'
+      ],
+      [
+        'Conta e segurança',
+        'Você é responsável por manter seus dados de cadastro corretos, proteger seu login, não compartilhar sua conta com terceiros e avisar a Zerou se suspeitar de uso indevido. A Zerou pode bloquear ou limitar acessos que indiquem fraude, abuso, violação destes termos ou risco de segurança.'
+      ],
+      [
+        'Dados inseridos pelo usuário',
+        'Você é responsável pela veracidade, legalidade e atualização dos lançamentos, categorias, comentários, valores, datas, faturas, convites e demais informações que registrar. Evite inserir dados de terceiros que não sejam necessários para a organização financeira.'
+      ],
+      [
+        'Espaço compartilhado',
+        'Ao criar ou aceitar um convite de espaço compartilhado, você entende que as informações lançadas nesse espaço poderão ser vistas pela outra pessoa participante. Contas, cartões, transações e histórico do espaço individual não são compartilhados automaticamente.'
+      ],
+      [
+        'Uso gratuito',
+        'O uso atual da Zerou é gratuito. Se a Zerou oferecer recursos pagos no futuro, qualquer cobrança dependerá de comunicação clara, preço informado e aceite próprio antes da contratação.'
+      ],
+      [
+        'Uso adequado',
+        'Você não deve usar a Zerou para atividades ilegais, fraude, lavagem de dinheiro, violação de direitos de terceiros, tentativa de invasão, engenharia reversa indevida, sobrecarga do serviço ou envio de conteúdo abusivo.'
+      ],
+      [
+        'Disponibilidade e atualizações',
+        'A Zerou busca manter o app estável, mas o serviço pode passar por manutenções, atualizações, falhas de conexão, indisponibilidade de fornecedores, mudanças de navegador, problemas de dispositivo ou ajustes de segurança. Atualizações podem alterar telas, recursos e regras de uso para melhorar o produto.'
+      ],
+      [
+        'Propriedade intelectual',
+        'A marca Zerou, a interface, os textos, o design, os fluxos, a identidade visual e o código do app pertencem aos seus titulares. O uso do app não transfere propriedade intelectual ao usuário.'
+      ],
+      [
+        'Encerramento e exclusão',
+        'Você pode parar de usar a Zerou a qualquer momento. A exclusão definitiva de conta deverá ocorrer pelas Configurações do app, com confirmação expressa, quando a rotina automatizada estiver disponível. Até lá, pedidos relacionados a direitos de privacidade podem ser enviados pelo canal indicado na Política de privacidade. Algumas informações podem ser mantidas pelo tempo necessário para segurança, prevenção de fraude, cumprimento legal, resolução de disputas ou exercício regular de direitos.'
+      ],
+      [
+        'Responsabilidade',
+        'Na extensão permitida pela lei brasileira, a Zerou não se responsabiliza por prejuízos decorrentes de dados inseridos incorretamente pelo usuário, decisões financeiras tomadas sem conferência, indisponibilidade temporária, falhas de internet, falhas do dispositivo, uso indevido da conta ou uso contrário a estes termos.'
+      ],
+      [
+        'Lei aplicável',
+        'Estes termos são regidos pelas leis brasileiras, incluindo o Código Civil, o Marco Civil da Internet, a Lei Geral de Proteção de Dados e o Código de Defesa do Consumidor quando aplicável. Eventuais controvérsias observarão as regras de competência previstas na legislação brasileira.'
+      ],
+      [
+        'Contato',
+        'Dúvidas sobre estes termos podem ser enviadas para suporte@zerou.app. Solicitações sobre privacidade e dados pessoais podem ser enviadas para privacidade@zerou.app.'
+      ]
     ]
   },
   privacy: {
     title: 'Política de privacidade',
-    description: 'Política de privacidade da Zerou alinhada à LGPD.',
+    description: 'Política de privacidade da Zerou conforme a LGPD e a legislação brasileira aplicável.',
     path: '/legal/privacy',
+    updatedAt: 'Atualizado em 15/06/2026',
     sections: [
-      ['Quem trata os dados', 'A Zerou trata dados pessoais para oferecer o app financeiro, manter contas de usuário, proteger acesso, sincronizar informações e operar recursos individuais e compartilhados.'],
-      ['Dados tratados', 'Podemos tratar nome, email, identificadores de autenticação, preferências de aparência, dados dos seus espaços na Zerou, registros financeiros que você inserir, convites, solicitações de privacidade, dados técnicos do dispositivo, logs de segurança e informações necessárias para suporte.'],
-      ['Finalidades e bases', 'Usamos dados para executar o serviço solicitado por você, cumprir obrigações legais, proteger a plataforma, prevenir abuso, responder solicitações e melhorar a operação. Consentimento é usado apenas quando uma finalidade opcional depender dele, como analytics ou marketing futuros.'],
-      ['Espaço compartilhado', 'Dados lançados no espaço compartilhado ficam visíveis aos membros daquele espaço conforme o recurso usado. O que fica no espaço individual não é compartilhado automaticamente.'],
-      ['Compartilhamento', 'A Zerou não vende dados pessoais. Fornecedores técnicos podem processar dados apenas para autenticação, banco de dados, hospedagem, entrega do app, suporte operacional e segurança, conforme a lista de subprocessadores.'],
-      ['Retenção', 'Mantemos dados enquanto sua conta estiver ativa ou enquanto forem necessários para funcionamento do serviço, segurança, auditoria, cumprimento legal, prevenção de fraude, resolução de disputas ou exercício regular de direitos.'],
-      ['Direitos LGPD', 'Você pode solicitar confirmação de tratamento, acesso, correção, anonimização, bloqueio, eliminação, portabilidade, informação sobre compartilhamentos, revogação de consentimento e revisão de decisões automatizadas quando aplicável.'],
-      ['Segurança', 'A Zerou usa autenticação, regras de acesso, separação por espaço, armazenamento local controlável e práticas de desenvolvimento voltadas à proteção dos dados. Nenhum serviço digital consegue prometer segurança absoluta.'],
-      ['Contato e solicitações', 'Use o Centro de privacidade para registrar pedidos vinculados à sua conta. Se não estiver logado, use os canais públicos de contato disponíveis no app.']
-    ]
-  },
-  cookies: {
-    title: 'Política de cookies',
-    description: 'Política de cookies e armazenamento local da Zerou.',
-    path: '/legal/cookies',
-    sections: [
-      ['Uso atual', 'A Zerou não usa cookies opcionais de marketing ou analytics por padrão. O app usa armazenamento local necessário para manter login, tema, funcionamento em instabilidades de conexão e segurança básica.'],
-      ['Necessários', 'Recursos necessários não dependem de consentimento separado porque permitem que o app funcione, mantenha sessão, aplique preferências essenciais e proteja o acesso. Você pode limpar esses dados pelo navegador, mas isso pode encerrar sessão e remover preferências locais.'],
-      ['Analytics', 'Analytics fica desligado por padrão. Se a Zerou ativar medição opcional no futuro, isso deverá ocorrer com aviso e consentimento quando exigido.'],
-      ['Marketing', 'Cookies ou identificadores de marketing não estão ativos nesta etapa. Campanhas futuras deverão respeitar consentimento e opção de revogação quando aplicável.'],
-      ['Controle pelo usuário', 'Você pode remover dados locais pelo Centro de privacidade, pelo menu de segurança do app ou pelas configurações do navegador.']
-    ]
-  },
-  subprocessors: {
-    title: 'Subprocessadores',
-    description: 'Subprocessadores técnicos usados ou preparados pela Zerou.',
-    path: '/legal/subprocessors',
-    sections: [
-      ['Firebase / Google Cloud', 'Autenticação, banco de dados, infraestrutura técnica, logs de segurança e recursos de backend quando configurados.'],
-      ['Vercel', 'Hospedagem do frontend, entrega de assets, previews, produção e logs técnicos de deploy.'],
-      ['Pagamento futuro', 'Fornecedor de pagamento poderá ser usado se a Zerou oferecer planos pagos no futuro. Como a Zerou está gratuita nesta etapa, não há cobrança ativa para usuários finais.'],
-      ['Provedor de email', 'Envio de emails transacionais pode ser configurado no futuro para autenticação, suporte e avisos operacionais.'],
-      ['Atualizações', 'A lista pode mudar quando fornecedores forem adicionados, removidos ou substituídos. Mudanças relevantes devem ser refletidas nesta página.']
+      [
+        'Controlador e contato',
+        'A Zerou é responsável por tratar os dados pessoais necessários para operar o app. Para assuntos de privacidade, proteção de dados, dúvidas ou exercício de direitos, use o canal privacidade@zerou.app.'
+      ],
+      [
+        'Dados que podem ser tratados',
+        'Podemos tratar nome, email, identificadores de autenticação, preferências de tema, dados dos seus espaços na Zerou, contas, transações, categorias, cartões, faturas, compromissos, recorrências, despesas compartilhadas, comentários, convites, dados técnicos do dispositivo, logs de segurança, registros de suporte e informações que você inserir voluntariamente no app.'
+      ],
+      [
+        'Dados financeiros',
+        'A Zerou armazena os registros financeiros que você digita para organizar sua rotina. A Zerou não acessa conta bancária, não movimenta dinheiro, não consulta saldo bancário real, não solicita senha de banco e não vende dados pessoais.'
+      ],
+      [
+        'Finalidades',
+        'Usamos dados para criar e proteger sua conta, manter login, salvar preferências, sincronizar informações entre dispositivos, organizar dados financeiros, operar o espaço compartilhado, gerar resumos dentro do app, prevenir abuso, manter segurança, responder suporte, cumprir obrigações legais e melhorar a estabilidade do serviço.'
+      ],
+      [
+        'Bases legais',
+        'O tratamento pode se apoiar na execução de contrato ou procedimentos preliminares, cumprimento de obrigação legal ou regulatória, legítimo interesse para segurança e melhoria do serviço, exercício regular de direitos e consentimento quando uma finalidade opcional depender dele.'
+      ],
+      [
+        'Espaço compartilhado',
+        'Quando você usa um espaço compartilhado, os lançamentos e comentários criados nesse espaço ficam disponíveis aos membros daquele espaço. Dados do espaço individual não são compartilhados automaticamente com parceiro ou parceira.'
+      ],
+      [
+        'Fornecedores técnicos',
+        'Para funcionar, a Zerou pode usar Firebase e Google Cloud para autenticação, banco de dados, segurança e infraestrutura técnica; Vercel para hospedagem, entrega do app, deploy e logs técnicos; e provedores de email ou suporte quando necessários para comunicação operacional. Esses fornecedores processam dados apenas para viabilizar o serviço contratado pela Zerou.'
+      ],
+      [
+        'Transferência internacional',
+        'Alguns fornecedores técnicos podem armazenar ou processar dados fora do Brasil. Quando isso ocorrer, a Zerou buscará usar fornecedores com mecanismos contratuais, técnicos e organizacionais compatíveis com a LGPD e com padrões reconhecidos de proteção de dados.'
+      ],
+      [
+        'Cookies e armazenamento local',
+        'A Zerou usa tecnologias necessárias como localStorage, IndexedDB, cache do PWA e mecanismos do Firebase Auth para manter login, preferências, funcionamento no celular e segurança básica. Não usamos cookies opcionais de publicidade ou rastreamento por padrão. Se analytics opcional for ativado no futuro, ele deverá respeitar aviso e consentimento quando exigido.'
+      ],
+      [
+        'Retenção e exclusão',
+        'Mantemos dados enquanto sua conta estiver ativa ou enquanto forem necessários para funcionamento do app, segurança, prevenção de fraude, cumprimento legal, resolução de disputas ou exercício regular de direitos. Após exclusão de conta, dados serão removidos ou anonimizados conforme a rotina aplicável, respeitadas retenções legais necessárias.'
+      ],
+      [
+        'Segurança',
+        'A Zerou usa autenticação, regras de acesso, separação por usuário e por espaço, controles de permissão e práticas de desenvolvimento voltadas à proteção dos dados. Nenhum serviço digital consegue garantir segurança absoluta, por isso também é importante proteger seu login e seu dispositivo.'
+      ],
+      [
+        'Seus direitos',
+        'Nos termos da LGPD, você pode solicitar confirmação de tratamento, acesso, correção, anonimização, bloqueio, eliminação, portabilidade, informação sobre compartilhamentos, informação sobre consequências de negar consentimento, revogação de consentimento e revisão de decisões automatizadas quando aplicável.'
+      ],
+      [
+        'Menores de idade',
+        'A Zerou é voltada a pessoas capazes de gerir a própria vida financeira. O uso por menores de idade deve ocorrer com autorização e acompanhamento do responsável legal.'
+      ],
+      [
+        'Alterações desta política',
+        'Esta política pode ser atualizada para refletir mudanças no app, na operação, nos fornecedores ou na legislação. Mudanças relevantes poderão ser comunicadas pelos canais disponíveis no app.'
+      ],
+      [
+        'Contato',
+        'Para privacidade e proteção de dados, escreva para privacidade@zerou.app. Para suporte geral, escreva para suporte@zerou.app.'
+      ]
     ]
   }
 } as const;
@@ -69,14 +144,6 @@ export function PrivacyPolicyPage() {
   return <LegalDocument kind="privacy" />;
 }
 
-export function CookiePolicyPage() {
-  return <LegalDocument kind="cookies" />;
-}
-
-export function SubprocessorsPage() {
-  return <LegalDocument kind="subprocessors" />;
-}
-
 function LegalDocument({ kind }: { kind: keyof typeof documents }) {
   const document = documents[kind];
 
@@ -84,11 +151,9 @@ function LegalDocument({ kind }: { kind: keyof typeof documents }) {
     <PublicLayout>
       <Seo title={document.title} description={document.description} path={document.path} />
       <article className="public-section legal-document">
-        <p className="eyebrow">Documento versionado</p>
+        <p className="eyebrow">Zerou</p>
         <h1 className="marketing-title">{document.title}</h1>
-        <p className="notice notice--success">
-          Versão {legalVersion}. Vigente desde 15/06/2026 para o lançamento gratuito atual da Zerou.
-        </p>
+        <p className="text-secondary">{document.updatedAt}</p>
         {document.sections.map(([title, body]) => (
           <section className="legal-section" key={title}>
             <h2>{title}</h2>

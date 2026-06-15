@@ -14,9 +14,8 @@ export function PublicLayout({ children }: PublicLayoutProps) {
           <BrandLockup />
         </Link>
         <div className="public-nav-links">
-          <Link to="/features">Funcionalidades</Link>
+          <a href="/#funcionalidades">Funcionalidades</a>
           <Link to="/security">Segurança</Link>
-          <Link to="/pricing">Planos</Link>
           <Link to="/help">Ajuda</Link>
         </div>
         <div className="button-row public-nav-actions">
@@ -37,16 +36,11 @@ export function PublicLayout({ children }: PublicLayoutProps) {
           <p className="text-secondary">Controle individual. Organização a dois.</p>
         </div>
         <div className="public-footer-links" aria-label="Links institucionais">
-          <Link to="/features">Funcionalidades</Link>
           <Link to="/security">Segurança</Link>
-          <Link to="/pricing">Planos</Link>
           <Link to="/help">Ajuda</Link>
           <Link to="/contact">Contato</Link>
-          <Link to="/privacy-center">Centro de privacidade</Link>
           <Link to="/legal/terms">Termos</Link>
           <Link to="/legal/privacy">Privacidade</Link>
-          <Link to="/legal/cookies">Cookies</Link>
-          <Link to="/legal/subprocessors">Subprocessadores</Link>
         </div>
       </footer>
     </main>

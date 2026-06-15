@@ -4,35 +4,23 @@
 
 Zerou separates personal finance data from couple-shared summaries. Sharing is explicit and does not expose personal accounts, cards or invoice references by default.
 
-## Cookie Consent
+## Public Legal Pages
 
-Categories:
+The public legal surface is intentionally small:
 
-- Necessary: always active for app operation.
-- Preferences: optional product preferences.
-- Analytics: optional and blocked until consent.
-- Marketing: optional and disabled by default.
+- `/legal/terms`
+- `/legal/privacy`
 
-Consent is persisted with version `zerou-cookie-v1` in local storage and can be changed from the footer or `/privacy-center`.
+Legacy routes `/legal/cookies` and `/legal/subprocessors` redirect to `/legal/privacy`. Cookies, local storage and technical providers are covered inside the privacy policy instead of separate public pages.
 
-## LGPD Request Flow
+## Local Storage And Analytics
 
-Authenticated users can create requests at `/privacy-center`. The app writes a document to:
+The app uses necessary browser storage such as `localStorage`, IndexedDB, PWA cache and Firebase Auth mechanisms for login, preferences, mobile operation and security.
 
-```text
-privacyRequests/{requestId}
-```
+Analytics stays disabled by default and must only be enabled with an explicit product decision and consent flow when required.
 
-Supported request types:
+## Data Rights
 
-- `correction`
-- `export`
-- `deletion`
-- `marketing_revocation`
-- `cache_help`
+LGPD rights are described in the privacy policy. The current Privacy page is informational and does not expose request buttons for marketing revocation, export, deletion or local cache cleanup.
 
-Requests are intentionally not auto-fulfilled in this phase. Operations must review, export or delete data manually until a verified automation exists.
-
-## Legal Status
-
-Documents in `docs/legal/` and `/legal/*` are drafts with visible placeholders. They require legal review before broad public launch.
+Account deletion should live inside authenticated settings with explicit confirmation when the verified automation is ready.

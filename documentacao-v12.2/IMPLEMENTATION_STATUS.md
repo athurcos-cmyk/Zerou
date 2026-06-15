@@ -6,10 +6,10 @@
 
 ```text
 Fase atual: 6 implementada em modo de lancamento gratuito
-Ultima fase concluida: 6. Lancamento gratuito com revisao mobile, legal e privacidade
+Ultima fase concluida: 6. Lancamento gratuito com revisao mobile, marketing, legal e privacidade
 Ambiente validado: local sem emuladores por bloqueio Java; Firestore Rules ja publicadas; build/e2e/unitarios/functions passaram
 Ultima atualizacao: 2026-06-15
-Gate da Fase 6: passou para uso gratuito atual com landing clara/mobile-first com mockup 3D leve, legal operacional sem placeholders publicos, sem banner de cookies, privacy center, mensagens de erro humanas, bloqueio de rotas privadas sem login/fundacao e QA local; producao publica ampla ainda depende de checklist manual/juridico/App Check/backups.
+Gate da Fase 6: passou para uso gratuito atual com landing clara/mobile-first, mockup 3D leve, funcionalidades no corpo da landing, legal operacional reforcado para Brasil, links publicos enxutos, sem pagina de planos, sem banner de cookies, privacy center informativo, mensagens de erro humanas, bloqueio de rotas privadas sem login/fundacao e QA local; checklist externo ainda inclui dominio final, App Check, backups/restore, emails oficiais e Java local para emuladores.
 ```
 
 ## Estado por fase
@@ -21,7 +21,7 @@ Gate da Fase 6: passou para uso gratuito atual com landing clara/mobile-first co
 | 3. Cartoes e faturas | implemented / Spark mode | dominio, build, e2e e rules publicadas passaram; emulator bloqueado por Java | Ledger imutavel por rules e totais derivados no client; backend server-side fica pendente para etapa Blaze/Functions futura. |
 | 4. Espaco compartilhado | implemented / Spark mode | build, e2e, unitarios e rules publicadas passaram; emulator bloqueado por Java | Workspace do casal, convite de uso unico, QR/link, claims compartilhados e settlements implementados sem Cloud Functions. |
 | 5. Billing Stripe custom | implemented / future scaffold | build, e2e, unitarios, functions e rules publicadas passaram; cobranca ativa suspensa por decisao de produto | Checkout/Portal callables, webhook assinado, billingEvents idempotentes, processor/retry, planCatalog e entitlements server-side implementados para uso futuro. |
-| 6. Lancamento | implemented / free launch | landing clara/mobile-first, juridico operacional, privacy center, docs e QA passaram; emulator bloqueado por Java | Rotas publicas reais, sem placeholders legais publicos, sem banner de cookies, Analytics desligado por padrao e app 100% gratuito por enquanto. |
+| 6. Lancamento | implemented / free launch | landing clara/mobile-first, juridico operacional reforcado, privacy center simplificado, docs e QA passaram; emulator bloqueado por Java | Rotas publicas enxutas, sem planos visiveis, sem paginas soltas de cookies/subprocessadores, sem placeholders legais publicos, sem banner de cookies, Analytics desligado por padrao e app 100% gratuito por enquanto. |
 
 ## O que foi implementado
 
@@ -86,10 +86,10 @@ Gate da Fase 6: passou para uso gratuito atual com landing clara/mobile-first co
 - Fase 5: `planCatalog/{free,duo,premium}` preparado com script admin `functions/scripts/seedPlanCatalog.mjs`.
 - Fase 5: Security Rules permitem leitura do proprio billing account/subscriptions, bloqueiam billingEvents ao client e impedem frontend de forjar entitlements.
 - Fase 5: criacao de workspace casal agora exige entitlement server-side `canCreateCoupleWorkspace` em `/billingAccounts/billing_{uid}`.
-- Fase 5: rota publica `/pricing` e tela autenticada `/app/settings/billing` implementadas, exibindo cobranca indisponivel quando Price IDs/secrets nao existem.
+- Fase 5: billing Stripe custom permanece como scaffold futuro; rotas/telas de plano foram removidas da navegacao ativa por decisao de produto gratuito.
 - Decisao de lancamento: a Zerou fica 100% gratuita por enquanto; billing Stripe permanece como scaffold futuro e sem checkout ativo para usuarios.
 - Fase 6: landing publica completa em `/` com hero canonico, problema, como funciona, cartoes/faturas, pessoal/compartilhado, seguranca, planos gratuitos, FAQ, CTA final e footer.
-- Fase 6: rotas publicas reais `/features`, `/security`, `/help`, `/contact`, `/pricing`, `/privacy-center`, `/legal/terms`, `/legal/privacy`, `/legal/cookies` e `/legal/subprocessors`.
+- Fase 6: rotas publicas reais `/features`, `/security`, `/help`, `/contact`, `/privacy-center`, `/legal/terms` e `/legal/privacy`; rotas legadas `/pricing`, `/legal/cookies` e `/legal/subprocessors` redirecionam sem expor paginas extras.
 - Fase 6: tema Paper claro virou padrao visual do app publico e do primeiro render; telas publicas e de autenticacao ficam claras mesmo quando o dispositivo esta em modo escuro.
 - Fase 6: experiencia mobile revisada com landing mais direta, bottom navigation com labels, menu "Mais", dashboard com guia inicial e resumo de gastos por categoria.
 - Fase 6: landing recebeu mockup mobile com efeito 3D leve inspirado em referencias de apps financeiros, mantendo leitura simples no celular.
@@ -99,8 +99,9 @@ Gate da Fase 6: passou para uso gratuito atual com landing clara/mobile-first co
 - Fase 6: copy publica e autenticada removeu termos tecnicos como billing, checkout, offline-first, ledger, workspace e regras Firestore de telas comuns.
 - Fase 6: area compartilhada simplificada para fluxo de casal mais claro; opcoes administrativas, comentarios e acoes avancadas ficam recolhidas.
 - Fase 6: banner de cookies removido para nao bloquear cadastro/uso; Analytics fica desligado por padrao e so pode inicializar com `VITE_ENABLE_ANALYTICS=true` mais consentimento futuro.
-- Fase 6: Centro de Privacidade cria solicitacoes rastreaveis em `privacyRequests/{requestId}` para correcao, exportacao, exclusao, revogacao de marketing e ajuda de cache.
-- Fase 6: documentos legais operacionais em `docs/legal/` e UI legal sem placeholders publicos, cobrindo termos, privacidade, cookies/tecnologias locais e subprocessadores em linguagem LGPD.
+- Fase 6: Privacy Center publico simplificado para orientacao sobre privacidade, espaco compartilhado e seguranca, sem botoes de protocolo para marketing/exportacao/exclusao/cache.
+- Fase 6: documentos legais operacionais em `docs/legal/` e UI legal sem placeholders publicos, cobrindo termos, privacidade, LGPD, Marco Civil, CDC, cookies/tecnologias locais e fornecedores tecnicos dentro da Politica de privacidade.
+- Rodada pos-Fase 6: FAQ removeu perguntas sobre producao e pagamento; topo/rodape removeram planos, cookies, subprocessadores e centro de privacidade como links soltos; funcionalidades passaram a aparecer diretamente na landing.
 - Fase 6: headers Vercel com CSP basica, `X-Robots-Tag` para app privado, `robots.txt`, `sitemap.xml`, meta tags e canonical.
 - Fase 6: CSP da Vercel inclui `https://apis.google.com` para evitar quebra do popup Google/Firebase Auth.
 - Fase 6: docs operacionais criados em `ARCHITECTURE.md`, `SECURITY.md`, `PRIVACY.md`, `RUNBOOK.md` e `docs/PRODUCTION_CHECKLIST.md`.
@@ -173,6 +174,15 @@ documentacao-v12.2/QA_SCENARIOS.md
 
 | Comando | Resultado | Observacao |
 |---|---|---|
+| `npm run typecheck` na rodada marketing/legal simplificado | passou | TypeScript strict validado apos remover rotas visiveis de plano, paginas soltas de cookies/subprocessadores e refazer legal/public pages. |
+| `npm run lint` na rodada marketing/legal simplificado | passou | ESLint sem erros. |
+| `npm test` na rodada marketing/legal simplificado | passou | 8 arquivos, 34 testes unitarios. |
+| `npm run build` na rodada marketing/legal simplificado | passou | Bundle PWA gerado: `assets/index-DgthtBvK.js`; aviso de chunk inicial > 500 kB permanece. |
+| `npm run test:e2e` na rodada marketing/legal simplificado | passou | 10 testes Playwright cobrindo landing clara, ausencia de planos/cookies/subprocessadores soltos, redirects legados, legal reforcado e privacy center informativo. |
+| `npm run functions:build` na rodada marketing/legal simplificado | passou | Functions continuam compilando. |
+| `npm run test:functions` na rodada marketing/legal simplificado | passou | 5 arquivos, 13 testes. |
+| Screenshot Playwright mobile na rodada marketing/legal simplificado | passou | Evidencias em `test-results/public-polish/landing-mobile.png` e `test-results/public-polish/privacy-mobile.png`. |
+| `npm run test:rules` na rodada marketing/legal simplificado | bloqueado por ambiente | Firebase CLI falhou antes dos emuladores: `java -version` saiu com codigo 3221226505. |
 | `npm run typecheck` na rodada UX simples/3D | passou | TypeScript strict validado apos mensagens humanas, copy limpa, bloqueio de fundacao e landing 3D. |
 | `npm run lint` na rodada UX simples/3D | passou | ESLint sem erros. |
 | `npm test` na rodada UX simples/3D | passou | 8 arquivos, 34 testes unitarios; inclui regressao para erro Zod virar mensagem de usuario. |
@@ -264,9 +274,9 @@ documentacao-v12.2/QA_SCENARIOS.md
 - [x] Fazer novo deploy Vercel com o bundle da Fase 6 deste commit.
 - [ ] Validar onboarding em producao ate cair no dashboard vazio.
 - [x] Validar em producao: landing, pricing gratuito, legal, cookies e privacy center respondendo 200.
-- [ ] Validar em producao apos a rodada mobile/legal: landing clara/mobile, legal sem placeholders, ausencia de banner de cookies e privacy center respondendo 200.
+- [ ] Validar em producao apos a rodada marketing/legal simplificado: landing clara/mobile, FAQ sem producao/pagamento, ausencia de planos/cookies/subprocessadores soltos, legal reforcado e privacy center informativo.
 - [ ] Substituir dominio/canonical `zerou-five.vercel.app` pelo dominio final quando existir.
-- [ ] Revisar juridicamente `docs/legal/*` com profissional habilitado antes de lancamento publico amplo.
+- [ ] Opcional/recomendado: revisar `docs/legal/*` com profissional habilitado quando o app ganhar escala ou antes de mudancas relevantes de tratamento/cobranca.
 - [ ] Configurar emails oficiais de suporte e privacidade.
 - [ ] Configurar App Check, backups/restore e alertas de custo antes de producao publica ampla.
 - [ ] Corrigir instalacao Java/PATH local para permitir `firebase emulators:exec` novamente.
@@ -287,8 +297,8 @@ documentacao-v12.2/QA_SCENARIOS.md
 - A Fase 5 tem scaffold real de billing, mas Checkout cloud nao fica ativo porque a decisao atual e manter a Zerou 100% gratuita.
 - As Cloud Functions nao foram deployadas nesta execucao para evitar ativar recurso pago sem preparacao externa. Apenas Firestore Rules/indexes foram publicados.
 - Criar novo espaco compartilhado esta liberado no modo gratuito atual; billing pago futuro exigira nova decisao de produto e migracao controlada.
-- Textos legais foram operacionalizados e os placeholders publicos foram removidos; revisao juridica profissional segue recomendada antes de escala publica ampla.
-- Privacy Center registra pedidos LGPD, mas exportacao/exclusao ainda exigem operacao manual ate automacao verificada.
+- Textos legais foram reforcados e os placeholders publicos foram removidos; revisao profissional segue recomendada como boa pratica, mas nao aparece como bloqueio na UI publica.
+- Privacy Center publico agora e informativo; exportacao/exclusao nao ficam expostas como botoes publicos e exclusao definitiva deve ir para Configuracoes quando a automacao estiver verificada.
 - O build mostra aviso de chunk inicial > 500 kB por causa do bundle com SDKs; otimizar com code splitting depois.
 - `npm audit` reportou vulnerabilidades moderadas transitivas em dependencias de ferramentas; nao foi aplicado `audit fix --force`.
 ```
@@ -320,15 +330,15 @@ documentacao-v12.2/QA_SCENARIOS.md
 | 2026-06-15 | `/billingAccounts/{billingAccountId}/subscriptions/{subscriptionId}` | Snapshot server-side de assinatura Stripe sincronizada por webhook/processor. | Criado/atualizado por Functions. |
 | 2026-06-15 | `/billingAccounts/{billingAccountId}/billingEvents/{stripeEventId}` | Eventos Stripe persistidos uma vez, status de processamento, tentativas e erro redigido. | Client nao le; criado por webhook. |
 | 2026-06-15 | `firestore.rules` | Criacao de `couple` workspace agora respeita o modo gratuito de lancamento e aceita Free/no billing account, mantendo billing write fechado ao client. | Nao; usuarios Free podem criar espaco compartilhado enquanto esta decisao estiver ativa. |
-| 2026-06-15 | `/privacyRequests/{requestId}` | Solicitações LGPD client-side autenticadas com `correction`, `export`, `deletion`, `marketing_revocation` e `cache_help`; update/list/delete bloqueados ao client. | Nao; colecao nova. |
+| 2026-06-15 | `/privacyRequests/{requestId}` | Colecao preparada anteriormente para solicitacoes LGPD client-side autenticadas; UI publica deixou de expor botoes de protocolo ate haver fluxo operacional melhor dentro do app. | Nao; colecao mantida. |
 | 2026-06-15 | `VITE_ENABLE_ANALYTICS` e cookies opcionais | Analytics fica desligado por padrao; nao ha banner de cookies no fluxo atual e qualquer analytics futuro exige flag explicita e consentimento. | Nao. |
-| 2026-06-15 | Rotas publicas `/features`, `/security`, `/help`, `/contact`, `/privacy-center`, `/legal/*` | Placeholders publicos removidos; paginas reais de lancamento, privacidade e juridico operacional implementadas. | Nao. |
+| 2026-06-15 | Rotas publicas `/features`, `/security`, `/help`, `/contact`, `/privacy-center`, `/legal/terms`, `/legal/privacy` | Placeholders publicos removidos; paginas reais de lancamento, privacidade e juridico operacional implementadas; `/pricing`, `/legal/cookies` e `/legal/subprocessors` redirecionam. | Nao. |
 
 ## Proximo passo
 
 ```text
 Nao avancar para novas funcionalidades antes de validar producao.
-Proximo passo recomendado: push em main, aguardar Vercel, smoke test em `https://zerou-five.vercel.app`, corrigir Java local para `npm run test:rules`, revisar checklist em `docs/PRODUCTION_CHECKLIST.md`, fazer teste real de cadastro/login no celular e validar juridicamente os textos antes de escala publica ampla.
+Proximo passo recomendado: push em main, aguardar Vercel, smoke test em `https://zerou-five.vercel.app`, corrigir Java local para `npm run test:rules`, revisar checklist em `docs/PRODUCTION_CHECKLIST.md` e fazer teste real de cadastro/login/uso financeiro no celular.
 Arquivos que o proximo agente deve ler: README-START-HERE.md, documentacao-v12.2/README.md, ZEROU-V12.2-ESPECIFICACAO-MESTRA.md, CONTRATOS-CANONICOS.md, THEME-SYSTEM.md, BRAND-GUIDELINES.md, BRAND-ASSET-INTEGRATION.md, PRODUCT-COPY-CANONICAL.md, IMPLEMENTATION_STATUS.md, QA_SCENARIOS.md, ARCHITECTURE.md, SECURITY.md, PRIVACY.md, RUNBOOK.md e docs/PRODUCTION_CHECKLIST.md.
 ```
 

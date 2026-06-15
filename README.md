@@ -12,7 +12,7 @@ App React/TypeScript/Firebase do Zerou v12.2 com Fases 1 a 6 implementadas em mo
 - Tailwind CSS com CSS variables e tokens semanticos
 - Vite PWA Plugin
 - Vitest, Firebase Rules Unit Testing e Playwright
-- Cloud Functions v2 para billing Stripe customizado futuro
+- Cloud Functions v2 mantidas como scaffold futuro, sem cobrança ativa no app
 
 ## Setup local
 
@@ -57,9 +57,9 @@ Decisao atual: a Zerou fica 100% gratuita por enquanto. Billing real exige nova 
 
 ## Escopo atual
 
-Implementado: autenticacao, onboarding, workspace pessoal, shell autenticado mobile-first, dashboard financeiro com resumo de gastos, contas, transacoes, contas a pagar, recorrencias, busca, cartoes, faturas, ledger de fatura, espaco compartilhado, convites de casal, despesas compartilhadas, settlements, pricing gratuito, tela de plano, Functions Stripe custom futuro, entitlements server-side, landing publica clara, rotas legais sem placeholders publicos, centro de privacidade, analytics desligado por padrao, temas Paper/Sakura/Obsidian/Midnight/Aurora/Rose Gold, modo system opcional, PWA basico e regras Firestore publicaveis.
+Implementado: autenticacao, onboarding, workspace pessoal, shell autenticado mobile-first, dashboard financeiro com resumo de gastos, contas, transacoes, contas a pagar, recorrencias, busca, cartoes, faturas, ledger de fatura, espaco compartilhado, convites de casal, despesas compartilhadas, settlements, Functions Stripe custom futuro sem UI ativa, entitlements server-side, landing publica clara com funcionalidades no corpo, rotas legais de Termos/Privacidade, privacidade simplificada, analytics desligado por padrao, temas Paper/Sakura/Obsidian/Midnight/Aurora/Rose Gold, modo system opcional, PWA basico e regras Firestore publicaveis.
 
-Fora do escopo atual: revisao juridica final, deploy cloud das Functions sem Blaze/secrets, Pix, boleto, cupons avancados, admin completo, automacao real de exportacao/exclusao de dados e cobranca ativa.
+Fora do escopo atual: deploy cloud das Functions sem Blaze/secrets, Pix, boleto, cupons avancados, admin completo, automacao real de exportacao/exclusao de dados e cobranca ativa.
 
 ## QA e status
 

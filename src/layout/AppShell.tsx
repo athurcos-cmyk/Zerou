@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
-  BadgeDollarSign,
   CalendarClock,
   Home,
   LogOut,
@@ -32,7 +31,7 @@ export function AppShell() {
 
   async function handleClearLocalDataLogout() {
     const confirmed = window.confirm(
-      'Sair e limpar os dados salvos neste dispositivo? Use isso em celular emprestado ou computador compartilhado.'
+      'Sair deste aparelho e remover os dados salvos localmente? Use isso em celular emprestado ou computador compartilhado.'
     );
 
     if (!confirmed) {
@@ -79,9 +78,6 @@ export function AppShell() {
           <NavLink className={getNavClass} to="/app/settings/appearance">
             <Palette size={19} aria-hidden="true" /> Aparência
           </NavLink>
-          <NavLink className={getNavClass} to="/app/settings/billing">
-            <BadgeDollarSign size={19} aria-hidden="true" /> Plano
-          </NavLink>
           <NavLink className={getNavClass} to="/app/settings/security/login-methods">
             <Shield size={19} aria-hidden="true" /> Segurança
           </NavLink>
@@ -92,7 +88,7 @@ export function AppShell() {
             <LogOut size={18} aria-hidden="true" /> Sair
           </button>
           <button className="button button--ghost" type="button" onClick={() => void handleClearLocalDataLogout()}>
-            Limpar dados locais
+            Sair deste aparelho
           </button>
         </div>
         </aside>
@@ -147,9 +143,6 @@ export function AppShell() {
               </NavLink>
               <NavLink className={getNavClass} to="/app/settings/appearance" onClick={() => setMobileMenuOpen(false)}>
                 <Palette size={19} aria-hidden="true" /> Aparência
-              </NavLink>
-              <NavLink className={getNavClass} to="/app/settings/billing" onClick={() => setMobileMenuOpen(false)}>
-                <BadgeDollarSign size={19} aria-hidden="true" /> Plano gratuito
               </NavLink>
               <NavLink className={getNavClass} to="/app/settings/security/login-methods" onClick={() => setMobileMenuOpen(false)}>
                 <Shield size={19} aria-hidden="true" /> Segurança

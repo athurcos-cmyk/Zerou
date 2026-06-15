@@ -25,7 +25,7 @@ export function FeaturesPage() {
         <Feature icon={<CreditCard size={24} />} title="Cartões e faturas" text="Compras ficam na fatura, e o saldo da conta muda quando você paga." />
         <Feature icon={<Split size={24} />} title="Espaço compartilhado" text="Convite por código/QR, despesas resumidas, comentários e acertos entre duas pessoas." />
         <Feature icon={<LockKeyhole size={24} />} title="Privacidade por desenho" text="Referências pessoais não entram no contrato de despesa compartilhada." />
-        <Feature icon={<ShieldCheck size={24} />} title="Visual do seu jeito" text="Temas oficiais, atualização automática e limpeza de dados locais quando precisar." />
+        <Feature icon={<ShieldCheck size={24} />} title="Visual do seu jeito" text="Temas oficiais, atualização automática e aparência ajustável por usuário." />
       </section>
     </PublicLayout>
   );
@@ -91,8 +91,8 @@ export function HelpPage() {
             <p>Use Cartões, crie um cartão e registre compras. Pagamentos de fatura saem de uma conta financeira.</p>
           </details>
           <details className="surface surface-pad faq-item">
-            <summary>Como limpar cache local?</summary>
-            <p>No app, use Sair e limpar dados locais. Isso ajuda em celular emprestado ou computador compartilhado.</p>
+            <summary>Posso usar pelo celular?</summary>
+            <p>Sim. A Zerou foi pensada primeiro para celular. Abra pelo navegador e adicione o atalho na tela inicial se quiser.</p>
           </details>
         </div>
       </section>
@@ -116,11 +116,8 @@ export function ContactPage() {
           <p>
             <Mail size={18} aria-hidden="true" /> Privacidade: <a className="inline-link" href="mailto:privacidade@zerou.app">privacidade@zerou.app</a>
           </p>
-          <p className="text-secondary">
-            Ajuste estes emails antes de produção caso o domínio final seja outro.
-          </p>
-          <Link className="button button--primary" to="/privacy-center">
-            Abrir centro de privacidade <ArrowRight size={18} aria-hidden="true" />
+          <Link className="button button--primary" to="/legal/privacy">
+            Ver política de privacidade <ArrowRight size={18} aria-hidden="true" />
           </Link>
         </div>
       </section>

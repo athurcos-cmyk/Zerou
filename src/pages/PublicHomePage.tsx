@@ -1,24 +1,33 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, CheckCircle2, CreditCard, LockKeyhole, ReceiptText, Split, WalletCards } from 'lucide-react';
+import {
+  ArrowRight,
+  BarChart3,
+  CheckCircle2,
+  CreditCard,
+  LockKeyhole,
+  ReceiptText,
+  Split,
+  WalletCards
+} from 'lucide-react';
 import { Seo } from '../components/Seo';
 import { PublicLayout } from './PublicLayout';
 
 const faqs = [
   {
-    question: 'A Zerou mistura minhas finanças com as do casal?',
-    answer: 'Não. Cada pessoa mantém o próprio espaço individual. O espaço compartilhado mostra apenas o que você decide compartilhar.'
+    question: 'Posso usar a Zerou sozinho?',
+    answer: 'Sim. A Zerou funciona muito bem para sua vida financeira individual. O modo casal entra quando você quiser organizar algo com outra pessoa.'
   },
   {
-    question: 'O app está pago?',
-    answer: 'Não. Nesta etapa de lançamento, a Zerou fica 100% gratuita. Planos pagos ficam para uma decisão futura.'
+    question: 'O que a outra pessoa consegue ver?',
+    answer: 'Ela vê apenas o que estiver no espaço do casal: despesas compartilhadas, divisões, comentários e acertos. Suas contas, cartões e lançamentos pessoais continuam privados.'
   },
   {
     question: 'Cartão de crédito entra no saldo duas vezes?',
-    answer: 'Não. Compras no cartão entram na fatura, e o saldo da conta só muda quando a fatura é paga.'
+    answer: 'Não. Compras no cartão ficam na fatura, e o saldo da conta só muda quando você registra o pagamento da fatura.'
   },
   {
-    question: 'Já posso usar em produção?',
-    answer: 'Sim para uso pessoal com o escopo atual. Antes de um lançamento público amplo, ainda faltam revisão jurídica, App Check e rotinas operacionais finais.'
+    question: 'Preciso instalar pela loja de apps?',
+    answer: 'Não. A Zerou é um app web: você abre pelo navegador do celular e pode adicionar o atalho na tela inicial.'
   }
 ];
 
@@ -34,30 +43,30 @@ export function PublicHomePage() {
       <section className="marketing-hero launch-hero" aria-label="Zerou">
         <div className="marketing-hero-grid">
           <div className="marketing-copy">
-            <p className="eyebrow">Finanças pessoais e a dois</p>
+            <p className="eyebrow">Controle individual. Organização a dois.</p>
             <h1 className="headline launch-headline">
-              Seu dinheiro claro no celular.
+              Seu dinheiro simples de entender.
             </h1>
             <p className="subtitle">
-              Registre contas, compras, faturas e despesas a dois sem misturar o que é pessoal com o que você decidiu compartilhar.
+              Acompanhe gastos, contas, cartões e combinados do casal em um app feito para o celular, sem expor o que é só seu.
             </p>
             <div className="button-row marketing-actions">
               <Link className="button button--primary" to="/register">
-                Começar grátis <ArrowRight size={18} aria-hidden="true" />
+                Começar agora <ArrowRight size={18} aria-hidden="true" />
               </Link>
-              <a className="button button--secondary" href="#como-funciona">
-                Ver como funciona
+              <a className="button button--secondary" href="#funcionalidades">
+                Ver funcionalidades
               </a>
             </div>
-            <div className="marketing-proof" aria-label="Destaques do lançamento">
+            <div className="marketing-proof" aria-label="Destaques da Zerou">
               <span>
                 <CheckCircle2 size={18} aria-hidden="true" /> Feito para usar no celular
               </span>
               <span>
-                <CheckCircle2 size={18} aria-hidden="true" /> Cartão sem bagunçar saldo
+                <CheckCircle2 size={18} aria-hidden="true" /> Pessoal e casal separados
               </span>
               <span>
-                <CheckCircle2 size={18} aria-hidden="true" /> Privado até você compartilhar
+                <CheckCircle2 size={18} aria-hidden="true" /> Fatura sem dupla contagem
               </span>
             </div>
           </div>
@@ -69,22 +78,22 @@ export function PublicHomePage() {
               <span />
             </div>
             <div className="preview-balance">
-              <p className="eyebrow">Hoje na Zerou</p>
+              <p className="eyebrow">Resumo do mês</p>
               <strong>R$ 2.480,00 livres</strong>
-              <p>Depois de faturas e compromissos do mês.</p>
+              <p>Depois de contas, faturas e combinados.</p>
             </div>
             <div className="preview-grid">
               <span>
                 <WalletCards size={18} aria-hidden="true" /> Contas
               </span>
               <span>
-                <CreditCard size={18} aria-hidden="true" /> Faturas
+                <CreditCard size={18} aria-hidden="true" /> Cartões
+              </span>
+              <span>
+                <BarChart3 size={18} aria-hidden="true" /> Gastos
               </span>
               <span>
                 <Split size={18} aria-hidden="true" /> Casal
-              </span>
-              <span>
-                <LockKeyhole size={18} aria-hidden="true" /> Privado
               </span>
             </div>
           </div>
@@ -94,57 +103,62 @@ export function PublicHomePage() {
       <section className="public-section split-section" id="como-funciona">
         <div>
           <p className="eyebrow">Como funciona</p>
-          <h2>Primeiro você entende o seu dinheiro. Depois decide o que é dos dois.</h2>
+          <h2>Primeiro você organiza o seu. Depois divide o que faz sentido.</h2>
         </div>
         <p>
-          A Zerou nasceu para tirar a organização financeira da planilha e da conversa solta. Ela separa sua rotina pessoal
-          do combinado com outra pessoa, com faturas, compromissos e acertos no mesmo lugar.
+          A Zerou foi pensada para a vida real: dinheiro pessoal continua pessoal, despesas do casal ficam em um lugar comum
+          e a fatura do cartão aparece do jeito que você paga no banco.
         </p>
       </section>
 
-      <section className="public-section feature-grid routine-grid" aria-label="Rotina Zerou">
+      <section className="public-section feature-grid routine-grid" id="funcionalidades" aria-label="Funcionalidades Zerou">
         <article className="surface surface-pad feature-card routine-card">
           <span className="step-pill">1</span>
           <WalletCards size={24} aria-hidden="true" />
-          <h3>Lance o básico</h3>
-          <p>Contas, entradas, gastos, recorrências e cartões ficam no seu espaço individual.</p>
+          <h3>Resumo claro</h3>
+          <p>Veja saldo, entradas, gastos e compromissos do mês sem precisar montar planilha.</p>
         </article>
         <article className="surface surface-pad feature-card routine-card">
           <span className="step-pill">2</span>
-          <CreditCard size={24} aria-hidden="true" />
-          <h3>Veja faturas e compromissos</h3>
-          <p>Compras alimentam faturas, e a conta só muda quando você registra o pagamento.</p>
+          <ReceiptText size={24} aria-hidden="true" />
+          <h3>Lançamentos rápidos</h3>
+          <p>Registre despesas, receitas, contas a pagar e gastos recorrentes em poucos toques.</p>
         </article>
         <article className="surface surface-pad feature-card routine-card">
           <span className="step-pill">3</span>
+          <CreditCard size={24} aria-hidden="true" />
+          <h3>Cartões e faturas</h3>
+          <p>Compras ficam na fatura. Pagamentos quitam a fatura sem virar outra despesa.</p>
+        </article>
+        <article className="surface surface-pad feature-card routine-card">
+          <span className="step-pill">4</span>
+          <BarChart3 size={24} aria-hidden="true" />
+          <h3>Gastos por categoria</h3>
+          <p>Entenda para onde o dinheiro está indo e encontre exageros antes do fim do mês.</p>
+        </article>
+        <article className="surface surface-pad feature-card routine-card">
+          <span className="step-pill">5</span>
           <Split size={24} aria-hidden="true" />
-          <h3>Divida sem expor tudo</h3>
-          <p>O espaço compartilhado recebe só o resumo, a divisão e o acerto que você escolheu.</p>
+          <h3>Casal sem confusão</h3>
+          <p>Divida despesas, acompanhe quem pagou e registre acertos sem abrir toda sua vida financeira.</p>
+        </article>
+        <article className="surface surface-pad feature-card routine-card">
+          <span className="step-pill">6</span>
+          <LockKeyhole size={24} aria-hidden="true" />
+          <h3>Privacidade por padrão</h3>
+          <p>O que é pessoal fica pessoal. O que é dos dois aparece só no espaço compartilhado.</p>
         </article>
       </section>
 
       <section className="public-section split-section">
         <div>
-          <p className="eyebrow">Segurança</p>
-          <h2>Seu espaço pessoal continua separado.</h2>
+          <p className="eyebrow">Diferencial</p>
+          <h2>Um app financeiro para você e, quando precisar, para os dois.</h2>
         </div>
         <p>
-            A Zerou separa seu espaço pessoal do espaço compartilhado. Seus dados pessoais não são vendidos, e análises
-          opcionais ficam desligadas por padrão.
+          Muitos apps ajudam a anotar gastos. A Zerou quer resolver o ponto que mais bagunça a rotina: separar o dinheiro
+          individual dos combinados do casal, com clareza para pagar, dividir e acertar.
         </p>
-      </section>
-
-      <section className="public-section pricing-strip">
-        <div>
-          <p className="eyebrow">Lançamento gratuito</p>
-          <h2>Por enquanto, tudo incluso.</h2>
-          <p className="text-secondary">
-            O app fica 100% gratuito nesta etapa. Não há cobrança, assinatura ou tela de pagamento ativa para usuários.
-          </p>
-        </div>
-        <Link className="button button--primary" to="/register">
-          Começar grátis
-        </Link>
       </section>
 
       <section className="public-section faq-grid" aria-label="Perguntas frequentes">
@@ -164,10 +178,10 @@ export function PublicHomePage() {
 
       <section className="public-section final-cta">
         <ReceiptText size={28} aria-hidden="true" />
-        <h2>Duas pessoas. Dois espaços. Uma organização em comum.</h2>
+        <h2>Controle individual. Organização a dois.</h2>
         <p>Comece pela sua rotina individual e convide a outra pessoa quando fizer sentido.</p>
         <Link className="button button--primary" to="/register">
-          Começar grátis <ArrowRight size={18} aria-hidden="true" />
+          Começar agora <ArrowRight size={18} aria-hidden="true" />
         </Link>
       </section>
     </PublicLayout>
