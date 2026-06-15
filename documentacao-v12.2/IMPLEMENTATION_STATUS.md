@@ -183,6 +183,7 @@ documentacao-v12.2/QA_SCENARIOS.md
 | `npm run test:functions` na rodada marketing/legal simplificado | passou | 5 arquivos, 13 testes. |
 | Screenshot Playwright mobile na rodada marketing/legal simplificado | passou | Evidencias em `test-results/public-polish/landing-mobile.png` e `test-results/public-polish/privacy-mobile.png`. |
 | `npm run test:rules` na rodada marketing/legal simplificado | bloqueado por ambiente | Firebase CLI falhou antes dos emuladores: `java -version` saiu com codigo 3221226505. |
+| HTTP live `https://zerou-five.vercel.app` apos rodada marketing/legal simplificado | passou | Vercel serviu `assets/index-DgthtBvK.js`; smoke validou landing sem planos/copy removida, redirects `/pricing`, `/legal/cookies`, `/legal/subprocessors`, legal e privacy center informativo. |
 | `npm run typecheck` na rodada UX simples/3D | passou | TypeScript strict validado apos mensagens humanas, copy limpa, bloqueio de fundacao e landing 3D. |
 | `npm run lint` na rodada UX simples/3D | passou | ESLint sem erros. |
 | `npm test` na rodada UX simples/3D | passou | 8 arquivos, 34 testes unitarios; inclui regressao para erro Zod virar mensagem de usuario. |
@@ -274,7 +275,7 @@ documentacao-v12.2/QA_SCENARIOS.md
 - [x] Fazer novo deploy Vercel com o bundle da Fase 6 deste commit.
 - [ ] Validar onboarding em producao ate cair no dashboard vazio.
 - [x] Validar em producao: landing, pricing gratuito, legal, cookies e privacy center respondendo 200.
-- [ ] Validar em producao apos a rodada marketing/legal simplificado: landing clara/mobile, FAQ sem producao/pagamento, ausencia de planos/cookies/subprocessadores soltos, legal reforcado e privacy center informativo.
+- [x] Validar em producao apos a rodada marketing/legal simplificado: landing clara/mobile, FAQ sem producao/pagamento, ausencia de planos/cookies/subprocessadores soltos, legal reforcado e privacy center informativo.
 - [ ] Substituir dominio/canonical `zerou-five.vercel.app` pelo dominio final quando existir.
 - [ ] Opcional/recomendado: revisar `docs/legal/*` com profissional habilitado quando o app ganhar escala ou antes de mudancas relevantes de tratamento/cobranca.
 - [ ] Configurar emails oficiais de suporte e privacidade.
