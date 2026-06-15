@@ -29,10 +29,15 @@
 
 | Cenario | Caminho esperado | Erro provavel a testar |
 |---|---|---|
-| Convite pendente | Owner cria convite, parceiro aceita e entra como membro ativo. | Token expirado, ja usado ou de outro email falha. |
-| Privacidade individual | Dados pessoais seguem isolados por workspace/membership. | Parceiro nao le workspace pessoal do outro. |
-| Visao compartilhada | Transacoes compartilhadas aparecem apenas no workspace do casal. | Troca de workspace nao mistura contas pessoais. |
-| Saida do casal | Membro removido perde leitura/escrita. | Cache local nao deve continuar mostrando dados privados apos logout/refresh. |
+| Workspace do casal | Owner cria workspace `couple`, membership owner e workspaceRef ativos. | Usuario com casal ativo nao cria outro casal. |
+| Convite valido uma vez | Owner gera codigo `DUO-XXXX-XX`, parceiro confirma e entra como membro ativo. | Mesmo convite aceito de novo falha por status/activeMemberCount. |
+| Expiracao e revogacao | Convites expirados/revogados nao aceitam parceiro. | Preview/accept deve falhar sem criar membership. |
+| Regenerar convite | Novo codigo invalida convites ativos anteriores do mesmo workspace. | Codigo antigo nao pode ser usado apos regeneracao. |
+| Limite de dois membros | Workspace do casal fica com owner + partner. | Terceiro membro ativo e bloqueado em Rules. |
+| Privacidade individual | Dados pessoais seguem isolados por workspace/membership. | Parceiro nao le workspace pessoal, contas, cartoes, faturas ou transacoes do outro. |
+| Claim compartilhado | Membro cria `SharedExpenseClaim` apenas com resumo, total, split, pagador e status. | Campos pessoais como account/card/invoice/history/notes sao rejeitados. |
+| Settlement | Balanco por membro gera proposta; pagamento parcial/total atualiza status e historico. | Valor invalido ou settlement fora do workspace falha. |
+| Saida/remocao | Partner pode sair; owner pode remover partner; workspaceRef/membership ficam removidos. | Membro removido perde leitura/escrita. |
 
 ## Fase 5 - Billing e entitlements
 
@@ -56,6 +61,6 @@
 ## Gates por fase
 
 - Fase 3 passa quando dominio de invoices, UI basica, Rules publicadas, build e testes principais passam.
-- Fase 4 passa quando convite/membership compartilhado nao vaza dados pessoais.
+- Fase 4 passa quando convite/membership, claims e settlements funcionam sem vazar dados pessoais.
 - Fase 5 passa quando billing e webhooks sao idempotentes e seguros.
 - Fase 6 passa quando produto, legal, PWA, deploy e QA visual estao prontos para uso publico.

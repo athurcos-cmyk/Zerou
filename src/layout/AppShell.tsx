@@ -9,6 +9,7 @@ import {
   Repeat,
   Search,
   Shield,
+  Users,
   WalletCards
 } from 'lucide-react';
 import { BrandLockup, BrandLogo } from '../components/BrandLogo';
@@ -63,6 +64,9 @@ export function AppShell() {
           </NavLink>
           <NavLink className={getNavClass} to="/app/search">
             <Search size={19} aria-hidden="true" /> Busca
+          </NavLink>
+          <NavLink className={getNavClass} to="/app/shared">
+            <Users size={19} aria-hidden="true" /> Compartilhado
           </NavLink>
           <NavLink className={getNavClass} to="/app/settings/appearance">
             <Palette size={19} aria-hidden="true" /> Aparência

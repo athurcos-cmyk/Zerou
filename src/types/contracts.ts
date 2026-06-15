@@ -55,10 +55,13 @@ export interface Workspace {
   type: WorkspaceType;
   name: string;
   ownerUserId: string;
+  partnerUserId?: string;
+  activeMemberCount?: number;
   status: 'active' | 'archived' | 'pending_deletion';
   currency: Currency;
   locale: 'pt-BR';
   timezone: 'America/Sao_Paulo';
+  billingAccountId?: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
@@ -69,6 +72,17 @@ export interface WorkspaceMembership {
   role: WorkspaceRole;
   status: MembershipStatus;
   joinedAt?: Timestamp;
+  removedAt?: Timestamp;
+  acceptedInviteId?: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+export interface WorkspaceRef {
+  workspaceId: string;
+  type: WorkspaceType;
+  role: WorkspaceRole;
+  status: MembershipStatus;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
@@ -203,5 +217,79 @@ export interface InvoiceLedgerEntry {
   sourceTransactionId?: string;
   idempotencyKey: string;
   createdBy: string;
+  createdAt?: Timestamp;
+}
+
+export interface CoupleInvite {
+  id: string;
+  workspaceId: string;
+  workspaceName: string;
+  codeHash: string;
+  codeHint: string;
+  createdBy: string;
+  expiresAt: Timestamp;
+  status: 'active' | 'accepted' | 'revoked' | 'expired';
+  usedBy?: string;
+  usedAt?: Timestamp;
+  revokedAt?: Timestamp;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+  version: number;
+}
+
+export interface SharedExpenseSplit {
+  userId: string;
+  amountCents: MoneyCents;
+}
+
+export interface SharedExpenseClaim {
+  id: string;
+  workspaceId: string;
+  payerUserId: string;
+  description: string;
+  totalAmountCents: MoneyCents;
+  split: SharedExpenseSplit[];
+  sourceVisibility: 'summary_only';
+  status: 'pending' | 'accepted' | 'disputed' | 'settled';
+  createdBy: string;
+  clientMutationId: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+  version: number;
+}
+
+export interface Settlement {
+  id: string;
+  workspaceId: string;
+  fromUserId: string;
+  toUserId: string;
+  amountCents: MoneyCents;
+  status: 'proposed' | 'accepted' | 'partially_paid' | 'settled' | 'cancelled';
+  paidAmountCents: MoneyCents;
+  createdBy: string;
+  clientMutationId: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+  version: number;
+}
+
+export interface SharedComment {
+  id: string;
+  workspaceId: string;
+  targetType: 'claim' | 'settlement';
+  targetId: string;
+  body: string;
+  createdBy: string;
+  createdAt?: Timestamp;
+}
+
+export interface AuditLog {
+  id: string;
+  workspaceId: string;
+  actorUserId: string;
+  type: string;
+  targetType: 'workspace' | 'invite' | 'claim' | 'settlement' | 'member';
+  targetId: string;
+  summary: string;
   createdAt?: Timestamp;
 }

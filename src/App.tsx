@@ -22,6 +22,7 @@ import { PublicHomePage } from './pages/PublicHomePage';
 import { RecurringPage } from './pages/RecurringPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { SearchPage } from './pages/SearchPage';
+import { SharedSpacePage } from './pages/SharedSpacePage';
 import { TransactionsPage } from './pages/TransactionsPage';
 import { VerifyEmailPage } from './pages/VerifyEmailPage';
 
@@ -55,6 +56,7 @@ export function App() {
               <Route path="bills" element={<BillsPage />} />
               <Route path="recurring" element={<RecurringPage />} />
               <Route path="search" element={<SearchPage />} />
+              <Route path="shared" element={<SharedSpacePage />} />
               <Route path="settings/appearance" element={<AppearanceSettingsPage />} />
               <Route path="settings/security/login-methods" element={<LoginMethodsPage />} />
             </Route>

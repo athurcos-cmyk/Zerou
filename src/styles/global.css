@@ -690,6 +690,35 @@ html[data-reduce-motion='true'] *::after {
   text-align: right;
 }
 
+.shared-invite-card {
+  display: grid;
+  gap: 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 1rem;
+  background: var(--bg-surface-subtle);
+  padding: 1rem;
+}
+
+.shared-invite-card strong {
+  font-size: clamp(1.45rem, 3vw, 2rem);
+  letter-spacing: 0.04em;
+}
+
+.shared-invite-card span {
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.shared-invite-card img {
+  width: 12rem;
+  max-width: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.85rem;
+  background: var(--bg-surface);
+  padding: 0.5rem;
+}
+
 .sync-badge {
   display: inline-flex;
   align-items: center;

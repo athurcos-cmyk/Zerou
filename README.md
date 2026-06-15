@@ -2,7 +2,7 @@
 
 Controle individual. Organizacao a dois.
 
-App React/TypeScript/Firebase do Zerou v12.2 com Fases 1, 2 e 3 implementadas em modo Spark/free.
+App React/TypeScript/Firebase do Zerou v12.2 com Fases 1, 2, 3 e 4 implementadas em modo Spark/free.
 
 ## Stack
 
@@ -48,13 +48,13 @@ Para `npm run test:rules`, Java precisa estar instalado e disponivel no PATH.
 
 O client Firebase le apenas variaveis `VITE_` e nao contem `firebaseConfig` hardcoded.
 
-Para manter o projeto no plano Spark/free, a Fase 1 cria o perfil e o workspace pessoal diretamente no Firestore, em uma transacao client-side protegida por Security Rules. As rules so permitem criar a propria fundacao em `/users/{uid}`, `/workspaces/personal_{uid}`, `/members/{uid}` e `/workspaceRefs/personal_{uid}` com owner e role fixos.
+Para manter o projeto no plano Spark/free, a fundacao e os fluxos atuais rodam client-side com Security Rules restritivas. A Fase 1 cria perfil e workspace pessoal em transacao; a Fase 4 cria workspace compartilhado, convite, claims e settlements no Firestore sem Cloud Functions.
 
 ## Escopo atual
 
-Implementado: autenticacao, onboarding, workspace pessoal, shell autenticado, dashboard financeiro v1, contas, transacoes, contas a pagar, recorrencias, busca, cartoes, faturas, ledger de fatura, temas Paper/Sakura/Obsidian/Midnight/Aurora/Rose Gold, modo system, PWA basico e regras Firestore publicaveis.
+Implementado: autenticacao, onboarding, workspace pessoal, shell autenticado, dashboard financeiro v1, contas, transacoes, contas a pagar, recorrencias, busca, cartoes, faturas, ledger de fatura, espaco compartilhado, convites de casal, claims compartilhados, settlements, temas Paper/Sakura/Obsidian/Midnight/Aurora/Rose Gold, modo system, PWA basico e regras Firestore publicaveis.
 
-Fora do escopo atual: espaco compartilhado funcional, Stripe/billing, landing completa, rotas juridicas finais e backend server-side para ledger/billing.
+Fora do escopo atual: Stripe/billing, landing completa, rotas juridicas finais, Cloud Functions e backend server-side para ledger/billing/entitlements.
 
 ## QA e status
 

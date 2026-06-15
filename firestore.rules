@@ -770,6 +770,430 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time;
     }
 
+    function isActiveOwner(workspaceId) {
+      return isActiveMember(workspaceId)
+        && get(currentMemberDoc(workspaceId)).data.role == 'owner';
+    }
+
+    function isCoupleWorkspaceAfter(workspaceId) {
+      return getAfter(workspaceDoc(workspaceId)).data.type == 'couple';
+    }
+
+    function isActiveMemberId(workspaceId, uid) {
+      return exists(memberDoc(workspaceId, uid))
+        && get(memberDoc(workspaceId, uid)).data.status == 'active';
+    }
+
+    function validCoupleWorkspaceCreate(workspaceId) {
+      let uid = request.auth.uid;
+
+      return signedIn()
+        && workspaceId.matches('^couple_.+')
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'type',
+          'name',
+          'ownerUserId',
+          'partnerUserId',
+          'activeMemberCount',
+          'status',
+          'currency',
+          'locale',
+          'timezone',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.id == workspaceId
+        && request.resource.data.type == 'couple'
+        && validShortText(request.resource.data.name, 2, 80)
+        && request.resource.data.ownerUserId == uid
+        && request.resource.data.partnerUserId == ''
+        && request.resource.data.activeMemberCount == 1
+        && request.resource.data.status == 'active'
+        && request.resource.data.currency == 'BRL'
+        && request.resource.data.locale == 'pt-BR'
+        && request.resource.data.timezone == 'America/Sao_Paulo'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && getAfter(memberDoc(workspaceId, uid)).data.role == 'owner'
+        && getAfter(workspaceRefDoc(uid, workspaceId)).data.role == 'owner';
+    }
+
+    function validCoupleWorkspaceUpdate(workspaceId) {
+      return signedIn()
+        && resource.data.type == 'couple'
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.type == resource.data.type
+        && request.resource.data.name == resource.data.name
+        && request.resource.data.ownerUserId == resource.data.ownerUserId
+        && request.resource.data.status == resource.data.status
+        && request.resource.data.currency == resource.data.currency
+        && request.resource.data.locale == resource.data.locale
+        && request.resource.data.timezone == resource.data.timezone
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['partnerUserId', 'activeMemberCount', 'updatedAt'])
+        && request.resource.data.updatedAt == request.time
+        && (
+          (
+            resource.data.activeMemberCount == 1
+            && resource.data.partnerUserId == ''
+            && request.resource.data.activeMemberCount == 2
+            && request.resource.data.partnerUserId == request.auth.uid
+            && existsAfter(memberDoc(workspaceId, request.auth.uid))
+            && getAfter(memberDoc(workspaceId, request.auth.uid)).data.role == 'partner'
+            && getAfter(memberDoc(workspaceId, request.auth.uid)).data.status == 'active'
+          )
+          || (
+            resource.data.activeMemberCount == 2
+            && request.resource.data.activeMemberCount == 1
+            && request.resource.data.partnerUserId == ''
+            && (request.auth.uid == resource.data.ownerUserId || request.auth.uid == resource.data.partnerUserId)
+            && existsAfter(memberDoc(workspaceId, resource.data.partnerUserId))
+            && getAfter(memberDoc(workspaceId, resource.data.partnerUserId)).data.status == 'removed'
+          )
+        );
+    }
+
+    function validCoupleOwnerMemberCreate(workspaceId, uid) {
+      return isSelf(uid)
+        && isCoupleWorkspaceAfter(workspaceId)
+        && request.resource.data.keys().hasOnly([
+          'userId',
+          'workspaceId',
+          'role',
+          'status',
+          'joinedAt',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.userId == uid
+        && request.resource.data.workspaceId == workspaceId
+        && request.resource.data.role == 'owner'
+        && request.resource.data.status == 'active'
+        && getAfter(workspaceDoc(workspaceId)).data.ownerUserId == uid
+        && request.resource.data.joinedAt == request.time
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validCouplePartnerMemberCreate(workspaceId, uid) {
+      return isSelf(uid)
+        && isCoupleWorkspaceAfter(workspaceId)
+        && request.resource.data.keys().hasOnly([
+          'userId',
+          'workspaceId',
+          'role',
+          'status',
+          'acceptedInviteId',
+          'joinedAt',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.userId == uid
+        && request.resource.data.workspaceId == workspaceId
+        && request.resource.data.role == 'partner'
+        && request.resource.data.status == 'active'
+        && request.resource.data.acceptedInviteId is string
+        && getAfter(/databases/$(database)/documents/coupleInvites/$(request.resource.data.acceptedInviteId)).data.status == 'accepted'
+        && getAfter(/databases/$(database)/documents/coupleInvites/$(request.resource.data.acceptedInviteId)).data.usedBy == uid
+        && getAfter(/databases/$(database)/documents/coupleInvites/$(request.resource.data.acceptedInviteId)).data.workspaceId == workspaceId
+        && getAfter(workspaceDoc(workspaceId)).data.partnerUserId == uid
+        && getAfter(workspaceDoc(workspaceId)).data.activeMemberCount == 2
+        && request.resource.data.joinedAt == request.time
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validCoupleMemberUpdate(workspaceId, uid) {
+      return signedIn()
+        && resource.data.workspaceId == workspaceId
+        && resource.data.userId == uid
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.workspaceId == resource.data.workspaceId
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.joinedAt == resource.data.joinedAt
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'removedAt', 'updatedAt'])
+        && request.resource.data.status == 'removed'
+        && request.resource.data.removedAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && resource.data.role == 'partner'
+        && (request.auth.uid == uid || request.auth.uid == get(workspaceDoc(workspaceId)).data.ownerUserId)
+        && getAfter(workspaceDoc(workspaceId)).data.partnerUserId == ''
+        && getAfter(workspaceDoc(workspaceId)).data.activeMemberCount == 1;
+    }
+
+    function validCoupleWorkspaceRefCreate(uid, workspaceId) {
+      return isSelf(uid)
+        && isCoupleWorkspaceAfter(workspaceId)
+        && request.resource.data.keys().hasOnly([
+          'workspaceId',
+          'type',
+          'role',
+          'status',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.workspaceId == workspaceId
+        && request.resource.data.type == 'couple'
+        && request.resource.data.role in ['owner', 'partner']
+        && request.resource.data.status == 'active'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && getAfter(memberDoc(workspaceId, uid)).data.role == request.resource.data.role
+        && getAfter(memberDoc(workspaceId, uid)).data.status == 'active';
+    }
+
+    function validCoupleWorkspaceRefUpdate(uid, workspaceId) {
+      return signedIn()
+        && (isSelf(uid) || request.auth.uid == get(workspaceDoc(workspaceId)).data.ownerUserId)
+        && resource.data.workspaceId == workspaceId
+        && resource.data.type == 'couple'
+        && request.resource.data.workspaceId == resource.data.workspaceId
+        && request.resource.data.type == resource.data.type
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        && request.resource.data.status == 'removed'
+        && request.resource.data.updatedAt == request.time
+        && getAfter(memberDoc(workspaceId, uid)).data.status == 'removed';
+    }
+
+    function validInviteCreate(inviteId) {
+      return signedIn()
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'workspaceId',
+          'workspaceName',
+          'codeHash',
+          'codeHint',
+          'createdBy',
+          'expiresAt',
+          'status',
+          'createdAt',
+          'updatedAt',
+          'version'
+        ])
+        && request.resource.data.id == inviteId
+        && inviteId.matches('^invite_[a-f0-9]{32}$')
+        && request.resource.data.workspaceId is string
+        && request.resource.data.workspaceName is string
+        && request.resource.data.workspaceName.size() <= 80
+        && request.resource.data.codeHash is string
+        && request.resource.data.codeHash.matches('^[a-f0-9]{64}$')
+        && request.resource.data.codeHint is string
+        && request.resource.data.codeHint.size() == 2
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.status == 'active'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.version == 1
+        && isActiveOwner(request.resource.data.workspaceId)
+        && get(workspaceDoc(request.resource.data.workspaceId)).data.type == 'couple';
+    }
+
+    function validInviteUpdate() {
+      return signedIn()
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.workspaceId == resource.data.workspaceId
+        && request.resource.data.workspaceName == resource.data.workspaceName
+        && request.resource.data.codeHash == resource.data.codeHash
+        && request.resource.data.codeHint == resource.data.codeHint
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.expiresAt == resource.data.expiresAt
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.version == resource.data.version
+        && request.resource.data.updatedAt == request.time
+        && (
+          (
+            isActiveOwner(resource.data.workspaceId)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'revokedAt', 'updatedAt'])
+            && request.resource.data.status in ['revoked', 'expired']
+            && (!request.resource.data.keys().hasAny(['revokedAt']) || request.resource.data.revokedAt == request.time)
+          )
+          || (
+            resource.data.status == 'active'
+            && resource.data.expiresAt > request.time
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'usedBy', 'usedAt', 'updatedAt'])
+            && request.resource.data.status == 'accepted'
+            && request.resource.data.usedBy == request.auth.uid
+            && request.resource.data.usedAt == request.time
+            && request.auth.uid != resource.data.createdBy
+            && getAfter(workspaceDoc(resource.data.workspaceId)).data.partnerUserId == request.auth.uid
+            && getAfter(workspaceDoc(resource.data.workspaceId)).data.activeMemberCount == 2
+            && getAfter(memberDoc(resource.data.workspaceId, request.auth.uid)).data.role == 'partner'
+            && getAfter(workspaceRefDoc(request.auth.uid, resource.data.workspaceId)).data.role == 'partner'
+          )
+        );
+    }
+
+    function validClaimSplit(workspaceId) {
+      return request.resource.data.split is list
+        && request.resource.data.split.size() == 2
+        && request.resource.data.split[0].keys().hasOnly(['userId', 'amountCents'])
+        && request.resource.data.split[1].keys().hasOnly(['userId', 'amountCents'])
+        && request.resource.data.split[0].userId is string
+        && request.resource.data.split[1].userId is string
+        && request.resource.data.split[0].userId != request.resource.data.split[1].userId
+        && isActiveMemberId(workspaceId, request.resource.data.split[0].userId)
+        && isActiveMemberId(workspaceId, request.resource.data.split[1].userId)
+        && validMoneyCents(request.resource.data.split[0].amountCents)
+        && validMoneyCents(request.resource.data.split[1].amountCents)
+        && request.resource.data.split[0].amountCents + request.resource.data.split[1].amountCents == request.resource.data.totalAmountCents;
+    }
+
+    function validSharedExpenseClaimCreate(workspaceId, claimId) {
+      return isActiveMember(workspaceId)
+        && get(workspaceDoc(workspaceId)).data.type == 'couple'
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'workspaceId',
+          'payerUserId',
+          'description',
+          'totalAmountCents',
+          'split',
+          'sourceVisibility',
+          'status',
+          'createdBy',
+          'clientMutationId',
+          'version',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.id == claimId
+        && request.resource.data.workspaceId == workspaceId
+        && request.resource.data.payerUserId == request.auth.uid
+        && request.resource.data.createdBy == request.auth.uid
+        && validShortText(request.resource.data.description, 2, 120)
+        && validMoneyCents(request.resource.data.totalAmountCents)
+        && request.resource.data.sourceVisibility == 'summary_only'
+        && request.resource.data.status == 'pending'
+        && request.resource.data.clientMutationId == claimId
+        && request.resource.data.version == 1
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && validClaimSplit(workspaceId);
+    }
+
+    function validSharedExpenseClaimUpdate(workspaceId) {
+      return isActiveMember(workspaceId)
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.workspaceId == resource.data.workspaceId
+        && request.resource.data.payerUserId == resource.data.payerUserId
+        && request.resource.data.description == resource.data.description
+        && request.resource.data.totalAmountCents == resource.data.totalAmountCents
+        && request.resource.data.split == resource.data.split
+        && request.resource.data.sourceVisibility == resource.data.sourceVisibility
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.clientMutationId == resource.data.clientMutationId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'version'])
+        && request.resource.data.status in ['accepted', 'disputed', 'settled']
+        && request.resource.data.version == resource.data.version + 1
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validSettlementCreate(workspaceId, settlementId) {
+      return isActiveMember(workspaceId)
+        && get(workspaceDoc(workspaceId)).data.type == 'couple'
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'workspaceId',
+          'fromUserId',
+          'toUserId',
+          'amountCents',
+          'status',
+          'paidAmountCents',
+          'createdBy',
+          'clientMutationId',
+          'version',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.id == settlementId
+        && request.resource.data.workspaceId == workspaceId
+        && request.resource.data.fromUserId is string
+        && request.resource.data.toUserId is string
+        && request.resource.data.fromUserId != request.resource.data.toUserId
+        && isActiveMemberId(workspaceId, request.resource.data.fromUserId)
+        && isActiveMemberId(workspaceId, request.resource.data.toUserId)
+        && validMoneyCents(request.resource.data.amountCents)
+        && request.resource.data.status == 'proposed'
+        && request.resource.data.paidAmountCents == 0
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.clientMutationId == settlementId
+        && request.resource.data.version == 1
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validSettlementUpdate(workspaceId) {
+      return isActiveMember(workspaceId)
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.workspaceId == resource.data.workspaceId
+        && request.resource.data.fromUserId == resource.data.fromUserId
+        && request.resource.data.toUserId == resource.data.toUserId
+        && request.resource.data.amountCents == resource.data.amountCents
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.clientMutationId == resource.data.clientMutationId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'paidAmountCents', 'updatedAt', 'version'])
+        && request.resource.data.status in ['accepted', 'partially_paid', 'settled', 'cancelled']
+        && request.resource.data.paidAmountCents is int
+        && request.resource.data.paidAmountCents >= resource.data.paidAmountCents
+        && request.resource.data.paidAmountCents <= resource.data.amountCents
+        && request.resource.data.version == resource.data.version + 1
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validSharedCommentCreate(workspaceId, commentId) {
+      return isActiveMember(workspaceId)
+        && get(workspaceDoc(workspaceId)).data.type == 'couple'
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'workspaceId',
+          'targetType',
+          'targetId',
+          'body',
+          'createdBy',
+          'createdAt'
+        ])
+        && request.resource.data.id == commentId
+        && request.resource.data.workspaceId == workspaceId
+        && request.resource.data.targetType in ['claim', 'settlement']
+        && validShortText(request.resource.data.targetId, 1, 140)
+        && validShortText(request.resource.data.body, 2, 500)
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+    }
+
+    function validAuditLogCreate(workspaceId, auditId) {
+      return signedIn()
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'workspaceId',
+          'actorUserId',
+          'type',
+          'targetType',
+          'targetId',
+          'summary',
+          'createdAt'
+        ])
+        && request.resource.data.id == auditId
+        && request.resource.data.workspaceId == workspaceId
+        && request.resource.data.actorUserId == request.auth.uid
+        && validShortText(request.resource.data.type, 3, 80)
+        && request.resource.data.targetType in ['workspace', 'invite', 'claim', 'settlement', 'member']
+        && validShortText(request.resource.data.targetId, 1, 140)
+        && validShortText(request.resource.data.summary, 3, 180)
+        && !request.resource.data.summary.matches('.*DUO-[A-Z0-9]{4}-[A-Z0-9]{2}.*')
+        && request.resource.data.createdAt == request.time
+        && existsAfter(currentMemberDoc(workspaceId))
+        && getAfter(currentMemberDoc(workspaceId)).data.status == 'active';
+    }
+
     match /users/{uid} {
       allow read: if isSelf(uid);
       allow create: if validUserFoundationCreate(uid);
@@ -778,20 +1202,25 @@ service cloud.firestore {
 
       match /workspaceRefs/{workspaceId} {
         allow read: if isSelf(uid);
-        allow create: if validWorkspaceRefFoundationCreate(uid, workspaceId);
-        allow update, delete: if false;
+        allow create: if validWorkspaceRefFoundationCreate(uid, workspaceId) || validCoupleWorkspaceRefCreate(uid, workspaceId);
+        allow update: if validCoupleWorkspaceRefUpdate(uid, workspaceId);
+        allow delete: if false;
       }
     }
 
     match /workspaces/{workspaceId} {
       allow read: if isActiveMember(workspaceId);
-      allow create: if validWorkspaceFoundationCreate(workspaceId);
-      allow update, delete: if false;
+      allow create: if validWorkspaceFoundationCreate(workspaceId) || validCoupleWorkspaceCreate(workspaceId);
+      allow update: if validCoupleWorkspaceUpdate(workspaceId);
+      allow delete: if false;
 
       match /members/{uid} {
         allow read: if isActiveMember(workspaceId);
-        allow create: if validMemberFoundationCreate(workspaceId, uid);
-        allow update, delete: if false;
+        allow create: if validMemberFoundationCreate(workspaceId, uid)
+          || validCoupleOwnerMemberCreate(workspaceId, uid)
+          || validCouplePartnerMemberCreate(workspaceId, uid);
+        allow update: if validCoupleMemberUpdate(workspaceId, uid);
+        allow delete: if false;
       }
 
       match /accounts/{accountId} {
@@ -849,6 +1278,32 @@ service cloud.firestore {
         }
       }
 
+      match /sharedExpenseClaims/{claimId} {
+        allow read: if isActiveMember(workspaceId);
+        allow create: if validSharedExpenseClaimCreate(workspaceId, claimId);
+        allow update: if validSharedExpenseClaimUpdate(workspaceId);
+        allow delete: if false;
+      }
+
+      match /settlements/{settlementId} {
+        allow read: if isActiveMember(workspaceId);
+        allow create: if validSettlementCreate(workspaceId, settlementId);
+        allow update: if validSettlementUpdate(workspaceId);
+        allow delete: if false;
+      }
+
+      match /comments/{commentId} {
+        allow read: if isActiveMember(workspaceId);
+        allow create: if validSharedCommentCreate(workspaceId, commentId);
+        allow update, delete: if false;
+      }
+
+      match /auditLogs/{auditId} {
+        allow read: if isActiveMember(workspaceId);
+        allow create: if validAuditLogCreate(workspaceId, auditId);
+        allow update, delete: if false;
+      }
+
       match /{document=**} {
         allow read: if isActiveMember(workspaceId);
         allow write: if false;
@@ -856,7 +1311,11 @@ service cloud.firestore {
     }
 
     match /coupleInvites/{inviteId} {
-      allow read, write: if false;
+      allow read: if resource.data.status == 'active' && resource.data.expiresAt > request.time
+        || (signedIn() && isActiveMember(resource.data.workspaceId));
+      allow create: if validInviteCreate(inviteId);
+      allow update: if validInviteUpdate();
+      allow delete: if false;
     }
 
     match /billingAccounts/{billingAccountId}/{document=**} {

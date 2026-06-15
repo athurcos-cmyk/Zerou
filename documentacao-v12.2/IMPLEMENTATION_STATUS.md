@@ -5,11 +5,11 @@
 ## Resumo
 
 ```text
-Fase atual: 3 implementada em modo Spark/free
-Ultima fase concluida: 3. Cartoes e faturas
+Fase atual: 4 implementada em modo Spark/free
+Ultima fase concluida: 4. Espaco compartilhado
 Ambiente validado: local sem emuladores por bloqueio Java; Firestore Rules compiladas e publicadas; build/e2e/unitarios passaram
-Ultima atualizacao: 2026-06-14
-Gate da Fase 3: implementacao, dominio, build, e2e e deploy de rules passaram; teste automatizado de rules/offline segue bloqueado pelo Java local.
+Ultima atualizacao: 2026-06-15
+Gate da Fase 4: implementacao, dominio, build, e2e e deploy de rules passaram; teste automatizado de rules/offline segue bloqueado pelo Java local.
 ```
 
 ## Estado por fase
@@ -19,7 +19,7 @@ Gate da Fase 3: implementacao, dominio, build, e2e e deploy de rules passaram; t
 | 1. Fundacao SaaS | implemented / Spark mode | local passou; Firestore rules publicadas | Fundacao React/Firebase/PWA entregue. Cloud Functions removidas do caminho ativo para manter plano Spark/free. |
 | 2. Motor financeiro essencial | implemented / Spark mode | build passou; rules publicadas; offline automatizado bloqueado por Java | Contas, transacoes, dashboard v1, bills, recorrencias, busca e sync status implementados sem Cloud Functions. |
 | 3. Cartoes e faturas | implemented / Spark mode | dominio, build, e2e e rules publicadas passaram; emulator bloqueado por Java | Ledger imutavel por rules e totais derivados no client; backend server-side fica pendente para etapa Blaze/Functions futura. |
-| 4. Espaco compartilhado | pending | casal sem vazamento pessoal | Convite pendente so e preservado localmente. |
+| 4. Espaco compartilhado | implemented / Spark mode | build, e2e, unitarios e rules publicadas passaram; emulator bloqueado por Java | Workspace do casal, convite de uso unico, QR/link, claims compartilhados e settlements implementados sem Cloud Functions. |
 | 5. Billing Stripe custom | pending | webhook idempotente + entitlements | Nao iniciado. |
 | 6. Lancamento | pending | landing, juridico e QA | Rotas publicas reservadas com placeholder. |
 
@@ -67,6 +67,16 @@ Gate da Fase 3: implementacao, dominio, build, e2e e deploy de rules passaram; t
 - Fase 3: telas basicas para criar cartao, registrar compra parcelada, fechar fatura, pagar fatura, registrar creditos, encargos, antecipacao e reconciliacao.
 - Fase 3: Firestore Rules publicadas para cards, invoices e ledger, com agregados de fatura protegidos e ledger sem update/delete.
 - Fase 3: matriz de cenarios de QA criada em `documentacao-v12.2/QA_SCENARIOS.md` cobrindo Fases 3 a 6 sem implementar fases futuras.
+- Fase 4: tipos canonicos de `CoupleInvite`, `SharedExpenseClaim`, `Settlement`, `SharedComment`, `AuditLog` e `WorkspaceRef`.
+- Fase 4: servico `src/shared/sharedService.ts` com `createCoupleWorkspace`, `createCoupleInvite`, `previewCoupleInvite`, `acceptCoupleInvite`, `revokeCoupleInvite`, `regenerateCoupleInvite`, `cleanupExpiredInvites`, `leaveCoupleWorkspace` e `removePartner`.
+- Fase 4: codigos amigaveis `DUO-XXXX-XX`, hash SHA-256 persistido, hint sem token bruto, validade padrao de 48 horas, uso unico, revogacao e regeneracao.
+- Fase 4: QR code e link de convite gerados no client sem persistir token bruto.
+- Fase 4: rota publica `/join/:code` preserva convite localmente para continuar apos login/cadastro.
+- Fase 4: rota autenticada `/app/shared` com criacao do espaco do casal, convites, aceite, members, claims compartilhados, comentarios e settlements.
+- Fase 4: claims compartilhados expõem apenas resumo, total, split, pagador, status e comentarios; referencias pessoais de conta/cartao/fatura ficam fora do contrato.
+- Fase 4: modulo puro `src/domain/shared/calculateSharedBalances.ts` calcula balanco por membro e sugestao de acerto com suporte a pagamento parcial/total.
+- Fase 4: Firestore Rules publicadas para couple workspace, members, workspaceRefs, coupleInvites, sharedExpenseClaims, settlements, comments e auditLogs.
+- Fase 4: entitlement preparado via `canCreateCoupleWorkspace` em modo Spark/local flag; billing real permanece para Fase 5.
 
 ## Decisao Firestore vs Realtime Database
 
@@ -97,9 +107,11 @@ src/auth/*
 src/finance/*
 src/cards/*
 src/domain/invoices/*
+src/domain/shared/*
 src/layout/AppShell.tsx
 src/onboarding/OnboardingPage.tsx
 src/pages/*
+src/shared/*
 src/settings/*
 src/styles/themes.css
 src/theme/*
@@ -148,6 +160,13 @@ documentacao-v12.2/QA_SCENARIOS.md
 | `npm run test:rules` na Fase 3 | bloqueado por ambiente | Firebase CLI falhou antes dos emuladores: `java -version` saiu com codigo 3221226505. Os testes de rules foram escritos, mas dependem do Java local funcional. |
 | `npx firebase-tools deploy --only firestore:rules,firestore:indexes --project zerou-26757` na Fase 3 | passou | Rules de cards, invoices, ledger e transacoes de cartao compilaram e foram publicadas no Firestore real. |
 | HTTP live `https://zerou-five.vercel.app` na Fase 3 | passou | Producao serve `assets/index-BYgXz7gs.js`; rotas `/`, `/app/cards`, `/app/cards/example` e `/app/cards/example/invoices/example` retornaram 200. |
+| `npm run typecheck` na Fase 4 | passou | TypeScript strict validado apos espaco compartilhado, convites, claims, settlements e rules tests. |
+| `npm run lint` na Fase 4 | passou | ESLint sem erros. |
+| `npm test` na Fase 4 | passou | 6 arquivos, 29 testes unitarios; cobre dominio financeiro, invoices, shared balances, invite codes, temas e cores. |
+| `npm run build` na Fase 4 | passou | Vite/PWA build gerado; aviso de chunk inicial > 500 kB permanece. |
+| `npm run test:e2e` na Fase 4 | passou | 2 testes Playwright: landing publica e rota publica `/join/DUO-7X4K-92`. |
+| `npm run test:rules` na Fase 4 | bloqueado por ambiente | Firebase CLI falhou antes dos emuladores: `java -version` saiu com codigo 3221226505. Os testes foram atualizados para Fases 3 e 4, mas precisam do Java local funcional. |
+| `npx firebase deploy --only firestore:rules,firestore:indexes --project zerou-26757` na Fase 4 | passou | Rules e indexes de coupleInvites compilaram e foram publicados no Firestore real. |
 
 ## Pendencias manuais externas
 
@@ -164,6 +183,7 @@ documentacao-v12.2/QA_SCENARIOS.md
 - [ ] Corrigir instalacao Java/PATH local para permitir `firebase emulators:exec` novamente.
 - [ ] Validar manualmente em producao: criar conta financeira, registrar receita, despesa, bill e conferir dashboard.
 - [ ] Validar manualmente em producao: criar cartao, registrar compra, pagar fatura parcial e conferir saldo livre.
+- [ ] Validar manualmente em producao com dois usuarios reais: criar espaco do casal, gerar convite, aceitar, criar claim e registrar settlement.
 - [ ] Reexecutar `npm run test:rules` e um teste offline automatizado assim que Java funcional estiver no PATH.
 ```
 
@@ -172,7 +192,9 @@ documentacao-v12.2/QA_SCENARIOS.md
 ```text
 - O teste automatizado de regras/offline depende do Java local, que esta quebrado neste computador.
 - A Fase 3 roda em modo Spark/free: sem Cloud Functions, o client cria entradas de ledger sob Rules restritivas; uma versao backend/server-side pode substituir esse caminho quando o projeto aceitar Blaze.
+- A Fase 4 roda em modo Spark/free: convites, memberships, claims e settlements sao criados pelo client sob Rules restritivas; Cloud Functions podem endurecer rate limit, limpeza automatica e entitlement server-side no futuro.
 - Os agregados persistidos da fatura ficam protegidos por Rules e nao sao alterados pelo client; a UI deriva totais do ledger.
+- O entitlement de casal esta preparado por `canCreateCoupleWorkspace`, mas billing real/Stripe permanece para a Fase 5.
 - Rotas publicas de pricing, legal, ajuda e afins sao placeholders; landing completa pertence a Fase 6.
 - O build mostra aviso de chunk inicial > 500 kB por causa do bundle com SDKs; otimizar com code splitting depois.
 - `npm audit` reportou vulnerabilidades moderadas transitivas em dependencias de ferramentas; nao foi aplicado `audit fix --force`.
@@ -194,13 +216,19 @@ documentacao-v12.2/QA_SCENARIOS.md
 | 2026-06-14 | `/workspaces/{workspaceId}/cards/{cardId}/invoices/{invoiceId}` | Faturas com status persistido e agregados protegidos; totais derivados pelo ledger. | Nao. |
 | 2026-06-14 | `/workspaces/{workspaceId}/cards/{cardId}/invoices/{invoiceId}/ledger/{entryId}` | Ledger de fatura criado com idempotencia por documento e bloqueado para update/delete. | Nao. |
 | 2026-06-14 | `/workspaces/{workspaceId}/transactions/{transactionId}` | Tipos `card_purchase` e `card_payment` adicionados; compra nao exige conta, pagamento exige conta. | Nao. |
+| 2026-06-15 | `/workspaces/{workspaceId}` | Tipo `couple`, `partnerUserId`, `activeMemberCount` e `billingAccountId` preparados para espaco compartilhado. | Nao. |
+| 2026-06-15 | `/workspaces/{workspaceId}/coupleInvites/{inviteId}` | Convites de casal com hash, hint, status, expiracao, acceptedBy e revokedAt; token bruto nao e persistido. | Nao. |
+| 2026-06-15 | `/users/{uid}/workspaceRefs/{workspaceId}` | Referencia individual para workspace compartilhado; escolha de tema segue no usuario e nao no casal. | Nao. |
+| 2026-06-15 | `/workspaces/{workspaceId}/sharedExpenseClaims/{claimId}` | Claims compartilhados com resumo, total, split, pagador, status e versao; campos pessoais bloqueados. | Nao. |
+| 2026-06-15 | `/workspaces/{workspaceId}/settlements/{settlementId}` | Settlements com devedor/credor, valor proposto, valor pago, status e historico. | Nao. |
+| 2026-06-15 | `/workspaces/{workspaceId}/comments/{commentId}` e `/auditLogs/{auditId}` | Comentarios e auditoria do espaco compartilhado sem expor token bruto de convite. | Nao. |
 
 ## Proxima fase
 
 ```text
-Prompt a executar: documentacao-v12.2/prompts/04-ESPACO-COMPARTILHADO.md
-Pre-condicoes: Auth providers habilitados, `.env.local` preenchido, Firestore rules da Fase 3 publicadas, Vercel com bundle da Fase 3 e fluxos de cartao/fatura validados manualmente.
-Arquivos que o proximo agente deve ler: README-START-HERE.md, documentacao-v12.2/README.md, ZEROU-V12.2-ESPECIFICACAO-MESTRA.md, CONTRATOS-CANONICOS.md, THEME-SYSTEM.md, BRAND-GUIDELINES.md, BRAND-ASSET-INTEGRATION.md, PRODUCT-COPY-CANONICAL.md, IMPLEMENTATION_STATUS.md, QA_SCENARIOS.md e o prompt da Fase 4.
+Prompt a executar: documentacao-v12.2/prompts/05-BILLING-STRIPE-CUSTOM.md
+Pre-condicoes: Auth providers habilitados, `.env.local` preenchido, Firestore rules da Fase 4 publicadas, Vercel com bundle da Fase 4 e fluxo manual de casal/claim/settlement validado com dois usuarios reais.
+Arquivos que o proximo agente deve ler: README-START-HERE.md, documentacao-v12.2/README.md, ZEROU-V12.2-ESPECIFICACAO-MESTRA.md, CONTRATOS-CANONICOS.md, THEME-SYSTEM.md, BRAND-GUIDELINES.md, BRAND-ASSET-INTEGRATION.md, PRODUCT-COPY-CANONICAL.md, IMPLEMENTATION_STATUS.md, QA_SCENARIOS.md e o prompt da Fase 5.
 ```
 
 ## Verificacao do sistema de temas
