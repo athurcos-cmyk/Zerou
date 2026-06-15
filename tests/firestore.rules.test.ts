@@ -616,6 +616,14 @@ describe('firestore security rules', () => {
     );
   });
 
+  it('allows an active member to archive a financial account', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    const accountReference = doc(aliceDb, 'workspaces/workspaceA/accounts/accountA');
+
+    await assertSucceeds(setDoc(accountReference, accountPayload('workspaceA', 'accountA', 'alice')));
+    await assertSucceeds(updateDoc(accountReference, { isActive: false, updatedAt: serverTimestamp() }));
+  });
+
   it('blocks a user from writing financial accounts in another workspace', async () => {
     const aliceDb = testEnv.authenticatedContext('alice').firestore();
 

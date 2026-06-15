@@ -102,20 +102,22 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
     return [...state.categories, ...missingDefaults].sort((left, right) => left.name.localeCompare(right.name, 'pt-BR'));
   }, [state.categories, workspaceId]);
 
+  const activeAccounts = useMemo(() => state.accounts.filter((account) => account.isActive), [state.accounts]);
+
   const accountBalances = useMemo(
-    () => calculateAccountBalances(state.accounts, state.transactions),
-    [state.accounts, state.transactions]
+    () => calculateAccountBalances(activeAccounts, state.transactions),
+    [activeAccounts, state.transactions]
   );
 
   const dashboard = useMemo(
     () =>
       calculateDashboardSummary({
-        accounts: state.accounts,
+        accounts: activeAccounts,
         transactions: state.transactions,
         bills: state.bills,
         recurringRules: state.recurringRules
       }),
-    [state.accounts, state.bills, state.recurringRules, state.transactions]
+    [activeAccounts, state.bills, state.recurringRules, state.transactions]
   );
 
   const pendingWrites = useMemo(
@@ -128,6 +130,7 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
 
   return {
     ...state,
+    accounts: activeAccounts,
     categories: categoriesWithDefaults,
     accountBalances,
     dashboard,

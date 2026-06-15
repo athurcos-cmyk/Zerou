@@ -55,6 +55,8 @@ Gate da Fase 6: passou para uso gratuito atual com landing clara/mobile-first, m
 - Fase 2: dashboard v1 com saldo total, disponivel livre v1, valor comprometido, proximos compromissos, transacoes recentes, acoes rapidas e sync status.
 - Fase 2: rotas `/app/dashboard`, `/app/transactions`, `/app/transactions/new`, `/app/transactions/:transactionId/edit`, `/app/accounts`, `/app/bills`, `/app/recurring` e `/app/search`.
 - Fase 2: cadastro rapido mobile de transacao com valor, tipo, descricao, categoria, conta, data e avancado recolhido.
+- Rodada pos-Fase 6: contas financeiras agora podem ser excluidas da lista ativa via arquivamento seguro (`isActive=false`), sem apagar historico antigo.
+- Rodada pos-Fase 6: cadastro de conta financeira ganhou sugestoes de instituicao com busca por nome/alias e badge visual local preparado para evoluir para asset pack de logos oficiais.
 - Fase 2: Firestore metadata `hasPendingWrites` usado para mostrar `pending` sem criar fila paralela em Dexie.
 - Fase 2: opcao de logout com limpeza de cache local do Firestore para dispositivo compartilhado.
 - Fase 2: Security Rules publicadas para accounts, categories, transactions, bills e recurring por membership ativa e campos protegidos.
@@ -184,6 +186,14 @@ documentacao-v12.2/QA_SCENARIOS.md
 | Screenshot Playwright mobile na rodada marketing/legal simplificado | passou | Evidencias em `test-results/public-polish/landing-mobile.png` e `test-results/public-polish/privacy-mobile.png`. |
 | `npm run test:rules` na rodada marketing/legal simplificado | bloqueado por ambiente | Firebase CLI falhou antes dos emuladores: `java -version` saiu com codigo 3221226505. |
 | HTTP live `https://zerou-five.vercel.app` apos rodada marketing/legal simplificado | passou | Vercel serviu `assets/index-DgthtBvK.js`; smoke validou landing sem planos/copy removida, redirects `/pricing`, `/legal/cookies`, `/legal/subprocessors`, legal e privacy center informativo. |
+| `npm run typecheck` na rodada contas financeiras | passou | TypeScript strict validado apos exclusao/arquivamento de conta e catalogo de instituicoes. |
+| `npm run lint` na rodada contas financeiras | passou | ESLint sem erros. |
+| `npm test` na rodada contas financeiras | passou | 9 arquivos, 36 testes unitarios; inclui busca de instituicoes por alias/acento. |
+| `npm run build` na rodada contas financeiras | passou | Bundle PWA gerado: `assets/index-Cafo2iPN.js`; aviso de chunk inicial > 500 kB permanece. |
+| `npm run test:e2e` na rodada contas financeiras | passou | 10 testes Playwright publicos continuam passando. |
+| `npm run functions:build` na rodada contas financeiras | passou | Functions continuam compilando. |
+| `npm run test:functions` na rodada contas financeiras | passou | 5 arquivos, 13 testes. |
+| `npm run test:rules` na rodada contas financeiras | bloqueado por ambiente | Firebase CLI falhou antes dos emuladores: `java -version` saiu com codigo 3221226505. |
 | `npm run typecheck` na rodada UX simples/3D | passou | TypeScript strict validado apos mensagens humanas, copy limpa, bloqueio de fundacao e landing 3D. |
 | `npm run lint` na rodada UX simples/3D | passou | ESLint sem erros. |
 | `npm test` na rodada UX simples/3D | passou | 8 arquivos, 34 testes unitarios; inclui regressao para erro Zod virar mensagem de usuario. |
@@ -312,6 +322,7 @@ documentacao-v12.2/QA_SCENARIOS.md
 | 2026-06-14 | `/workspaces/{workspaceId}` e `/members/{uid}` | Criacao do workspace pessoal agora e client-side transacional, validada por Rules. | Nao para usuarios novos. |
 | 2026-06-14 | `firestore.rules` | Rules permitem somente criacao atomica da propria fundacao e atualizacao posterior de aparencia. | Publicar rules no Firebase real. |
 | 2026-06-14 | `/workspaces/{workspaceId}/accounts/{accountId}` | Conta financeira da Fase 2 implementada conforme contrato canonico. | Nao para usuarios novos. |
+| 2026-06-15 | `/workspaces/{workspaceId}/accounts/{accountId}.isActive` | Exclusao visual de conta financeira usa arquivamento seguro (`isActive=false`) para preservar historico e ocultar a conta de listas/seletor/dashboard. | Nao; campo ja existia no contrato. |
 | 2026-06-14 | `/workspaces/{workspaceId}/categories/{categoryId}` | Categorias padrao idempotentes implementadas por IDs deterministico. | Nao para usuarios novos. |
 | 2026-06-14 | `/workspaces/{workspaceId}/transactions/{transactionId}` | Transacoes com `clientMutationId`, `syncStatus`, soft delete e versao implementadas. | Nao para usuarios novos. |
 | 2026-06-14 | `/workspaces/{workspaceId}/bills/{billId}` | Contas a pagar basicas entram no disponivel livre v1. | Nao. |
