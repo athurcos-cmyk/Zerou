@@ -7,7 +7,7 @@
 ```text
 Fase atual: 2 implementada em modo Spark/free
 Ultima fase concluida: 2. Motor financeiro essencial
-Ambiente validado: local sem emuladores por bloqueio Java; Firestore Rules compiladas e publicadas; Vercel pendente deste commit
+Ambiente validado: local sem emuladores por bloqueio Java; Firestore Rules compiladas e publicadas; Vercel publico serve bundle da Fase 2
 Ultima atualizacao: 2026-06-14
 Gate da Fase 2: implementacao, build, dominio e deploy de rules passaram; teste automatizado de rules/offline segue bloqueado pelo Java local.
 ```
@@ -127,6 +127,7 @@ docs/MANUAL_SETUP_REQUIRED.md
 | `npm run test:e2e` na Fase 2 | passou | 1 teste Playwright da landing publica. |
 | `npm run test:rules` na Fase 2 | bloqueado por ambiente | Emulator Suite ainda falha em `java -version` com codigo 3221226505; pastas locais de JDK nao possuem `bin/java.exe` e `winget` nao esta disponivel. |
 | `npx firebase-tools deploy --only firestore:rules,firestore:indexes --project zerou-26757` na Fase 2 | passou | Rules novas compilaram e foram publicadas no Firestore real. |
+| HTTP live `https://zerou-five.vercel.app` na Fase 2 | passou | HTML publico serve `assets/index-ChTxLlxD.js`. |
 
 ## Pendencias manuais externas
 
