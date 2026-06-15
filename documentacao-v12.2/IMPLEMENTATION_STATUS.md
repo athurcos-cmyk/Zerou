@@ -222,6 +222,7 @@ documentacao-v12.2/QA_SCENARIOS.md
 | Screenshot Playwright desktop/mobile na Fase 6 | passou | Geradas em `test-results/fase6-desktop.png` e `test-results/fase6-mobile.png`; servidor temporario encerrado via script. |
 | `npm run test:rules` na Fase 6 | bloqueado por ambiente | Firebase CLI falhou antes dos emuladores: `java -version` saiu com codigo 3221226505. Tests foram atualizados para free launch e privacyRequests. |
 | `npx firebase deploy --only firestore:rules,firestore:indexes --project zerou-26757` na Fase 6 | passou | Rules de free launch e `privacyRequests` compilaram e foram publicadas no Firestore real. |
+| HTTP live `https://zerou-five.vercel.app` na Fase 6 | passou | Vercel serviu bundle `assets/index-D980VqvZ.js`; rotas `/`, `/pricing`, `/features`, `/security`, `/help`, `/contact`, `/privacy-center`, `/legal/privacy` e `/app` responderam 200. |
 
 ## Pendencias manuais externas
 
@@ -233,9 +234,9 @@ documentacao-v12.2/QA_SCENARIOS.md
 - [x] Configurar Vercel com as variaveis `VITE_FIREBASE_*`.
 - [x] Autorizar `zerou-five.vercel.app` em Firebase Auth -> Settings -> Authorized domains.
 - [ ] Criar bucket Storage em Firebase Console -> Storage -> Get Started, quando a fase que usar Storage chegar.
-- [ ] Fazer novo deploy Vercel com o bundle da Fase 6 deste commit.
+- [x] Fazer novo deploy Vercel com o bundle da Fase 6 deste commit.
 - [ ] Validar onboarding em producao ate cair no dashboard vazio.
-- [ ] Validar em producao: landing, pricing gratuito, legal, cookies e privacy center.
+- [x] Validar em producao: landing, pricing gratuito, legal, cookies e privacy center respondendo 200.
 - [ ] Substituir dominio/canonical `zerou-five.vercel.app` pelo dominio final quando existir.
 - [ ] Revisar juridicamente `docs/legal/*` antes de lancamento publico amplo.
 - [ ] Configurar emails oficiais de suporte e privacidade.
