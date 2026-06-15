@@ -92,6 +92,7 @@ Gate da Fase 6: passou para uso gratuito atual com landing clara/mobile-first, l
 - Fase 6: rotas publicas reais `/features`, `/security`, `/help`, `/contact`, `/pricing`, `/privacy-center`, `/legal/terms`, `/legal/privacy`, `/legal/cookies` e `/legal/subprocessors`.
 - Fase 6: tema Paper claro virou padrao visual do app publico e do primeiro render; telas publicas e de autenticacao ficam claras mesmo quando o dispositivo esta em modo escuro.
 - Fase 6: experiencia mobile revisada com landing mais direta, bottom navigation com labels, menu "Mais", dashboard com guia inicial e resumo de gastos por categoria.
+- Fase 6: onboarding autenticado usa modo foco sem sidebar/bottom navigation ate a fundacao ser concluida, reduzindo confusao no primeiro uso mobile.
 - Fase 6: area compartilhada simplificada para fluxo de casal mais claro; opcoes administrativas, comentarios e acoes avancadas ficam recolhidas.
 - Fase 6: banner de cookies removido para nao bloquear cadastro/uso; Analytics fica desligado por padrao e so pode inicializar com `VITE_ENABLE_ANALYTICS=true` mais consentimento futuro.
 - Fase 6: Centro de Privacidade cria solicitacoes rastreaveis em `privacyRequests/{requestId}` para correcao, exportacao, exclusao, revogacao de marketing e ajuda de cache.

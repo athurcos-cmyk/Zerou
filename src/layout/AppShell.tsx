@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   BadgeDollarSign,
   CalendarClock,
@@ -26,7 +26,9 @@ function getNavClass({ isActive }: { isActive: boolean }) {
 
 export function AppShell() {
   const { user, profile } = useAuth();
+  const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const isOnboarding = location.pathname.startsWith('/app/onboarding');
 
   async function handleClearLocalDataLogout() {
     const confirmed = window.confirm(
@@ -45,8 +47,9 @@ export function AppShell() {
   }
 
   return (
-    <div className="app-layout">
-      <aside className="sidebar" aria-label="Navegação principal">
+    <div className={`app-layout${isOnboarding ? ' app-layout--focus' : ''}`}>
+      {!isOnboarding ? (
+        <aside className="sidebar" aria-label="Navegação principal">
         <BrandLockup />
         <nav className="sidebar-nav">
           <NavLink className={getNavClass} to="/app" end>
@@ -92,7 +95,8 @@ export function AppShell() {
             Limpar dados locais
           </button>
         </div>
-      </aside>
+        </aside>
+      ) : null}
 
       <main className="app-main">
         <header className="app-header">
@@ -107,7 +111,7 @@ export function AppShell() {
         <Outlet />
       </main>
 
-      {mobileMenuOpen ? (
+      {mobileMenuOpen && !isOnboarding ? (
         <>
           <button
             className="mobile-more-backdrop"
@@ -158,7 +162,8 @@ export function AppShell() {
         </>
       ) : null}
 
-      <nav className="mobile-nav" aria-label="Navegação mobile">
+      {!isOnboarding ? (
+        <nav className="mobile-nav" aria-label="Navegação mobile">
         <NavLink className={getNavClass} to="/app" end aria-label="Início">
           <Home size={20} aria-hidden="true" />
           <span>Início</span>
@@ -185,7 +190,8 @@ export function AppShell() {
           <MoreHorizontal size={20} aria-hidden="true" />
           <span>Mais</span>
         </button>
-      </nav>
+        </nav>
+      ) : null}
     </div>
   );
 }

@@ -494,6 +494,15 @@ html[data-reduce-motion='true'] *::after {
   grid-template-columns: 17rem minmax(0, 1fr);
 }
 
+.app-layout--focus {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app-layout--focus .app-main {
+  width: min(100%, 54rem);
+  margin: 0 auto;
+}
+
 .sidebar {
   position: sticky;
   top: 0;
@@ -1586,6 +1595,10 @@ html[data-reduce-motion='true'] *::after {
 
   .app-main {
     padding: 1rem 1rem calc(5.75rem + env(safe-area-inset-bottom));
+  }
+
+  .app-layout--focus .app-main {
+    padding-bottom: 1rem;
   }
 
   .mobile-nav {
