@@ -20,6 +20,22 @@ export type TransactionType =
   | 'card_purchase'
   | 'card_payment';
 
+export type InvoiceStatus = 'open' | 'closed' | 'partial' | 'paid' | 'overpaid' | 'overdue' | 'renegotiated';
+
+export type InvoiceLedgerEntryType =
+  | 'purchase'
+  | 'payment'
+  | 'advance_payment'
+  | 'refund_credit'
+  | 'chargeback_credit'
+  | 'manual_credit'
+  | 'manual_debit'
+  | 'interest'
+  | 'fine'
+  | 'iof'
+  | 'fee'
+  | 'installment_anticipation';
+
 export interface UserProfile extends AppearancePreferences {
   id: string;
   name: string;
@@ -140,4 +156,52 @@ export interface RecurringRule {
   createdBy: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
+}
+
+export interface CreditCard {
+  id: string;
+  workspaceId: string;
+  ownerUserId?: string;
+  name: string;
+  lastFour: string;
+  brand: string;
+  limitCents: MoneyCents;
+  closingDay: number;
+  dueDay: number;
+  colorToken: string;
+  isActive: boolean;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+export interface Invoice {
+  id: string;
+  cardId: string;
+  workspaceId: string;
+  referenceMonth: string;
+  dueDate: Timestamp;
+  status: InvoiceStatus;
+  purchasesTotalCents: MoneyCents;
+  paymentsTotalCents: MoneyCents;
+  creditsTotalCents: MoneyCents;
+  feesTotalCents: MoneyCents;
+  outstandingBalanceCents: MoneyCents;
+  overpaidCreditCents: MoneyCents;
+  version: number;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+export interface InvoiceLedgerEntry {
+  id: string;
+  invoiceId: string;
+  cardId: string;
+  workspaceId: string;
+  type: InvoiceLedgerEntryType;
+  amountCents: MoneyCents;
+  effectiveAt: Timestamp;
+  sourceTransactionId?: string;
+  idempotencyKey: string;
+  createdBy: string;
+  createdAt?: Timestamp;
 }

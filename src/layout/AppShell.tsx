@@ -49,6 +49,9 @@ export function AppShell() {
           <NavLink className={getNavClass} to="/app/accounts">
             <WalletCards size={19} aria-hidden="true" /> Contas
           </NavLink>
+          <NavLink className={getNavClass} to="/app/cards">
+            <CreditCardIcon /> Cartões
+          </NavLink>
           <NavLink className={getNavClass} to="/app/transactions">
             <ReceiptText size={19} aria-hidden="true" /> Transações
           </NavLink>
@@ -113,4 +116,8 @@ export function AppShell() {
       </nav>
     </div>
   );
+}
+
+function CreditCardIcon() {
+  return <WalletCards size={19} aria-hidden="true" />;
 }

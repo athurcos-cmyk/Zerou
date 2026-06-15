@@ -1,6 +1,6 @@
 import { addDays, compareAsc, isAfter, isBefore, isEqual } from 'date-fns';
 import { toDate } from './financeDates';
-import type { Account, Bill, RecurringRule, Transaction } from '../types/contracts';
+import type { Account, Bill, Invoice, RecurringRule, Transaction } from '../types/contracts';
 
 export interface AccountBalance extends Account {
   balanceCents: number;
@@ -8,7 +8,7 @@ export interface AccountBalance extends Account {
 
 export interface UpcomingCommitment {
   id: string;
-  kind: 'bill' | 'recurring';
+  kind: 'bill' | 'recurring' | 'invoice';
   description: string;
   amountCents: number;
   dueAt: Date;
@@ -50,10 +50,14 @@ function applyTransactionToBalances(
     return;
   }
 
-  if (transaction.type === 'expense' || transaction.type === 'card_purchase') {
+  if (transaction.type === 'expense' || transaction.type === 'card_payment') {
     if (sourceId && accountIds.has(sourceId)) {
       balances.set(sourceId, (balances.get(sourceId) ?? 0) - transaction.amountCents);
     }
+    return;
+  }
+
+  if (transaction.type === 'card_purchase') {
     return;
   }
 
@@ -104,7 +108,8 @@ export function findNextIncomeDate(transactions: Transaction[], now = new Date()
 export function buildUpcomingCommitments(
   bills: Bill[],
   recurringRules: RecurringRule[],
-  cutoff: Date
+  cutoff: Date,
+  invoices: Invoice[] = []
 ): UpcomingCommitment[] {
   const billCommitments = bills
     .filter((bill) => bill.status === 'pending' || bill.status === 'overdue')
@@ -134,7 +139,23 @@ export function buildUpcomingCommitments(
     )
     .filter((commitment) => isOnOrBefore(commitment.dueAt, cutoff));
 
-  return [...billCommitments, ...recurringCommitments].sort((left, right) => compareAsc(left.dueAt, right.dueAt));
+  const invoiceCommitments = invoices
+    .filter((invoice) => invoice.status !== 'paid' && invoice.status !== 'overpaid' && invoice.outstandingBalanceCents > 0)
+    .map(
+      (invoice) =>
+        ({
+          id: invoice.id,
+          kind: 'invoice',
+          description: `Fatura ${invoice.referenceMonth}`,
+          amountCents: invoice.outstandingBalanceCents,
+          dueAt: toDate(invoice.dueDate)
+        }) satisfies UpcomingCommitment
+    )
+    .filter((commitment) => isOnOrBefore(commitment.dueAt, cutoff));
+
+  return [...billCommitments, ...recurringCommitments, ...invoiceCommitments].sort((left, right) =>
+    compareAsc(left.dueAt, right.dueAt)
+  );
 }
 
 export function calculateDashboardSummary(input: {
@@ -142,13 +163,14 @@ export function calculateDashboardSummary(input: {
   transactions: Transaction[];
   bills: Bill[];
   recurringRules: RecurringRule[];
+  invoices?: Invoice[];
   now?: Date;
 }): DashboardSummary {
   const now = input.now ?? new Date();
   const nextIncomeAt = findNextIncomeDate(input.transactions, now);
   const cutoff = nextIncomeAt ?? addDays(now, 30);
   const totalBalanceCents = calculateTotalBalance(input.accounts, input.transactions);
-  const commitments = buildUpcomingCommitments(input.bills, input.recurringRules, cutoff);
+  const commitments = buildUpcomingCommitments(input.bills, input.recurringRules, cutoff, input.invoices ?? []);
   const committedCents = commitments.reduce((total, commitment) => total + commitment.amountCents, 0);
   const recentTransactions = input.transactions
     .filter(isActiveTransaction)

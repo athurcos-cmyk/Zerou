@@ -139,6 +139,137 @@ function transactionPayload(
   };
 }
 
+function cardPayload(workspaceId: string, cardId: string, uid: string, overrides: Record<string, unknown> = {}) {
+  const now = serverTimestamp();
+
+  return {
+    id: cardId,
+    workspaceId,
+    ownerUserId: uid,
+    name: 'Cartao teste',
+    lastFour: '4242',
+    brand: 'Visa',
+    limitCents: 200000,
+    closingDay: 5,
+    dueDay: 12,
+    colorToken: 'chart-1',
+    isActive: true,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides
+  };
+}
+
+function invoicePayload(workspaceId: string, cardId: string, invoiceId: string, overrides: Record<string, unknown> = {}) {
+  const now = serverTimestamp();
+
+  return {
+    id: invoiceId,
+    workspaceId,
+    cardId,
+    referenceMonth: '2026-06',
+    dueDate: Timestamp.fromDate(new Date('2026-06-12T12:00:00')),
+    status: 'open',
+    purchasesTotalCents: 0,
+    paymentsTotalCents: 0,
+    creditsTotalCents: 0,
+    feesTotalCents: 0,
+    outstandingBalanceCents: 0,
+    overpaidCreditCents: 0,
+    version: 1,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides
+  };
+}
+
+function ledgerPayload(
+  workspaceId: string,
+  cardId: string,
+  invoiceId: string,
+  entryId: string,
+  uid: string,
+  overrides: Record<string, unknown> = {}
+) {
+  const now = serverTimestamp();
+
+  return {
+    id: entryId,
+    workspaceId,
+    cardId,
+    invoiceId,
+    type: 'purchase',
+    amountCents: 109000,
+    effectiveAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
+    sourceTransactionId: 'txnCardPurchase',
+    idempotencyKey: entryId,
+    createdBy: uid,
+    createdAt: now,
+    ...overrides
+  };
+}
+
+function cardPurchaseTransactionPayload(workspaceId: string, transactionId: string, uid: string) {
+  const now = serverTimestamp();
+
+  return {
+    id: transactionId,
+    workspaceId,
+    createdBy: uid,
+    updatedBy: uid,
+    type: 'card_purchase',
+    amountCents: 109000,
+    description: 'Compra no cartao',
+    categoryId: '',
+    cardId: 'cardA',
+    invoiceId: 'cardA_2026-06',
+    date: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
+    competenceMonth: '2026-06',
+    cashMonth: '2026-06',
+    tags: [],
+    isRecurring: false,
+    installmentGroupId: '',
+    clientMutationId: transactionId,
+    syncStatus: 'synced',
+    version: 1,
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
+function cardPaymentTransactionPayload(
+  workspaceId: string,
+  transactionId: string,
+  uid: string,
+  overrides: Record<string, unknown> = {}
+) {
+  const now = serverTimestamp();
+
+  return {
+    id: transactionId,
+    workspaceId,
+    createdBy: uid,
+    updatedBy: uid,
+    type: 'card_payment',
+    amountCents: 55000,
+    description: 'Pagamento de fatura',
+    accountId: 'accountA',
+    cardId: 'cardA',
+    invoiceId: 'cardA_2026-06',
+    date: Timestamp.fromDate(new Date('2026-06-15T12:00:00')),
+    competenceMonth: '2026-06',
+    cashMonth: '2026-06',
+    tags: [],
+    isRecurring: false,
+    clientMutationId: transactionId,
+    syncStatus: 'synced',
+    version: 1,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides
+  };
+}
+
 describe('firestore security rules', () => {
   beforeAll(async () => {
     testEnv = await initializeTestEnvironment({
@@ -349,5 +480,115 @@ describe('firestore security rules', () => {
 
     await assertSucceeds(getDoc(doc(bobDb, 'workspaces/workspaceB/transactions/txnB')));
     await assertFails(getDoc(doc(aliceDb, 'workspaces/workspaceB/transactions/txnB')));
+  });
+
+  it('allows an active member to create a credit card in their workspace', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(setDoc(doc(aliceDb, 'workspaces/workspaceA/cards/cardA'), cardPayload('workspaceA', 'cardA', 'alice')));
+  });
+
+  it('blocks non-members from reading cards and invoices', async () => {
+    const bobDb = testEnv.authenticatedContext('bob').firestore();
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const adminDb = context.firestore();
+      await setDoc(doc(adminDb, 'workspaces/workspaceA/cards/cardA'), {
+        ...cardPayload('workspaceA', 'cardA', 'alice'),
+        createdAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
+        updatedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00'))
+      });
+      await setDoc(doc(adminDb, 'workspaces/workspaceA/cards/cardA/invoices/cardA_2026-06'), {
+        ...invoicePayload('workspaceA', 'cardA', 'cardA_2026-06'),
+        createdAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
+        updatedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00'))
+      });
+    });
+
+    await assertFails(getDoc(doc(bobDb, 'workspaces/workspaceA/cards/cardA')));
+    await assertFails(getDoc(doc(bobDb, 'workspaces/workspaceA/cards/cardA/invoices/cardA_2026-06')));
+  });
+
+  it('allows card purchase transactions to create an invoice and immutable ledger entry atomically', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    const modularDb = aliceDb as unknown as Parameters<typeof writeBatch>[0];
+    const batch = writeBatch(modularDb);
+
+    await assertSucceeds(setDoc(doc(aliceDb, 'workspaces/workspaceA/cards/cardA'), cardPayload('workspaceA', 'cardA', 'alice')));
+
+    batch.set(
+      doc(modularDb, 'workspaces/workspaceA/cards/cardA/invoices/cardA_2026-06'),
+      invoicePayload('workspaceA', 'cardA', 'cardA_2026-06')
+    );
+    batch.set(
+      doc(modularDb, 'workspaces/workspaceA/cards/cardA/invoices/cardA_2026-06/ledger/txnCardPurchase_purchase_1'),
+      ledgerPayload('workspaceA', 'cardA', 'cardA_2026-06', 'txnCardPurchase_purchase_1', 'alice')
+    );
+    batch.set(
+      doc(modularDb, 'workspaces/workspaceA/transactions/txnCardPurchase'),
+      cardPurchaseTransactionPayload('workspaceA', 'txnCardPurchase', 'alice')
+    );
+
+    await assertSucceeds(batch.commit());
+  });
+
+  it('requires an existing account when recording a card payment transaction', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(setDoc(doc(aliceDb, 'workspaces/workspaceA/cards/cardA'), cardPayload('workspaceA', 'cardA', 'alice')));
+    await assertSucceeds(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/cards/cardA/invoices/cardA_2026-06'),
+        invoicePayload('workspaceA', 'cardA', 'cardA_2026-06')
+      )
+    );
+    await assertSucceeds(
+      setDoc(doc(aliceDb, 'workspaces/workspaceA/accounts/accountA'), accountPayload('workspaceA', 'accountA', 'alice'))
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/transactions/txnCardPayment'),
+        cardPaymentTransactionPayload('workspaceA', 'txnCardPayment', 'alice')
+      )
+    );
+
+    const paymentWithoutAccount = cardPaymentTransactionPayload('workspaceA', 'txnCardPaymentNoAccount', 'alice');
+    delete (paymentWithoutAccount as Record<string, unknown>).accountId;
+
+    await assertFails(setDoc(doc(aliceDb, 'workspaces/workspaceA/transactions/txnCardPaymentNoAccount'), paymentWithoutAccount));
+  });
+
+  it('blocks client changes to invoice aggregate fields while allowing status reconciliation', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    const invoiceDocument = doc(aliceDb, 'workspaces/workspaceA/cards/cardA/invoices/cardA_2026-06');
+
+    await assertSucceeds(setDoc(doc(aliceDb, 'workspaces/workspaceA/cards/cardA'), cardPayload('workspaceA', 'cardA', 'alice')));
+    await assertSucceeds(setDoc(invoiceDocument, invoicePayload('workspaceA', 'cardA', 'cardA_2026-06')));
+
+    await assertFails(updateDoc(invoiceDocument, { outstandingBalanceCents: 109000, updatedAt: serverTimestamp() }));
+    await assertSucceeds(updateDoc(invoiceDocument, { status: 'closed', updatedAt: serverTimestamp() }));
+  });
+
+  it('keeps invoice ledger entries immutable after creation', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    const ledgerDocument = doc(aliceDb, 'workspaces/workspaceA/cards/cardA/invoices/cardA_2026-06/ledger/ledgerPurchaseA');
+
+    await assertSucceeds(setDoc(doc(aliceDb, 'workspaces/workspaceA/cards/cardA'), cardPayload('workspaceA', 'cardA', 'alice')));
+    await assertSucceeds(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/cards/cardA/invoices/cardA_2026-06'),
+        invoicePayload('workspaceA', 'cardA', 'cardA_2026-06')
+      )
+    );
+    await assertSucceeds(
+      setDoc(
+        ledgerDocument,
+        ledgerPayload('workspaceA', 'cardA', 'cardA_2026-06', 'ledgerPurchaseA', 'alice', {
+          sourceTransactionId: 'txnLedgerPurchaseA'
+        })
+      )
+    );
+
+    await assertFails(updateDoc(ledgerDocument, { amountCents: 1 }));
   });
 });

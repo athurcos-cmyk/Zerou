@@ -26,8 +26,10 @@ function transaction(overrides: Partial<Transaction>): Transaction {
     type: overrides.type ?? 'expense',
     amountCents: overrides.amountCents ?? 0,
     description: overrides.description ?? 'Movimento',
-    accountId: overrides.accountId ?? 'checking',
+    accountId: 'accountId' in overrides ? overrides.accountId : 'checking',
     destinationAccountId: overrides.destinationAccountId,
+    cardId: overrides.cardId,
+    invoiceId: overrides.invoiceId,
     date: overrides.date ?? date,
     competenceMonth: '2026-06',
     cashMonth: '2026-06',
@@ -85,6 +87,27 @@ describe('financial calculations', () => {
     );
 
     expect(total).toBe(10000);
+  });
+
+  it('does not reduce cash balance when a card purchase is recorded', () => {
+    const total = calculateTotalBalance(
+      [account('checking', 100000)],
+      [transaction({ type: 'card_purchase', amountCents: 25000, accountId: undefined, cardId: 'cardA', invoiceId: 'invoiceA' })]
+    );
+
+    expect(total).toBe(100000);
+  });
+
+  it('reduces cash balance once when an invoice payment is recorded', () => {
+    const total = calculateTotalBalance(
+      [account('checking', 100000)],
+      [
+        transaction({ type: 'card_purchase', amountCents: 25000, accountId: undefined, cardId: 'cardA', invoiceId: 'invoiceA' }),
+        transaction({ type: 'card_payment', amountCents: 25000, accountId: 'checking', cardId: 'cardA', invoiceId: 'invoiceA' })
+      ]
+    );
+
+    expect(total).toBe(75000);
   });
 
   it('calculates free to spend from bills and recurring rules', () => {

@@ -7,9 +7,12 @@ import { AppShell } from './layout/AppShell';
 import { AppearanceSettingsPage } from './settings/AppearanceSettingsPage';
 import { AccountsPage } from './pages/AccountsPage';
 import { BillsPage } from './pages/BillsPage';
+import { CardDetailPage } from './pages/CardDetailPage';
+import { CardsPage } from './pages/CardsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { EditTransactionPage } from './pages/EditTransactionPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
+import { InvoicePage } from './pages/InvoicePage';
 import { JoinInvitePage } from './pages/JoinInvitePage';
 import { LoginMethodsPage } from './settings/LoginMethodsPage';
 import { LoginPage } from './pages/LoginPage';
@@ -46,6 +49,9 @@ export function App() {
               <Route path="transactions/new" element={<NewTransactionPage />} />
               <Route path="transactions/:transactionId/edit" element={<EditTransactionPage />} />
               <Route path="accounts" element={<AccountsPage />} />
+              <Route path="cards" element={<CardsPage />} />
+              <Route path="cards/:cardId" element={<CardDetailPage />} />
+              <Route path="cards/:cardId/invoices/:invoiceId" element={<InvoicePage />} />
               <Route path="bills" element={<BillsPage />} />
               <Route path="recurring" element={<RecurringPage />} />
               <Route path="search" element={<SearchPage />} />

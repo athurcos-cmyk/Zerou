@@ -5,11 +5,11 @@
 ## Resumo
 
 ```text
-Fase atual: 2 implementada em modo Spark/free
-Ultima fase concluida: 2. Motor financeiro essencial
-Ambiente validado: local sem emuladores por bloqueio Java; Firestore Rules compiladas e publicadas; Vercel publico serve bundle da Fase 2
+Fase atual: 3 implementada em modo Spark/free
+Ultima fase concluida: 3. Cartoes e faturas
+Ambiente validado: local sem emuladores por bloqueio Java; Firestore Rules compiladas e publicadas; build/e2e/unitarios passaram
 Ultima atualizacao: 2026-06-14
-Gate da Fase 2: implementacao, build, dominio e deploy de rules passaram; teste automatizado de rules/offline segue bloqueado pelo Java local.
+Gate da Fase 3: implementacao, dominio, build, e2e e deploy de rules passaram; teste automatizado de rules/offline segue bloqueado pelo Java local.
 ```
 
 ## Estado por fase
@@ -18,7 +18,7 @@ Gate da Fase 2: implementacao, build, dominio e deploy de rules passaram; teste 
 |---|---|---|---|
 | 1. Fundacao SaaS | implemented / Spark mode | local passou; Firestore rules publicadas | Fundacao React/Firebase/PWA entregue. Cloud Functions removidas do caminho ativo para manter plano Spark/free. |
 | 2. Motor financeiro essencial | implemented / Spark mode | build passou; rules publicadas; offline automatizado bloqueado por Java | Contas, transacoes, dashboard v1, bills, recorrencias, busca e sync status implementados sem Cloud Functions. |
-| 3. Cartoes e faturas | pending | ledger parcial e dupla contagem testados | Nao iniciado. |
+| 3. Cartoes e faturas | implemented / Spark mode | dominio, build, e2e e rules publicadas passaram; emulator bloqueado por Java | Ledger imutavel por rules e totais derivados no client; backend server-side fica pendente para etapa Blaze/Functions futura. |
 | 4. Espaco compartilhado | pending | casal sem vazamento pessoal | Convite pendente so e preservado localmente. |
 | 5. Billing Stripe custom | pending | webhook idempotente + entitlements | Nao iniciado. |
 | 6. Lancamento | pending | landing, juridico e QA | Rotas publicas reservadas com placeholder. |
@@ -58,6 +58,15 @@ Gate da Fase 2: implementacao, build, dominio e deploy de rules passaram; teste 
 - Fase 2: Firestore metadata `hasPendingWrites` usado para mostrar `pending` sem criar fila paralela em Dexie.
 - Fase 2: opcao de logout com limpeza de cache local do Firestore para dispositivo compartilhado.
 - Fase 2: Security Rules publicadas para accounts, categories, transactions, bills e recurring por membership ativa e campos protegidos.
+- Fase 3: tipos canonicos de `CreditCard`, `Invoice` e `InvoiceLedgerEntry`.
+- Fase 3: modulo puro `src/domain/invoices/*` para calcular faturas por ledger imutavel.
+- Fase 3: compra no cartao (`card_purchase`) reconhece despesa, mas nao reduz saldo de conta.
+- Fase 3: pagamento de fatura (`card_payment`) reduz saldo de conta uma unica vez.
+- Fase 3: dashboard inclui faturas abertas/fechadas no disponivel livre v1.
+- Fase 3: rotas `/app/cards`, `/app/cards/:cardId` e `/app/cards/:cardId/invoices/:invoiceId`.
+- Fase 3: telas basicas para criar cartao, registrar compra parcelada, fechar fatura, pagar fatura, registrar creditos, encargos, antecipacao e reconciliacao.
+- Fase 3: Firestore Rules publicadas para cards, invoices e ledger, com agregados de fatura protegidos e ledger sem update/delete.
+- Fase 3: matriz de cenarios de QA criada em `documentacao-v12.2/QA_SCENARIOS.md` cobrindo Fases 3 a 6 sem implementar fases futuras.
 
 ## Decisao Firestore vs Realtime Database
 
@@ -86,6 +95,8 @@ src/App.tsx
 src/firebase/config.ts
 src/auth/*
 src/finance/*
+src/cards/*
+src/domain/invoices/*
 src/layout/AppShell.tsx
 src/onboarding/OnboardingPage.tsx
 src/pages/*
@@ -98,6 +109,7 @@ tests/firestore.rules.test.ts
 tests/storage.rules.test.ts
 tests/e2e/public.spec.ts
 docs/MANUAL_SETUP_REQUIRED.md
+documentacao-v12.2/QA_SCENARIOS.md
 ```
 
 ## Testes executados
@@ -128,6 +140,13 @@ docs/MANUAL_SETUP_REQUIRED.md
 | `npm run test:rules` na Fase 2 | bloqueado por ambiente | Emulator Suite ainda falha em `java -version` com codigo 3221226505; pastas locais de JDK nao possuem `bin/java.exe` e `winget` nao esta disponivel. |
 | `npx firebase-tools deploy --only firestore:rules,firestore:indexes --project zerou-26757` na Fase 2 | passou | Rules novas compilaram e foram publicadas no Firestore real. |
 | HTTP live `https://zerou-five.vercel.app` na Fase 2 | passou | HTML publico serve `assets/index-ChTxLlxD.js`. |
+| `npm run typecheck` na Fase 3 | passou | TypeScript strict validado apos cartoes, faturas, ledger e rotas novas. |
+| `npm run lint` na Fase 3 | passou | ESLint sem erros. |
+| `npm test` na Fase 3 | passou | 4 arquivos, 20 testes unitarios; cobre dominio de invoices, idempotencia, parciais, overpayment, creditos, encargos, parcelas e saldo de conta. |
+| `npm run build` na Fase 3 | passou | Bundle gerado: `assets/index-BYgXz7gs.js`; aviso de chunk inicial > 500 kB permanece. |
+| `npm run test:e2e` na Fase 3 | passou | 1 teste Playwright da landing publica. |
+| `npm run test:rules` na Fase 3 | bloqueado por ambiente | Firebase CLI falhou antes dos emuladores: `java -version` saiu com codigo 3221226505. Os testes de rules foram escritos, mas dependem do Java local funcional. |
+| `npx firebase-tools deploy --only firestore:rules,firestore:indexes --project zerou-26757` na Fase 3 | passou | Rules de cards, invoices, ledger e transacoes de cartao compilaram e foram publicadas no Firestore real. |
 
 ## Pendencias manuais externas
 
@@ -143,6 +162,7 @@ docs/MANUAL_SETUP_REQUIRED.md
 - [ ] Validar onboarding em producao ate cair no dashboard vazio.
 - [ ] Corrigir instalacao Java/PATH local para permitir `firebase emulators:exec` novamente.
 - [ ] Validar manualmente em producao: criar conta financeira, registrar receita, despesa, bill e conferir dashboard.
+- [ ] Validar manualmente em producao: criar cartao, registrar compra, pagar fatura parcial e conferir saldo livre.
 - [ ] Reexecutar `npm run test:rules` e um teste offline automatizado assim que Java funcional estiver no PATH.
 ```
 
@@ -150,7 +170,8 @@ docs/MANUAL_SETUP_REQUIRED.md
 
 ```text
 - O teste automatizado de regras/offline depende do Java local, que esta quebrado neste computador.
-- O dashboard agora e real, mas nao inclui cartoes/faturas; o ponto de extensao fica reservado para a Fase 3.
+- A Fase 3 roda em modo Spark/free: sem Cloud Functions, o client cria entradas de ledger sob Rules restritivas; uma versao backend/server-side pode substituir esse caminho quando o projeto aceitar Blaze.
+- Os agregados persistidos da fatura ficam protegidos por Rules e nao sao alterados pelo client; a UI deriva totais do ledger.
 - Rotas publicas de pricing, legal, ajuda e afins sao placeholders; landing completa pertence a Fase 6.
 - O build mostra aviso de chunk inicial > 500 kB por causa do bundle com SDKs; otimizar com code splitting depois.
 - `npm audit` reportou vulnerabilidades moderadas transitivas em dependencias de ferramentas; nao foi aplicado `audit fix --force`.
@@ -168,13 +189,17 @@ docs/MANUAL_SETUP_REQUIRED.md
 | 2026-06-14 | `/workspaces/{workspaceId}/transactions/{transactionId}` | Transacoes com `clientMutationId`, `syncStatus`, soft delete e versao implementadas. | Nao para usuarios novos. |
 | 2026-06-14 | `/workspaces/{workspaceId}/bills/{billId}` | Contas a pagar basicas entram no disponivel livre v1. | Nao. |
 | 2026-06-14 | `/workspaces/{workspaceId}/recurring/{recurringId}` | Regras recorrentes basicas entram como compromissos previstos. | Nao. |
+| 2026-06-14 | `/workspaces/{workspaceId}/cards/{cardId}` | Cartoes de credito da Fase 3 implementados por workspace/membership. | Nao. |
+| 2026-06-14 | `/workspaces/{workspaceId}/cards/{cardId}/invoices/{invoiceId}` | Faturas com status persistido e agregados protegidos; totais derivados pelo ledger. | Nao. |
+| 2026-06-14 | `/workspaces/{workspaceId}/cards/{cardId}/invoices/{invoiceId}/ledger/{entryId}` | Ledger de fatura criado com idempotencia por documento e bloqueado para update/delete. | Nao. |
+| 2026-06-14 | `/workspaces/{workspaceId}/transactions/{transactionId}` | Tipos `card_purchase` e `card_payment` adicionados; compra nao exige conta, pagamento exige conta. | Nao. |
 
 ## Proxima fase
 
 ```text
-Prompt a executar: documentacao-v12.2/prompts/03-CARTOES-E-FATURAS.md
-Pre-condicoes: Auth providers habilitados, `.env.local` preenchido, Firestore rules da Fase 2 publicadas, Vercel com bundle da Fase 2 e fluxo financeiro essencial validado manualmente.
-Arquivos que o proximo agente deve ler: README-START-HERE.md, documentacao-v12.2/README.md, ZEROU-V12.2-ESPECIFICACAO-MESTRA.md, CONTRATOS-CANONICOS.md, THEME-SYSTEM.md, BRAND-GUIDELINES.md, BRAND-ASSET-INTEGRATION.md, PRODUCT-COPY-CANONICAL.md, IMPLEMENTATION_STATUS.md e o prompt da Fase 3.
+Prompt a executar: documentacao-v12.2/prompts/04-ESPACO-COMPARTILHADO.md
+Pre-condicoes: Auth providers habilitados, `.env.local` preenchido, Firestore rules da Fase 3 publicadas, Vercel com bundle da Fase 3 e fluxos de cartao/fatura validados manualmente.
+Arquivos que o proximo agente deve ler: README-START-HERE.md, documentacao-v12.2/README.md, ZEROU-V12.2-ESPECIFICACAO-MESTRA.md, CONTRATOS-CANONICOS.md, THEME-SYSTEM.md, BRAND-GUIDELINES.md, BRAND-ASSET-INTEGRATION.md, PRODUCT-COPY-CANONICAL.md, IMPLEMENTATION_STATUS.md, QA_SCENARIOS.md e o prompt da Fase 4.
 ```
 
 ## Verificacao do sistema de temas

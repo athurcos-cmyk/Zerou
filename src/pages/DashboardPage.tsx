@@ -1,9 +1,11 @@
 import { ArrowRight, CalendarClock, Plus, ReceiptText, Wallet } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
-import { formatMoney } from '../finance/money';
+import { useCardsData } from '../cards/useCardsData';
+import { calculateDashboardSummary } from '../finance/financeCalculations';
 import { toDateInputValue } from '../finance/financeDates';
 import { transactionTypeLabels } from '../finance/financeLabels';
+import { formatMoney } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
 import { useFinanceData } from '../finance/useFinanceData';
 
@@ -11,8 +13,15 @@ export function DashboardPage() {
   const { user, profile } = useAuth();
   const workspaceId = profile?.defaultWorkspaceId;
   const finance = useFinanceData(workspaceId, user?.uid);
-
-  const syncStatus = finance.pendingWrites ? 'pending' : 'synced';
+  const cardsData = useCardsData(workspaceId);
+  const dashboard = calculateDashboardSummary({
+    accounts: finance.accounts,
+    transactions: finance.transactions,
+    bills: finance.bills,
+    recurringRules: finance.recurringRules,
+    invoices: cardsData.invoices
+  });
+  const syncStatus = finance.pendingWrites || cardsData.pendingWrites ? 'pending' : 'synced';
 
   return (
     <section className="page-content">
@@ -21,13 +30,13 @@ export function DashboardPage() {
           <p className="eyebrow">Dashboard Zerou</p>
           <h1 className="page-title">Seu dinheiro, seus compromissos.</h1>
           <p className="page-description">
-            Acompanhe saldo, disponível livre e próximos vencimentos do seu espaço pessoal.
+            Acompanhe saldo, disponível livre, faturas e próximos vencimentos do seu espaço pessoal.
           </p>
         </div>
         <SyncStatusBadge status={syncStatus} />
       </div>
 
-      {finance.error ? <div className="notice notice--danger">{finance.error}</div> : null}
+      {finance.error || cardsData.error ? <div className="notice notice--danger">{finance.error ?? cardsData.error}</div> : null}
 
       <div className="metric-grid">
         <article className="surface surface-pad metric-card">
@@ -35,7 +44,7 @@ export function DashboardPage() {
             <Wallet size={20} aria-hidden="true" />
           </span>
           <p className="eyebrow">Saldo total</p>
-          <strong>{formatMoney(finance.dashboard.totalBalanceCents)}</strong>
+          <strong>{formatMoney(dashboard.totalBalanceCents)}</strong>
           <span className="text-secondary">Soma das contas ativas.</span>
         </article>
         <article className="surface surface-pad metric-card">
@@ -43,7 +52,7 @@ export function DashboardPage() {
             <ReceiptText size={20} aria-hidden="true" />
           </span>
           <p className="eyebrow">Disponível livre v1</p>
-          <strong>{formatMoney(finance.dashboard.freeToSpendCents)}</strong>
+          <strong>{formatMoney(dashboard.freeToSpendCents)}</strong>
           <span className="text-secondary">Saldo menos compromissos previstos.</span>
         </article>
         <article className="surface surface-pad metric-card">
@@ -51,8 +60,8 @@ export function DashboardPage() {
             <CalendarClock size={20} aria-hidden="true" />
           </span>
           <p className="eyebrow">Comprometido</p>
-          <strong>{formatMoney(finance.dashboard.committedCents)}</strong>
-          <span className="text-secondary">Bills e recorrências até o próximo corte.</span>
+          <strong>{formatMoney(dashboard.committedCents)}</strong>
+          <span className="text-secondary">Bills, recorrências e faturas até o próximo corte.</span>
         </article>
       </div>
 
@@ -62,6 +71,9 @@ export function DashboardPage() {
         </Link>
         <Link className="button button--secondary" to="/app/accounts">
           Criar conta
+        </Link>
+        <Link className="button button--secondary" to="/app/cards">
+          Cartões
         </Link>
         <Link className="button button--secondary" to="/app/bills">
           Novo compromisso
@@ -79,14 +91,14 @@ export function DashboardPage() {
               Ver todos
             </Link>
           </div>
-          {finance.dashboard.upcomingCommitments.length > 0 ? (
+          {dashboard.upcomingCommitments.length > 0 ? (
             <div className="item-list">
-              {finance.dashboard.upcomingCommitments.map((commitment) => (
+              {dashboard.upcomingCommitments.map((commitment) => (
                 <div className="list-row" key={`${commitment.kind}-${commitment.id}`}>
                   <div>
                     <strong>{commitment.description}</strong>
                     <span className="text-secondary">
-                      {commitment.kind === 'bill' ? 'Conta a pagar' : 'Recorrência'} ·{' '}
+                      {commitment.kind === 'bill' ? 'Conta a pagar' : commitment.kind === 'invoice' ? 'Fatura' : 'Recorrência'} ·{' '}
                       {toDateInputValue(commitment.dueAt)}
                     </span>
                   </div>
@@ -109,9 +121,9 @@ export function DashboardPage() {
               Ver todas
             </Link>
           </div>
-          {finance.dashboard.recentTransactions.length > 0 ? (
+          {dashboard.recentTransactions.length > 0 ? (
             <div className="item-list">
-              {finance.dashboard.recentTransactions.map((transaction) => (
+              {dashboard.recentTransactions.map((transaction) => (
                 <div className="list-row" key={transaction.id}>
                   <div>
                     <strong>{transaction.description}</strong>

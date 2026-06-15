@@ -22,6 +22,14 @@ service cloud.firestore {
       return /databases/$(database)/documents/workspaces/$(workspaceId);
     }
 
+    function cardDoc(workspaceId, cardId) {
+      return /databases/$(database)/documents/workspaces/$(workspaceId)/cards/$(cardId);
+    }
+
+    function invoiceDoc(workspaceId, cardId, invoiceId) {
+      return /databases/$(database)/documents/workspaces/$(workspaceId)/cards/$(cardId)/invoices/$(invoiceId);
+    }
+
     function memberDoc(workspaceId, uid) {
       return /databases/$(database)/documents/workspaces/$(workspaceId)/members/$(uid);
     }
@@ -224,6 +232,43 @@ service cloud.firestore {
       return request.resource.data.tags is list && request.resource.data.tags.size() <= 8;
     }
 
+    function validCardBrand(value) {
+      return value in ['Visa', 'Mastercard', 'Elo', 'Amex', 'Hipercard', 'Outro'];
+    }
+
+    function validInvoiceStatus(value) {
+      return value in ['open', 'closed', 'partial', 'paid', 'overpaid', 'overdue', 'renegotiated'];
+    }
+
+    function validInvoiceLedgerEntryType(value) {
+      return value in [
+        'purchase',
+        'payment',
+        'advance_payment',
+        'refund_credit',
+        'chargeback_credit',
+        'manual_credit',
+        'manual_debit',
+        'interest',
+        'fine',
+        'iof',
+        'fee',
+        'installment_anticipation'
+      ];
+    }
+
+    function validCardReference(workspaceId) {
+      return request.resource.data.cardId is string
+        && request.resource.data.invoiceId is string
+        && exists(cardDoc(workspaceId, request.resource.data.cardId))
+        && existsAfter(invoiceDoc(workspaceId, request.resource.data.cardId, request.resource.data.invoiceId));
+    }
+
+    function validExistingAccountReference(workspaceId, accountId) {
+      return accountId is string
+        && exists(/databases/$(database)/documents/workspaces/$(workspaceId)/accounts/$(accountId));
+    }
+
     function validAccountCreate(workspaceId, accountId) {
       return isActiveMember(workspaceId)
         && request.resource.data.keys().hasOnly([
@@ -310,20 +355,40 @@ service cloud.firestore {
     }
 
     function validPhase2TransactionType() {
-      return request.resource.data.type in ['income', 'expense', 'transfer', 'adjustment', 'refund', 'reimbursement'];
+      return request.resource.data.type in [
+        'income',
+        'expense',
+        'transfer',
+        'adjustment',
+        'refund',
+        'reimbursement',
+        'card_purchase',
+        'card_payment'
+      ];
     }
 
     function validTransactionAccounts(workspaceId) {
-      return request.resource.data.accountId is string
-        && exists(/databases/$(database)/documents/workspaces/$(workspaceId)/accounts/$(request.resource.data.accountId))
-        && (
-          request.resource.data.type != 'transfer'
-          ? !request.resource.data.keys().hasAny(['destinationAccountId'])
-          : (
-            request.resource.data.destinationAccountId is string
-            && request.resource.data.destinationAccountId != request.resource.data.accountId
-            && exists(/databases/$(database)/documents/workspaces/$(workspaceId)/accounts/$(request.resource.data.destinationAccountId))
-          )
+      return request.resource.data.type == 'transfer'
+        ? (
+          validExistingAccountReference(workspaceId, request.resource.data.accountId)
+          && validExistingAccountReference(workspaceId, request.resource.data.destinationAccountId)
+          && request.resource.data.destinationAccountId != request.resource.data.accountId
+          && !request.resource.data.keys().hasAny(['cardId', 'invoiceId'])
+        )
+        : request.resource.data.type == 'card_purchase'
+        ? (
+          !request.resource.data.keys().hasAny(['accountId', 'destinationAccountId'])
+          && validCardReference(workspaceId)
+        )
+        : request.resource.data.type == 'card_payment'
+        ? (
+          validExistingAccountReference(workspaceId, request.resource.data.accountId)
+          && !request.resource.data.keys().hasAny(['destinationAccountId'])
+          && validCardReference(workspaceId)
+        )
+        : (
+          validExistingAccountReference(workspaceId, request.resource.data.accountId)
+          && !request.resource.data.keys().hasAny(['destinationAccountId', 'cardId', 'invoiceId'])
         );
     }
 
@@ -341,6 +406,8 @@ service cloud.firestore {
           'categoryId',
           'accountId',
           'destinationAccountId',
+          'cardId',
+          'invoiceId',
           'date',
           'competenceMonth',
           'cashMonth',
@@ -396,6 +463,8 @@ service cloud.firestore {
           'categoryId',
           'accountId',
           'destinationAccountId',
+          'cardId',
+          'invoiceId',
           'date',
           'competenceMonth',
           'cashMonth',
@@ -542,6 +611,165 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time;
     }
 
+    function validCardCreate(workspaceId, cardId) {
+      return isActiveMember(workspaceId)
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'workspaceId',
+          'ownerUserId',
+          'name',
+          'lastFour',
+          'brand',
+          'limitCents',
+          'closingDay',
+          'dueDay',
+          'colorToken',
+          'isActive',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.id == cardId
+        && request.resource.data.workspaceId == workspaceId
+        && request.resource.data.ownerUserId == request.auth.uid
+        && validShortText(request.resource.data.name, 2, 80)
+        && request.resource.data.lastFour is string
+        && request.resource.data.lastFour.matches('^\\d{4}$')
+        && validCardBrand(request.resource.data.brand)
+        && validMoneyCents(request.resource.data.limitCents)
+        && request.resource.data.closingDay is int
+        && request.resource.data.closingDay >= 1
+        && request.resource.data.closingDay <= 28
+        && request.resource.data.dueDay is int
+        && request.resource.data.dueDay >= 1
+        && request.resource.data.dueDay <= 28
+        && validShortText(request.resource.data.colorToken, 3, 40)
+        && request.resource.data.isActive is bool
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validCardUpdate(workspaceId) {
+      return isActiveMember(workspaceId)
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.workspaceId == resource.data.workspaceId
+        && request.resource.data.workspaceId == workspaceId
+        && request.resource.data.ownerUserId == resource.data.ownerUserId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name',
+          'lastFour',
+          'brand',
+          'limitCents',
+          'closingDay',
+          'dueDay',
+          'colorToken',
+          'isActive',
+          'updatedAt'
+        ])
+        && validShortText(request.resource.data.name, 2, 80)
+        && request.resource.data.lastFour is string
+        && request.resource.data.lastFour.matches('^\\d{4}$')
+        && validCardBrand(request.resource.data.brand)
+        && validMoneyCents(request.resource.data.limitCents)
+        && request.resource.data.closingDay is int
+        && request.resource.data.closingDay >= 1
+        && request.resource.data.closingDay <= 28
+        && request.resource.data.dueDay is int
+        && request.resource.data.dueDay >= 1
+        && request.resource.data.dueDay <= 28
+        && validShortText(request.resource.data.colorToken, 3, 40)
+        && request.resource.data.isActive is bool
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validInvoiceCreate(workspaceId, cardId, invoiceId) {
+      return isActiveMember(workspaceId)
+        && exists(cardDoc(workspaceId, cardId))
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'cardId',
+          'workspaceId',
+          'referenceMonth',
+          'dueDate',
+          'status',
+          'purchasesTotalCents',
+          'paymentsTotalCents',
+          'creditsTotalCents',
+          'feesTotalCents',
+          'outstandingBalanceCents',
+          'overpaidCreditCents',
+          'version',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.id == invoiceId
+        && request.resource.data.cardId == cardId
+        && request.resource.data.workspaceId == workspaceId
+        && validMonthKey(request.resource.data.referenceMonth)
+        && request.resource.data.dueDate is timestamp
+        && request.resource.data.status == 'open'
+        && request.resource.data.purchasesTotalCents == 0
+        && request.resource.data.paymentsTotalCents == 0
+        && request.resource.data.creditsTotalCents == 0
+        && request.resource.data.feesTotalCents == 0
+        && request.resource.data.outstandingBalanceCents == 0
+        && request.resource.data.overpaidCreditCents == 0
+        && request.resource.data.version == 1
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validInvoiceUpdate(workspaceId, cardId) {
+      return isActiveMember(workspaceId)
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.cardId == resource.data.cardId
+        && request.resource.data.cardId == cardId
+        && request.resource.data.workspaceId == resource.data.workspaceId
+        && request.resource.data.workspaceId == workspaceId
+        && request.resource.data.referenceMonth == resource.data.referenceMonth
+        && request.resource.data.dueDate == resource.data.dueDate
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.version == resource.data.version
+        && request.resource.data.purchasesTotalCents == resource.data.purchasesTotalCents
+        && request.resource.data.paymentsTotalCents == resource.data.paymentsTotalCents
+        && request.resource.data.creditsTotalCents == resource.data.creditsTotalCents
+        && request.resource.data.feesTotalCents == resource.data.feesTotalCents
+        && request.resource.data.outstandingBalanceCents == resource.data.outstandingBalanceCents
+        && request.resource.data.overpaidCreditCents == resource.data.overpaidCreditCents
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        && validInvoiceStatus(request.resource.data.status)
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validInvoiceLedgerCreate(workspaceId, cardId, invoiceId, entryId) {
+      return isActiveMember(workspaceId)
+        && existsAfter(invoiceDoc(workspaceId, cardId, invoiceId))
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'invoiceId',
+          'cardId',
+          'workspaceId',
+          'type',
+          'amountCents',
+          'effectiveAt',
+          'sourceTransactionId',
+          'idempotencyKey',
+          'createdBy',
+          'createdAt'
+        ])
+        && request.resource.data.id == entryId
+        && request.resource.data.invoiceId == invoiceId
+        && request.resource.data.cardId == cardId
+        && request.resource.data.workspaceId == workspaceId
+        && validInvoiceLedgerEntryType(request.resource.data.type)
+        && validMoneyCents(request.resource.data.amountCents)
+        && request.resource.data.effectiveAt is timestamp
+        && validOptionalString('sourceTransactionId', 140)
+        && request.resource.data.idempotencyKey == entryId
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+    }
+
     match /users/{uid} {
       allow read: if isSelf(uid);
       allow create: if validUserFoundationCreate(uid);
@@ -599,6 +827,26 @@ service cloud.firestore {
         allow create: if validRecurringCreate(workspaceId, recurringId);
         allow update: if validRecurringUpdate(workspaceId);
         allow delete: if false;
+      }
+
+      match /cards/{cardId} {
+        allow read: if isActiveMember(workspaceId);
+        allow create: if validCardCreate(workspaceId, cardId);
+        allow update: if validCardUpdate(workspaceId);
+        allow delete: if false;
+
+        match /invoices/{invoiceId} {
+          allow read: if isActiveMember(workspaceId);
+          allow create: if validInvoiceCreate(workspaceId, cardId, invoiceId);
+          allow update: if validInvoiceUpdate(workspaceId, cardId);
+          allow delete: if false;
+
+          match /ledger/{entryId} {
+            allow read: if isActiveMember(workspaceId);
+            allow create: if validInvoiceLedgerCreate(workspaceId, cardId, invoiceId, entryId);
+            allow update, delete: if false;
+          }
+        }
       }
 
       match /{document=**} {
