@@ -147,6 +147,7 @@ documentacao-v12.2/QA_SCENARIOS.md
 | `npm run test:e2e` na Fase 3 | passou | 1 teste Playwright da landing publica. |
 | `npm run test:rules` na Fase 3 | bloqueado por ambiente | Firebase CLI falhou antes dos emuladores: `java -version` saiu com codigo 3221226505. Os testes de rules foram escritos, mas dependem do Java local funcional. |
 | `npx firebase-tools deploy --only firestore:rules,firestore:indexes --project zerou-26757` na Fase 3 | passou | Rules de cards, invoices, ledger e transacoes de cartao compilaram e foram publicadas no Firestore real. |
+| HTTP live `https://zerou-five.vercel.app` na Fase 3 | passou | Producao serve `assets/index-BYgXz7gs.js`; rotas `/`, `/app/cards`, `/app/cards/example` e `/app/cards/example/invoices/example` retornaram 200. |
 
 ## Pendencias manuais externas
 
