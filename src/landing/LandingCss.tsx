@@ -78,7 +78,7 @@ export function LandingCss() {
   );
 
   return (
-    <LandingShell variant="css" hero={hero}>
+    <LandingShell hero={hero}>
       <LandingSections />
     </LandingShell>
   );

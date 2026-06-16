@@ -4,21 +4,14 @@ import { Seo } from '../components/Seo';
 import './landing.css';
 
 interface LandingShellProps {
-  variant: 'css' | 'webgl' | 'mix';
   hero: ReactNode;
   children: ReactNode;
 }
 
-const variantLabels: Record<LandingShellProps['variant'], string> = {
-  css: 'CSS 3D',
-  webgl: 'WebGL',
-  mix: 'Misto'
-};
-
-export function LandingShell({ variant, hero, children }: LandingShellProps) {
+export function LandingShell({ hero, children }: LandingShellProps) {
   return (
     <main className="lp" data-theme="paper">
-      <Seo title="Zerou — finanças simples de entender" description="Organize suas finanças pessoais e do casal, sem misturar o que é seu com o que é compartilhado." path={`/landing/${variant}`} />
+      <Seo title="Zerou — finanças simples de entender" description="Organize suas finanças pessoais e do casal, sem misturar o que é seu com o que é compartilhado." path="/" />
 
       <header className="lp-nav">
         <div className="lp-nav-inner">
@@ -53,13 +46,6 @@ export function LandingShell({ variant, hero, children }: LandingShellProps) {
         </footer>
       </div>
 
-      {/* Eval-only variant switcher */}
-      <nav className="lp-ribbon" aria-label="Comparar variantes">
-        <Link className={variant === 'css' ? 'on' : ''} to="/landing/css">CSS 3D</Link>
-        <Link className={variant === 'webgl' ? 'on' : ''} to="/landing/webgl">WebGL</Link>
-        <Link className={variant === 'mix' ? 'on' : ''} to="/landing/mix">Misto</Link>
-      </nav>
-      <span hidden>{variantLabels[variant]}</span>
     </main>
   );
 }

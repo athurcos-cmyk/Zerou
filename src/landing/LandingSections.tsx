@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import {
-  ArrowRight, BarChart3, CreditCard, Handshake, LockKeyhole, Split, Target, Wallet
+  ArrowRight, BarChart3, CreditCard, LockKeyhole, PiggyBank, Target, TrendingUp, Wallet
 } from 'lucide-react';
 
 const faqs = [
@@ -66,24 +66,27 @@ export function LandingSections() {
         </div>
       </section>
 
-      {/* Couple band */}
+      {/* Couple band — cofrinho */}
       <section className="lp-section" id="casal">
         <div className="lp-couple">
           <div>
             <p className="lp-kicker" style={{ color: '#f8a07a' }}>Modo casal</p>
-            <h2 className="lp-h2">Dividam sem abrir a vida financeira.</h2>
-            <p>A maioria dos apps obriga você a misturar tudo. Na Zerou, cada um continua com seu espaço privado e só o que vocês decidem dividir aparece no espaço compartilhado.</p>
+            <h2 className="lp-h2">Juntem dinheiro pra realizar junto.</h2>
+            <p>Criem um cofrinho em comum — viagem, reserva, a casa nova. Cada um guarda quando quiser, direto da sua conta, e vocês acompanham o quanto já juntaram rumo à meta.</p>
             <ul className="lp-couple-points">
-              <li><span className="lp-cp-ico" style={{ background: 'rgba(255,255,255,0.12)' }}><LockKeyhole size={16} /></span> Seu pessoal continua 100% privado — o outro nunca vê suas contas e cartões</li>
-              <li><span className="lp-cp-ico" style={{ background: 'rgba(255,255,255,0.12)' }}><Split size={16} /></span> Lance uma despesa em comum e divida igual, por porcentagem ou valor</li>
-              <li><span className="lp-cp-ico" style={{ background: 'rgba(255,255,255,0.12)' }}><Handshake size={16} /></span> A Zerou calcula quem deve quanto — vocês acertam com um toque</li>
+              <li><span className="lp-cp-ico"><PiggyBank size={16} /></span> Guardem juntos para um objetivo: o dinheiro sai da sua conta e entra no cofrinho do casal</li>
+              <li><span className="lp-cp-ico"><TrendingUp size={16} /></span> Vejam quanto cada um contribuiu e quanto juntaram no mês</li>
+              <li><span className="lp-cp-ico"><LockKeyhole size={16} /></span> Seu pessoal continua 100% privado — o outro só vê o cofrinho em comum</li>
             </ul>
           </div>
           <div className="lp-couple-card">
-            <span>Você tem a receber</span>
-            <strong>R$ 240,00</strong>
-            <span>Ana deve esse valor a você.</span>
-            <div className="pay"><Handshake size={16} style={{ marginRight: 6 }} /> Acertar contas</div>
+            <div className="lp-cofrinho-head">
+              <span className="lp-cofrinho-ico"><PiggyBank size={20} /></span>
+              <div><strong>Viagem dos sonhos</strong><span>Cofrinho do casal</span></div>
+            </div>
+            <div className="lp-cofrinho-amount">R$ 4.300 <em>de R$ 12.000</em></div>
+            <div className="lp-cofrinho-bar"><i style={{ width: '36%' }} /></div>
+            <div className="lp-cofrinho-month">Este mês vocês juntaram <strong>+ R$ 860</strong></div>
           </div>
         </div>
       </section>

@@ -340,7 +340,19 @@
 .lp-couple-card .pay { display: inline-flex; margin-top: 1rem; background: var(--white); color: var(--ink); border-radius: 999px; padding: 0.6rem 1.1rem; font-weight: 700; font-size: 0.9rem; }
 .lp-couple-points { list-style: none; margin: 1.5rem 0 0; padding: 0; display: grid; gap: 0.9rem; }
 .lp-couple-points li { display: flex; gap: 0.7rem; align-items: flex-start; color: rgba(255, 255, 255, 0.9); font-size: 0.95rem; line-height: 1.45; }
-.lp-cp-ico { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0; color: #f8a07a; }
+.lp-cp-ico { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0; color: #f8a07a; background: rgba(255, 255, 255, 0.12); }
+
+/* cofrinho card on landing */
+.lp-cofrinho-head { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 1.1rem; }
+.lp-cofrinho-ico { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 12px; background: rgba(255, 255, 255, 0.2); color: #fff; flex-shrink: 0; }
+.lp-cofrinho-head strong { display: block; font-size: 1.05rem; }
+.lp-cofrinho-head span { font-size: 0.78rem; opacity: 0.85; }
+.lp-cofrinho-amount { font-family: 'DM Sans', system-ui, sans-serif; font-weight: 800; font-size: clamp(1.9rem, 5vw, 2.6rem); line-height: 1; }
+.lp-cofrinho-amount em { font-style: normal; font-size: 0.95rem; font-weight: 600; opacity: 0.85; }
+.lp-cofrinho-bar { margin: 0.9rem 0 0.85rem; height: 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.25); overflow: hidden; }
+.lp-cofrinho-bar i { display: block; height: 100%; border-radius: 999px; background: #fff; }
+.lp-cofrinho-month { font-size: 0.92rem; opacity: 0.95; }
+.lp-cofrinho-month strong { font-family: 'DM Sans', system-ui, sans-serif; font-weight: 800; }
 
 /* Steps */
 .lp-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
@@ -367,29 +379,6 @@
 .lp-footer-links { display: flex; flex-wrap: wrap; gap: 1.25rem; }
 .lp-footer-links a { color: var(--ink-2); font-size: 0.9rem; font-weight: 600; }
 .lp-footer-links a:hover { color: var(--ink); }
-
-/* Mix variant: WebGL card highlight floating over the CSS stage */
-.lp-mix-card { position: absolute; top: -8%; right: -10%; width: 300px; height: 230px; z-index: 5; }
-@media (max-width: 900px) {
-  .lp-mix-card { top: -14%; right: 0; width: 240px; height: 190px; }
-}
-
-/* WebGL canvas wrapper */
-.lp-canvas { position: absolute; inset: 0; z-index: 1; }
-.lp-canvas--hero { border-radius: 28px; overflow: hidden; }
-.lp-webgl-stage { position: relative; min-height: 480px; display: grid; place-items: center; }
-.lp-webgl-fallback { position: absolute; inset: 0; display: grid; place-items: center; color: var(--ink-3); }
-.lp-webgl-phone { position: absolute; left: 4%; bottom: -4%; z-index: 2; transform: scale(0.82) rotate(-4deg); transform-origin: bottom left; filter: drop-shadow(0 30px 50px rgba(28, 24, 20, 0.22)); }
-@media (max-width: 900px) {
-  .lp-webgl-stage { min-height: 420px; }
-  .lp-webgl-phone { position: relative; left: 0; bottom: 0; transform: none; }
-}
-
-/* Variant ribbon (eval only) */
-.lp-ribbon { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); z-index: 50; display: flex; gap: 0.35rem; padding: 0.35rem; border-radius: 999px; background: rgba(28, 24, 20, 0.9); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); }
-.lp-ribbon a { color: rgba(255, 255, 255, 0.7); font-size: 0.8rem; font-weight: 700; padding: 0.4rem 0.85rem; border-radius: 999px; text-decoration: none; }
-.lp-ribbon a:hover { color: #fff; }
-.lp-ribbon a.on { background: var(--tang); color: #fff; }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 900px) {
