@@ -457,6 +457,11 @@ html[data-reduce-motion='true'] *::after {
   color: var(--text-secondary);
 }
 
+.button--danger {
+  background: var(--danger);
+  color: #fff;
+}
+
 .inline-link {
   color: var(--action-primary);
   font-weight: 800;
@@ -2982,6 +2987,90 @@ html[data-reduce-motion='true'] *::after {
 
 .empty-state-action {
   margin-top: 0.5rem;
+}
+
+/* ============================================================
+   Shared / couple space
+   ============================================================ */
+.balance-hero {
+  display: grid;
+  gap: 0.3rem;
+  padding: 1.5rem 1.4rem;
+  border-radius: 1.25rem;
+  color: #fff;
+  background: linear-gradient(140deg, #3B4658 0%, #5A6B82 100%);
+  box-shadow: 0 12px 30px rgba(59, 70, 88, 0.24);
+}
+
+.balance-hero--credit {
+  background: linear-gradient(140deg, #1F9E6E 0%, #36C18C 100%);
+  box-shadow: 0 12px 30px rgba(31, 158, 110, 0.26);
+}
+
+.balance-hero--debit {
+  background: linear-gradient(140deg, #EE5524 0%, #F47B3D 100%);
+  box-shadow: 0 12px 30px rgba(238, 85, 36, 0.26);
+}
+
+.balance-hero-label {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.balance-hero-amount {
+  font-size: clamp(2rem, 8vw, 2.7rem);
+  color: #fff;
+}
+
+.balance-hero-sub {
+  font-size: 0.86rem;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.balance-hero-cta {
+  margin-top: 0.9rem;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.95);
+  color: #1C1814;
+  min-height: 3rem;
+}
+
+.balance-hero-cta:hover {
+  background: #fff;
+}
+
+.split-preview {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.split-preview span {
+  flex: 1;
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 0.85rem;
+  background: var(--bg-surface-subtle);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.split-preview strong {
+  display: block;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.invite-hero .shared-invite-card {
+  display: grid;
+  gap: 0.6rem;
+  justify-items: center;
+  text-align: center;
 }
 
 /* Card limit hero (new card form) */

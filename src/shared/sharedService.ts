@@ -130,6 +130,26 @@ function splitEqually(totalAmountCents: number, userIds: string[]) {
   }));
 }
 
+/** Use an explicit split when its parts sum to the total; otherwise fall back to an equal split. */
+function resolveSplit(
+  totalAmountCents: number,
+  userIds: string[],
+  split?: Array<{ userId: string; amountCents: number }>
+) {
+  if (!split || split.length !== userIds.length) {
+    return splitEqually(totalAmountCents, userIds);
+  }
+
+  const sum = split.reduce((total, part) => total + part.amountCents, 0);
+  const sameMembers = split.every((part) => userIds.includes(part.userId));
+
+  if (sum !== totalAmountCents || !sameMembers) {
+    return splitEqually(totalAmountCents, userIds);
+  }
+
+  return split.map((part) => ({ userId: part.userId, amountCents: part.amountCents }));
+}
+
 function auditEntry(workspaceId: string, actorUserId: string, type: string, targetType: AuditLog['targetType'], targetId: string, summary: string) {
   const id = createId('audit');
 
@@ -455,7 +475,7 @@ export async function createSharedExpenseClaim(workspaceId: string, userId: stri
     payerUserId: userId,
     description: parsed.description,
     totalAmountCents: parsed.totalAmountCents,
-    split: splitEqually(parsed.totalAmountCents, parsed.participantUserIds),
+    split: resolveSplit(parsed.totalAmountCents, parsed.participantUserIds, parsed.split),
     sourceVisibility: 'summary_only',
     status: 'pending',
     createdBy: userId,

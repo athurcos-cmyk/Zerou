@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Handshake, Link2, MessageSquare, QrCode, ShieldCheck, Users } from 'lucide-react';
+import { Copy, Handshake, Link2, MessageSquare, Plus, QrCode, Users } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { clearPendingInvite, readPendingInvite, savePendingInvite } from '../auth/pendingInvite';
-import { SelectField } from '../components/SelectField';
+import { BottomSheet } from '../components/BottomSheet';
+import { useConfirm } from '../components/ConfirmDialog';
+import { EmptyState } from '../components/EmptyState';
 import { FormMessage } from '../components/FormMessage';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
@@ -41,16 +43,12 @@ const settlementStatusLabels: Record<Settlement['status'], string> = {
   cancelled: 'Cancelado'
 };
 
+type SplitMode = 'equal' | 'percent' | 'value';
+
 function memberLabel(member: WorkspaceMembership | undefined, currentUserId?: string) {
-  if (!member) {
-    return 'Membro';
-  }
-
-  if (member.userId === currentUserId) {
-    return 'Você';
-  }
-
-  return member.role === 'owner' ? 'Dono' : 'Parceiro';
+  if (!member) return 'Parceiro(a)';
+  if (member.userId === currentUserId) return 'Você';
+  return member.role === 'owner' ? 'Dono' : 'Parceiro(a)';
 }
 
 export function SharedSpacePage() {
@@ -58,30 +56,35 @@ export function SharedSpacePage() {
   const shared = useSharedWorkspaceData(user?.uid);
   const workspaceId = shared.workspace?.id;
   const ownerMember = shared.activeMembers.find((member) => member.role === 'owner');
-  const partnerMember = shared.activeMembers.find((member) => member.role === 'partner');
+  const partnerMember = shared.activeMembers.find((member) => member.userId !== user?.uid);
   const activeInvite = shared.invites[0];
+  const { confirm, dialog } = useConfirm();
+
   const [message, setMessage] = useState<string | null>(null);
   const [pendingInviteCode, setPendingInviteCode] = useState('');
   const [pendingInvitePreview, setPendingInvitePreview] = useState<CoupleInvite | null>(null);
   const [generatedInvite, setGeneratedInvite] = useState<{ code: string; joinUrl: string; qrDataUrl: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+
   const [claimDescription, setClaimDescription] = useState('');
   const [claimAmount, setClaimAmount] = useState('');
+  const [splitMode, setSplitMode] = useState<SplitMode>('equal');
+  const [myPercent, setMyPercent] = useState('50');
+  const [myValue, setMyValue] = useState('');
+
   const [commentTargetId, setCommentTargetId] = useState('');
   const [commentBody, setCommentBody] = useState('');
+  const [settleOpen, setSettleOpen] = useState(false);
   const [settlementPaymentId, setSettlementPaymentId] = useState('');
   const [settlementPaymentAmount, setSettlementPaymentAmount] = useState('');
 
   useEffect(() => {
     const storedCode = readPendingInvite();
-
-    if (storedCode) {
-      setPendingInviteCode(storedCode);
-    }
+    if (storedCode) setPendingInviteCode(storedCode);
   }, []);
 
   async function guardAction(action: () => Promise<unknown>) {
     setMessage(null);
-
     try {
       await action();
     } catch (error) {
@@ -90,18 +93,12 @@ export function SharedSpacePage() {
   }
 
   function handleCreateWorkspace() {
-    if (!user) {
-      return;
-    }
-
+    if (!user) return;
     void guardAction(() => createCoupleWorkspace(user.uid, profile?.name ?? user.displayName ?? 'Zerou'));
   }
 
   function handleCreateInvite() {
-    if (!workspaceId || !user || !shared.workspace) {
-      return;
-    }
-
+    if (!workspaceId || !user || !shared.workspace) return;
     void guardAction(async () => {
       const invite = await createCoupleInvite(workspaceId, user.uid, shared.workspace!.name);
       setGeneratedInvite(invite);
@@ -109,10 +106,7 @@ export function SharedSpacePage() {
   }
 
   function handleRegenerateInvite() {
-    if (!workspaceId || !user || !shared.workspace) {
-      return;
-    }
-
+    if (!workspaceId || !user || !shared.workspace) return;
     void guardAction(async () => {
       const invite = await regenerateCoupleInvite(workspaceId, user.uid, shared.workspace!.name);
       setGeneratedInvite(invite);
@@ -122,7 +116,6 @@ export function SharedSpacePage() {
   function handlePreviewInvite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     savePendingInvite(pendingInviteCode);
-
     void guardAction(async () => {
       const preview = await previewCoupleInvite(pendingInviteCode);
       setPendingInvitePreview(preview);
@@ -130,12 +123,15 @@ export function SharedSpacePage() {
   }
 
   function handleAcceptInvite() {
-    if (!user) {
-      return;
-    }
-
+    if (!user) return;
     void guardAction(async () => {
-      await acceptCoupleInvite(pendingInviteCode, user.uid, window.confirm('Entrar neste espaço compartilhado da Zerou?'));
+      const ok = await confirm({
+        title: 'Entrar neste espaço compartilhado?',
+        message: pendingInvitePreview ? `Você vai compartilhar resumos de despesa com ${pendingInvitePreview.workspaceName}.` : undefined,
+        confirmLabel: 'Entrar'
+      });
+      if (!ok) return;
+      await acceptCoupleInvite(pendingInviteCode, user.uid, true);
       clearPendingInvite();
       setPendingInviteCode('');
       setPendingInvitePreview(null);
@@ -143,63 +139,80 @@ export function SharedSpacePage() {
   }
 
   function handleRevokeInvite(inviteId: string) {
-    if (!workspaceId || !user) {
-      return;
-    }
-
+    if (!workspaceId || !user) return;
     void guardAction(() => revokeCoupleInvite(workspaceId, inviteId, user.uid));
   }
 
   function handleCleanupInvites() {
-    if (!workspaceId || !user) {
-      return;
-    }
-
+    if (!workspaceId || !user) return;
     void guardAction(() => cleanupExpiredInvites(workspaceId, user.uid));
+  }
+
+  async function copyInvite() {
+    if (!generatedInvite) return;
+    try {
+      await navigator.clipboard.writeText(`${generatedInvite.joinUrl}\nCódigo: ${generatedInvite.code}`);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setMessage('Não foi possível copiar. Copie o código manualmente.');
+    }
+  }
+
+  function computeSplit(totalCents: number) {
+    const me = user!.uid;
+    const partnerId = partnerMember?.userId;
+    if (!partnerId) return undefined;
+    let myShare: number;
+    if (splitMode === 'equal') {
+      myShare = Math.floor(totalCents / 2);
+    } else if (splitMode === 'percent') {
+      const pct = Math.min(100, Math.max(0, Number(myPercent) || 0));
+      myShare = Math.round((totalCents * pct) / 100);
+    } else {
+      myShare = Math.min(totalCents, Math.max(0, parseMoneyToCents(myValue || '0')));
+    }
+    return [
+      { userId: me, amountCents: myShare },
+      { userId: partnerId, amountCents: totalCents - myShare }
+    ];
   }
 
   function handleCreateClaim(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
     if (!workspaceId || !user || shared.activeMembers.length < 2) {
       setMessage('A despesa compartilhada precisa de duas pessoas ativas no espaço.');
       return;
     }
-
     void guardAction(async () => {
+      const totalCents = parseMoneyToCents(claimAmount);
       await createSharedExpenseClaim(workspaceId, user.uid, {
         description: claimDescription,
-        totalAmountCents: parseMoneyToCents(claimAmount),
-        participantUserIds: shared.activeMembers.map((member) => member.userId)
+        totalAmountCents: totalCents,
+        participantUserIds: shared.activeMembers.map((member) => member.userId),
+        split: splitMode === 'equal' ? undefined : computeSplit(totalCents)
       });
       setClaimDescription('');
       setClaimAmount('');
+      setSplitMode('equal');
+      setMyPercent('50');
+      setMyValue('');
     });
   }
 
   function handleClaimStatus(claimId: string, status: 'accepted' | 'disputed' | 'settled') {
-    if (!workspaceId || !user) {
-      return;
-    }
-
+    if (!workspaceId || !user) return;
     void guardAction(() => updateSharedExpenseClaimStatus(workspaceId, user.uid, { claimId, status }));
   }
 
   function handleCreateSettlement() {
-    if (!workspaceId || !user || !shared.settlementSuggestion) {
-      return;
-    }
-
+    if (!workspaceId || !user || !shared.settlementSuggestion) return;
     void guardAction(() => createSettlementProposal(workspaceId, user.uid, shared.settlementSuggestion!));
   }
 
   function handleSettlementPayment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    if (!workspaceId || !user) {
-      return;
-    }
-
+    if (!workspaceId || !user) return;
     void guardAction(async () => {
       await recordSettlementPayment(workspaceId, user.uid, {
         settlementId: settlementPaymentId,
@@ -211,61 +224,63 @@ export function SharedSpacePage() {
   }
 
   function handleAcceptSettlement(settlementId: string) {
-    if (!workspaceId || !user) {
-      return;
-    }
-
+    if (!workspaceId || !user) return;
     void guardAction(() => acceptSettlement(workspaceId, user.uid, settlementId));
   }
 
   function handleComment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    if (!workspaceId || !user) {
-      return;
-    }
-
+    if (!workspaceId || !user || !commentTargetId) return;
     void guardAction(async () => {
-      await addSharedComment(workspaceId, user.uid, {
-        targetType: 'claim',
-        targetId: commentTargetId,
-        body: commentBody
-      });
+      await addSharedComment(workspaceId, user.uid, { targetType: 'claim', targetId: commentTargetId, body: commentBody });
       setCommentBody('');
     });
   }
 
   function handleLeaveOrRemove() {
-    if (!workspaceId || !user || !shared.workspace) {
-      return;
-    }
-
-    if (shared.workspace.ownerUserId === user.uid && partnerMember) {
-      void guardAction(() => removePartner(workspaceId, user.uid, partnerMember.userId, window.confirm('Remover o parceiro deste espaço compartilhado?')));
-      return;
-    }
-
-    void guardAction(() => leaveCoupleWorkspace(workspaceId, user.uid, window.confirm('Sair deste espaço compartilhado?')));
+    if (!workspaceId || !user || !shared.workspace) return;
+    const isOwnerRemovingPartner = shared.workspace.ownerUserId === user.uid && partnerMember;
+    void guardAction(async () => {
+      const ok = await confirm({
+        title: isOwnerRemovingPartner ? 'Remover parceiro?' : 'Sair do espaço compartilhado?',
+        message: 'As despesas e acertos compartilhados deixam de ser atualizados para você.',
+        confirmLabel: isOwnerRemovingPartner ? 'Remover' : 'Sair',
+        danger: true
+      });
+      if (!ok) return;
+      if (isOwnerRemovingPartner) {
+        await removePartner(workspaceId, user.uid, partnerMember!.userId, true);
+      } else {
+        await leaveCoupleWorkspace(workspaceId, user.uid, true);
+      }
+    });
   }
 
-  const canLeaveOrRemove = Boolean(shared.workspace?.ownerUserId !== user?.uid || partnerMember);
   const claimOptions = useMemo(() => shared.claims.map((claim) => ({ id: claim.id, label: claim.description })), [shared.claims]);
 
   useEffect(() => {
-    if (!commentTargetId && claimOptions[0]) {
-      setCommentTargetId(claimOptions[0].id);
-    }
+    if (!commentTargetId && claimOptions[0]) setCommentTargetId(claimOptions[0].id);
   }, [claimOptions, commentTargetId]);
 
+  const partnered = shared.activeMembers.length >= 2;
+  const myBalance = shared.balances.find((balance) => balance.userId === user?.uid)?.balanceCents ?? 0;
+  const suggestion = shared.settlementSuggestion;
+
+  // Live preview of the split for the add-expense form.
+  const splitPreview = (() => {
+    const totalCents = claimAmount ? parseMoneyToCents(claimAmount) : 0;
+    if (!totalCents || !partnerMember) return null;
+    const split = computeSplit(totalCents);
+    if (!split) return null;
+    return { mine: split[0].amountCents, partner: split[1].amountCents };
+  })();
+
   return (
-    <section className="page-content">
-      <div className="page-heading-row">
+    <section className="page-content page-content--narrow">
+      <div className="page-heading-row page-heading-row--tight">
         <div>
-          <p className="eyebrow">Espaço compartilhado</p>
-          <h1 className="page-title">Duas pessoas. Dois espaços. Uma organização em comum.</h1>
-          <p className="page-description">
-            Compartilhe apenas um resumo da despesa e o acerto combinado. Conta, cartão, fatura e histórico pessoal ficam privados.
-          </p>
+          <p className="eyebrow">Espaço do casal</p>
+          <h1 className="page-title page-title--compact">Organização a dois</h1>
         </div>
         <span className={`sync-badge sync-badge--${shared.pendingWrites ? 'pending' : 'synced'}`}>
           {shared.pendingWrites ? 'Sincronizando' : 'Sincronizado'}
@@ -274,301 +289,287 @@ export function SharedSpacePage() {
 
       <FormMessage>{message ?? shared.error}</FormMessage>
 
+      {/* 1) No shared space yet — create or join */}
       {!shared.activeCoupleRef ? (
-        <div className="finance-grid">
-          <article className="surface surface-pad form-stack">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">Criar</p>
-                <h2>Começar um espaço compartilhado</h2>
-              </div>
-              <Users size={22} aria-hidden="true" />
-            </div>
-            <p className="text-secondary">
-              A Zerou mantém seu espaço pessoal separado. O espaço compartilhado nasce vazio e recebe somente o que vocês decidirem lançar nele.
-            </p>
-            <button className="button button--primary" type="button" onClick={handleCreateWorkspace}>
-              Criar espaço compartilhado
-            </button>
-          </article>
+        <div className="form-stack">
+          <EmptyState
+            illustration="shared"
+            title="Organize as contas a dois"
+            description="Seu espaço pessoal continua privado. O compartilhado recebe só o resumo das despesas que vocês decidirem dividir."
+          />
+          <button className="button button--primary button--block" type="button" onClick={handleCreateWorkspace}>
+            <Plus size={18} aria-hidden="true" /> Criar espaço compartilhado
+          </button>
 
-          <article className="surface surface-pad form-stack">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">Entrar</p>
-                <h2>Usar um convite</h2>
-              </div>
-              <Link2 size={22} aria-hidden="true" />
-            </div>
+          <details className="advanced-panel">
+            <summary>Tenho um convite</summary>
             <form className="form-stack" onSubmit={handlePreviewInvite}>
               <label className="field">
                 <span>Código do convite</span>
                 <input className="input" value={pendingInviteCode} onChange={(event) => setPendingInviteCode(event.target.value)} placeholder="DUO-7X4K-92" />
               </label>
-              <button className="button button--secondary" type="submit">
-                Ver convite
+              <button className="button button--secondary" type="submit">Ver convite</button>
+              {pendingInvitePreview ? (
+                <div className="notice notice--success">
+                  Convite ativo para {pendingInvitePreview.workspaceName}. Expira em {pendingInvitePreview.expiresAt.toDate().toLocaleString('pt-BR')}.
+                </div>
+              ) : null}
+              <button className="button button--primary" type="button" disabled={!pendingInvitePreview} onClick={handleAcceptInvite}>
+                Aceitar convite
               </button>
             </form>
-            {pendingInvitePreview ? (
-              <div className="notice notice--success">
-                Convite ativo para {pendingInvitePreview.workspaceName}. Ele expira em {pendingInvitePreview.expiresAt.toDate().toLocaleString('pt-BR')}.
-              </div>
-            ) : null}
-            <button className="button button--primary" type="button" disabled={!pendingInvitePreview} onClick={handleAcceptInvite}>
-              Aceitar convite
-            </button>
-          </article>
+          </details>
         </div>
-      ) : (
-        <>
-          <div className="metric-grid">
-            {shared.balances.map((balance) => (
-              <article className="surface surface-pad metric-card" key={balance.userId}>
-                <p className="eyebrow">{memberLabel(shared.activeMembers.find((member) => member.userId === balance.userId), user?.uid)}</p>
-                <strong>{formatMoney(balance.balanceCents)}</strong>
-                <span className="text-secondary">{balance.balanceCents >= 0 ? 'tem a receber' : 'tem a pagar'}</span>
-              </article>
-            ))}
-          </div>
-
-          <div className="shared-flow-hint">
-            <span>1. Convide a outra pessoa</span>
-            <span>2. Adicione uma despesa</span>
-            <span>3. Combine o acerto</span>
-          </div>
-
-          <div className="finance-grid">
-            <div className="form-stack">
-              <article className="surface surface-pad form-stack">
-                <div className="section-heading">
-                  <div>
-                    <p className="eyebrow">Convite</p>
-                    <h2>Trazer a outra pessoa</h2>
-                  </div>
-                  <QrCode size={22} aria-hidden="true" />
-                </div>
-                {activeInvite ? (
-                  <p className="notice">
-                    Existe um convite ativo com final {activeInvite.codeHint}. Por segurança, o código completo só aparece quando é gerado.
-                  </p>
-                ) : (
-                  <p className="text-secondary">Gere um código, link e QR Code derivados do mesmo token lógico.</p>
-                )}
-                <button className="button button--primary" type="button" onClick={handleCreateInvite}>
+      ) : !partnered ? (
+        /* 2) Space exists but waiting for partner — invite hero */
+        <div className="form-stack">
+          <article className="surface surface-pad form-stack invite-hero">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Convite</p>
+                <h2>Chame a outra pessoa</h2>
+              </div>
+              <QrCode size={22} aria-hidden="true" />
+            </div>
+            {generatedInvite ? (
+              <div className="shared-invite-card">
+                <strong>{generatedInvite.code}</strong>
+                <span>{generatedInvite.joinUrl}</span>
+                <img src={generatedInvite.qrDataUrl} alt="QR Code do convite Zerou" />
+                <button className="button button--subtle button--block" type="button" onClick={() => void copyInvite()}>
+                  <Copy size={16} aria-hidden="true" /> {copied ? 'Copiado!' : 'Copiar link e código'}
+                </button>
+              </div>
+            ) : (
+              <>
+                <p className="text-secondary">Gere um código, link e QR Code para a outra pessoa entrar.</p>
+                <button className="button button--primary button--block" type="button" onClick={handleCreateInvite}>
                   Gerar convite
                 </button>
-                <details className="advanced-panel">
-                  <summary>Opções do convite</summary>
-                  <div className="button-row">
-                    <button className="button button--secondary" type="button" onClick={handleRegenerateInvite}>
-                      Regenerar
-                    </button>
-                    {activeInvite ? (
-                      <button className="button button--ghost" type="button" onClick={() => handleRevokeInvite(activeInvite.id)}>
-                        Revogar
-                      </button>
-                    ) : null}
-                    <button className="button button--ghost" type="button" onClick={handleCleanupInvites}>
-                      Limpar expirados
-                    </button>
-                  </div>
-                </details>
-                {generatedInvite ? (
-                  <div className="shared-invite-card">
-                    <strong>{generatedInvite.code}</strong>
-                    <span>{generatedInvite.joinUrl}</span>
-                    <img src={generatedInvite.qrDataUrl} alt="QR Code do convite Zerou" />
-                  </div>
+              </>
+            )}
+            <details className="advanced-panel">
+              <summary>Opções do convite</summary>
+              <div className="button-row">
+                <button className="button button--secondary" type="button" onClick={handleRegenerateInvite}>Regenerar</button>
+                {activeInvite ? (
+                  <button className="button button--ghost" type="button" onClick={() => handleRevokeInvite(activeInvite.id)}>Revogar</button>
                 ) : null}
-              </article>
-
-              <form className="surface surface-pad form-stack" onSubmit={handleCreateClaim}>
-                <div className="section-heading">
-                  <div>
-                    <p className="eyebrow">Despesa</p>
-                    <h2>Registrar gasto compartilhado</h2>
-                  </div>
-                  <ShieldCheck size={22} aria-hidden="true" />
-                </div>
-                <label className="field">
-                  <span>Descrição resumida</span>
-                  <input className="input" value={claimDescription} onChange={(event) => setClaimDescription(event.target.value)} placeholder="Mercado do mês" />
-                </label>
-                <label className="field">
-                  <span>Valor total</span>
-                  <input className="input" inputMode="decimal" value={claimAmount} onChange={(event) => setClaimAmount(event.target.value)} placeholder="0,00" />
-                </label>
-                <button className="button button--primary" type="submit" disabled={shared.activeMembers.length < 2}>
-                  Adicionar despesa
-                </button>
-                <p className="text-secondary">A divisão inicial é meio a meio. Nenhuma conta, cartão ou fatura pessoal entra neste registro.</p>
-              </form>
-
-              <details className="advanced-panel">
-                <summary>Comentários sobre despesas</summary>
-                <form className="form-stack" onSubmit={handleComment}>
-                  <div className="section-heading">
-                    <div>
-                      <p className="eyebrow">Comentários</p>
-                      <h2>Conversar sobre uma despesa</h2>
-                    </div>
-                    <MessageSquare size={22} aria-hidden="true" />
-                  </div>
-                  <SelectField
-                    label="Despesa"
-                    value={commentTargetId}
-                    onChange={setCommentTargetId}
-                    options={claimOptions.map((c) => ({ value: c.id, label: c.label }))}
-                    placeholder="Nenhuma despesa ainda"
-                  />
-                  <textarea className="input textarea" value={commentBody} onChange={(event) => setCommentBody(event.target.value)} placeholder="Escreva um comentário curto." />
-                  <button className="button button--secondary" type="submit" disabled={!commentTargetId}>
-                    Comentar
-                  </button>
-                </form>
-              </details>
-            </div>
-
-            <div className="form-stack">
-              <article className="surface surface-pad">
-                <div className="section-heading">
-                  <div>
-                    <p className="eyebrow">Despesas</p>
-                    <h2>Resumo compartilhado</h2>
-                  </div>
-                  <Handshake size={22} aria-hidden="true" />
-                </div>
-                {shared.claims.length > 0 ? (
-                  <div className="item-list">
-                    {shared.claims.map((claim) => (
-                      <div className="list-row" key={claim.id}>
-                        <div>
-                          <strong>{claim.description}</strong>
-                          <span className="text-secondary">
-                            {formatMoney(claim.totalAmountCents)} · {claimStatusLabels[claim.status]} · pago por {memberLabel(shared.activeMembers.find((member) => member.userId === claim.payerUserId), user?.uid)}
-                          </span>
-                          <span className="text-muted">Visibilidade: resumo compartilhado</span>
-                        </div>
-                        <div className="list-row-end">
-                          {claim.status === 'pending' ? (
-                            <>
-                              <button className="button button--subtle button--compact" type="button" onClick={() => handleClaimStatus(claim.id, 'accepted')}>
-                                Aceitar
-                              </button>
-                              <button className="button button--ghost button--compact" type="button" onClick={() => handleClaimStatus(claim.id, 'disputed')}>
-                                Contestar
-                              </button>
-                            </>
-                          ) : null}
-                          {claim.status === 'accepted' ? (
-                            <button className="button button--ghost button--compact" type="button" onClick={() => handleClaimStatus(claim.id, 'settled')}>
-                              Marcar acertado
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-secondary">Nenhuma despesa compartilhada ainda.</p>
-                )}
-              </article>
-
-              <article className="surface surface-pad form-stack">
-                <div className="section-heading">
-                  <div>
-                    <p className="eyebrow">Acerto</p>
-                    <h2>Proposta de reembolso</h2>
-                  </div>
-                  <Handshake size={22} aria-hidden="true" />
-                </div>
-                {shared.settlementSuggestion ? (
-                  <p className="notice">
-                    Sugestão: {memberLabel(shared.activeMembers.find((member) => member.userId === shared.settlementSuggestion?.fromUserId), user?.uid)} paga {formatMoney(shared.settlementSuggestion.amountCents)} para {memberLabel(shared.activeMembers.find((member) => member.userId === shared.settlementSuggestion?.toUserId), user?.uid)}.
-                  </p>
-                ) : (
-                  <p className="text-secondary">Sem saldo pendente para sugerir acerto.</p>
-                )}
-                <button className="button button--primary" type="button" disabled={!shared.settlementSuggestion} onClick={handleCreateSettlement}>
-                  Criar proposta
-                </button>
-                {shared.settlements.length > 0 ? (
-                  <div className="item-list">
-                    {shared.settlements.map((settlement) => (
-                      <div className="list-row" key={settlement.id}>
-                        <div>
-                          <strong>{formatMoney(settlement.amountCents)}</strong>
-                          <span className="text-secondary">
-                            {settlementStatusLabels[settlement.status]} · pago {formatMoney(settlement.paidAmountCents)}
-                          </span>
-                        </div>
-                        <div className="list-row-end">
-                          {settlement.status === 'proposed' ? (
-                            <button className="button button--subtle button--compact" type="button" onClick={() => handleAcceptSettlement(settlement.id)}>
-                              Aceitar
-                            </button>
-                          ) : null}
-                          <button className="button button--subtle button--compact" type="button" onClick={() => setSettlementPaymentId(settlement.id)}>
-                            Registrar pagamento
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-                <form className="form-stack" onSubmit={handleSettlementPayment}>
-                  <SelectField
-                    label="Acerto"
-                    value={settlementPaymentId}
-                    onChange={setSettlementPaymentId}
-                    options={shared.settlements.map((s) => ({
-                      value: s.id,
-                      label: `${formatMoney(s.amountCents)} · ${settlementStatusLabels[s.status]}`
-                    }))}
-                    placeholder="Escolha um acerto"
-                  />
-                  <input className="input" inputMode="decimal" value={settlementPaymentAmount} onChange={(event) => setSettlementPaymentAmount(event.target.value)} placeholder="0,00" />
-                  <button className="button button--secondary" type="submit" disabled={!settlementPaymentId}>
-                    Registrar parcial ou total
-                  </button>
-                </form>
-              </article>
-
-              <details className="advanced-panel">
-                <summary>Comentários recentes</summary>
-                {shared.comments.length > 0 ? (
-                  <div className="item-list">
-                    {shared.comments.slice(0, 5).map((comment) => (
-                      <div className="list-row" key={comment.id}>
-                        <div>
-                          <strong>{memberLabel(shared.activeMembers.find((member) => member.userId === comment.createdBy), user?.uid)}</strong>
-                          <span className="text-secondary">{comment.body}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-secondary">Sem comentários ainda.</p>
-                )}
-              </details>
-            </div>
-          </div>
+                <button className="button button--ghost" type="button" onClick={handleCleanupInvites}>Limpar expirados</button>
+              </div>
+            </details>
+          </article>
 
           <details className="advanced-panel shared-admin-panel">
             <summary>Gerenciar espaço</summary>
-            <div className="quick-actions">
-            {canLeaveOrRemove ? (
-              <button className="button button--ghost" type="button" onClick={handleLeaveOrRemove}>
+            <button className="button button--ghost" type="button" onClick={handleLeaveOrRemove}>Sair do espaço</button>
+          </details>
+        </div>
+      ) : (
+        /* 3) Partnered — balances, expenses, settlement */
+        <div className="form-stack">
+          <article className={`surface balance-hero${myBalance > 0 ? ' balance-hero--credit' : myBalance < 0 ? ' balance-hero--debit' : ''}`}>
+            {myBalance === 0 ? (
+              <>
+                <p className="balance-hero-label">Tudo certo entre vocês</p>
+                <strong className="balance-hero-amount display-number">{formatMoney(0)}</strong>
+                <span className="balance-hero-sub">Sem pendências no momento.</span>
+              </>
+            ) : myBalance > 0 ? (
+              <>
+                <p className="balance-hero-label">Você tem a receber</p>
+                <strong className="balance-hero-amount display-number">{formatMoney(myBalance)}</strong>
+                <span className="balance-hero-sub">{memberLabel(partnerMember, user?.uid)} deve esse valor a você.</span>
+              </>
+            ) : (
+              <>
+                <p className="balance-hero-label">Você deve</p>
+                <strong className="balance-hero-amount display-number">{formatMoney(Math.abs(myBalance))}</strong>
+                <span className="balance-hero-sub">para {memberLabel(partnerMember, user?.uid)}.</span>
+              </>
+            )}
+            <button className="button button--block balance-hero-cta" type="button" onClick={() => setSettleOpen(true)}>
+              <Handshake size={18} aria-hidden="true" /> Acertar contas
+            </button>
+          </article>
+
+          {/* Add shared expense with flexible split */}
+          <form className="surface surface-pad form-stack" onSubmit={handleCreateClaim}>
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Nova despesa</p>
+                <h2>Dividir um gasto</h2>
+              </div>
+              <Plus size={20} aria-hidden="true" />
+            </div>
+            <label className="field">
+              <span>Descrição</span>
+              <input className="input" value={claimDescription} onChange={(event) => setClaimDescription(event.target.value)} placeholder="Mercado do mês" />
+            </label>
+            <label className="field">
+              <span>Valor total</span>
+              <input className="input" inputMode="decimal" value={claimAmount} onChange={(event) => setClaimAmount(event.target.value)} placeholder="0,00" />
+            </label>
+
+            <div className="field">
+              <span className="field-label">Como dividir?</span>
+              <div className="segmented">
+                {(['equal', 'percent', 'value'] as const).map((mode) => (
+                  <button key={mode} type="button" aria-pressed={splitMode === mode} onClick={() => setSplitMode(mode)}>
+                    {mode === 'equal' ? 'Igual' : mode === 'percent' ? 'Porcentagem' : 'Valor'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {splitMode === 'percent' && (
+              <label className="field">
+                <span>Sua parte (%)</span>
+                <input className="input" inputMode="numeric" value={myPercent} onChange={(event) => setMyPercent(event.target.value)} placeholder="50" />
+              </label>
+            )}
+            {splitMode === 'value' && (
+              <label className="field">
+                <span>Sua parte (R$)</span>
+                <input className="input" inputMode="decimal" value={myValue} onChange={(event) => setMyValue(event.target.value)} placeholder="0,00" />
+              </label>
+            )}
+
+            {splitPreview && (
+              <div className="split-preview">
+                <span><strong>Você</strong> {formatMoney(splitPreview.mine)}</span>
+                <span><strong>{memberLabel(partnerMember, user?.uid)}</strong> {formatMoney(splitPreview.partner)}</span>
+              </div>
+            )}
+
+            <button className="button button--primary button--block" type="submit">Adicionar despesa</button>
+            <p className="text-muted" style={{ margin: 0, fontSize: '0.8rem' }}>Nenhuma conta, cartão ou fatura pessoal entra neste registro.</p>
+          </form>
+
+          {/* Claims list */}
+          <article className="surface surface-pad">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Despesas</p>
+                <h2>Resumo compartilhado</h2>
+              </div>
+              <Users size={20} aria-hidden="true" />
+            </div>
+            {shared.claims.length > 0 ? (
+              <div className="item-list">
+                {shared.claims.map((claim) => (
+                  <div className="list-row" key={claim.id}>
+                    <div>
+                      <strong>{claim.description}</strong>
+                      <span className="text-secondary">
+                        {formatMoney(claim.totalAmountCents)} · {claimStatusLabels[claim.status]} · pago por {memberLabel(shared.activeMembers.find((member) => member.userId === claim.payerUserId), user?.uid)}
+                      </span>
+                    </div>
+                    <div className="list-row-end">
+                      {claim.status === 'pending' ? (
+                        <>
+                          <button className="button button--subtle button--compact" type="button" onClick={() => handleClaimStatus(claim.id, 'accepted')}>Aceitar</button>
+                          <button className="button button--ghost button--compact" type="button" onClick={() => handleClaimStatus(claim.id, 'disputed')}>Contestar</button>
+                        </>
+                      ) : null}
+                      {claim.status === 'accepted' ? (
+                        <button className="button button--ghost button--compact" type="button" onClick={() => handleClaimStatus(claim.id, 'settled')}>Marcar acertado</button>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState illustration="wallet" compact title="Nenhuma despesa dividida" description="Adicione um gasto acima para começar a dividir." />
+            )}
+          </article>
+
+          {/* Comments */}
+          <details className="advanced-panel">
+            <summary><MessageSquare size={15} aria-hidden="true" /> Comentários</summary>
+            <form className="form-stack" onSubmit={handleComment}>
+              {shared.comments.length > 0 ? (
+                <div className="item-list">
+                  {shared.comments.slice(0, 5).map((comment) => (
+                    <div className="list-row" key={comment.id}>
+                      <div>
+                        <strong>{memberLabel(shared.activeMembers.find((member) => member.userId === comment.createdBy), user?.uid)}</strong>
+                        <span className="text-secondary">{comment.body}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              {claimOptions.length > 0 ? (
+                <>
+                  <textarea className="input textarea" value={commentBody} onChange={(event) => setCommentBody(event.target.value)} placeholder="Escreva um comentário sobre a despesa selecionada." />
+                  <button className="button button--secondary" type="submit" disabled={!commentTargetId || !commentBody.trim()}>Comentar</button>
+                </>
+              ) : (
+                <p className="text-secondary">Adicione uma despesa para comentar sobre ela.</p>
+              )}
+            </form>
+          </details>
+
+          {/* Manage */}
+          <details className="advanced-panel shared-admin-panel">
+            <summary>Gerenciar espaço</summary>
+            <div className="form-stack">
+              <span className="text-secondary">
+                Dono: {memberLabel(ownerMember, user?.uid)} · Parceiro: {partnerMember ? memberLabel(partnerMember, user?.uid) : 'aguardando'}
+              </span>
+              <button className="button button--ghost button--danger-text" type="button" onClick={handleLeaveOrRemove}>
                 {shared.workspace?.ownerUserId === user?.uid && partnerMember ? 'Remover parceiro' : 'Sair do espaço'}
               </button>
-            ) : null}
-            <span className="text-secondary">
-              Dono: {memberLabel(ownerMember, user?.uid)} · Parceiro: {partnerMember ? memberLabel(partnerMember, user?.uid) : 'aguardando convite'}
-            </span>
             </div>
           </details>
-        </>
+        </div>
       )}
+
+      {/* Settlement sheet */}
+      <BottomSheet open={settleOpen} onClose={() => setSettleOpen(false)} title="Acertar contas" subtitle="Combine e registre o reembolso">
+        {suggestion ? (
+          <div className="notice notice--success">
+            Sugestão: {memberLabel(shared.activeMembers.find((member) => member.userId === suggestion.fromUserId), user?.uid)} paga {formatMoney(suggestion.amountCents)} para {memberLabel(shared.activeMembers.find((member) => member.userId === suggestion.toUserId), user?.uid)}.
+          </div>
+        ) : (
+          <p className="text-secondary">Sem saldo pendente para sugerir acerto.</p>
+        )}
+        <button className="button button--primary button--block" type="button" disabled={!suggestion} onClick={handleCreateSettlement} style={{ marginTop: '0.75rem' }}>
+          Criar proposta de acerto
+        </button>
+
+        {shared.settlements.length > 0 ? (
+          <div className="item-list" style={{ marginTop: '1rem' }}>
+            {shared.settlements.map((settlement) => (
+              <div className="list-row" key={settlement.id}>
+                <div>
+                  <strong>{formatMoney(settlement.amountCents)}</strong>
+                  <span className="text-secondary">{settlementStatusLabels[settlement.status]} · pago {formatMoney(settlement.paidAmountCents)}</span>
+                </div>
+                <div className="list-row-end">
+                  {settlement.status === 'proposed' ? (
+                    <button className="button button--subtle button--compact" type="button" onClick={() => handleAcceptSettlement(settlement.id)}>Aceitar</button>
+                  ) : null}
+                  <button className="button button--ghost button--compact" type="button" onClick={() => setSettlementPaymentId(settlement.id)}>Pagar</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {settlementPaymentId ? (
+          <form className="form-stack" onSubmit={handleSettlementPayment} style={{ marginTop: '1rem' }}>
+            <label className="field">
+              <span>Valor pago</span>
+              <input className="input" inputMode="decimal" value={settlementPaymentAmount} onChange={(event) => setSettlementPaymentAmount(event.target.value)} placeholder="0,00" autoFocus />
+            </label>
+            <button className="button button--secondary button--block" type="submit">Registrar pagamento</button>
+          </form>
+        ) : null}
+      </BottomSheet>
+
+      {dialog}
     </section>
   );
 }
