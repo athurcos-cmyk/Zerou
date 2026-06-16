@@ -8,6 +8,8 @@ interface EnsurePersonalFoundationInput {
   name: string;
   termsVersion: string;
   appearance: AppearancePreferences;
+  goal?: string;
+  challenge?: string;
 }
 
 interface EnsurePersonalFoundationResponse {
@@ -33,7 +35,9 @@ export async function ensurePersonalFoundation({
   user,
   name,
   termsVersion,
-  appearance
+  appearance,
+  goal,
+  challenge
 }: EnsurePersonalFoundationInput): Promise<EnsurePersonalFoundationResponse> {
   const db = getFirebaseDb();
   const displayName = sanitizeDisplayName(name);
@@ -66,6 +70,8 @@ export async function ensurePersonalFoundation({
       termsVersion,
       termsAcceptedAt: now,
       defaultWorkspaceId: workspaceId,
+      ...(goal ? { onboardingGoal: goal } : {}),
+      ...(challenge ? { onboardingChallenge: challenge } : {}),
       ...appearance,
       createdAt: now,
       updatedAt: now
