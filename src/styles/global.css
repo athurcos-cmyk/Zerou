@@ -2937,6 +2937,102 @@ html[data-reduce-motion='true'] *::after {
 }
 
 /* ============================================================
+   Empty states
+   ============================================================ */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.5rem;
+  padding: 1.75rem 1rem;
+}
+
+.empty-state--compact {
+  padding: 1rem 0.5rem;
+}
+
+.empty-state-art {
+  width: 7.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.empty-state--compact .empty-state-art {
+  width: 6rem;
+}
+
+.empty-state-art svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.empty-state-title {
+  font-size: 1.02rem;
+  color: var(--text-primary);
+}
+
+.empty-state-desc {
+  margin: 0;
+  max-width: 22rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.empty-state-action {
+  margin-top: 0.5rem;
+}
+
+/* Card limit hero (new card form) */
+.card-limit-hero {
+  display: grid;
+  gap: 0.3rem;
+  padding: 1.1rem 1.25rem;
+  border-radius: 1.1rem;
+  background: linear-gradient(140deg, #EE5524 0%, #F47B3D 100%);
+  box-shadow: 0 8px 22px rgba(238, 85, 36, 0.24);
+}
+
+.card-limit-hero-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.card-limit-hero-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.card-limit-hero-currency {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 1.3rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.card-limit-hero-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(2rem, 7vw, 2.6rem);
+  line-height: 1.1;
+  padding: 0;
+  outline: none;
+}
+
+.card-limit-hero-input::placeholder {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* ============================================================
    Onboarding wizard
    ============================================================ */
 .onboard {

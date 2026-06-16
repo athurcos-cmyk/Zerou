@@ -1,6 +1,7 @@
-import { Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { EmptyState } from '../components/EmptyState';
 import { toDateInputValue } from '../finance/financeDates';
 import { transactionTypeLabels } from '../finance/financeLabels';
 import { softDeleteTransaction } from '../finance/financeService';
@@ -65,12 +66,16 @@ export function TransactionsPage() {
             ))}
           </div>
         ) : (
-          <div className="empty-copy">
-            <p className="text-secondary">Nenhuma transação registrada ainda.</p>
-            <Link className="inline-link" to="/app/transactions/new">
-              Cadastrar primeira transação
-            </Link>
-          </div>
+          <EmptyState
+            illustration="transactions"
+            title="Nenhuma transação registrada"
+            description="Seus lançamentos de entradas, gastos e transferências aparecem aqui."
+            action={
+              <Link className="button button--primary button--compact" to="/app/transactions/new">
+                <Plus size={16} aria-hidden="true" /> Cadastrar primeira
+              </Link>
+            }
+          />
         )}
       </article>
     </section>

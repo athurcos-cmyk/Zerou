@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { CreditCard, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { EmptyState } from '../components/EmptyState';
 import { SelectField } from '../components/SelectField';
 import { FormMessage } from '../components/FormMessage';
 import { cardBrandOptions, type CreateCreditCardInput } from '../cards/cardSchemas';
@@ -75,10 +76,23 @@ export function CardsPage() {
               <Plus size={20} aria-hidden="true" />
             </span>
           </div>
-          <p className="text-secondary" style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.55 }}>
-            O Zerou acompanha compras, parcelas e faturas separadas do saldo das suas contas.
-          </p>
           <FormMessage>{message}</FormMessage>
+
+          <div className="card-limit-hero">
+            <span className="card-limit-hero-label">Limite do cartão</span>
+            <span className="card-limit-hero-wrap">
+              <span className="card-limit-hero-currency">R$</span>
+              <input
+                className="card-limit-hero-input"
+                inputMode="decimal"
+                value={limit}
+                onChange={(event) => setLimit(event.target.value)}
+                placeholder="0,00"
+                aria-label="Limite do cartão"
+              />
+            </span>
+          </div>
+
           <label className="field">
             <span>Nome do cartão</span>
             <input className="input" value={name} onChange={(event) => setName(event.target.value)} placeholder="Cartão principal" />
@@ -93,10 +107,6 @@ export function CardsPage() {
             onChange={(v) => setBrand(v as CreateCreditCardInput['brand'])}
             options={cardBrandOptions.map((b) => ({ value: b, label: b }))}
           />
-          <label className="field">
-            <span>Limite total</span>
-            <input className="input" inputMode="decimal" value={limit} onChange={(event) => setLimit(event.target.value)} placeholder="0,00" />
-          </label>
           <div className="form-grid-2">
             <label className="field">
               <span>Dia de fechamento</span>
@@ -158,12 +168,11 @@ export function CardsPage() {
               })}
             </div>
           ) : (
-            <div className="empty-copy">
-              <span className="empty-icon">
-                <CreditCard size={24} aria-hidden="true" />
-              </span>
-              <p className="text-secondary">Nenhum cartão cadastrado ainda. Adicione seu primeiro cartão ao lado.</p>
-            </div>
+            <EmptyState
+              illustration="cards"
+              title="Nenhum cartão cadastrado"
+              description="Adicione seu primeiro cartão para acompanhar compras, parcelas e faturas sem misturar com o saldo das contas."
+            />
           )}
         </article>
       </div>

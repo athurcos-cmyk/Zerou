@@ -1,4 +1,4 @@
-import { ArrowRight, CalendarClock, CreditCard, Plus, Wallet } from 'lucide-react';
+import { CalendarClock, CreditCard, Plus, Wallet } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsData } from '../cards/useCardsData';
@@ -8,6 +8,7 @@ import { transactionTypeLabels } from '../finance/financeLabels';
 import { formatMoney } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
 import { useFinanceData } from '../finance/useFinanceData';
+import { EmptyState } from '../components/EmptyState';
 
 export function DashboardPage() {
   const { user, profile } = useAuth();
@@ -140,7 +141,12 @@ export function DashboardPage() {
             ))}
           </div>
         ) : (
-          <p className="text-secondary">Quando você lançar gastos, a Zerou mostra aqui as maiores categorias do mês.</p>
+          <EmptyState
+            illustration="wallet"
+            compact
+            title="Sem gastos este mês"
+            description="Quando você lançar gastos, as maiores categorias do mês aparecem aqui."
+          />
         )}
       </article>
 
@@ -207,12 +213,17 @@ export function DashboardPage() {
               })}
             </div>
           ) : (
-            <div className="empty-copy">
-              <p className="text-secondary">Nenhuma transação ainda. Crie sua primeira conta e registre uma entrada.</p>
-              <Link className="inline-link" to="/app/transactions/new">
-                Começar agora <ArrowRight size={16} aria-hidden="true" />
-              </Link>
-            </div>
+            <EmptyState
+              illustration="transactions"
+              compact
+              title="Nenhuma transação ainda"
+              description="Registre sua primeira entrada ou gasto para ver os movimentos aqui."
+              action={
+                <Link className="button button--subtle button--compact" to="/app/transactions/new">
+                  <Plus size={16} aria-hidden="true" /> Lançar agora
+                </Link>
+              }
+            />
           )}
         </article>
       </div>
