@@ -1,5 +1,7 @@
+import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthContext';
+import { LandingCss } from './landing/LandingCss';
 import { PublicOnlyRoute, RequireAuth, RequireOnboardingComplete } from './auth/routeGuards';
 import { AppearanceSyncBridge } from './settings/AppearanceSyncBridge';
 import { ThemeRuntime } from './theme/ThemeRuntime';
@@ -30,6 +32,9 @@ import { SharedSpacePage } from './pages/SharedSpacePage';
 import { TransactionsPage } from './pages/TransactionsPage';
 import { VerifyEmailPage } from './pages/VerifyEmailPage';
 
+const LandingWebgl = lazy(() => import('./landing/LandingWebgl').then((m) => ({ default: m.LandingWebgl })));
+const LandingMix = lazy(() => import('./landing/LandingMix').then((m) => ({ default: m.LandingMix })));
+
 export function App() {
   return (
     <AuthProvider>
@@ -37,6 +42,15 @@ export function App() {
       <AppearanceSyncBridge />
       <Routes>
         <Route path="/" element={<PublicHomePage />} />
+        <Route path="/landing/css" element={<LandingCss />} />
+        <Route
+          path="/landing/webgl"
+          element={<Suspense fallback={<div style={{ minHeight: '100vh' }} />}><LandingWebgl /></Suspense>}
+        />
+        <Route
+          path="/landing/mix"
+          element={<Suspense fallback={<div style={{ minHeight: '100vh' }} />}><LandingMix /></Suspense>}
+        />
         <Route path="/pricing" element={<Navigate to="/" replace />} />
         <Route path="/features" element={<FeaturesPage />} />
         <Route path="/security" element={<SecurityPage />} />

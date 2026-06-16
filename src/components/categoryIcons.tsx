@@ -6,9 +6,9 @@ import {
   PiggyBank, Wifi, Droplets, Zap, Cigarette, Pizza, Stethoscope, Scissors,
   type LucideIcon
 } from 'lucide-react';
-import { categoryColors, defaultCategoryColors } from '../theme/palette';
+import { categoryColors, defaultCategoryColor, defaultCategoryColors } from '../theme/palette';
 
-export { categoryColors, defaultCategoryColor } from '../theme/palette';
+export { categoryColors, defaultCategoryColor };
 
 export const categoryIcons: Record<string, LucideIcon> = {
   'briefcase': Briefcase,
