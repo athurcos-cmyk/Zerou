@@ -141,7 +141,10 @@
   margin: 0 0 1.75rem;
 }
 
-.lp-hero-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.75rem; }
+.lp-hero-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.85rem; }
+
+.lp-hero-note { margin: 0 0 1.6rem; color: var(--ink-3); font-size: 0.85rem; font-weight: 600; }
+.lp-cta-note { margin: 1rem 0 0; color: var(--ink-3); font-size: 0.88rem; font-weight: 600; }
 
 .lp-proof { display: flex; flex-wrap: wrap; gap: 1.25rem; }
 .lp-proof span { display: inline-flex; align-items: center; gap: 0.45rem; color: var(--ink-2); font-size: 0.9rem; font-weight: 600; }

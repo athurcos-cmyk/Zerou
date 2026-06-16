@@ -34,13 +34,14 @@ export function LandingCss() {
       <div className="lp-wrap">
         <div className="lp-hero-grid">
           <div className="lp-hero-copy">
-            <span className="lp-pill"><i /> Controle individual. Organização a dois.</span>
-            <h1 className="lp-h1">Seu dinheiro, <span className="grad">simples de entender.</span></h1>
-            <p className="lp-lead">Gastos, contas, cartões e os combinados do casal num app feito para o celular — sem expor o que é só seu.</p>
+            <span className="lp-pill"><i /> A pergunta de todo fim de mês</span>
+            <h1 className="lp-h1">Cadê o dinheiro <span className="grad">que você ganhou?</span></h1>
+            <p className="lp-lead">O salário cai, some em duas semanas e você fica esperando o próximo. A Zerou mostra pra onde vai cada real — e te tira desse ciclo.</p>
             <div className="lp-hero-actions">
-              <Link className="lp-btn lp-btn--primary lp-btn--lg" to="/register">Começar grátis <ArrowRight size={18} /></Link>
+              <Link className="lp-btn lp-btn--primary lp-btn--lg" to="/register">Quero ver meus gastos <ArrowRight size={18} /></Link>
               <a className="lp-btn lp-btn--ghost lp-btn--lg" href="#recursos">Ver recursos</a>
             </div>
+            <p className="lp-hero-note">Grátis · sem cartão de crédito · funciona no navegador do celular</p>
             <div className="lp-proof">
               <span><CheckCircle2 size={18} /> Feito para o celular</span>
               <span><CheckCircle2 size={18} /> Pessoal e casal separados</span>

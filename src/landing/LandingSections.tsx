@@ -71,8 +71,8 @@ export function LandingSections() {
         <div className="lp-couple">
           <div>
             <p className="lp-kicker" style={{ color: '#f8a07a' }}>Modo casal</p>
-            <h2 className="lp-h2">Juntem dinheiro pra realizar junto.</h2>
-            <p>Criem um cofrinho em comum — viagem, reserva, a casa nova. Cada um guarda quando quiser, direto da sua conta, e vocês acompanham o quanto já juntaram rumo à meta.</p>
+            <h2 className="lp-h2">A viagem dos sonhos some todo mês nas pequenas contas.</h2>
+            <p>Vocês querem juntar, mas o dinheiro escorre entre os dois e o sonho nunca sai do papel. Com o cofrinho do casal, cada real guardado aparece — e o objetivo finalmente cresce na frente de vocês.</p>
             <ul className="lp-couple-points">
               <li><span className="lp-cp-ico"><PiggyBank size={16} /></span> Guardem juntos para um objetivo: o dinheiro sai da sua conta e entra no cofrinho do casal</li>
               <li><span className="lp-cp-ico"><TrendingUp size={16} /></span> Vejam quanto cada um contribuiu e quanto juntaram no mês</li>
@@ -135,11 +135,12 @@ export function LandingSections() {
       {/* Final CTA */}
       <section className="lp-section">
         <div className="lp-cta">
-          <p className="lp-kicker">Controle individual. Organização a dois.</p>
-          <h2 className="lp-h2">Seu dinheiro, finalmente simples.</h2>
+          <p className="lp-kicker">Chega de terminar o mês no zero</p>
+          <h2 className="lp-h2">Descubra pra onde vai seu dinheiro hoje.</h2>
           <Link className="lp-btn lp-btn--primary lp-btn--lg" to="/register">
-            Começar grátis <ArrowRight size={18} />
+            Quero ver meus gastos <ArrowRight size={18} />
           </Link>
+          <p className="lp-cta-note">Grátis · sem cartão de crédito · em 2 minutos</p>
         </div>
       </section>
     </>
