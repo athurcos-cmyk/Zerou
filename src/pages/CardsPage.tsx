@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { CreditCard, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
-import { CustomSelect } from '../components/CustomSelect';
+import { SelectField } from '../components/SelectField';
 import { FormMessage } from '../components/FormMessage';
 import { cardBrandOptions, type CreateCreditCardInput } from '../cards/cardSchemas';
 import { createCreditCard } from '../cards/cardService';
@@ -87,14 +87,12 @@ export function CardsPage() {
             <span>Últimos 4 dígitos</span>
             <input className="input" inputMode="numeric" maxLength={4} value={lastFour} onChange={(event) => setLastFour(event.target.value)} placeholder="0000" />
           </label>
-          <div className="field">
-            <span className="field-label">Bandeira</span>
-            <CustomSelect
-              value={brand}
-              onChange={(v) => setBrand(v as CreateCreditCardInput['brand'])}
-              options={cardBrandOptions.map((b) => ({ value: b, label: b }))}
-            />
-          </div>
+          <SelectField
+            label="Bandeira"
+            value={brand}
+            onChange={(v) => setBrand(v as CreateCreditCardInput['brand'])}
+            options={cardBrandOptions.map((b) => ({ value: b, label: b }))}
+          />
           <label className="field">
             <span>Limite total</span>
             <input className="input" inputMode="decimal" value={limit} onChange={(event) => setLimit(event.target.value)} placeholder="0,00" />

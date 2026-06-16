@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { CheckCircle2, ReceiptText } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
-import { CustomSelect } from '../components/CustomSelect';
+import { SelectField } from '../components/SelectField';
 import { FormMessage } from '../components/FormMessage';
 import { invoiceStatusLabels, ledgerTypeLabels } from '../cards/cardLabels';
 import {
@@ -243,15 +243,13 @@ export function InvoicePage() {
                     placeholder={invoice.outstandingBalanceCents > 0 ? formatMoney(invoice.outstandingBalanceCents).replace('R$ ', '') : '0,00'}
                   />
                 </label>
-                <div className="field">
-                  <span className="field-label">Pagar com qual conta?</span>
-                  <CustomSelect
-                    value={paymentAccountId}
-                    onChange={setPaymentAccountId}
-                    options={finance.accounts.map((a) => ({ value: a.id, label: a.name }))}
-                    placeholder="Escolha uma conta"
-                  />
-                </div>
+                <SelectField
+                  label="Pagar com qual conta?"
+                  value={paymentAccountId}
+                  onChange={setPaymentAccountId}
+                  options={finance.accounts.map((a) => ({ value: a.id, label: a.name }))}
+                  placeholder="Escolha uma conta"
+                />
                 <label className="field">
                   <span>Data do pagamento</span>
                   <input className="input" type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} />
@@ -297,7 +295,8 @@ export function InvoicePage() {
                   </p>
                   <form className="form-stack" onSubmit={handleCredit}>
                     <p className="eyebrow">Crédito / estorno</p>
-                    <CustomSelect
+                    <SelectField
+                      label="Tipo de crédito"
                       value={creditType}
                       onChange={(v) => setCreditType(v as typeof creditType)}
                       options={[
@@ -313,7 +312,8 @@ export function InvoicePage() {
                   </form>
                   <form className="form-stack" onSubmit={handleFee} style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '1rem' }}>
                     <p className="eyebrow">Tarifa / juros</p>
-                    <CustomSelect
+                    <SelectField
+                      label="Tipo de tarifa"
                       value={feeType}
                       onChange={(v) => setFeeType(v as typeof feeType)}
                       options={[

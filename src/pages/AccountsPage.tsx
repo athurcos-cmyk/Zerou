@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Building2, Plus, Trash2, Wallet } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
-import { CustomSelect } from '../components/CustomSelect';
+import { SelectField } from '../components/SelectField';
 import { FormMessage } from '../components/FormMessage';
 import { findBankInstitution, searchBankInstitutions, type BankInstitution } from '../finance/bankInstitutions';
 import { accountTypeLabels } from '../finance/financeLabels';
@@ -135,14 +135,12 @@ export function AccountsPage() {
               ))}
             </div>
           </div>
-          <div className="field">
-            <span className="field-label">Tipo</span>
-            <CustomSelect
-              value={type}
-              onChange={(v) => setType(v as AccountType)}
-              options={accountTypes.map((t) => ({ value: t, label: accountTypeLabels[t] }))}
-            />
-          </div>
+          <SelectField
+            label="Tipo"
+            value={type}
+            onChange={(v) => setType(v as AccountType)}
+            options={accountTypes.map((t) => ({ value: t, label: accountTypeLabels[t] }))}
+          />
           <label className="field">
             <span>Saldo inicial</span>
             <input className="input" inputMode="decimal" value={openingBalance} onChange={(event) => setOpeningBalance(event.target.value)} />

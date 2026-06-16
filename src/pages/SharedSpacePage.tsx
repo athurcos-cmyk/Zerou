@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Handshake, Link2, MessageSquare, QrCode, ShieldCheck, Users } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { clearPendingInvite, readPendingInvite, savePendingInvite } from '../auth/pendingInvite';
-import { CustomSelect } from '../components/CustomSelect';
+import { SelectField } from '../components/SelectField';
 import { FormMessage } from '../components/FormMessage';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
@@ -414,7 +414,8 @@ export function SharedSpacePage() {
                     </div>
                     <MessageSquare size={22} aria-hidden="true" />
                   </div>
-                  <CustomSelect
+                  <SelectField
+                    label="Despesa"
                     value={commentTargetId}
                     onChange={setCommentTargetId}
                     options={claimOptions.map((c) => ({ value: c.id, label: c.label }))}
@@ -516,7 +517,8 @@ export function SharedSpacePage() {
                   </div>
                 ) : null}
                 <form className="form-stack" onSubmit={handleSettlementPayment}>
-                  <CustomSelect
+                  <SelectField
+                    label="Acerto"
                     value={settlementPaymentId}
                     onChange={setSettlementPaymentId}
                     options={shared.settlements.map((s) => ({

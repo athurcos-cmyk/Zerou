@@ -109,6 +109,7 @@ export interface Category {
   type: 'income' | 'expense' | 'both';
   parentCategoryId?: string;
   icon?: string;
+  color?: string;
   isDefault: boolean;
   isActive: boolean;
   createdAt?: Timestamp;

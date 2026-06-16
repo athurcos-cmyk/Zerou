@@ -2,8 +2,8 @@ import { useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { CalendarClock, CreditCard, ReceiptText } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
-import { CategoryPicker } from '../components/CategoryPicker';
-import { CustomSelect } from '../components/CustomSelect';
+import { CategoryField } from '../components/CategoryField';
+import { SelectField } from '../components/SelectField';
 import { FormMessage } from '../components/FormMessage';
 import { invoiceStatusLabels } from '../cards/cardLabels';
 import { createCardPurchase } from '../cards/cardService';
@@ -144,35 +144,30 @@ export function CardDetailPage() {
             <span>Data da compra</span>
             <input className="input" type="date" value={purchaseDate} onChange={(event) => setPurchaseDate(event.target.value)} />
           </label>
-          <div className="field">
-            <span className="field-label">Categoria</span>
-            <CategoryPicker
-              value={categoryId}
-              onChange={setCategoryId}
-              categories={finance.categories}
-              filterType="expense"
-              onCreateCategory={async (name, icon, type) => {
-                if (!workspaceId || !user) return;
-                const id = await createCategory(workspaceId, user.uid, { name, icon, type });
-                setCategoryId(id);
-              }}
-              onDeleteCategory={async (id) => {
-                if (!workspaceId) return;
-                await deleteCategory(workspaceId, id);
-              }}
-            />
-          </div>
-          <div className="field">
-            <span className="field-label">Parcelamento</span>
-            <CustomSelect
-              value={String(installments)}
-              onChange={(v) => setInstallments(Number(v))}
-              options={Array.from({ length: 24 }, (_, i) => i + 1).map((n) => ({
-                value: String(n),
-                label: n === 1 ? '1x à vista' : `${n}x`
-              }))}
-            />
-          </div>
+          <CategoryField
+            value={categoryId}
+            onChange={setCategoryId}
+            categories={finance.categories}
+            filterType="expense"
+            onCreateCategory={async (name, icon, type, color) => {
+              if (!workspaceId || !user) return;
+              const id = await createCategory(workspaceId, user.uid, { name, icon, type, color });
+              setCategoryId(id);
+            }}
+            onDeleteCategory={async (id) => {
+              if (!workspaceId) return;
+              await deleteCategory(workspaceId, id);
+            }}
+          />
+          <SelectField
+            label="Parcelamento"
+            value={String(installments)}
+            onChange={(v) => setInstallments(Number(v))}
+            options={Array.from({ length: 24 }, (_, i) => i + 1).map((n) => ({
+              value: String(n),
+              label: n === 1 ? '1x à vista' : `${n}x`
+            }))}
+          />
           <button className="button button--primary" type="submit">
             Registrar compra
           </button>

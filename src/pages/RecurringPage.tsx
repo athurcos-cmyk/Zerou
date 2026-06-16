@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { Repeat } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
-import { CategoryPicker } from '../components/CategoryPicker';
-import { CustomSelect } from '../components/CustomSelect';
+import { CategoryField } from '../components/CategoryField';
+import { SelectField } from '../components/SelectField';
 import { FormMessage } from '../components/FormMessage';
 import { fromDateInputValue, todayInputValue, toDateInputValue } from '../finance/financeDates';
 import { recurringFrequencyLabels } from '../finance/financeLabels';
@@ -77,45 +77,38 @@ export function RecurringPage() {
             <span>Valor previsto</span>
             <input className="input" inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0,00" />
           </label>
-          <div className="field">
-            <span className="field-label">Frequência</span>
-            <CustomSelect
-              value={frequency}
-              onChange={(v) => setFrequency(v as CreateRecurringRuleInput['frequency'])}
-              options={recurringFrequencies.map((f) => ({ value: f, label: recurringFrequencyLabels[f] }))}
-            />
-          </div>
+          <SelectField
+            label="Frequência"
+            value={frequency}
+            onChange={(v) => setFrequency(v as CreateRecurringRuleInput['frequency'])}
+            options={recurringFrequencies.map((f) => ({ value: f, label: recurringFrequencyLabels[f] }))}
+          />
           <label className="field">
             <span>Próxima ocorrência</span>
             <input className="input" type="date" value={nextOccurrenceAt} onChange={(event) => setNextOccurrenceAt(event.target.value)} />
           </label>
-          <div className="field">
-            <span className="field-label">Conta</span>
-            <CustomSelect
-              value={accountId}
-              onChange={setAccountId}
-              options={finance.accounts.map((a) => ({ value: a.id, label: a.name }))}
-              placeholder="Definir depois"
-            />
-          </div>
-          <div className="field">
-            <span className="field-label">Categoria</span>
-            <CategoryPicker
-              value={categoryId}
-              onChange={setCategoryId}
-              categories={finance.categories}
-              filterType="expense"
-              onCreateCategory={async (name, icon, type) => {
-                if (!workspaceId || !user) return;
-                const id = await createCategory(workspaceId, user.uid, { name, icon, type });
-                setCategoryId(id);
-              }}
-              onDeleteCategory={async (id) => {
-                if (!workspaceId) return;
-                await deleteCategory(workspaceId, id);
-              }}
-            />
-          </div>
+          <SelectField
+            label="Conta"
+            value={accountId}
+            onChange={setAccountId}
+            options={finance.accounts.map((a) => ({ value: a.id, label: a.name }))}
+            placeholder="Definir depois"
+          />
+          <CategoryField
+            value={categoryId}
+            onChange={setCategoryId}
+            categories={finance.categories}
+            filterType="expense"
+            onCreateCategory={async (name, icon, type, color) => {
+              if (!workspaceId || !user) return;
+              const id = await createCategory(workspaceId, user.uid, { name, icon, type, color });
+              setCategoryId(id);
+            }}
+            onDeleteCategory={async (id) => {
+              if (!workspaceId) return;
+              await deleteCategory(workspaceId, id);
+            }}
+          />
           <button className="button button--primary" type="submit">
             Criar recorrência
           </button>

@@ -147,22 +147,23 @@ export async function createTransaction(workspaceId: string, userId: string, inp
 export async function createCategory(
   workspaceId: string,
   userId: string,
-  input: { name: string; icon: string; type: 'income' | 'expense' | 'both' }
+  input: { name: string; icon: string; type: 'income' | 'expense' | 'both'; color?: string }
 ) {
   const id = createId('cat');
   const now = serverTimestamp();
-  await setDoc(documentRef(workspaceId, 'categories', id), {
+  await setDoc(documentRef(workspaceId, 'categories', id), omitUndefined({
     id,
     workspaceId,
     name: input.name.trim(),
     icon: input.icon,
+    color: input.color,
     type: input.type,
     isDefault: false,
     isActive: true,
     createdBy: userId,
     createdAt: now,
     updatedAt: now
-  });
+  }));
   return id;
 }
 

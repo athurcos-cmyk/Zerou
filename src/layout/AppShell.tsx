@@ -165,9 +165,8 @@ export function AppShell() {
           <WalletCards size={20} aria-hidden="true" />
           <span>Cartões</span>
         </NavLink>
-        <NavLink className={getNavClass} to="/app/transactions/new" aria-label="Adicionar transação">
-          <Plus size={22} aria-hidden="true" />
-          <span>Lançar</span>
+        <NavLink className="mobile-fab" to="/app/transactions/new" aria-label="Adicionar transação">
+          <Plus size={26} aria-hidden="true" />
         </NavLink>
         <NavLink className={getNavClass} to="/app/shared" aria-label="Compartilhado">
           <Users size={20} aria-hidden="true" />

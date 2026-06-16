@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { CalendarClock } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
-import { CategoryPicker } from '../components/CategoryPicker';
-import { CustomSelect } from '../components/CustomSelect';
+import { CategoryField } from '../components/CategoryField';
+import { SelectField } from '../components/SelectField';
 import { FormMessage } from '../components/FormMessage';
 import { fromDateInputValue, todayInputValue, toDateInputValue } from '../finance/financeDates';
 import { billStatusLabels } from '../finance/financeLabels';
@@ -86,33 +86,28 @@ export function BillsPage() {
             <span>Vencimento</span>
             <input className="input" type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
           </label>
-          <div className="field">
-            <span className="field-label">Categoria</span>
-            <CategoryPicker
-              value={categoryId}
-              onChange={setCategoryId}
-              categories={finance.categories}
-              filterType="expense"
-              onCreateCategory={async (name, icon, type) => {
-                if (!workspaceId || !user) return;
-                const id = await createCategory(workspaceId, user.uid, { name, icon, type });
-                setCategoryId(id);
-              }}
-              onDeleteCategory={async (id) => {
-                if (!workspaceId) return;
-                await deleteCategory(workspaceId, id);
-              }}
-            />
-          </div>
-          <div className="field">
-            <span className="field-label">Conta de pagamento</span>
-            <CustomSelect
-              value={accountId}
-              onChange={setAccountId}
-              options={finance.accounts.map((a) => ({ value: a.id, label: a.name }))}
-              placeholder="Definir depois"
-            />
-          </div>
+          <CategoryField
+            value={categoryId}
+            onChange={setCategoryId}
+            categories={finance.categories}
+            filterType="expense"
+            onCreateCategory={async (name, icon, type, color) => {
+              if (!workspaceId || !user) return;
+              const id = await createCategory(workspaceId, user.uid, { name, icon, type, color });
+              setCategoryId(id);
+            }}
+            onDeleteCategory={async (id) => {
+              if (!workspaceId) return;
+              await deleteCategory(workspaceId, id);
+            }}
+          />
+          <SelectField
+            label="Conta de pagamento"
+            value={accountId}
+            onChange={setAccountId}
+            options={finance.accounts.map((a) => ({ value: a.id, label: a.name }))}
+            placeholder="Definir depois"
+          />
           <button className="button button--primary" type="submit">
             Criar compromisso
           </button>

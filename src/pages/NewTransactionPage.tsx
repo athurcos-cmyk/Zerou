@@ -1,13 +1,14 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Wallet } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
-import { CategoryPicker } from '../components/CategoryPicker';
-import { CustomSelect } from '../components/CustomSelect';
+import { CategoryField } from '../components/CategoryField';
 import { FormMessage } from '../components/FormMessage';
+import { SelectField } from '../components/SelectField';
 import { fromDateInputValue, todayInputValue } from '../finance/financeDates';
 import { accountTypeLabels, transactionTypeLabels } from '../finance/financeLabels';
 import { createCategory, createTransaction, deleteCategory } from '../finance/financeService';
-import { transactionTypes, type SupportedTransactionType } from '../finance/financeSchemas';
+import { type SupportedTransactionType } from '../finance/financeSchemas';
 import { parseMoneyToCents } from '../finance/money';
 import { useFinanceData } from '../finance/useFinanceData';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
@@ -16,6 +17,14 @@ function waitForLocalWrite() {
   return new Promise((resolve) => {
     window.setTimeout(resolve, 350);
   });
+}
+
+const primaryTypes: SupportedTransactionType[] = ['income', 'expense', 'transfer'];
+
+function yesterdayInputValue() {
+  const date = new Date();
+  date.setDate(date.getDate() - 1);
+  return date.toISOString().slice(0, 10);
 }
 
 export function NewTransactionPage() {
@@ -35,30 +44,24 @@ export function NewTransactionPage() {
   const [tags, setTags] = useState('');
   const [message, setMessage] = useState<string | null>(null);
 
-  const typeOptions = transactionTypes.map((t) => ({
-    value: t,
-    label: transactionTypeLabels[t]
-  }));
-
   const accountOptions = finance.accounts.map((account) => ({
     value: account.id,
     label: account.name,
-    description: accountTypeLabels[account.type]
+    description: accountTypeLabels[account.type],
+    icon: <Wallet size={17} aria-hidden="true" />
   }));
 
-  const destinationOptions = finance.accounts
-    .filter((account) => account.id !== accountId)
-    .map((account) => ({
-      value: account.id,
-      label: account.name,
-      description: accountTypeLabels[account.type]
-    }));
-
+  const destinationOptions = accountOptions.filter((option) => option.value !== accountId);
   const categoryFilterType = type === 'income' ? 'income' : type === 'expense' ? 'expense' : 'all';
+  const moodClass = type === 'income' ? 'amount-hero--income' : type === 'transfer' ? 'amount-hero--transfer' : 'amount-hero--expense';
 
-  async function handleCreateCategory(name: string, icon: string, catType: 'income' | 'expense' | 'both') {
+  const today = todayInputValue();
+  const yesterday = yesterdayInputValue();
+  const datePreset = date === today ? 'today' : date === yesterday ? 'yesterday' : 'other';
+
+  async function handleCreateCategory(name: string, icon: string, catType: 'income' | 'expense' | 'both', color: string) {
     if (!workspaceId || !user) return;
-    const id = await createCategory(workspaceId, user.uid, { name, icon, type: catType });
+    const id = await createCategory(workspaceId, user.uid, { name, icon, type: catType, color });
     setCategoryId(id);
   }
 
@@ -107,12 +110,44 @@ export function NewTransactionPage() {
   }
 
   return (
-    <section className="page-content page-content--narrow">
-      <p className="eyebrow">Cadastro rápido</p>
-      <h1 className="page-title">Nova transação.</h1>
-      <p className="page-description">Registre uma entrada, gasto ou transferência. Se a internet oscilar, a Zerou tenta enviar depois.</p>
+    <div className="entry-screen">
+      <header className={`amount-hero ${moodClass}`}>
+        <div className="amount-hero-top">
+          <Link className="amount-hero-back" to="/app/transactions" aria-label="Voltar">
+            <ArrowLeft size={20} aria-hidden="true" />
+          </Link>
+          <div className="type-switch" role="tablist" aria-label="Tipo de transação">
+            {primaryTypes.map((option) => (
+              <button
+                key={option}
+                type="button"
+                role="tab"
+                aria-selected={type === option}
+                className={`type-switch-btn${type === option ? ' type-switch-btn--active' : ''}`}
+                onClick={() => { setType(option); setCategoryId(''); }}
+              >
+                {transactionTypeLabels[option]}
+              </button>
+            ))}
+          </div>
+        </div>
+        <label className="amount-hero-field">
+          <span className="amount-hero-label">Valor</span>
+          <span className="amount-hero-input-wrap">
+            <span className="amount-hero-currency">R$</span>
+            <input
+              className="amount-hero-input"
+              inputMode="decimal"
+              value={amount}
+              onChange={(event) => setAmount(event.target.value)}
+              placeholder="0,00"
+              aria-label="Valor da transação"
+            />
+          </span>
+        </label>
+      </header>
 
-      <form className="surface surface-pad form-stack finance-form" onSubmit={handleSubmit}>
+      <form className="entry-form" onSubmit={handleSubmit}>
         <FormMessage>{message}</FormMessage>
 
         {finance.accounts.length === 0 ? (
@@ -122,65 +157,51 @@ export function NewTransactionPage() {
         ) : null}
 
         <label className="field">
-          <span>Valor</span>
-          <input className="input input--money" inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0,00" />
-        </label>
-
-        <div className="field">
-          <span className="field-label">Tipo</span>
-          <CustomSelect
-            value={type}
-            onChange={(v) => { setType(v as SupportedTransactionType); setCategoryId(''); }}
-            options={typeOptions}
-          />
-        </div>
-
-        <label className="field">
-          <span>Descrição</span>
+          <span>Título</span>
           <input className="input" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Mercado, salário, aluguel" />
         </label>
 
         <div className="field">
-          <span className="field-label">Categoria</span>
-          <CategoryPicker
-            value={categoryId}
-            onChange={setCategoryId}
-            categories={finance.categories}
-            filterType={categoryFilterType as 'income' | 'expense' | 'all'}
-            onCreateCategory={handleCreateCategory}
-            onDeleteCategory={handleDeleteCategory}
-          />
+          <span className="field-label">Data</span>
+          <div className="chip-row">
+            <button type="button" className={`chip${datePreset === 'today' ? ' chip--active' : ''}`} onClick={() => setDate(today)}>Hoje</button>
+            <button type="button" className={`chip${datePreset === 'yesterday' ? ' chip--active' : ''}`} onClick={() => setDate(yesterday)}>Ontem</button>
+            <label className={`chip chip--date${datePreset === 'other' ? ' chip--active' : ''}`}>
+              {datePreset === 'other' ? date.split('-').reverse().join('/') : 'Outra'}
+              <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+            </label>
+          </div>
         </div>
 
-        <div className="field">
-          <span className="field-label">Conta</span>
-          <CustomSelect
-            value={accountId}
-            onChange={setAccountId}
-            options={accountOptions}
-            placeholder="Escolha uma conta"
-          />
-        </div>
+        <CategoryField
+          value={categoryId}
+          onChange={setCategoryId}
+          categories={finance.categories}
+          filterType={categoryFilterType as 'income' | 'expense' | 'all'}
+          onCreateCategory={handleCreateCategory}
+          onDeleteCategory={handleDeleteCategory}
+        />
+
+        <SelectField
+          label={type === 'transfer' ? 'Conta de origem' : 'Conta'}
+          value={accountId}
+          onChange={setAccountId}
+          options={accountOptions}
+          placeholder="Escolha uma conta"
+        />
 
         {type === 'transfer' ? (
-          <div className="field">
-            <span className="field-label">Conta de destino</span>
-            <CustomSelect
-              value={destinationAccountId}
-              onChange={setDestinationAccountId}
-              options={destinationOptions}
-              placeholder="Escolha o destino"
-            />
-          </div>
+          <SelectField
+            label="Conta de destino"
+            value={destinationAccountId}
+            onChange={setDestinationAccountId}
+            options={destinationOptions}
+            placeholder="Escolha o destino"
+          />
         ) : null}
 
-        <label className="field">
-          <span>Data</span>
-          <input className="input" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
-        </label>
-
         <details className="advanced-panel">
-          <summary>Avançado</summary>
+          <summary>Mais detalhes</summary>
           <div className="form-stack">
             <label className="field">
               <span>Estabelecimento</span>
@@ -197,15 +218,12 @@ export function NewTransactionPage() {
           </div>
         </details>
 
-        <div className="button-row">
-          <button className="button button--primary" type="submit">
+        <div className="entry-actions">
+          <button className="button button--primary button--block" type="submit">
             Salvar transação
           </button>
-          <Link className="button button--ghost" to="/app/transactions">
-            Cancelar
-          </Link>
         </div>
       </form>
-    </section>
+    </div>
   );
 }
