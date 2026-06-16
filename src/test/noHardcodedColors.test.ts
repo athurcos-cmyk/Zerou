@@ -4,7 +4,11 @@ import { join, relative } from 'node:path';
 
 const projectRoot = process.cwd();
 const srcRoot = join(projectRoot, 'src');
-const allowedFiles = new Set([join(srcRoot, 'styles', 'themes.css')]);
+const allowedFiles = new Set([
+  join(srcRoot, 'styles', 'themes.css'),
+  // Sanctioned color-data registry: persisted category/goal palette + on-accent foreground.
+  join(srcRoot, 'theme', 'palette.ts')
+]);
 const colorPattern = /(?:#[0-9a-fA-F]{3,8}\b|rgba?\()/;
 
 function readSourceFiles(directory: string): string[] {

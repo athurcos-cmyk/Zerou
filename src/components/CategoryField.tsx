@@ -5,6 +5,7 @@ import { BottomSheet } from './BottomSheet';
 import {
   CategoryIcon, categoryColors, categoryIconKeys, resolveCategoryColor
 } from './categoryIcons';
+import { ACCENT_FOREGROUND } from '../theme/palette';
 
 export interface CategoryPatch {
   name?: string;
@@ -219,7 +220,7 @@ export function CategoryField({
                     aria-pressed={color === c}
                     onClick={() => setColor(c)}
                   >
-                    {color === c && <Check size={15} color="#fff" />}
+                    {color === c && <Check size={15} color={ACCENT_FOREGROUND} />}
                   </button>
                 ))}
               </div>
@@ -233,7 +234,7 @@ export function CategoryField({
                     key={key}
                     type="button"
                     className={`icon-cell${icon === key ? ' icon-cell--selected' : ''}`}
-                    style={icon === key ? { background: color, borderColor: color, color: '#fff' } : undefined}
+                    style={icon === key ? { background: color, borderColor: color, color: ACCENT_FOREGROUND } : undefined}
                     aria-pressed={icon === key}
                     onClick={() => setIcon(key)}
                   >

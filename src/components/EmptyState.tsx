@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { ACCENT_FOREGROUND } from '../theme/palette';
 
 type Illustration = 'transactions' | 'cards' | 'wallet' | 'shared' | 'goals';
 
@@ -33,15 +34,15 @@ function EmptyArt({ name }: { name: Illustration }) {
             <rect x="40" y="46" width="40" height="4" rx="2" fill="var(--border-default)" />
             <rect x="40" y="56" width="32" height="4" rx="2" fill="var(--border-default)" />
             <circle cx="84" cy="26" r="11" fill="var(--action-primary)" />
-            <path d="M84 21v10M79 26h10" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" />
+            <path d="M84 21v10M79 26h10" stroke={ACCENT_FOREGROUND} strokeWidth="2.4" strokeLinecap="round" />
           </>
         )}
         {name === 'cards' && (
           <>
             <rect x="24" y="36" width="58" height="38" rx="7" fill="var(--bg-surface)" stroke="var(--border-default)" strokeWidth="2" transform="rotate(-8 24 36)" />
             <rect x="38" y="28" width="58" height="38" rx="7" fill="var(--action-primary)" />
-            <rect x="46" y="40" width="16" height="11" rx="2.5" fill="#fff" opacity="0.85" />
-            <rect x="46" y="56" width="40" height="4" rx="2" fill="#fff" opacity="0.55" />
+            <rect x="46" y="40" width="16" height="11" rx="2.5" fill={ACCENT_FOREGROUND} opacity="0.85" />
+            <rect x="46" y="56" width="40" height="4" rx="2" fill={ACCENT_FOREGROUND} opacity="0.55" />
           </>
         )}
         {name === 'wallet' && (

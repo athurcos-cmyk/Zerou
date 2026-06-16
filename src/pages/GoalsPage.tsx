@@ -3,6 +3,7 @@ import { Check, Minus, Plus, Trash2 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { BottomSheet } from '../components/BottomSheet';
 import { CategoryIcon, categoryColors, categoryIconKeys } from '../components/categoryIcons';
+import { ACCENT_FOREGROUND } from '../theme/palette';
 import { EmptyState } from '../components/EmptyState';
 import { FormMessage } from '../components/FormMessage';
 import { contributeToGoal, createGoal, deleteGoal } from '../finance/financeService';
@@ -207,7 +208,7 @@ export function GoalsPage() {
             <div className="color-grid">
               {categoryColors.map((c) => (
                 <button key={c} type="button" className={`color-dot${color === c ? ' color-dot--selected' : ''}`} style={{ background: c, color: c }} aria-label={`Cor ${c}`} aria-pressed={color === c} onClick={() => setColor(c)}>
-                  {color === c && <Check size={15} color="#fff" />}
+                  {color === c && <Check size={15} color={ACCENT_FOREGROUND} />}
                 </button>
               ))}
             </div>
@@ -217,7 +218,7 @@ export function GoalsPage() {
             <span className="field-label">Ícone</span>
             <div className="icon-grid">
               {categoryIconKeys.map((key) => (
-                <button key={key} type="button" className={`icon-cell${icon === key ? ' icon-cell--selected' : ''}`} style={icon === key ? { background: color, borderColor: color, color: '#fff' } : undefined} aria-pressed={icon === key} onClick={() => setIcon(key)}>
+                <button key={key} type="button" className={`icon-cell${icon === key ? ' icon-cell--selected' : ''}`} style={icon === key ? { background: color, borderColor: color, color: ACCENT_FOREGROUND } : undefined} aria-pressed={icon === key} onClick={() => setIcon(key)}>
                   <CategoryIcon icon={key} size={19} />
                 </button>
               ))}

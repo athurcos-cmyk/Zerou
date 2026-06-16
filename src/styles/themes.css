@@ -33,6 +33,35 @@
   --shadow-xs: 0 1px 2px rgba(28, 24, 20, 0.05);
   --shadow-sm: 0 3px 10px rgba(28, 24, 20, 0.07);
   --shadow-md: 0 10px 28px rgba(28, 24, 20, 0.09);
+
+  /* Brand gradients & on-accent tokens (consistent across all themes) */
+  --accent-foreground: #fff;
+  --text-on-light: #1C1814;
+  --gradient-brand: linear-gradient(140deg, #EE5524 0%, #F47B3D 100%);
+  --gradient-income: linear-gradient(140deg, #1F9E6E 0%, #36C18C 100%);
+  --gradient-slate: linear-gradient(140deg, #3B4658 0%, #5A6B82 100%);
+  --on-accent-90: rgba(255, 255, 255, 0.9);
+  --on-accent-85: rgba(255, 255, 255, 0.85);
+  --on-accent-82: rgba(255, 255, 255, 0.82);
+  --on-accent-55: rgba(255, 255, 255, 0.55);
+  --on-accent-45: rgba(255, 255, 255, 0.45);
+  --on-accent-25: rgba(255, 255, 255, 0.25);
+  --on-accent-16: rgba(255, 255, 255, 0.16);
+  --on-accent-26: rgba(255, 255, 255, 0.26);
+  --on-accent-95: rgba(255, 255, 255, 0.95);
+  --shadow-button: 0 2px 8px rgba(0, 0, 0, 0.12);
+  --shadow-button-hover: 0 4px 14px rgba(0, 0, 0, 0.18);
+  --shadow-sheet: 0 -10px 40px rgba(28, 24, 20, 0.22);
+  --shadow-nav: 0 -6px 24px rgba(28, 24, 20, 0.08);
+  --shadow-fab: 0 8px 20px rgba(238, 85, 36, 0.4);
+  --shadow-fab-hover: 0 12px 26px rgba(238, 85, 36, 0.45);
+  --shadow-card-limit: 0 8px 22px rgba(238, 85, 36, 0.24);
+  --shadow-brand-28: 0 12px 30px rgba(238, 85, 36, 0.28);
+  --shadow-brand-26: 0 12px 30px rgba(238, 85, 36, 0.26);
+  --shadow-income-28: 0 12px 30px rgba(31, 158, 110, 0.28);
+  --shadow-income-26: 0 12px 30px rgba(31, 158, 110, 0.26);
+  --shadow-slate-24: 0 12px 30px rgba(59, 70, 88, 0.24);
+  --shadow-slate-26: 0 12px 30px rgba(59, 70, 88, 0.26);
 }
 
 [data-theme='sakura'] {
