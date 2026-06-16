@@ -12,6 +12,7 @@ import { CardsPage } from './pages/CardsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { EditTransactionPage } from './pages/EditTransactionPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
+import { GoalsPage } from './pages/GoalsPage';
 import { InvoicePage } from './pages/InvoicePage';
 import { JoinInvitePage } from './pages/JoinInvitePage';
 import { LoginMethodsPage } from './settings/LoginMethodsPage';
@@ -67,6 +68,7 @@ export function App() {
               <Route path="cards/:cardId" element={<CardDetailPage />} />
               <Route path="cards/:cardId/invoices/:invoiceId" element={<InvoicePage />} />
               <Route path="bills" element={<BillsPage />} />
+              <Route path="goals" element={<GoalsPage />} />
               <Route path="recurring" element={<RecurringPage />} />
               <Route path="search" element={<SearchPage />} />
               <Route path="shared" element={<SharedSpacePage />} />

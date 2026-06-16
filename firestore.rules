@@ -1304,6 +1304,16 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      match /goals/{goalId} {
+        allow read: if isActiveMember(workspaceId);
+        allow create: if isActiveMember(workspaceId)
+          && request.resource.data.id == goalId
+          && request.resource.data.workspaceId == workspaceId;
+        allow update: if isActiveMember(workspaceId)
+          && request.resource.data.workspaceId == workspaceId;
+        allow delete: if isActiveMember(workspaceId);
+      }
+
       match /cards/{cardId} {
         allow read: if isActiveMember(workspaceId);
         allow create: if validCardCreate(workspaceId, cardId);

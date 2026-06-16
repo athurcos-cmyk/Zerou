@@ -1,0 +1,34 @@
+import { useEffect, useState } from 'react';
+import { subscribeGoals, type LocalSynced } from './financeService';
+import type { Goal } from '../types/contracts';
+
+interface GoalsState {
+  goals: Array<LocalSynced<Goal>>;
+  loading: boolean;
+  error: string | null;
+}
+
+const initialState: GoalsState = { goals: [], loading: true, error: null };
+
+export function useGoalsData(workspaceId?: string) {
+  const [state, setState] = useState<GoalsState>(initialState);
+
+  useEffect(() => {
+    if (!workspaceId) {
+      setState({ ...initialState, loading: false });
+      return undefined;
+    }
+
+    setState((current) => ({ ...current, loading: true, error: null }));
+
+    return subscribeGoals(
+      workspaceId,
+      (goals) => setState({ goals: goals.filter((goal) => goal.isActive !== false), loading: false, error: null }),
+      (error) => setState({ goals: [], loading: false, error: error.message })
+    );
+  }, [workspaceId]);
+
+  const pendingWrites = state.goals.some((goal) => goal.localSyncStatus === 'pending');
+
+  return { ...state, pendingWrites };
+}

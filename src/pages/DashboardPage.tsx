@@ -1,4 +1,4 @@
-import { CalendarClock, CreditCard, Plus, Wallet } from 'lucide-react';
+import { CalendarClock, CreditCard, Plus, Target, Wallet } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsData } from '../cards/useCardsData';
@@ -90,6 +90,9 @@ export function DashboardPage() {
         </Link>
         <Link className="button button--subtle" to="/app/bills">
           <CalendarClock size={17} aria-hidden="true" /> Compromissos
+        </Link>
+        <Link className="button button--subtle" to="/app/goals">
+          <Target size={17} aria-hidden="true" /> Metas
         </Link>
       </div>
 

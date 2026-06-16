@@ -11,6 +11,7 @@ import {
   Repeat,
   Search,
   Shield,
+  Target,
   Users,
   WalletCards,
   X
@@ -65,6 +66,9 @@ export function AppShell() {
           </NavLink>
           <NavLink className={getNavClass} to="/app/bills">
             <CalendarClock size={19} aria-hidden="true" /> Compromissos
+          </NavLink>
+          <NavLink className={getNavClass} to="/app/goals">
+            <Target size={19} aria-hidden="true" /> Metas
           </NavLink>
           <NavLink className={getNavClass} to="/app/recurring">
             <Repeat size={19} aria-hidden="true" /> Recorrências
@@ -134,6 +138,9 @@ export function AppShell() {
               </NavLink>
               <NavLink className={getNavClass} to="/app/bills" onClick={() => setMobileMenuOpen(false)}>
                 <CalendarClock size={19} aria-hidden="true" /> Compromissos
+              </NavLink>
+              <NavLink className={getNavClass} to="/app/goals" onClick={() => setMobileMenuOpen(false)}>
+                <Target size={19} aria-hidden="true" /> Metas
               </NavLink>
               <NavLink className={getNavClass} to="/app/recurring" onClick={() => setMobileMenuOpen(false)}>
                 <Repeat size={19} aria-hidden="true" /> Recorrências

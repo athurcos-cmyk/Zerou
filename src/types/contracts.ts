@@ -49,6 +49,24 @@ export interface UserProfile extends AppearancePreferences {
   timezone: 'America/Sao_Paulo';
   themeMode: ThemeMode;
   themeId: ThemeId;
+  onboardingGoal?: string;
+  onboardingChallenge?: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+export interface Goal {
+  id: string;
+  workspaceId: string;
+  name: string;
+  kind: 'save' | 'debt';
+  targetCents: MoneyCents;
+  savedCents: MoneyCents;
+  icon?: string;
+  color?: string;
+  dueDate?: Timestamp;
+  isActive: boolean;
+  createdBy?: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }

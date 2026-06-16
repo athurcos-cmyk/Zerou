@@ -3073,6 +3073,80 @@ html[data-reduce-motion='true'] *::after {
   text-align: center;
 }
 
+/* ============================================================
+   Goals
+   ============================================================ */
+.goal-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.goal-card {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.goal-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.goal-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex-shrink: 0;
+  border-radius: 0.85rem;
+  color: #fff;
+}
+
+.goal-card-title {
+  display: grid;
+  gap: 0.1rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.goal-card-title strong {
+  font-size: 1rem;
+}
+
+.goal-card-title span {
+  font-size: 0.8rem;
+}
+
+.goal-progress-track {
+  height: 0.65rem;
+  border-radius: 999px;
+  background: var(--bg-surface-muted);
+  overflow: hidden;
+}
+
+.goal-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--action-primary);
+  transition: width 0.3s ease;
+}
+
+.goal-progress-fill--done {
+  background: var(--success);
+}
+
+.goal-card-foot {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.goal-amount {
+  font-size: 1.35rem;
+}
+
 /* Card limit hero (new card form) */
 .card-limit-hero {
   display: grid;

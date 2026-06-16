@@ -30,9 +30,9 @@ import {
   type CreateRecurringRuleInput,
   type CreateTransactionInput
 } from './financeSchemas';
-import type { Account, Bill, Category, RecurringRule, SyncStatus, Transaction } from '../types/contracts';
+import type { Account, Bill, Category, Goal, RecurringRule, SyncStatus, Transaction } from '../types/contracts';
 
-export type FinancialCollectionName = 'accounts' | 'categories' | 'transactions' | 'bills' | 'recurring';
+export type FinancialCollectionName = 'accounts' | 'categories' | 'transactions' | 'bills' | 'recurring' | 'goals';
 
 export type LocalSynced<T> = T & {
   localSyncStatus: SyncStatus;
@@ -187,6 +187,42 @@ export async function deleteCategory(workspaceId: string, categoryId: string) {
   });
 }
 
+export async function createGoal(
+  workspaceId: string,
+  userId: string,
+  input: { name: string; kind: 'save' | 'debt'; targetCents: number; savedCents?: number; icon?: string; color?: string; dueDate?: Date }
+) {
+  const id = createId('goal');
+  const now = serverTimestamp();
+  await setDoc(documentRef(workspaceId, 'goals', id), omitUndefined({
+    id,
+    workspaceId,
+    name: input.name.trim(),
+    kind: input.kind,
+    targetCents: input.targetCents,
+    savedCents: input.savedCents ?? 0,
+    icon: input.icon,
+    color: input.color,
+    dueDate: input.dueDate ? Timestamp.fromDate(input.dueDate) : undefined,
+    isActive: true,
+    createdBy: userId,
+    createdAt: now,
+    updatedAt: now
+  }));
+  return id;
+}
+
+export async function contributeToGoal(workspaceId: string, goalId: string, deltaCents: number) {
+  await updateDoc(documentRef(workspaceId, 'goals', goalId), {
+    savedCents: increment(deltaCents),
+    updatedAt: serverTimestamp()
+  });
+}
+
+export async function deleteGoal(workspaceId: string, goalId: string) {
+  await deleteDoc(documentRef(workspaceId, 'goals', goalId));
+}
+
 export async function softDeleteTransaction(workspaceId: string, userId: string, transactionId: string) {
   await updateDoc(documentRef(workspaceId, 'transactions', transactionId), {
     updatedBy: userId,
@@ -317,6 +353,19 @@ export function subscribeTransactions(
     query(collectionRef(workspaceId, 'transactions'), orderBy('date', 'desc')),
     { includeMetadataChanges: true },
     (snapshot) => onNext(snapshot.docs.map((item) => withLocalSync<Transaction>(item))),
+    onError
+  );
+}
+
+export function subscribeGoals(
+  workspaceId: string,
+  onNext: (items: Array<LocalSynced<Goal>>) => void,
+  onError: (error: Error) => void
+): Unsubscribe {
+  return onSnapshot(
+    query(collectionRef(workspaceId, 'goals'), orderBy('createdAt', 'desc')),
+    { includeMetadataChanges: true },
+    (snapshot) => onNext(snapshot.docs.map((item) => withLocalSync<Goal>(item))),
     onError
   );
 }
