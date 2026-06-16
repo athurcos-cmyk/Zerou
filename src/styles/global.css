@@ -29,9 +29,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
-  background:
-    radial-gradient(circle at top left, var(--action-primary-soft), transparent 28rem),
-    var(--bg-page);
+  background: var(--bg-page);
   color: var(--text-primary);
 }
 

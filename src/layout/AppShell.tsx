@@ -101,12 +101,6 @@ export function AppShell() {
       <main className="app-main">
         <header className="app-header">
           <BrandLogo compact />
-          <div>
-            <strong>Zerou</strong>
-            <p className="text-muted" style={{ margin: 0 }}>
-              Controle individual. Organização a dois.
-            </p>
-          </div>
         </header>
         <Outlet />
       </main>
