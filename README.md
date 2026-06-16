@@ -63,6 +63,8 @@ Fora do escopo atual: deploy cloud das Functions sem Blaze/secrets, Pix, boleto,
 
 ## QA e status
 
+Resumo executivo para handoff fica em `HANDOFF-PARA-CLAUDE.md`.
+Historico resumido de mudancas fica em `CHANGELOG.md`.
 O handoff das fases fica em `documentacao-v12.2/IMPLEMENTATION_STATUS.md`.
 A matriz de cenarios de sucesso/erro fica em `documentacao-v12.2/QA_SCENARIOS.md`.
 Arquitetura, seguranca, privacidade e operacao ficam em `ARCHITECTURE.md`, `SECURITY.md`, `PRIVACY.md`, `RUNBOOK.md` e `docs/PRODUCTION_CHECKLIST.md`.
