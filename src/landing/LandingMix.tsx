@@ -28,8 +28,6 @@ export function LandingMix() {
 
   const hero = (
     <section className="lp-hero">
-      <span className="lp-blob lp-blob--tang" />
-      <span className="lp-blob lp-blob--blue" />
       <div className="lp-wrap">
         <div className="lp-hero-grid">
           <div className="lp-hero-copy">

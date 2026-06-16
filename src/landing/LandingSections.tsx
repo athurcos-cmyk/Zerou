@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import {
-  ArrowRight, BarChart3, CreditCard, Handshake, LockKeyhole, Target, Wallet
+  ArrowRight, BarChart3, CreditCard, Handshake, LockKeyhole, Split, Target, Wallet
 } from 'lucide-react';
 
 const faqs = [
@@ -72,7 +72,12 @@ export function LandingSections() {
           <div>
             <p className="lp-kicker" style={{ color: '#f8a07a' }}>Modo casal</p>
             <h2 className="lp-h2">Dividam sem abrir a vida financeira.</h2>
-            <p>Compartilhe só o resumo da despesa e o acerto combinado. Divisão igual, por porcentagem ou valor — e a Zerou diz na hora quem deve quanto.</p>
+            <p>A maioria dos apps obriga você a misturar tudo. Na Zerou, cada um continua com seu espaço privado e só o que vocês decidem dividir aparece no espaço compartilhado.</p>
+            <ul className="lp-couple-points">
+              <li><span className="lp-cp-ico" style={{ background: 'rgba(255,255,255,0.12)' }}><LockKeyhole size={16} /></span> Seu pessoal continua 100% privado — o outro nunca vê suas contas e cartões</li>
+              <li><span className="lp-cp-ico" style={{ background: 'rgba(255,255,255,0.12)' }}><Split size={16} /></span> Lance uma despesa em comum e divida igual, por porcentagem ou valor</li>
+              <li><span className="lp-cp-ico" style={{ background: 'rgba(255,255,255,0.12)' }}><Handshake size={16} /></span> A Zerou calcula quem deve quanto — vocês acertam com um toque</li>
+            </ul>
           </div>
           <div className="lp-couple-card">
             <span>Você tem a receber</span>
@@ -127,8 +132,6 @@ export function LandingSections() {
       {/* Final CTA */}
       <section className="lp-section">
         <div className="lp-cta">
-          <span className="lp-cta-coin lp-cta-coin--1" />
-          <span className="lp-cta-coin lp-cta-coin--2" />
           <p className="lp-kicker">Controle individual. Organização a dois.</p>
           <h2 className="lp-h2">Seu dinheiro, finalmente simples.</h2>
           <Link className="lp-btn lp-btn--primary lp-btn--lg" to="/register">
