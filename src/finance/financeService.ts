@@ -30,9 +30,9 @@ import {
   type CreateRecurringRuleInput,
   type CreateTransactionInput
 } from './financeSchemas';
-import type { Account, Bill, Category, Goal, RecurringRule, SyncStatus, Transaction } from '../types/contracts';
+import type { Account, Bill, Category, Goal, GoalContribution, RecurringRule, SyncStatus, Transaction } from '../types/contracts';
 
-export type FinancialCollectionName = 'accounts' | 'categories' | 'transactions' | 'bills' | 'recurring' | 'goals';
+export type FinancialCollectionName = 'accounts' | 'categories' | 'transactions' | 'bills' | 'recurring' | 'goals' | 'goalContributions';
 
 export type LocalSynced<T> = T & {
   localSyncStatus: SyncStatus;
@@ -217,6 +217,44 @@ export async function contributeToGoal(workspaceId: string, goalId: string, delt
     savedCents: increment(deltaCents),
     updatedAt: serverTimestamp()
   });
+}
+
+/**
+ * Record a contribution to a (shared) goal: writes a per-person contribution doc and
+ * bumps the goal total in one batch. Used by the couple "cofrinho".
+ */
+export async function addGoalContribution(workspaceId: string, userId: string, goalId: string, amountCents: number) {
+  const id = createId('contrib');
+  const now = new Date();
+  const batch = writeBatch(getFirebaseDb());
+  batch.set(documentRef(workspaceId, 'goalContributions', id), {
+    id,
+    workspaceId,
+    goalId,
+    userId,
+    amountCents,
+    monthKey: monthKeyFromDate(now),
+    createdAt: serverTimestamp()
+  });
+  batch.update(documentRef(workspaceId, 'goals', goalId), {
+    savedCents: increment(amountCents),
+    updatedAt: serverTimestamp()
+  });
+  await batch.commit();
+  return id;
+}
+
+export function subscribeGoalContributions(
+  workspaceId: string,
+  onNext: (items: Array<LocalSynced<GoalContribution>>) => void,
+  onError: (error: Error) => void
+): Unsubscribe {
+  return onSnapshot(
+    query(collectionRef(workspaceId, 'goalContributions'), orderBy('createdAt', 'desc')),
+    { includeMetadataChanges: true },
+    (snapshot) => onNext(snapshot.docs.map((item) => withLocalSync<GoalContribution>(item))),
+    onError
+  );
 }
 
 export async function deleteGoal(workspaceId: string, goalId: string) {

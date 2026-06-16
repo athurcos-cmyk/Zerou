@@ -1,12 +1,17 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Copy, Handshake, Link2, MessageSquare, Plus, QrCode, Users } from 'lucide-react';
+import { Check, Copy, Handshake, Link2, MessageSquare, PiggyBank, Plus, QrCode, Trash2, Users } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { clearPendingInvite, readPendingInvite, savePendingInvite } from '../auth/pendingInvite';
 import { BottomSheet } from '../components/BottomSheet';
+import { categoryColors } from '../components/categoryIcons';
+import { ACCENT_FOREGROUND } from '../theme/palette';
 import { useConfirm } from '../components/ConfirmDialog';
 import { EmptyState } from '../components/EmptyState';
 import { FormMessage } from '../components/FormMessage';
+import { addGoalContribution, createGoal, createTransaction, deleteGoal } from '../finance/financeService';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
+import { useCoupleSavings, type CoupleGoalStats } from '../shared/useCoupleSavings';
+import { useFinanceData } from '../finance/useFinanceData';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
 import {
   acceptCoupleInvite,
@@ -78,10 +83,82 @@ export function SharedSpacePage() {
   const [settlementPaymentId, setSettlementPaymentId] = useState('');
   const [settlementPaymentAmount, setSettlementPaymentAmount] = useState('');
 
+  // Couple savings ("cofrinho")
+  const savings = useCoupleSavings(workspaceId);
+  const personalFinance = useFinanceData(profile?.defaultWorkspaceId, user?.uid);
+  const [cofrinhoOpen, setCofrinhoOpen] = useState(false);
+  const [cofrinhoName, setCofrinhoName] = useState('');
+  const [cofrinhoTarget, setCofrinhoTarget] = useState('');
+  const [cofrinhoColor, setCofrinhoColor] = useState(categoryColors[0]);
+  const [guardarTarget, setGuardarTarget] = useState<CoupleGoalStats | null>(null);
+  const [guardarAmount, setGuardarAmount] = useState('');
+  const [guardarFromAccount, setGuardarFromAccount] = useState('');
+  const [busy, setBusy] = useState(false);
+
   useEffect(() => {
     const storedCode = readPendingInvite();
     if (storedCode) setPendingInviteCode(storedCode);
   }, []);
+
+  async function handleCreateCofrinho(event: FormEvent) {
+    event.preventDefault();
+    if (!workspaceId || !user || !cofrinhoName.trim()) return;
+    setBusy(true);
+    try {
+      await createGoal(workspaceId, user.uid, {
+        name: cofrinhoName.trim(),
+        kind: 'save',
+        targetCents: cofrinhoTarget ? parseMoneyToCents(cofrinhoTarget) : 0,
+        icon: 'piggy',
+        color: cofrinhoColor
+      });
+      setCofrinhoName('');
+      setCofrinhoTarget('');
+      setCofrinhoColor(categoryColors[0]);
+      setCofrinhoOpen(false);
+    } catch (error) {
+      setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar o cofrinho agora.'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleGuardar(event: FormEvent) {
+    event.preventDefault();
+    if (!workspaceId || !user || !guardarTarget) return;
+    const amountCents = parseMoneyToCents(guardarAmount);
+    if (amountCents <= 0) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      await addGoalContribution(workspaceId, user.uid, guardarTarget.goal.id, amountCents);
+      // Optionally pull the money out of a personal account as an expense.
+      if (guardarFromAccount && profile?.defaultWorkspaceId) {
+        await createTransaction(profile.defaultWorkspaceId, user.uid, {
+          type: 'expense',
+          amountCents,
+          description: `Cofrinho: ${guardarTarget.goal.name}`,
+          accountId: guardarFromAccount,
+          date: new Date(),
+          tags: ['cofrinho']
+        });
+      }
+      setGuardarTarget(null);
+      setGuardarAmount('');
+      setGuardarFromAccount('');
+    } catch (error) {
+      setMessage(getUserFacingErrorMessage(error, 'Não foi possível guardar agora.'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDeleteCofrinho(goalId: string) {
+    if (!workspaceId) return;
+    const ok = await confirm({ title: 'Excluir este cofrinho?', message: 'O histórico de quanto vocês já juntaram será removido.', confirmLabel: 'Excluir', danger: true });
+    if (!ok) return;
+    await deleteGoal(workspaceId, goalId);
+  }
 
   async function guardAction(action: () => Promise<unknown>) {
     setMessage(null);
@@ -366,8 +443,77 @@ export function SharedSpacePage() {
           </details>
         </div>
       ) : (
-        /* 3) Partnered — balances, expenses, settlement */
+        /* 3) Partnered — cofrinho, balances, expenses, settlement */
         <div className="form-stack">
+          {/* Cofrinho do casal — juntar dinheiro juntos */}
+          <section className="cofrinho-section">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Cofrinho do casal</p>
+                <h2>Juntem dinheiro juntos</h2>
+              </div>
+              <PiggyBank size={22} aria-hidden="true" />
+            </div>
+
+            {savings.stats.length === 0 ? (
+              <article className="surface surface-pad">
+                <EmptyState
+                  illustration="goals"
+                  compact
+                  title="Nenhum cofrinho ainda"
+                  description="Criem um objetivo em comum — viagem, reserva, casa — e acompanhem quanto já juntaram."
+                  action={
+                    <button className="button button--primary button--compact" type="button" onClick={() => setCofrinhoOpen(true)}>
+                      <Plus size={16} aria-hidden="true" /> Criar cofrinho
+                    </button>
+                  }
+                />
+              </article>
+            ) : (
+              <div className="form-stack">
+                {savings.stats.map((stat) => {
+                  const mine = stat.byUser[user?.uid ?? ''] ?? 0;
+                  const partnerCents = Object.entries(stat.byUser)
+                    .filter(([uid]) => uid !== user?.uid)
+                    .reduce((total, [, value]) => total + value, 0);
+                  return (
+                    <article className="surface cofrinho-card" key={stat.goal.id}>
+                      <div className="cofrinho-top">
+                        <span className="cofrinho-mark" style={{ background: stat.goal.color ?? categoryColors[0] }}><PiggyBank size={20} /></span>
+                        <div className="cofrinho-title">
+                          <strong>{stat.goal.name}</strong>
+                          <span>Juntos este mês: {formatMoney(stat.thisMonthCents)}</span>
+                        </div>
+                        <button className="icon-button" type="button" aria-label="Excluir cofrinho" onClick={() => void handleDeleteCofrinho(stat.goal.id)}>
+                          <Trash2 size={16} aria-hidden="true" />
+                        </button>
+                      </div>
+                      <div className="cofrinho-amount">
+                        <strong className="display-number">{formatMoney(stat.totalCents)}</strong>
+                        {stat.goal.targetCents > 0 ? <span> de {formatMoney(stat.goal.targetCents)} · {stat.percent}%</span> : null}
+                      </div>
+                      {stat.goal.targetCents > 0 ? (
+                        <div className="goal-progress-track" aria-hidden="true">
+                          <span className="goal-progress-fill" style={{ width: `${Math.max(3, stat.percent)}%`, background: stat.goal.color }} />
+                        </div>
+                      ) : null}
+                      <div className="cofrinho-people">
+                        <div><span>Você juntou</span><strong>{formatMoney(mine)}</strong></div>
+                        <div><span>{memberLabel(partnerMember, user?.uid)} juntou</span><strong>{formatMoney(partnerCents)}</strong></div>
+                      </div>
+                      <button className="button button--primary button--block" type="button" onClick={() => { setGuardarTarget(stat); setGuardarAmount(''); setGuardarFromAccount(''); }}>
+                        <PiggyBank size={17} aria-hidden="true" /> Guardar no cofrinho
+                      </button>
+                    </article>
+                  );
+                })}
+                <button className="button button--ghost" type="button" onClick={() => setCofrinhoOpen(true)}>
+                  <Plus size={16} aria-hidden="true" /> Novo cofrinho
+                </button>
+              </div>
+            )}
+          </section>
+
           <article className={`surface balance-hero${myBalance > 0 ? ' balance-hero--credit' : myBalance < 0 ? ' balance-hero--debit' : ''}`}>
             {myBalance === 0 ? (
               <>
@@ -567,6 +713,61 @@ export function SharedSpacePage() {
             <button className="button button--secondary button--block" type="submit">Registrar pagamento</button>
           </form>
         ) : null}
+      </BottomSheet>
+
+      {/* Create cofrinho sheet */}
+      <BottomSheet open={cofrinhoOpen} onClose={() => setCofrinhoOpen(false)} title="Novo cofrinho do casal" subtitle="Um objetivo em comum">
+        <form className="category-create" onSubmit={(event) => void handleCreateCofrinho(event)}>
+          <div className="category-create-preview">
+            <span className="category-tile-mark category-tile-mark--lg" style={{ background: cofrinhoColor }}><PiggyBank size={26} /></span>
+          </div>
+          <label className="field">
+            <span>Nome</span>
+            <input className="input" value={cofrinhoName} onChange={(event) => setCofrinhoName(event.target.value)} placeholder="Ex: Viagem, Reserva, Casa nova..." autoFocus />
+          </label>
+          <label className="field">
+            <span>Meta (opcional)</span>
+            <input className="input" inputMode="decimal" value={cofrinhoTarget} onChange={(event) => setCofrinhoTarget(event.target.value)} placeholder="0,00" />
+          </label>
+          <div className="field">
+            <span className="field-label">Cor</span>
+            <div className="color-grid">
+              {categoryColors.map((color) => (
+                <button key={color} type="button" className={`color-dot${cofrinhoColor === color ? ' color-dot--selected' : ''}`} style={{ background: color, color }} aria-pressed={cofrinhoColor === color} aria-label={`Cor ${color}`} onClick={() => setCofrinhoColor(color)}>
+                  {cofrinhoColor === color && <Check size={15} color={ACCENT_FOREGROUND} />}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="sheet-actions">
+            <button className="button button--primary" type="submit" disabled={busy || !cofrinhoName.trim()}>{busy ? 'Criando...' : 'Criar cofrinho'}</button>
+          </div>
+        </form>
+      </BottomSheet>
+
+      {/* Guardar (contribute) sheet */}
+      <BottomSheet open={Boolean(guardarTarget)} onClose={() => setGuardarTarget(null)} title={guardarTarget ? `Guardar — ${guardarTarget.goal.name}` : ''} subtitle="Quanto você vai guardar?">
+        <form className="form-stack" onSubmit={(event) => void handleGuardar(event)}>
+          <label className="field">
+            <span>Valor</span>
+            <input className="input input--money" inputMode="decimal" value={guardarAmount} onChange={(event) => setGuardarAmount(event.target.value)} placeholder="0,00" autoFocus />
+          </label>
+          <div className="field">
+            <span className="field-label">De onde sai o dinheiro?</span>
+            <div className="chip-row">
+              <button type="button" className={`chip${!guardarFromAccount ? ' chip--active' : ''}`} onClick={() => setGuardarFromAccount('')}>Só registrar</button>
+              {personalFinance.accounts.map((account) => (
+                <button key={account.id} type="button" className={`chip${guardarFromAccount === account.id ? ' chip--active' : ''}`} onClick={() => setGuardarFromAccount(account.id)}>{account.name}</button>
+              ))}
+            </div>
+            <p className="text-muted" style={{ fontSize: '0.8rem', margin: '0.4rem 0 0' }}>
+              {guardarFromAccount ? 'Vira uma despesa "Cofrinho" na sua conta pessoal e some no total do casal.' : 'Só soma no cofrinho do casal, sem mexer no saldo das suas contas.'}
+            </p>
+          </div>
+          <div className="sheet-actions">
+            <button className="button button--primary" type="submit" disabled={busy || !guardarAmount}>{busy ? 'Guardando...' : 'Guardar'}</button>
+          </div>
+        </form>
       </BottomSheet>
 
       {dialog}

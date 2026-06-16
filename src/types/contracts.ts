@@ -71,6 +71,16 @@ export interface Goal {
   updatedAt?: Timestamp;
 }
 
+export interface GoalContribution {
+  id: string;
+  workspaceId: string;
+  goalId: string;
+  userId: string;
+  amountCents: MoneyCents;
+  monthKey?: string;
+  createdAt?: Timestamp;
+}
+
 export interface Workspace {
   id: string;
   type: WorkspaceType;

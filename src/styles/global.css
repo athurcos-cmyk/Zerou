@@ -3064,6 +3064,80 @@ html[data-reduce-motion='true'] *::after {
   letter-spacing: 0.03em;
 }
 
+/* Cofrinho do casal */
+.cofrinho-card {
+  display: grid;
+  gap: 0.8rem;
+  padding: 1.25rem;
+  background: linear-gradient(155deg, var(--action-primary-soft), var(--bg-surface) 60%);
+  border: 1px solid var(--border-subtle);
+}
+
+.cofrinho-top {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.cofrinho-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex-shrink: 0;
+  border-radius: 0.85rem;
+  color: var(--accent-foreground);
+}
+
+.cofrinho-title {
+  display: grid;
+  gap: 0.1rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.cofrinho-title strong { font-size: 1.02rem; }
+.cofrinho-title span { font-size: 0.8rem; color: var(--text-secondary); }
+
+.cofrinho-amount {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.cofrinho-amount .display-number { font-size: 1.9rem; }
+.cofrinho-amount span { font-size: 0.86rem; color: var(--text-secondary); }
+
+.cofrinho-people {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.cofrinho-people div {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.8rem;
+  padding: 0.6rem 0.75rem;
+}
+
+.cofrinho-people span {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.cofrinho-people strong {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.05rem;
+}
+
 .invite-hero .shared-invite-card {
   display: grid;
   gap: 0.6rem;
