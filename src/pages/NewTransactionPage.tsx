@@ -1,7 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Wallet } from 'lucide-react';
+import { ArrowLeft, CreditCard, Wallet } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { createCardPurchase } from '../cards/cardService';
+import { useCardsData } from '../cards/useCardsData';
 import { CategoryField } from '../components/CategoryField';
 import { FormMessage } from '../components/FormMessage';
 import { SelectField } from '../components/SelectField';
@@ -12,6 +14,8 @@ import { type SupportedTransactionType } from '../finance/financeSchemas';
 import { parseMoneyToCents } from '../finance/money';
 import { useFinanceData } from '../finance/useFinanceData';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
+
+const CARD_PREFIX = 'card:';
 
 function waitForLocalWrite() {
   return new Promise((resolve) => {
@@ -32,26 +36,40 @@ export function NewTransactionPage() {
   const { user, profile } = useAuth();
   const workspaceId = profile?.defaultWorkspaceId;
   const finance = useFinanceData(workspaceId, user?.uid);
+  const cardsData = useCardsData(workspaceId);
   const [type, setType] = useState<SupportedTransactionType>('expense');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [accountId, setAccountId] = useState('');
   const [destinationAccountId, setDestinationAccountId] = useState('');
+  const [installments, setInstallments] = useState(1);
   const [date, setDate] = useState(todayInputValue());
   const [merchant, setMerchant] = useState('');
   const [notes, setNotes] = useState('');
   const [tags, setTags] = useState('');
   const [message, setMessage] = useState<string | null>(null);
 
-  const accountOptions = finance.accounts.map((account) => ({
+  const activeCards = cardsData.cards.filter((card) => card.isActive !== false);
+  const isCardSelected = accountId.startsWith(CARD_PREFIX);
+
+  const walletOptions = finance.accounts.map((account) => ({
     value: account.id,
     label: account.name,
     description: accountTypeLabels[account.type],
     icon: <Wallet size={17} aria-hidden="true" />
   }));
 
-  const destinationOptions = accountOptions.filter((option) => option.value !== accountId);
+  // For expenses you can pay with a card; cards become card purchases (with installments).
+  const cardOptions = activeCards.map((card) => ({
+    value: `${CARD_PREFIX}${card.id}`,
+    label: card.name,
+    description: `Cartão · ${card.brand}`,
+    icon: <CreditCard size={17} aria-hidden="true" />
+  }));
+  const accountOptions = type === 'expense' ? [...walletOptions, ...cardOptions] : walletOptions;
+
+  const destinationOptions = walletOptions.filter((option) => option.value !== accountId);
   const categoryFilterType = type === 'income' ? 'income' : type === 'expense' ? 'expense' : 'all';
   const moodClass = type === 'income' ? 'amount-hero--income' : type === 'transfer' ? 'amount-hero--transfer' : 'amount-hero--expense';
 
@@ -84,12 +102,30 @@ export function NewTransactionPage() {
       return;
     }
 
-    if (finance.accounts.length === 0) {
+    const payingWithCard = type === 'expense' && accountId.startsWith(CARD_PREFIX);
+
+    if (!payingWithCard && finance.accounts.length === 0) {
       setMessage('Crie uma conta financeira antes de registrar transações.');
       return;
     }
 
     try {
+      if (payingWithCard) {
+        const cardId = accountId.slice(CARD_PREFIX.length);
+        const write = createCardPurchase(workspaceId, user.uid, {
+          cardId,
+          description,
+          amountCents: parseMoneyToCents(amount),
+          purchaseDate: fromDateInputValue(date),
+          categoryId: categoryId || undefined,
+          installments
+        });
+        await Promise.race([write, waitForLocalWrite()]);
+        void write.catch(() => undefined);
+        navigate(`/app/cards/${cardId}`);
+        return;
+      }
+
       const write = createTransaction(workspaceId, user.uid, {
         type,
         amountCents: parseMoneyToCents(amount),
@@ -129,7 +165,7 @@ export function NewTransactionPage() {
                 role="tab"
                 aria-selected={type === option}
                 className={`type-switch-btn${type === option ? ' type-switch-btn--active' : ''}`}
-                onClick={() => { setType(option); setCategoryId(''); }}
+                onClick={() => { setType(option); setCategoryId(''); if (option !== 'expense' && accountId.startsWith(CARD_PREFIX)) setAccountId(''); }}
               >
                 {transactionTypeLabels[option]}
               </button>
@@ -189,12 +225,24 @@ export function NewTransactionPage() {
         />
 
         <SelectField
-          label={type === 'transfer' ? 'Conta de origem' : 'Conta'}
+          label={type === 'transfer' ? 'Conta de origem' : type === 'expense' ? 'Conta ou cartão' : 'Conta'}
           value={accountId}
           onChange={setAccountId}
           options={accountOptions}
-          placeholder="Escolha uma conta"
+          placeholder={type === 'expense' ? 'Conta ou cartão' : 'Escolha uma conta'}
         />
+
+        {isCardSelected ? (
+          <SelectField
+            label="Parcelamento"
+            value={String(installments)}
+            onChange={(v) => setInstallments(Number(v))}
+            options={Array.from({ length: 24 }, (_, i) => i + 1).map((n) => ({
+              value: String(n),
+              label: n === 1 ? '1x à vista' : `${n}x`
+            }))}
+          />
+        ) : null}
 
         {type === 'transfer' ? (
           <SelectField
