@@ -34,18 +34,22 @@ export function LandingCss() {
       <div className="lp-wrap">
         <div className="lp-hero-grid">
           <div className="lp-hero-copy">
-            <span className="lp-pill"><i /> A pergunta de todo fim de mês</span>
-            <h1 className="lp-h1">Cadê o dinheiro <span className="grad">que você ganhou?</span></h1>
-            <p className="lp-lead">O salário cai, some em duas semanas e você fica esperando o próximo. A Zerou mostra pra onde vai cada real — e te tira desse ciclo.</p>
+            <span className="lp-pill"><i /> A real que ninguém te conta</span>
+            <h1 className="lp-h1">Seu salário <span className="grad">já chega devendo.</span></h1>
+            <p className="lp-subhead">E some antes de você ver a cor dele.</p>
+            <p className="lp-lead">
+              Você trabalha o mês inteiro pra quê? Dia 5 cai, dia 15 já era. Aí vem a fatura, o "tinha esquecido dessa", o boleto que dobrou.{' '}
+              <strong>Você não é ruim com dinheiro</strong> — você só nunca viu pra onde ele foge. A Zerou mostra cada real que sai, separa o seu do cartão, e te tira do aperto que parece não ter fim.
+            </p>
             <div className="lp-hero-actions">
-              <Link className="lp-btn lp-btn--primary lp-btn--lg" to="/register">Quero ver meus gastos <ArrowRight size={18} /></Link>
-              <a className="lp-btn lp-btn--ghost lp-btn--lg" href="#recursos">Ver recursos</a>
+              <Link className="lp-btn lp-btn--primary lp-btn--lg" to="/register">Quero ver pra onde vai meu dinheiro <ArrowRight size={18} /></Link>
+              <a className="lp-btn lp-btn--ghost lp-btn--lg" href="#como">Ver como funciona</a>
             </div>
             <p className="lp-hero-note">Grátis · sem cartão de crédito · funciona no navegador do celular</p>
             <div className="lp-proof">
-              <span><CheckCircle2 size={18} /> Feito para o celular</span>
-              <span><CheckCircle2 size={18} /> Pessoal e casal separados</span>
-              <span><CheckCircle2 size={18} /> Fatura sem dupla contagem</span>
+              <span><CheckCircle2 size={18} /> Feito pro celular</span>
+              <span><CheckCircle2 size={18} /> Você e a família, separados</span>
+              <span><CheckCircle2 size={18} /> Fatura sem contar duas vezes</span>
             </div>
           </div>
 
