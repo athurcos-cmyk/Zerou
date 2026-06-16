@@ -1,4 +1,4 @@
-import { ArrowRight, CalendarClock, CreditCard, Plus, ReceiptText, Wallet } from 'lucide-react';
+import { ArrowRight, CalendarClock, CreditCard, Plus, Wallet } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsData } from '../cards/useCardsData';
@@ -44,44 +44,37 @@ export function DashboardPage() {
 
   return (
     <section className="page-content">
-      <div className="page-heading-row">
+      <div className="page-heading-row page-heading-row--tight">
         <div>
-          <p className="eyebrow">Dashboard Zerou</p>
-          <h1 className="page-title">Seu dinheiro, seus compromissos.</h1>
-          <p className="page-description">
-            Veja saldo, dinheiro livre, faturas e o que vence primeiro no seu espaço pessoal.
-          </p>
+          <p className="eyebrow">Olá{profile?.name ? `, ${profile.name.split(' ')[0]}` : ''}</p>
+          <h1 className="page-title page-title--compact">Seu resumo</h1>
         </div>
         <SyncStatusBadge status={syncStatus} />
       </div>
 
       {finance.error || cardsData.error ? <div className="notice notice--danger">{finance.error ?? cardsData.error}</div> : null}
 
-      <div className="metric-grid">
-        <article className="surface surface-pad metric-card">
+      <div className="dash-summary">
+        <article className="surface surface-pad dash-balance">
           <span className="metric-icon">
-            <Wallet size={20} aria-hidden="true" />
+            <Wallet size={18} aria-hidden="true" />
           </span>
           <p className="eyebrow">Saldo total</p>
-          <strong>{formatMoney(dashboard.totalBalanceCents)}</strong>
+          <strong className="display-number">{formatMoney(dashboard.totalBalanceCents)}</strong>
           <span className="text-secondary">Soma das contas ativas.</span>
         </article>
-        <article className="surface surface-pad metric-card">
-          <span className="metric-icon">
-            <ReceiptText size={20} aria-hidden="true" />
-          </span>
-          <p className="eyebrow">Disponível agora</p>
-          <strong>{formatMoney(dashboard.freeToSpendCents)}</strong>
-          <span className="text-secondary">Saldo menos compromissos previstos.</span>
-        </article>
-        <article className="surface surface-pad metric-card">
-          <span className="metric-icon">
-            <CalendarClock size={20} aria-hidden="true" />
-          </span>
-          <p className="eyebrow">Comprometido</p>
-          <strong>{formatMoney(dashboard.committedCents)}</strong>
-          <span className="text-secondary">Contas, recorrências e faturas próximas.</span>
-        </article>
+        <div className="dash-secondary">
+          <article className="surface surface-pad dash-metric">
+            <p className="eyebrow">Disponível agora</p>
+            <strong className="display-number">{formatMoney(dashboard.freeToSpendCents)}</strong>
+            <span className="text-secondary">Menos compromissos.</span>
+          </article>
+          <article className="surface surface-pad dash-metric">
+            <p className="eyebrow">Comprometido</p>
+            <strong className="display-number">{formatMoney(dashboard.committedCents)}</strong>
+            <span className="text-secondary">Contas e faturas.</span>
+          </article>
+        </div>
       </div>
 
       <div className="quick-actions">

@@ -618,6 +618,58 @@ html[data-reduce-motion='true'] *::after {
   gap: 0.55rem;
 }
 
+/* Compact dashboard summary: prominent balance + two smaller metrics */
+.dash-summary {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1.2fr) minmax(0, 2fr);
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.dash-balance,
+.dash-metric {
+  padding: 1rem 1.1rem;
+}
+
+.dash-balance {
+  display: grid;
+  gap: 0.35rem;
+  align-content: center;
+}
+
+.dash-balance .display-number {
+  font-size: clamp(1.5rem, 3.4vw, 2.1rem);
+}
+
+.dash-secondary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.dash-metric {
+  display: grid;
+  gap: 0.3rem;
+  align-content: center;
+}
+
+.dash-metric .display-number {
+  font-size: clamp(1.15rem, 2.6vw, 1.5rem);
+}
+
+.dash-metric .eyebrow,
+.dash-balance .eyebrow {
+  margin: 0;
+}
+
+.page-heading-row--tight {
+  margin-bottom: 1rem;
+}
+
+.page-title--compact {
+  font-size: clamp(1.4rem, 4vw, 1.9rem);
+}
+
 .metric-card strong {
   font-family: 'DM Sans', system-ui, sans-serif;
   font-size: clamp(1.65rem, 3vw, 2.35rem);
@@ -2253,8 +2305,13 @@ html[data-reduce-motion='true'] *::after {
   .start-guide-steps,
   .shared-flow-hint,
   .theme-grid,
-  .plan-grid {
+  .plan-grid,
+  .dash-summary {
     grid-template-columns: 1fr;
+  }
+
+  .dash-summary {
+    gap: 0.75rem;
   }
 
   .quick-actions .button {
