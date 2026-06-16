@@ -1,20 +1,21 @@
 :root,
 [data-theme='paper'] {
-  --bg-page: #F6F7F9;
+  /* Sol — areia quente + tangerina */
+  --bg-page: #FAF8F5;
   --bg-surface: #FFFFFF;
-  --bg-surface-subtle: #F1F3F6;
-  --bg-surface-muted: #ECEFF3;
-  --bg-overlay: rgba(23, 26, 31, 0.42);
-  --text-primary: #171A1F;
-  --text-secondary: #667085;
-  --text-muted: #98A2B3;
+  --bg-surface-subtle: #F5F1EB;
+  --bg-surface-muted: #EDE8DF;
+  --bg-overlay: rgba(28, 24, 20, 0.42);
+  --text-primary: #1C1814;
+  --text-secondary: #6B5D52;
+  --text-muted: #A0908A;
   --text-inverse: #FFFFFF;
-  --border-subtle: #E7EAF0;
-  --border-default: #DDE2EA;
-  --border-focus: #6366F1;
-  --action-primary: #5B5BD6;
-  --action-primary-hover: #4F4FC4;
-  --action-primary-soft: #EEF0FF;
+  --border-subtle: #EEE8E0;
+  --border-default: #E5DDD4;
+  --border-focus: #EE5524;
+  --action-primary: #EE5524;
+  --action-primary-hover: #D44A1C;
+  --action-primary-soft: #FEF0EB;
   --action-secondary: #FFFFFF;
   --success: #2EAE7D;
   --success-soft: #EAF8F2;
@@ -24,14 +25,14 @@
   --warning-soft: #FFF6E8;
   --info: #4C82D8;
   --info-soft: #EEF5FF;
-  --chart-1: #5B5BD6;
+  --chart-1: #EE5524;
   --chart-2: #2EAE7D;
   --chart-3: #4C82D8;
   --chart-4: #C98A35;
   --chart-5: #B36DA8;
-  --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.04);
-  --shadow-sm: 0 3px 10px rgba(16, 24, 40, 0.06);
-  --shadow-md: 0 10px 28px rgba(16, 24, 40, 0.08);
+  --shadow-xs: 0 1px 2px rgba(28, 24, 20, 0.05);
+  --shadow-sm: 0 3px 10px rgba(28, 24, 20, 0.07);
+  --shadow-md: 0 10px 28px rgba(28, 24, 20, 0.09);
 }
 
 [data-theme='sakura'] {
@@ -210,9 +211,9 @@
 }
 
 .theme-preview[data-preview-theme='paper'] {
-  --preview-bg-page: #F6F7F9;
+  --preview-bg-page: #FAF8F5;
   --preview-bg-surface: #FFFFFF;
-  --preview-action-primary: #5B5BD6;
+  --preview-action-primary: #EE5524;
 }
 
 .theme-preview[data-preview-theme='sakura'] {

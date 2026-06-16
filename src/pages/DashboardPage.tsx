@@ -1,4 +1,4 @@
-import { ArrowRight, CalendarClock, Plus, ReceiptText, Wallet } from 'lucide-react';
+import { ArrowRight, CalendarClock, CreditCard, Plus, ReceiptText, Wallet } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsData } from '../cards/useCardsData';
@@ -88,14 +88,14 @@ export function DashboardPage() {
         <Link className="button button--primary" to="/app/transactions/new">
           <Plus size={18} aria-hidden="true" /> Lançar agora
         </Link>
-        <Link className="button button--secondary" to="/app/accounts">
-          Criar conta
+        <Link className="button button--subtle" to="/app/accounts">
+          <Wallet size={17} aria-hidden="true" /> Contas
         </Link>
-        <Link className="button button--secondary" to="/app/cards">
-          Cartões
+        <Link className="button button--subtle" to="/app/cards">
+          <CreditCard size={17} aria-hidden="true" /> Cartões
         </Link>
-        <Link className="button button--secondary" to="/app/bills">
-          Novo compromisso
+        <Link className="button button--subtle" to="/app/bills">
+          <CalendarClock size={17} aria-hidden="true" /> Compromissos
         </Link>
       </div>
 
@@ -173,7 +173,7 @@ export function DashboardPage() {
                       {toDateInputValue(commitment.dueAt)}
                     </span>
                   </div>
-                  <strong>{formatMoney(commitment.amountCents)}</strong>
+                  <strong className="amount--expense">{formatMoney(commitment.amountCents)}</strong>
                 </div>
               ))}
             </div>
@@ -194,17 +194,24 @@ export function DashboardPage() {
           </div>
           {dashboard.recentTransactions.length > 0 ? (
             <div className="item-list">
-              {dashboard.recentTransactions.map((transaction) => (
-                <div className="list-row" key={transaction.id}>
-                  <div>
-                    <strong>{transaction.description}</strong>
-                    <span className="text-secondary">
-                      {transactionTypeLabels[transaction.type]} · {toDateInputValue(transaction.date)}
-                    </span>
+              {dashboard.recentTransactions.map((transaction) => {
+                const isIncome = transaction.type === 'income';
+                const isExpense = transaction.type === 'expense' || transaction.type === 'card_purchase';
+                const amountClass = isIncome ? 'amount--income' : isExpense ? 'amount--expense' : 'amount--neutral';
+                return (
+                  <div className="list-row" key={transaction.id}>
+                    <div>
+                      <strong>{transaction.description}</strong>
+                      <span className="text-secondary">
+                        {transactionTypeLabels[transaction.type]} · {toDateInputValue(transaction.date)}
+                      </span>
+                    </div>
+                    <strong className={amountClass}>
+                      {isIncome ? '+' : isExpense ? '−' : ''}{formatMoney(transaction.amountCents)}
+                    </strong>
                   </div>
-                  <strong>{formatMoney(transaction.amountCents)}</strong>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="empty-copy">

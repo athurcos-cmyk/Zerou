@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Handshake, Link2, MessageSquare, QrCode, ShieldCheck, Users } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { clearPendingInvite, readPendingInvite, savePendingInvite } from '../auth/pendingInvite';
+import { CustomSelect } from '../components/CustomSelect';
 import { FormMessage } from '../components/FormMessage';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
@@ -413,17 +414,12 @@ export function SharedSpacePage() {
                     </div>
                     <MessageSquare size={22} aria-hidden="true" />
                   </div>
-                  <select className="select" value={commentTargetId} onChange={(event) => setCommentTargetId(event.target.value)}>
-                    {claimOptions.length > 0 ? (
-                      claimOptions.map((claim) => (
-                        <option key={claim.id} value={claim.id}>
-                          {claim.label}
-                        </option>
-                      ))
-                    ) : (
-                      <option value="">Nenhuma despesa ainda</option>
-                    )}
-                  </select>
+                  <CustomSelect
+                    value={commentTargetId}
+                    onChange={setCommentTargetId}
+                    options={claimOptions.map((c) => ({ value: c.id, label: c.label }))}
+                    placeholder="Nenhuma despesa ainda"
+                  />
                   <textarea className="input textarea" value={commentBody} onChange={(event) => setCommentBody(event.target.value)} placeholder="Escreva um comentário curto." />
                   <button className="button button--secondary" type="submit" disabled={!commentTargetId}>
                     Comentar
@@ -520,14 +516,15 @@ export function SharedSpacePage() {
                   </div>
                 ) : null}
                 <form className="form-stack" onSubmit={handleSettlementPayment}>
-                  <select className="select" value={settlementPaymentId} onChange={(event) => setSettlementPaymentId(event.target.value)}>
-                    <option value="">Escolha um acerto</option>
-                    {shared.settlements.map((settlement) => (
-                      <option key={settlement.id} value={settlement.id}>
-                        {formatMoney(settlement.amountCents)} · {settlementStatusLabels[settlement.status]}
-                      </option>
-                    ))}
-                  </select>
+                  <CustomSelect
+                    value={settlementPaymentId}
+                    onChange={setSettlementPaymentId}
+                    options={shared.settlements.map((s) => ({
+                      value: s.id,
+                      label: `${formatMoney(s.amountCents)} · ${settlementStatusLabels[s.status]}`
+                    }))}
+                    placeholder="Escolha um acerto"
+                  />
                   <input className="input" inputMode="decimal" value={settlementPaymentAmount} onChange={(event) => setSettlementPaymentAmount(event.target.value)} placeholder="0,00" />
                   <button className="button button--secondary" type="submit" disabled={!settlementPaymentId}>
                     Registrar parcial ou total

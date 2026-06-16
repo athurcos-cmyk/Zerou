@@ -1,10 +1,12 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { CategoryPicker } from '../components/CategoryPicker';
+import { CustomSelect } from '../components/CustomSelect';
 import { FormMessage } from '../components/FormMessage';
 import { fromDateInputValue, todayInputValue } from '../finance/financeDates';
 import { accountTypeLabels, transactionTypeLabels } from '../finance/financeLabels';
-import { createTransaction } from '../finance/financeService';
+import { createCategory, createTransaction, deleteCategory } from '../finance/financeService';
 import { transactionTypes, type SupportedTransactionType } from '../finance/financeSchemas';
 import { parseMoneyToCents } from '../finance/money';
 import { useFinanceData } from '../finance/useFinanceData';
@@ -33,9 +35,37 @@ export function NewTransactionPage() {
   const [tags, setTags] = useState('');
   const [message, setMessage] = useState<string | null>(null);
 
-  const categoryOptions = finance.categories.filter(
-    (category) => category.isActive && (category.type === 'both' || category.type === type)
-  );
+  const typeOptions = transactionTypes.map((t) => ({
+    value: t,
+    label: transactionTypeLabels[t]
+  }));
+
+  const accountOptions = finance.accounts.map((account) => ({
+    value: account.id,
+    label: account.name,
+    description: accountTypeLabels[account.type]
+  }));
+
+  const destinationOptions = finance.accounts
+    .filter((account) => account.id !== accountId)
+    .map((account) => ({
+      value: account.id,
+      label: account.name,
+      description: accountTypeLabels[account.type]
+    }));
+
+  const categoryFilterType = type === 'income' ? 'income' : type === 'expense' ? 'expense' : 'all';
+
+  async function handleCreateCategory(name: string, icon: string, catType: 'income' | 'expense' | 'both') {
+    if (!workspaceId || !user) return;
+    const id = await createCategory(workspaceId, user.uid, { name, icon, type: catType });
+    setCategoryId(id);
+  }
+
+  async function handleDeleteCategory(id: string) {
+    if (!workspaceId) return;
+    await deleteCategory(workspaceId, id);
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -96,60 +126,52 @@ export function NewTransactionPage() {
           <input className="input input--money" inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0,00" />
         </label>
 
-        <label className="field">
-          <span>Tipo</span>
-          <select className="select" value={type} onChange={(event) => setType(event.target.value as SupportedTransactionType)}>
-            {transactionTypes.map((transactionType) => (
-              <option key={transactionType} value={transactionType}>
-                {transactionTypeLabels[transactionType]}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="field">
+          <span className="field-label">Tipo</span>
+          <CustomSelect
+            value={type}
+            onChange={(v) => { setType(v as SupportedTransactionType); setCategoryId(''); }}
+            options={typeOptions}
+          />
+        </div>
 
         <label className="field">
           <span>Descrição</span>
           <input className="input" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Mercado, salário, aluguel" />
         </label>
 
-        <label className="field">
-          <span>Categoria</span>
-          <select className="select" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
-            <option value="">Sem categoria</option>
-            {categoryOptions.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="field">
+          <span className="field-label">Categoria</span>
+          <CategoryPicker
+            value={categoryId}
+            onChange={setCategoryId}
+            categories={finance.categories}
+            filterType={categoryFilterType as 'income' | 'expense' | 'all'}
+            onCreateCategory={handleCreateCategory}
+            onDeleteCategory={handleDeleteCategory}
+          />
+        </div>
 
-        <label className="field">
-          <span>Conta</span>
-          <select className="select" value={accountId} onChange={(event) => setAccountId(event.target.value)}>
-            <option value="">Escolha uma conta</option>
-            {finance.accounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.name} · {accountTypeLabels[account.type]}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="field">
+          <span className="field-label">Conta</span>
+          <CustomSelect
+            value={accountId}
+            onChange={setAccountId}
+            options={accountOptions}
+            placeholder="Escolha uma conta"
+          />
+        </div>
 
         {type === 'transfer' ? (
-          <label className="field">
-            <span>Conta de destino</span>
-            <select className="select" value={destinationAccountId} onChange={(event) => setDestinationAccountId(event.target.value)}>
-              <option value="">Escolha o destino</option>
-              {finance.accounts
-                .filter((account) => account.id !== accountId)
-                .map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name}
-                  </option>
-                ))}
-            </select>
-          </label>
+          <div className="field">
+            <span className="field-label">Conta de destino</span>
+            <CustomSelect
+              value={destinationAccountId}
+              onChange={setDestinationAccountId}
+              options={destinationOptions}
+              placeholder="Escolha o destino"
+            />
+          </div>
         ) : null}
 
         <label className="field">

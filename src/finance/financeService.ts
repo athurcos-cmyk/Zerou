@@ -144,6 +144,35 @@ export async function createTransaction(workspaceId: string, userId: string, inp
   return id;
 }
 
+export async function createCategory(
+  workspaceId: string,
+  userId: string,
+  input: { name: string; icon: string; type: 'income' | 'expense' | 'both' }
+) {
+  const id = createId('cat');
+  const now = serverTimestamp();
+  await setDoc(documentRef(workspaceId, 'categories', id), {
+    id,
+    workspaceId,
+    name: input.name.trim(),
+    icon: input.icon,
+    type: input.type,
+    isDefault: false,
+    isActive: true,
+    createdBy: userId,
+    createdAt: now,
+    updatedAt: now
+  });
+  return id;
+}
+
+export async function deleteCategory(workspaceId: string, categoryId: string) {
+  await updateDoc(documentRef(workspaceId, 'categories', categoryId), {
+    isActive: false,
+    updatedAt: serverTimestamp()
+  });
+}
+
 export async function softDeleteTransaction(workspaceId: string, userId: string, transactionId: string) {
   await updateDoc(documentRef(workspaceId, 'transactions', transactionId), {
     updatedBy: userId,

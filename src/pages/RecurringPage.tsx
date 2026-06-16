@@ -1,10 +1,12 @@
 import { useState, type FormEvent } from 'react';
 import { Repeat } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { CategoryPicker } from '../components/CategoryPicker';
+import { CustomSelect } from '../components/CustomSelect';
 import { FormMessage } from '../components/FormMessage';
 import { fromDateInputValue, todayInputValue, toDateInputValue } from '../finance/financeDates';
 import { recurringFrequencyLabels } from '../finance/financeLabels';
-import { createRecurringRule } from '../finance/financeService';
+import { createCategory, createRecurringRule, deleteCategory } from '../finance/financeService';
 import { recurringFrequencies, type CreateRecurringRuleInput } from '../finance/financeSchemas';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
@@ -75,42 +77,45 @@ export function RecurringPage() {
             <span>Valor previsto</span>
             <input className="input" inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0,00" />
           </label>
-          <label className="field">
-            <span>Frequência</span>
-            <select className="select" value={frequency} onChange={(event) => setFrequency(event.target.value as CreateRecurringRuleInput['frequency'])}>
-              {recurringFrequencies.map((item) => (
-                <option key={item} value={item}>
-                  {recurringFrequencyLabels[item]}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="field">
+            <span className="field-label">Frequência</span>
+            <CustomSelect
+              value={frequency}
+              onChange={(v) => setFrequency(v as CreateRecurringRuleInput['frequency'])}
+              options={recurringFrequencies.map((f) => ({ value: f, label: recurringFrequencyLabels[f] }))}
+            />
+          </div>
           <label className="field">
             <span>Próxima ocorrência</span>
             <input className="input" type="date" value={nextOccurrenceAt} onChange={(event) => setNextOccurrenceAt(event.target.value)} />
           </label>
-          <label className="field">
-            <span>Conta</span>
-            <select className="select" value={accountId} onChange={(event) => setAccountId(event.target.value)}>
-              <option value="">Definir depois</option>
-              {finance.accounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>Categoria</span>
-            <select className="select" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
-              <option value="">Sem categoria</option>
-              {finance.categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="field">
+            <span className="field-label">Conta</span>
+            <CustomSelect
+              value={accountId}
+              onChange={setAccountId}
+              options={finance.accounts.map((a) => ({ value: a.id, label: a.name }))}
+              placeholder="Definir depois"
+            />
+          </div>
+          <div className="field">
+            <span className="field-label">Categoria</span>
+            <CategoryPicker
+              value={categoryId}
+              onChange={setCategoryId}
+              categories={finance.categories}
+              filterType="expense"
+              onCreateCategory={async (name, icon, type) => {
+                if (!workspaceId || !user) return;
+                const id = await createCategory(workspaceId, user.uid, { name, icon, type });
+                setCategoryId(id);
+              }}
+              onDeleteCategory={async (id) => {
+                if (!workspaceId) return;
+                await deleteCategory(workspaceId, id);
+              }}
+            />
+          </div>
           <button className="button button--primary" type="submit">
             Criar recorrência
           </button>

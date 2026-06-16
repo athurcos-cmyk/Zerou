@@ -1,10 +1,12 @@
 import { useState, type FormEvent } from 'react';
 import { CalendarClock } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { CategoryPicker } from '../components/CategoryPicker';
+import { CustomSelect } from '../components/CustomSelect';
 import { FormMessage } from '../components/FormMessage';
 import { fromDateInputValue, todayInputValue, toDateInputValue } from '../finance/financeDates';
 import { billStatusLabels } from '../finance/financeLabels';
-import { createBill, updateBillStatus } from '../finance/financeService';
+import { createBill, createCategory, deleteCategory, updateBillStatus } from '../finance/financeService';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
 import { useFinanceData } from '../finance/useFinanceData';
@@ -84,30 +86,33 @@ export function BillsPage() {
             <span>Vencimento</span>
             <input className="input" type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
           </label>
-          <label className="field">
-            <span>Categoria</span>
-            <select className="select" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
-              <option value="">Sem categoria</option>
-              {finance.categories
-                .filter((category) => category.type !== 'income')
-                .map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>Conta de pagamento</span>
-            <select className="select" value={accountId} onChange={(event) => setAccountId(event.target.value)}>
-              <option value="">Definir depois</option>
-              {finance.accounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="field">
+            <span className="field-label">Categoria</span>
+            <CategoryPicker
+              value={categoryId}
+              onChange={setCategoryId}
+              categories={finance.categories}
+              filterType="expense"
+              onCreateCategory={async (name, icon, type) => {
+                if (!workspaceId || !user) return;
+                const id = await createCategory(workspaceId, user.uid, { name, icon, type });
+                setCategoryId(id);
+              }}
+              onDeleteCategory={async (id) => {
+                if (!workspaceId) return;
+                await deleteCategory(workspaceId, id);
+              }}
+            />
+          </div>
+          <div className="field">
+            <span className="field-label">Conta de pagamento</span>
+            <CustomSelect
+              value={accountId}
+              onChange={setAccountId}
+              options={finance.accounts.map((a) => ({ value: a.id, label: a.name }))}
+              placeholder="Definir depois"
+            />
+          </div>
           <button className="button button--primary" type="submit">
             Criar compromisso
           </button>

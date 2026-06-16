@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { CreditCard, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { CustomSelect } from '../components/CustomSelect';
 import { FormMessage } from '../components/FormMessage';
 import { cardBrandOptions, type CreateCreditCardInput } from '../cards/cardSchemas';
 import { createCreditCard } from '../cards/cardService';
@@ -67,72 +68,104 @@ export function CardsPage() {
         <form className="surface surface-pad form-stack" onSubmit={handleSubmit}>
           <div className="section-heading">
             <div>
-              <p className="eyebrow">Novo cartão</p>
-              <h2>Cadastrar cartão</h2>
+              <p className="eyebrow">Adicionar cartão</p>
+              <h2>Cadastrar novo cartão</h2>
             </div>
             <span className="empty-icon">
               <Plus size={20} aria-hidden="true" />
             </span>
           </div>
+          <p className="text-secondary" style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.55 }}>
+            O Zerou acompanha compras, parcelas e faturas separadas do saldo das suas contas.
+          </p>
           <FormMessage>{message}</FormMessage>
           <label className="field">
-            <span>Nome</span>
+            <span>Nome do cartão</span>
             <input className="input" value={name} onChange={(event) => setName(event.target.value)} placeholder="Cartão principal" />
           </label>
           <label className="field">
             <span>Últimos 4 dígitos</span>
-            <input className="input" inputMode="numeric" maxLength={4} value={lastFour} onChange={(event) => setLastFour(event.target.value)} />
+            <input className="input" inputMode="numeric" maxLength={4} value={lastFour} onChange={(event) => setLastFour(event.target.value)} placeholder="0000" />
           </label>
+          <div className="field">
+            <span className="field-label">Bandeira</span>
+            <CustomSelect
+              value={brand}
+              onChange={(v) => setBrand(v as CreateCreditCardInput['brand'])}
+              options={cardBrandOptions.map((b) => ({ value: b, label: b }))}
+            />
+          </div>
           <label className="field">
-            <span>Bandeira</span>
-            <select className="select" value={brand} onChange={(event) => setBrand(event.target.value as CreateCreditCardInput['brand'])}>
-              {cardBrandOptions.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>Limite</span>
+            <span>Limite total</span>
             <input className="input" inputMode="decimal" value={limit} onChange={(event) => setLimit(event.target.value)} placeholder="0,00" />
           </label>
           <div className="form-grid-2">
             <label className="field">
-              <span>Fechamento</span>
+              <span>Dia de fechamento</span>
               <input className="input" type="number" min={1} max={28} value={closingDay} onChange={(event) => setClosingDay(Number(event.target.value))} />
             </label>
             <label className="field">
-              <span>Vencimento</span>
+              <span>Dia de vencimento</span>
               <input className="input" type="number" min={1} max={28} value={dueDay} onChange={(event) => setDueDay(Number(event.target.value))} />
             </label>
           </div>
           <button className="button button--primary" type="submit">
-            Criar cartão
+            Adicionar cartão
           </button>
         </form>
 
         <article className="surface surface-pad">
-          <p className="eyebrow">Cartões ativos</p>
+          <p className="eyebrow">Seus cartões</p>
+          <h2 style={{ margin: '0.25rem 0 1rem' }}>Cartões ativos</h2>
           {cardsData.cards.length > 0 ? (
             <div className="item-list">
-              {cardsData.cards.map((card) => (
-                <Link className="list-row list-row--link" to={`/app/cards/${card.id}`} key={card.id}>
-                  <div>
-                    <strong>{card.name}</strong>
-                    <span className="text-secondary">
-                      {card.brand} final {card.lastFour} · fecha dia {card.closingDay}
-                    </span>
-                  </div>
-                  <div className="list-row-end">
-                    <strong>{formatMoney(card.limitCents)}</strong>
-                    <CreditCard size={20} aria-hidden="true" />
-                  </div>
-                </Link>
-              ))}
+              {cardsData.cards.map((card) => {
+                const usedCents = cardsData.invoices
+                  .filter((invoice) => invoice.cardId === card.id && (invoice.status === 'open' || invoice.status === 'closed'))
+                  .reduce((total, invoice) => total + invoice.outstandingBalanceCents, 0);
+                const availableCents = Math.max(0, card.limitCents - usedCents);
+                const usedPercent = card.limitCents > 0 ? Math.min(100, Math.round((usedCents / card.limitCents) * 100)) : 0;
+                const barClass =
+                  usedPercent >= 90 ? 'card-limit-bar-fill--danger' :
+                  usedPercent >= 70 ? 'card-limit-bar-fill--warning' : '';
+
+                return (
+                  <Link className="list-row list-row--link" to={`/app/cards/${card.id}`} key={card.id}>
+                    <div className="card-list-item" style={{ flex: 1 }}>
+                      <div className="card-list-item-top">
+                        <div>
+                          <strong>{card.name}</strong>
+                          <span className="text-secondary">
+                            {card.brand} ···· {card.lastFour} · fecha dia {card.closingDay}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <CreditCard size={20} aria-hidden="true" />
+                        </div>
+                      </div>
+                      <div className="card-limit-block" style={{ marginBottom: 0 }}>
+                        <div className="card-limit-bar-track" aria-hidden="true">
+                          <div className={`card-limit-bar-fill ${barClass}`} style={{ width: `${usedPercent}%` }} />
+                        </div>
+                        <div className="card-limit-row">
+                          <span className="text-secondary">
+                            Disponível: <strong className="card-limit-available">{formatMoney(availableCents)}</strong>
+                          </span>
+                          <span className="text-secondary">de {formatMoney(card.limitCents)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           ) : (
-            <p className="text-secondary">Nenhum cartão criado ainda.</p>
+            <div className="empty-copy">
+              <span className="empty-icon">
+                <CreditCard size={24} aria-hidden="true" />
+              </span>
+              <p className="text-secondary">Nenhum cartão cadastrado ainda. Adicione seu primeiro cartão ao lado.</p>
+            </div>
           )}
         </article>
       </div>
