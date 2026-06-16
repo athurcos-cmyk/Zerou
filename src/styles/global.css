@@ -2704,6 +2704,17 @@ html[data-reduce-motion='true'] *::after {
   margin-top: 1.25rem;
 }
 
+.sheet-hint {
+  margin: 0.75rem 0 0;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.button--danger-text {
+  color: var(--danger);
+}
+
 /* --- Category grid in sheet --- */
 .category-grid {
   display: grid;

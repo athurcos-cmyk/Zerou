@@ -6,7 +6,7 @@ import { SelectField } from '../components/SelectField';
 import { FormMessage } from '../components/FormMessage';
 import { fromDateInputValue, todayInputValue, toDateInputValue } from '../finance/financeDates';
 import { recurringFrequencyLabels } from '../finance/financeLabels';
-import { createCategory, createRecurringRule, deleteCategory } from '../finance/financeService';
+import { createCategory, createRecurringRule, deleteCategory, updateCategory } from '../finance/financeService';
 import { recurringFrequencies, type CreateRecurringRuleInput } from '../finance/financeSchemas';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
@@ -103,6 +103,10 @@ export function RecurringPage() {
               if (!workspaceId || !user) return;
               const id = await createCategory(workspaceId, user.uid, { name, icon, type, color });
               setCategoryId(id);
+            }}
+            onUpdateCategory={async (id, patch) => {
+              if (!workspaceId) return;
+              await updateCategory(workspaceId, id, patch);
             }}
             onDeleteCategory={async (id) => {
               if (!workspaceId) return;

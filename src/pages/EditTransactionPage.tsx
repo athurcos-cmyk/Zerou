@@ -7,7 +7,7 @@ import { FormMessage } from '../components/FormMessage';
 import { SelectField } from '../components/SelectField';
 import { fromDateInputValue, toDateInputValue } from '../finance/financeDates';
 import { accountTypeLabels, transactionTypeLabels } from '../finance/financeLabels';
-import { createCategory, deleteCategory, updateTransaction } from '../finance/financeService';
+import { createCategory, deleteCategory, updateCategory, updateTransaction } from '../finance/financeService';
 import { type SupportedTransactionType } from '../finance/financeSchemas';
 import { centsToInputValue, parseMoneyToCents } from '../finance/money';
 import { useFinanceData } from '../finance/useFinanceData';
@@ -86,6 +86,11 @@ export function EditTransactionPage() {
   async function handleDeleteCategory(id: string) {
     if (!workspaceId) return;
     await deleteCategory(workspaceId, id);
+  }
+
+  async function handleUpdateCategory(id: string, patch: { name?: string; icon?: string; color?: string }) {
+    if (!workspaceId) return;
+    await updateCategory(workspaceId, id, patch);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -198,6 +203,7 @@ export function EditTransactionPage() {
           categories={finance.categories}
           filterType={categoryFilterType as 'income' | 'expense' | 'all'}
           onCreateCategory={handleCreateCategory}
+          onUpdateCategory={handleUpdateCategory}
           onDeleteCategory={handleDeleteCategory}
         />
 

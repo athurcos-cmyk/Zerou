@@ -9,7 +9,7 @@ import { invoiceStatusLabels } from '../cards/cardLabels';
 import { createCardPurchase } from '../cards/cardService';
 import { useCardsData } from '../cards/useCardsData';
 import { fromDateInputValue, todayInputValue, toDateInputValue } from '../finance/financeDates';
-import { createCategory, deleteCategory } from '../finance/financeService';
+import { createCategory, deleteCategory, updateCategory } from '../finance/financeService';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { useFinanceData } from '../finance/useFinanceData';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
@@ -153,6 +153,10 @@ export function CardDetailPage() {
               if (!workspaceId || !user) return;
               const id = await createCategory(workspaceId, user.uid, { name, icon, type, color });
               setCategoryId(id);
+            }}
+            onUpdateCategory={async (id, patch) => {
+              if (!workspaceId) return;
+              await updateCategory(workspaceId, id, patch);
             }}
             onDeleteCategory={async (id) => {
               if (!workspaceId) return;

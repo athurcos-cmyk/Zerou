@@ -174,12 +174,12 @@ export function OnboardingPage() {
           </button>
         )}
         {step === 1 && (
-          <button className="button button--primary onboard-cta" type="button" disabled={!goal} onClick={next}>
+          <button className="button button--primary onboard-cta" type="button" onClick={next}>
             Continuar <ArrowRight size={18} aria-hidden="true" />
           </button>
         )}
         {step === 2 && (
-          <button className="button button--primary onboard-cta" type="button" disabled={busy || !challenge || Boolean(firebaseError)} onClick={() => void finish()}>
+          <button className="button button--primary onboard-cta" type="button" disabled={busy || Boolean(firebaseError)} onClick={() => void finish()}>
             {busy ? 'Preparando...' : <>Entrar no Zerou <CheckCircle2 size={18} aria-hidden="true" /></>}
           </button>
         )}

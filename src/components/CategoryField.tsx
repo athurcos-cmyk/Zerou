@@ -1,8 +1,16 @@
 import { useState, type FormEvent } from 'react';
-import { Check, ChevronRight, Plus, Settings2, Tag, Trash2, X } from 'lucide-react';
+import { Check, ChevronRight, Pencil, Plus, Settings2, Tag, Trash2, X } from 'lucide-react';
 import type { Category } from '../types/contracts';
 import { BottomSheet } from './BottomSheet';
-import { CategoryIcon, categoryColors, categoryIconKeys, defaultCategoryColor } from './categoryIcons';
+import {
+  CategoryIcon, categoryColors, categoryIconKeys, resolveCategoryColor
+} from './categoryIcons';
+
+export interface CategoryPatch {
+  name?: string;
+  icon?: string;
+  color?: string;
+}
 
 interface CategoryFieldProps {
   label?: string;
@@ -11,6 +19,7 @@ interface CategoryFieldProps {
   categories: Category[];
   filterType?: 'income' | 'expense' | 'both' | 'all';
   onCreateCategory?: (name: string, icon: string, type: 'income' | 'expense' | 'both', color: string) => Promise<void>;
+  onUpdateCategory?: (id: string, patch: CategoryPatch) => Promise<void>;
   onDeleteCategory?: (id: string) => Promise<void>;
 }
 
@@ -21,10 +30,12 @@ export function CategoryField({
   categories,
   filterType = 'all',
   onCreateCategory,
+  onUpdateCategory,
   onDeleteCategory
 }: CategoryFieldProps) {
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<'list' | 'create'>('list');
+  const [mode, setMode] = useState<'list' | 'form'>('list');
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [manage, setManage] = useState(false);
 
   const [name, setName] = useState('');
@@ -41,21 +52,36 @@ export function CategoryField({
   });
   const selected = filtered.find((cat) => cat.id === value);
 
-  function reset() {
+  function startCreate() {
+    setEditingId(null);
     setName('');
     setIcon('shopping-bag');
     setColor(categoryColors[0]);
     setType(filterType === 'income' ? 'income' : 'expense');
-    setMode('list');
+    setMode('form');
   }
 
-  async function handleCreate(event: FormEvent) {
+  function startEdit(cat: Category) {
+    setEditingId(cat.id);
+    setName(cat.name);
+    setIcon(cat.icon ?? 'shopping-bag');
+    setColor(resolveCategoryColor(cat));
+    setType(cat.type);
+    setMode('form');
+  }
+
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!name.trim() || !onCreateCategory) return;
+    if (!name.trim()) return;
     setBusy(true);
     try {
-      await onCreateCategory(name.trim(), icon, type, color);
-      reset();
+      if (editingId) {
+        if (onUpdateCategory) await onUpdateCategory(editingId, { name: name.trim(), icon, color });
+      } else if (onCreateCategory) {
+        await onCreateCategory(name.trim(), icon, type, color);
+      }
+      setMode('list');
+      setManage(false);
     } finally {
       setBusy(false);
     }
@@ -77,13 +103,15 @@ export function CategoryField({
     setOpen(false);
   }
 
+  const editingDefault = editingId ? filtered.find((c) => c.id === editingId)?.isDefault : false;
+
   return (
     <div className="field">
       <span className="field-label">{label}</span>
-      <button className="select-row" type="button" onClick={() => { setOpen(true); setMode('list'); }}>
+      <button className="select-row" type="button" onClick={() => { setOpen(true); setMode('list'); setManage(false); }}>
         <span
           className="select-row-icon select-row-icon--category"
-          style={{ background: selected?.color ?? (selected ? defaultCategoryColor : 'var(--bg-surface-muted)') }}
+          style={{ background: selected ? resolveCategoryColor(selected) : 'var(--bg-surface-muted)' }}
           aria-hidden="true"
         >
           {selected ? <CategoryIcon icon={selected.icon} size={17} /> : <Tag size={17} />}
@@ -101,7 +129,7 @@ export function CategoryField({
       <BottomSheet
         open={open}
         onClose={() => setOpen(false)}
-        title={mode === 'create' ? 'Nova categoria' : 'Selecionar categoria'}
+        title={mode === 'form' ? (editingId ? 'Editar categoria' : 'Nova categoria') : 'Selecionar categoria'}
       >
         {mode === 'list' ? (
           <>
@@ -112,14 +140,15 @@ export function CategoryField({
                   <button
                     key={cat.id}
                     type="button"
-                    className={`category-tile${isSelected ? ' category-tile--selected' : ''}`}
-                    onClick={() => (manage ? undefined : pick(cat.id))}
+                    className={`category-tile${isSelected && !manage ? ' category-tile--selected' : ''}`}
+                    onClick={() => (manage ? startEdit(cat) : pick(cat.id))}
                   >
-                    <span className="category-tile-mark" style={{ background: cat.color ?? defaultCategoryColor }}>
+                    <span className="category-tile-mark" style={{ background: resolveCategoryColor(cat) }}>
                       <CategoryIcon icon={cat.icon} size={20} />
                     </span>
                     <span className="category-tile-name">{cat.name}</span>
                     {isSelected && !manage && <Check size={14} className="category-tile-check" aria-hidden="true" />}
+                    {manage && <Pencil size={13} className="category-tile-check" aria-hidden="true" />}
                     {manage && onDeleteCategory && !cat.isDefault && (
                       <span
                         className="category-tile-delete"
@@ -139,19 +168,20 @@ export function CategoryField({
 
             <div className="sheet-actions">
               {onCreateCategory && (
-                <button className="button button--primary" type="button" onClick={() => { reset(); setType(filterType === 'income' ? 'income' : 'expense'); setMode('create'); }}>
+                <button className="button button--primary" type="button" onClick={startCreate}>
                   <Plus size={17} aria-hidden="true" /> Nova categoria
                 </button>
               )}
-              {onDeleteCategory && filtered.some((cat) => !cat.isDefault) && (
+              {onUpdateCategory && filtered.length > 0 && (
                 <button className="button button--ghost" type="button" onClick={() => setManage((m) => !m)}>
-                  <Settings2 size={16} aria-hidden="true" /> {manage ? 'Concluir' : 'Gerenciar'}
+                  <Settings2 size={16} aria-hidden="true" /> {manage ? 'Concluir' : 'Editar categorias'}
                 </button>
               )}
             </div>
+            {manage && <p className="sheet-hint">Toque numa categoria para mudar cor, ícone ou nome.</p>}
           </>
         ) : (
-          <form className="category-create" onSubmit={(event) => void handleCreate(event)}>
+          <form className="category-create" onSubmit={(event) => void handleSubmit(event)}>
             <div className="category-create-preview">
               <span className="category-tile-mark category-tile-mark--lg" style={{ background: color }}>
                 <CategoryIcon icon={icon} size={26} />
@@ -163,7 +193,7 @@ export function CategoryField({
               <input className="input" value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex: Pets, Streaming, Uber..." autoFocus />
             </label>
 
-            {filterType === 'all' && (
+            {!editingId && filterType === 'all' && (
               <div className="field">
                 <span className="field-label">Tipo</span>
                 <div className="segmented">
@@ -184,12 +214,12 @@ export function CategoryField({
                     key={c}
                     type="button"
                     className={`color-dot${color === c ? ' color-dot--selected' : ''}`}
-                    style={{ background: c }}
+                    style={{ background: c, color: c }}
                     aria-label={`Cor ${c}`}
                     aria-pressed={color === c}
                     onClick={() => setColor(c)}
                   >
-                    {color === c && <Check size={15} />}
+                    {color === c && <Check size={15} color="#fff" />}
                   </button>
                 ))}
               </div>
@@ -215,8 +245,13 @@ export function CategoryField({
 
             <div className="sheet-actions">
               <button className="button button--primary" type="submit" disabled={busy || !name.trim()}>
-                {busy ? 'Criando...' : 'Criar categoria'}
+                {busy ? 'Salvando...' : editingId ? 'Salvar alterações' : 'Criar categoria'}
               </button>
+              {editingId && onDeleteCategory && !editingDefault && (
+                <button className="button button--ghost button--danger-text" type="button" disabled={busy} onClick={() => { const id = editingId; setMode('list'); void handleDelete(id); }}>
+                  <Trash2 size={16} aria-hidden="true" /> Excluir categoria
+                </button>
+              )}
               <button className="button button--ghost" type="button" onClick={() => setMode('list')}>
                 <X size={16} aria-hidden="true" /> Cancelar
               </button>

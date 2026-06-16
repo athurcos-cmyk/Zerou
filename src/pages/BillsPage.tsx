@@ -6,7 +6,7 @@ import { SelectField } from '../components/SelectField';
 import { FormMessage } from '../components/FormMessage';
 import { fromDateInputValue, todayInputValue, toDateInputValue } from '../finance/financeDates';
 import { billStatusLabels } from '../finance/financeLabels';
-import { createBill, createCategory, deleteCategory, updateBillStatus } from '../finance/financeService';
+import { createBill, createCategory, deleteCategory, updateBillStatus, updateCategory } from '../finance/financeService';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
 import { useFinanceData } from '../finance/useFinanceData';
@@ -95,6 +95,10 @@ export function BillsPage() {
               if (!workspaceId || !user) return;
               const id = await createCategory(workspaceId, user.uid, { name, icon, type, color });
               setCategoryId(id);
+            }}
+            onUpdateCategory={async (id, patch) => {
+              if (!workspaceId) return;
+              await updateCategory(workspaceId, id, patch);
             }}
             onDeleteCategory={async (id) => {
               if (!workspaceId) return;

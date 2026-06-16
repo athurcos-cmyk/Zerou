@@ -71,3 +71,27 @@ export const categoryColors = [
 ];
 
 export const defaultCategoryColor = '#7C6F64';
+
+/** Deterministic colors for the built-in categories so they aren't all gray (no migration needed). */
+const defaultCategoryColors: Record<string, string> = {
+  income_salary: '#5FA052',
+  income_extra: '#2E9E8F',
+  expense_home: '#3B82C4',
+  expense_food: '#EE5524',
+  expense_transport: '#6366C9',
+  expense_health: '#D14545',
+  expense_leisure: '#9B5DE5',
+  both_transfer: '#4A5568',
+  both_adjustment: '#7C6F64'
+};
+
+/** Resolve the color to paint a category mark: explicit color → built-in default → hashed palette. */
+export function resolveCategoryColor(category: { id: string; color?: string }) {
+  if (category.color) return category.color;
+  if (defaultCategoryColors[category.id]) return defaultCategoryColors[category.id];
+  let hash = 0;
+  for (let i = 0; i < category.id.length; i += 1) {
+    hash = (hash * 31 + category.id.charCodeAt(i)) >>> 0;
+  }
+  return categoryColors[hash % categoryColors.length];
+}

@@ -167,6 +167,19 @@ export async function createCategory(
   return id;
 }
 
+export async function updateCategory(
+  workspaceId: string,
+  categoryId: string,
+  patch: { name?: string; icon?: string; color?: string }
+) {
+  await updateDoc(documentRef(workspaceId, 'categories', categoryId), omitUndefined({
+    name: patch.name?.trim(),
+    icon: patch.icon,
+    color: patch.color,
+    updatedAt: serverTimestamp()
+  }));
+}
+
 export async function deleteCategory(workspaceId: string, categoryId: string) {
   await updateDoc(documentRef(workspaceId, 'categories', categoryId), {
     isActive: false,
