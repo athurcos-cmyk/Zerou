@@ -15,6 +15,10 @@ Documentação organizada para reduzir contexto inicial. Os arquivos de entrada 
 | `docs/BILLING.md`, `docs/BOOTSTRAP_FIREBASE_STRIPE.md` | Billing futuro (inativo) |
 | `docs/MANUAL_SETUP_REQUIRED.md` | Setup manual de infraestrutura |
 | `docs/legal/` | Materiais legais |
+| `docs/ARCHITECTURE.md` | Visão técnica/arquitetura |
+| `docs/SECURITY.md`, `docs/PRIVACY.md` | Segurança e privacidade (LGPD) |
+| `docs/RUNBOOK.md` | Operação e deploy |
+| `docs/HANDOFF-PARA-CLAUDE.md`, `docs/README-START-HERE.md` | Handoff legado (substituídos por `SESSAO.md`/`CLAUDE.md`) |
 
 ## Arquivos de entrada (na raiz)
 
@@ -23,9 +27,9 @@ Documentação organizada para reduzir contexto inicial. Os arquivos de entrada 
 - `CLAUDE.md` / `CODEX.md`: instruções para agentes (regra de docs, stack, restrições).
 - `docs/BUSCA_RAPIDA.md`: mapa para achar assunto sem carregar histórico grande.
 
-## Referência técnica (na raiz, legado mantido)
+## Referência técnica
 
-`ARCHITECTURE.md`, `SECURITY.md`, `PRIVACY.md`, `RUNBOOK.md` e `HANDOFF-PARA-CLAUDE.md` seguem na raiz. São referência sob demanda — mapeados em `BUSCA_RAPIDA.md`.
+`docs/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/PRIVACY.md` e `docs/RUNBOOK.md` são referência sob demanda — mapeados em `BUSCA_RAPIDA.md`. A raiz fica só com os arquivos de entrada (`README`, `CLAUDE`, `CODEX`, `SESSAO`, `CHANGELOG`).
 
 ## Como atualizar histórico
 

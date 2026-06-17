@@ -17,9 +17,9 @@
 | Design/UI (Sol) | `docs/design/DESIGN.md` |
 | Pendências/roadmap | `docs/planning/TODOS.md` |
 | Testes/QA | `docs/qa/TESTES.md` |
-| Arquitetura | `ARCHITECTURE.md` |
-| Segurança/privacidade | `SECURITY.md`, `PRIVACY.md` |
-| Operação/deploy | `RUNBOOK.md`, `docs/PRODUCTION_CHECKLIST.md` |
+| Arquitetura | `docs/ARCHITECTURE.md` |
+| Segurança/privacidade | `docs/SECURITY.md`, `docs/PRIVACY.md` |
+| Operação/deploy | `docs/RUNBOOK.md`, `docs/PRODUCTION_CHECKLIST.md` |
 | Billing futuro (inativo) | `docs/BILLING.md`, `docs/BOOTSTRAP_FIREBASE_STRIPE.md` |
 
 ## Projeto

@@ -13,9 +13,9 @@ Use este arquivo como mapa antes de abrir documentos grandes. Regra: leia o meno
 | Pendências/roadmap | `docs/planning/TODOS.md` | Itens abertos |
 | Design/UI (Sol) | `docs/design/DESIGN.md` | Tokens, fontes, componentes-base |
 | Testes e QA | `docs/qa/TESTES.md` | Estratégia, comandos, cenários |
-| Arquitetura | `ARCHITECTURE.md` | Visão técnica |
-| Segurança / privacidade | `SECURITY.md`, `PRIVACY.md` | Regras, LGPD |
-| Operação / deploy | `RUNBOOK.md`, `docs/PRODUCTION_CHECKLIST.md` | Rotina e checklist |
+| Arquitetura | `docs/ARCHITECTURE.md` | Visão técnica |
+| Segurança / privacidade | `docs/SECURITY.md`, `docs/PRIVACY.md` | Regras, LGPD |
+| Operação / deploy | `docs/RUNBOOK.md`, `docs/PRODUCTION_CHECKLIST.md` | Rotina e checklist |
 | Billing futuro (inativo) | `docs/BILLING.md`, `docs/BOOTSTRAP_FIREBASE_STRIPE.md` | Não ativar sem pedido |
 | Setup de infra manual | `docs/MANUAL_SETUP_REQUIRED.md` | Passos fora do código |
 | Instruções pra agentes | `CLAUDE.md`, `CODEX.md` | Regra de docs e restrições |

@@ -27,8 +27,8 @@ React 19 (TS strict), Vite, Firebase Web SDK (Auth + Firestore + Storage), Verce
 | Design/UI (Sol) | `docs/design/DESIGN.md` |
 | Pendências | `docs/planning/TODOS.md` |
 | Testes/QA | `docs/qa/TESTES.md` |
-| Arquitetura | `ARCHITECTURE.md` |
-| Segurança/privacidade/operação | `SECURITY.md`, `PRIVACY.md`, `RUNBOOK.md` |
+| Arquitetura | `docs/ARCHITECTURE.md` |
+| Segurança/privacidade/operação | `docs/SECURITY.md`, `docs/PRIVACY.md`, `docs/RUNBOOK.md` |
 
 ## Convenções essenciais
 
