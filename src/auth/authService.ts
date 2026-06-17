@@ -2,8 +2,10 @@ import {
   EmailAuthProvider,
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
+  deleteUser,
   linkWithCredential,
   linkWithPopup,
+  reauthenticateWithPopup,
   reauthenticateWithCredential,
   sendEmailVerification,
   sendPasswordResetEmail,
@@ -85,10 +87,19 @@ export async function reauthenticateWithPassword(user: User, password: string) {
   await reauthenticateWithCredential(user, credential);
 }
 
+export async function reauthenticateWithGoogle(user: User) {
+  await reauthenticateWithPopup(user, googleProvider);
+}
+
 export async function unlinkProvider(user: User, providerId: string) {
   if (user.providerData.length <= 1) {
     throw new Error('Mantenha pelo menos um método de acesso ativo.');
   }
 
   await unlink(user, providerId);
+}
+
+export async function deleteAuthenticatedUser(user: User) {
+  await deleteUser(user);
+  clearCachedProfiles();
 }

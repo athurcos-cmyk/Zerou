@@ -32,7 +32,8 @@ Do not mark broad public production as ready until every blocking item is comple
 - [ ] Cookie banner tested for accept, refuse and preference review.
 - [ ] Analytics verified not to load before consent.
 - [ ] Privacy Center request creation verified against Prod Firestore.
-- [ ] Data export and deletion manual runbook tested.
+- [ ] Data export manual runbook tested.
+- [ ] In-app account deletion tested in production with a disposable account.
 
 ## Billing Future
 

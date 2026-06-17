@@ -1558,6 +1558,10 @@ html[data-reduce-motion='true'] *::after {
   margin-top: 1.5rem;
 }
 
+.danger-zone {
+  border-color: var(--danger);
+}
+
 .pricing-page {
   align-content: start;
   gap: 2rem;

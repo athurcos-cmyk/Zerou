@@ -50,7 +50,7 @@ const documents = {
       ],
       [
         'Encerramento e exclusão',
-        'Você pode parar de usar a Zerou a qualquer momento. A exclusão definitiva de conta deverá ocorrer pelas Configurações do app, com confirmação expressa, quando a rotina automatizada estiver disponível. Até lá, pedidos relacionados a direitos de privacidade podem ser enviados pelo canal indicado na Política de privacidade. Algumas informações podem ser mantidas pelo tempo necessário para segurança, prevenção de fraude, cumprimento legal, resolução de disputas ou exercício regular de direitos.'
+        'Você pode parar de usar a Zerou a qualquer momento. A exclusão definitiva de conta ocorre pelas Configurações do app, na área de Segurança, com confirmação expressa e reautenticação quando exigida pelo Firebase. Algumas informações podem ser mantidas pelo tempo necessário para segurança, prevenção de fraude, cumprimento legal, resolução de disputas ou exercício regular de direitos.'
       ],
       [
         'Responsabilidade',

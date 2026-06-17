@@ -40,7 +40,7 @@ A Zerou busca manter o app estavel, mas pode passar por manutencoes, atualizacoe
 
 ## Encerramento e exclusao
 
-O usuario pode parar de usar a Zerou a qualquer momento. A exclusao definitiva de conta devera ocorrer pelas Configuracoes do app, com confirmacao expressa, quando a rotina automatizada estiver disponivel. Ate la, pedidos relacionados a direitos de privacidade podem ser enviados pelo canal indicado na Politica de privacidade. Algumas informacoes podem ser mantidas pelo tempo necessario para seguranca, prevencao de fraude, cumprimento legal, resolucao de disputas ou exercicio regular de direitos.
+O usuario pode parar de usar a Zerou a qualquer momento. A exclusao definitiva de conta ocorre pelas Configuracoes do app, na area de Seguranca, com confirmacao expressa e reautenticacao quando exigida pelo Firebase. Algumas informacoes podem ser mantidas pelo tempo necessario para seguranca, prevencao de fraude, cumprimento legal, resolucao de disputas ou exercicio regular de direitos.
 
 ## Lei aplicavel
 

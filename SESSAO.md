@@ -40,6 +40,7 @@ React 19 (TS strict), Vite, Firebase Web SDK (Auth + Firestore + Storage), Verce
 - **Offline-first**: Firestore com `persistentLocalCache` + `experimentalAutoDetectLongPolling` (`src/firebase/config.ts`). **Nunca bloquear a UI esperando ack do Firestore** — dispara a escrita (fire-and-forget + `.catch`) e deixa o `onSnapshot` refletir (badge pendente → sincronizado).
 - **Boot em internet fraca**: `AuthContext` usa cache local de perfil (`src/auth/profileCache.ts`) como fallback após 1,8s se Auth/perfil ficarem presos em rede "online ruim". Enquanto `authFromCache` estiver ativo, ações sensíveis de login/verificação ficam bloqueadas até Firebase confirmar a sessão real.
 - **PWA offline**: SVGs também entram no precache do Workbox; logos de banco em `public/bank-logos/` devem funcionar offline após o service worker atualizar.
+- **Exclusão de conta**: disponível em `/app/settings/security/login-methods`; exige digitar `EXCLUIR` e reautenticar. Remove perfil, workspace pessoal, dados financeiros/cartões/faturas, billing shell e espaços de casal criados pelo usuário. Parceiro em workspace de outra pessoa sai do espaço sem apagar o workspace do dono.
 - Cores só em `src/styles/themes.css` (+ `src/theme/palette.ts`). Literais quebram o teste `noHardcodedColors` (exceção: `src/landing/`).
 - Componentes-base de UX: `BottomSheet`, `SelectField`, `CategoryField`, `ConfirmDialog`, `EmptyState`.
 - Não expor erro técnico ao usuário; landing sempre clara.

@@ -1,9 +1,17 @@
 import { useMemo, useState } from 'react';
-import { CircleUserRound, KeyRound, Link2, ShieldAlert, Trash2 } from 'lucide-react';
+import { AlertTriangle, CircleUserRound, KeyRound, Link2, ShieldAlert, Trash2 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
-import { addPasswordProvider, linkGoogleProvider, reauthenticateWithPassword, unlinkProvider } from '../auth/authService';
+import {
+  addPasswordProvider,
+  deleteAuthenticatedUser,
+  linkGoogleProvider,
+  reauthenticateWithGoogle,
+  reauthenticateWithPassword,
+  unlinkProvider
+} from '../auth/authService';
 import { getAuthErrorMessage } from '../auth/authErrors';
 import { FormMessage } from '../components/FormMessage';
+import { deleteAccountData } from './accountDeletionService';
 
 const providerLabels: Record<string, string> = {
   password: 'Email e senha',
@@ -16,6 +24,8 @@ export function LoginMethodsPage() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deletePassword, setDeletePassword] = useState('');
   const [busy, setBusy] = useState(false);
   const providers = useMemo(() => user?.providerData.map((provider) => provider.providerId) ?? [], [user]);
   const hasGoogle = providers.includes('google.com');
@@ -53,6 +63,42 @@ export function LoginMethodsPage() {
 
       await unlinkProvider(user, providerId);
     }, 'Método removido da sua conta Zerou.');
+  }
+
+  async function onDeleteAccount() {
+    setBusy(true);
+    setMessage(null);
+    setSuccess(null);
+
+    try {
+      if (!user || authFromCache) {
+        throw new Error('Entre novamente na Zerou antes de excluir a conta.');
+      }
+
+      if (deleteConfirmation.trim() !== 'EXCLUIR') {
+        throw new Error('Digite EXCLUIR para confirmar.');
+      }
+
+      if (hasPassword) {
+        if (!deletePassword) {
+          throw new Error('Informe sua senha atual para confirmar a exclusão.');
+        }
+
+        await reauthenticateWithPassword(user, deletePassword);
+      } else if (hasGoogle) {
+        await reauthenticateWithGoogle(user);
+      } else {
+        throw new Error('Adicione um método de login antes de excluir a conta.');
+      }
+
+      await deleteAccountData(user.uid);
+      await deleteAuthenticatedUser(user);
+      window.location.assign('/');
+    } catch (error) {
+      setMessage(getAuthErrorMessage(error));
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -155,6 +201,54 @@ export function LoginMethodsPage() {
           <p className="text-muted">
             Provedor atual: <Link2 size={14} aria-hidden="true" /> {user?.uid}
           </p>
+        </section>
+
+        <section className="surface surface-pad form-stack danger-zone" aria-labelledby="delete-account-title">
+          <div className="notice notice--danger">
+            <AlertTriangle size={18} aria-hidden="true" /> Esta ação apaga sua conta, seu workspace pessoal, contas,
+            transações, cartões, faturas, metas, cofrinhos pessoais e espaços de casal criados por você.
+          </div>
+
+          <div>
+            <h2 id="delete-account-title">Excluir conta definitivamente</h2>
+            <p className="text-secondary">
+              Essa exclusão não pode ser desfeita. Para confirmar, digite EXCLUIR e valide seu login.
+            </p>
+          </div>
+
+          <div className="field">
+            <label htmlFor="delete-confirmation">Digite EXCLUIR</label>
+            <input
+              className="input"
+              id="delete-confirmation"
+              value={deleteConfirmation}
+              onChange={(event) => setDeleteConfirmation(event.target.value)}
+              autoComplete="off"
+            />
+          </div>
+
+          {hasPassword ? (
+            <div className="field">
+              <label htmlFor="delete-password">Senha atual</label>
+              <input
+                className="input"
+                id="delete-password"
+                type="password"
+                value={deletePassword}
+                onChange={(event) => setDeletePassword(event.target.value)}
+                autoComplete="current-password"
+              />
+            </div>
+          ) : null}
+
+          <button
+            className="button button--danger"
+            type="button"
+            disabled={busy || authFromCache || deleteConfirmation.trim() !== 'EXCLUIR' || (hasPassword && !deletePassword)}
+            onClick={() => void onDeleteAccount()}
+          >
+            <Trash2 size={18} aria-hidden="true" /> {busy ? 'Excluindo...' : 'Excluir minha conta'}
+          </button>
         </section>
       </div>
     </section>

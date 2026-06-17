@@ -546,6 +546,21 @@ describe('firestore security rules', () => {
     await assertSucceeds(getDoc(doc(charlieDb, 'workspaces/personal_charlie')));
   });
 
+  it('allows a signed-in user to delete their own personal foundation atomically', async () => {
+    const charlieDb = testEnv.authenticatedContext('charlie').firestore();
+    const modularDb = charlieDb as unknown as Parameters<typeof writeBatch>[0];
+
+    await assertSucceeds(createFoundationBatch(charlieDb, 'charlie').commit());
+
+    const batch = writeBatch(modularDb);
+    batch.delete(doc(modularDb, 'workspaces/personal_charlie/members/charlie'));
+    batch.delete(doc(modularDb, 'users/charlie/workspaceRefs/personal_charlie'));
+    batch.delete(doc(modularDb, 'workspaces/personal_charlie'));
+    batch.delete(doc(modularDb, 'users/charlie'));
+
+    await assertSucceeds(batch.commit());
+  });
+
   it('blocks forged Spark foundation owner and workspace references', async () => {
     const charlieDb = testEnv.authenticatedContext('charlie').firestore();
 

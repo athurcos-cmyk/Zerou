@@ -833,6 +833,29 @@ service cloud.firestore {
         && get(memberDoc(workspaceId, uid)).data.status == 'active';
     }
 
+    function canDeleteUserAccountData(uid) {
+      return isSelf(uid);
+    }
+
+    function canDeleteWorkspaceTree(workspaceId) {
+      return signedIn()
+        && (
+          workspaceId == personalWorkspaceId(request.auth.uid)
+          || get(workspaceDoc(workspaceId)).data.ownerUserId == request.auth.uid
+        );
+    }
+
+    function canDeleteWorkspaceDocument(workspaceId) {
+      return signedIn()
+        && (
+          (
+            workspaceId == personalWorkspaceId(request.auth.uid)
+            && resource.data.ownerUserId == request.auth.uid
+          )
+          || resource.data.ownerUserId == request.auth.uid
+        );
+    }
+
     function validCoupleWorkspaceCreate(workspaceId) {
       let uid = request.auth.uid;
 
@@ -1248,13 +1271,13 @@ service cloud.firestore {
       allow read: if isSelf(uid);
       allow create: if validUserFoundationCreate(uid);
       allow update: if isSelf(uid) && onlyAppearanceChanged() && validThemeFields();
-      allow delete: if false;
+      allow delete: if canDeleteUserAccountData(uid);
 
       match /workspaceRefs/{workspaceId} {
         allow read: if isSelf(uid);
         allow create: if validWorkspaceRefFoundationCreate(uid, workspaceId) || validCoupleWorkspaceRefCreate(uid, workspaceId);
         allow update: if validCoupleWorkspaceRefUpdate(uid, workspaceId);
-        allow delete: if false;
+        allow delete: if canDeleteUserAccountData(uid);
       }
     }
 
@@ -1262,7 +1285,7 @@ service cloud.firestore {
       allow read: if isActiveMember(workspaceId);
       allow create: if validWorkspaceFoundationCreate(workspaceId) || validCoupleWorkspaceCreate(workspaceId);
       allow update: if validCoupleWorkspaceUpdate(workspaceId);
-      allow delete: if false;
+      allow delete: if canDeleteWorkspaceDocument(workspaceId);
 
       match /members/{uid} {
         allow read: if isActiveMember(workspaceId);
@@ -1270,7 +1293,7 @@ service cloud.firestore {
           || validCoupleOwnerMemberCreate(workspaceId, uid)
           || validCouplePartnerMemberCreate(workspaceId, uid);
         allow update: if validCoupleMemberUpdate(workspaceId, uid);
-        allow delete: if false;
+        allow delete: if canDeleteWorkspaceTree(workspaceId) || canDeleteUserAccountData(uid);
       }
 
       match /accounts/{accountId} {
@@ -1284,28 +1307,28 @@ service cloud.firestore {
         allow read: if isActiveMember(workspaceId);
         allow create: if validCategoryCreate(workspaceId, categoryId);
         allow update: if validCategoryUpdate(workspaceId);
-        allow delete: if false;
+        allow delete: if canDeleteWorkspaceTree(workspaceId);
       }
 
       match /transactions/{transactionId} {
         allow read: if isActiveMember(workspaceId);
         allow create: if validTransactionCreate(workspaceId, transactionId);
         allow update: if validTransactionUpdate(workspaceId);
-        allow delete: if false;
+        allow delete: if canDeleteWorkspaceTree(workspaceId);
       }
 
       match /bills/{billId} {
         allow read: if isActiveMember(workspaceId);
         allow create: if validBillCreate(workspaceId, billId);
         allow update: if validBillUpdate(workspaceId);
-        allow delete: if false;
+        allow delete: if canDeleteWorkspaceTree(workspaceId);
       }
 
       match /recurring/{recurringId} {
         allow read: if isActiveMember(workspaceId);
         allow create: if validRecurringCreate(workspaceId, recurringId);
         allow update: if validRecurringUpdate(workspaceId);
-        allow delete: if false;
+        allow delete: if canDeleteWorkspaceTree(workspaceId);
       }
 
       match /goals/{goalId} {
@@ -1324,25 +1347,27 @@ service cloud.firestore {
           && request.resource.data.id == contribId
           && request.resource.data.workspaceId == workspaceId
           && request.resource.data.userId == request.auth.uid;
-        allow update, delete: if false;
+        allow update: if false;
+        allow delete: if canDeleteWorkspaceTree(workspaceId);
       }
 
       match /cards/{cardId} {
         allow read: if isActiveMember(workspaceId);
         allow create: if validCardCreate(workspaceId, cardId);
         allow update: if validCardUpdate(workspaceId);
-        allow delete: if false;
+        allow delete: if canDeleteWorkspaceTree(workspaceId);
 
         match /invoices/{invoiceId} {
           allow read: if isActiveMember(workspaceId);
           allow create: if validInvoiceCreate(workspaceId, cardId, invoiceId);
           allow update: if validInvoiceUpdate(workspaceId, cardId);
-          allow delete: if false;
+          allow delete: if canDeleteWorkspaceTree(workspaceId);
 
           match /ledger/{entryId} {
             allow read: if isActiveMember(workspaceId);
             allow create: if validInvoiceLedgerCreate(workspaceId, cardId, invoiceId, entryId);
-            allow update, delete: if false;
+            allow update: if false;
+            allow delete: if canDeleteWorkspaceTree(workspaceId);
           }
         }
       }
@@ -1351,26 +1376,28 @@ service cloud.firestore {
         allow read: if isActiveMember(workspaceId);
         allow create: if validSharedExpenseClaimCreate(workspaceId, claimId);
         allow update: if validSharedExpenseClaimUpdate(workspaceId);
-        allow delete: if false;
+        allow delete: if canDeleteWorkspaceTree(workspaceId);
       }
 
       match /settlements/{settlementId} {
         allow read: if isActiveMember(workspaceId);
         allow create: if validSettlementCreate(workspaceId, settlementId);
         allow update: if validSettlementUpdate(workspaceId);
-        allow delete: if false;
+        allow delete: if canDeleteWorkspaceTree(workspaceId);
       }
 
       match /comments/{commentId} {
         allow read: if isActiveMember(workspaceId);
         allow create: if validSharedCommentCreate(workspaceId, commentId);
-        allow update, delete: if false;
+        allow update: if false;
+        allow delete: if canDeleteWorkspaceTree(workspaceId);
       }
 
       match /auditLogs/{auditId} {
         allow read: if isActiveMember(workspaceId);
         allow create: if validAuditLogCreate(workspaceId, auditId);
-        allow update, delete: if false;
+        allow update: if false;
+        allow delete: if canDeleteWorkspaceTree(workspaceId);
       }
 
       match /{document=**} {
@@ -1384,16 +1411,22 @@ service cloud.firestore {
         || (signedIn() && isActiveMember(resource.data.workspaceId));
       allow create: if validInviteCreate(inviteId);
       allow update: if validInviteUpdate();
-      allow delete: if false;
+      allow delete: if signedIn()
+        && (
+          resource.data.createdBy == request.auth.uid
+          || get(workspaceDoc(resource.data.workspaceId)).data.ownerUserId == request.auth.uid
+        );
     }
 
     match /billingAccounts/{billingAccountId} {
       allow get: if signedIn() && billingAccountId == billingAccountIdFor(request.auth.uid);
-      allow list, create, update, delete: if false;
+      allow list, create, update: if false;
+      allow delete: if signedIn() && billingAccountId == billingAccountIdFor(request.auth.uid);
 
       match /subscriptions/{subscriptionId} {
         allow get, list: if signedIn() && billingAccountId == billingAccountIdFor(request.auth.uid);
-        allow create, update, delete: if false;
+        allow create, update: if false;
+        allow delete: if signedIn() && billingAccountId == billingAccountIdFor(request.auth.uid);
       }
 
       match /billingEvents/{stripeEventId} {

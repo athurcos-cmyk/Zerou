@@ -21,6 +21,6 @@ Analytics stays disabled by default and must only be enabled with an explicit pr
 
 ## Data Rights
 
-LGPD rights are described in the privacy policy. The current Privacy page is informational and does not expose request buttons for marketing revocation, export, deletion or local cache cleanup.
+LGPD rights are described in the privacy policy. The current Privacy page is informational and does not expose public request buttons for marketing revocation, export or local cache cleanup.
 
-Account deletion should live inside authenticated settings with explicit confirmation when the verified automation is ready.
+Account deletion now lives inside authenticated security settings with explicit confirmation, recent-login reauthentication and Firestore cleanup for the user's profile, personal workspace, owned couple workspaces and billing shell when present.
