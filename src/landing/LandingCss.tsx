@@ -48,7 +48,7 @@ export function LandingCss() {
             <p className="lp-hero-note">Grátis · sem cartão de crédito · funciona no navegador do celular</p>
             <div className="lp-proof">
               <span><CheckCircle2 size={18} /> Feito pro celular</span>
-              <span><CheckCircle2 size={18} /> Você e a família, separados</span>
+              <span><CheckCircle2 size={18} /> Pessoal e casal, separados</span>
               <span><CheckCircle2 size={18} /> Fatura sem contar duas vezes</span>
             </div>
           </div>
