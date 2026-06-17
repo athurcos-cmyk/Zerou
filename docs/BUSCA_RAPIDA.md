@@ -1,0 +1,58 @@
+# Busca rápida — Zerou
+
+Use este arquivo como mapa antes de abrir documentos grandes. Regra: leia o menor arquivo que responde a pergunta e use `rg`/Grep antes de abrir histórico mensal.
+
+## Entrada rápida
+
+| Quero saber | Abrir primeiro | Observação |
+|---|---|---|
+| Estado atual do app | `SESSAO.md` | Brief curto para início de sessão |
+| Últimas mudanças | `CHANGELOG.md` | Resumo recente |
+| Histórico por data | `docs/history/YYYY-MM.md` | Abrir só o mês necessário |
+| Onde fica cada doc | `docs/README.md` | Mapa das pastas |
+| Pendências/roadmap | `docs/planning/TODOS.md` | Itens abertos |
+| Design/UI (Sol) | `docs/design/DESIGN.md` | Tokens, fontes, componentes-base |
+| Testes e QA | `docs/qa/TESTES.md` | Estratégia, comandos, cenários |
+| Arquitetura | `ARCHITECTURE.md` | Visão técnica |
+| Segurança / privacidade | `SECURITY.md`, `PRIVACY.md` | Regras, LGPD |
+| Operação / deploy | `RUNBOOK.md`, `docs/PRODUCTION_CHECKLIST.md` | Rotina e checklist |
+| Billing futuro (inativo) | `docs/BILLING.md`, `docs/BOOTSTRAP_FIREBASE_STRIPE.md` | Não ativar sem pedido |
+| Setup de infra manual | `docs/MANUAL_SETUP_REQUIRED.md` | Passos fora do código |
+| Instruções pra agentes | `CLAUDE.md`, `CODEX.md` | Regra de docs e restrições |
+
+## Onde está cada coisa no código
+
+| Assunto | Caminho |
+|---|---|
+| Telas autenticadas | `src/pages/` |
+| Shell + nav inferior/FAB | `src/layout/AppShell.tsx` |
+| Onboarding (questionário) | `src/onboarding/OnboardingPage.tsx` |
+| Componentes-base de UX | `src/components/` (`BottomSheet`, `SelectField`, `CategoryField`, `ConfirmDialog`, `EmptyState`) |
+| Ícones + cores de categoria | `src/components/categoryIcons.tsx`, `src/theme/palette.ts` |
+| Serviço financeiro | `src/finance/financeService.ts` |
+| Cartões / faturas | `src/cards/` |
+| Espaço do casal + cofrinho | `src/pages/SharedSpacePage.tsx`, `src/shared/`, `src/shared/useCoupleSavings.ts` |
+| Metas (pessoais) | `src/pages/GoalsPage.tsx`, `src/finance/useGoalsData.ts` |
+| Tokens de cor / temas | `src/styles/themes.css` |
+| CSS global | `src/styles/global.css` |
+| Landing pública | `src/landing/` (`LandingCss`, `LandingSections`, `LandingShell`, `AppMockup`, `landing.css`) |
+| Regras Firestore | `firestore.rules` |
+
+## Histórico mensal
+
+| Mês | Arquivo | Use para |
+|---|---|---|
+| Junho 2026 | `docs/history/2026-06.md` | Redesign Sol, mobile shell, cofrinho do casal, metas, landing nova |
+
+## Buscas principais
+
+```powershell
+# Última coisa sobre cofrinho/casal
+rg -n "cofrinho|goalContribution|SharedSpace" CHANGELOG.md docs/history
+
+# Onde um token de cor é definido
+rg -n "EE5524|--action-primary|--gradient" src/styles/themes.css
+
+# Onde uma coleção Firestore é usada
+rg -n "goalContributions|collectionRef" src/finance
+```

@@ -1,0 +1,83 @@
+# Zerou — instruções para agentes (Claude)
+
+## Leitura inicial obrigatória
+
+1. Leia `SESSAO.md` (brief curto do estado atual).
+2. Use `docs/BUSCA_RAPIDA.md` para decidir qual contexto abrir.
+3. Não abra arquivos grandes por padrão. Use `rg`/Grep primeiro em `docs/history/` e nos docs de referência.
+
+## Mapa de contexto
+
+| Tema | Arquivo |
+|---|---|
+| Estado atual | `SESSAO.md` |
+| Mudanças recentes | `CHANGELOG.md` |
+| Busca por assunto | `docs/BUSCA_RAPIDA.md` |
+| Histórico mensal | `docs/history/YYYY-MM.md` |
+| Design/UI (Sol) | `docs/design/DESIGN.md` |
+| Pendências/roadmap | `docs/planning/TODOS.md` |
+| Testes/QA | `docs/qa/TESTES.md` |
+| Arquitetura | `ARCHITECTURE.md` |
+| Segurança/privacidade | `SECURITY.md`, `PRIVACY.md` |
+| Operação/deploy | `RUNBOOK.md`, `docs/PRODUCTION_CHECKLIST.md` |
+| Billing futuro (inativo) | `docs/BILLING.md`, `docs/BOOTSTRAP_FIREBASE_STRIPE.md` |
+
+## Projeto
+
+SaaS/PWA financeiro mobile-first. Duas frentes: **controle individual** das finanças e **organização a dois** (casal). Tagline: "Controle individual. Organização a dois." Produção: https://zerou-five.vercel.app · Repo: `athurcos-cmyk/Zerou` · Branch: `main` (direto, sem PR, por pedido do dono).
+
+## Stack
+
+React 19, TypeScript strict, Vite, Firebase Web SDK (Auth + Firestore + Storage), Vercel, Vite PWA Plugin, React Router, React Hook Form, Zod, Zustand, Lucide React. Node >= 22. Testes: Vitest, Playwright, Firebase Rules Unit Testing.
+
+## Regras de código
+
+- **Dinheiro sempre em centavos inteiros** (`amountCents`); exibir via `formatMoney()`.
+- **Firestore** (não Realtime Database). Não mudar sem redesenhar.
+- **IDs client-side** + `clientMutationId` para idempotência.
+- Onboarding e fluxos financeiros rodam **client-side com Security Rules** restritivas — sem Cloud Functions.
+- Coleções por workspace: `workspaces/{id}/{accounts|categories|transactions|bills|recurring|goals|goalContributions|cards|...}`.
+- UI mobile-first. Componentes-base de UX: `BottomSheet`, `SelectField`, `CategoryField`, `ConfirmDialog`, `EmptyState` (ver `docs/design/DESIGN.md`).
+- Cores: tokens em `src/styles/themes.css`. **Não** usar hex/rgba literal fora de `themes.css` e `src/theme/palette.ts` (teste `noHardcodedColors` falha). Zona de marketing `src/landing/` é exceção.
+- Edição cirúrgica: não reescrever arquivo inteiro para mudar poucas linhas.
+- Antes de mexer em UI, leia `docs/design/DESIGN.md`.
+
+## Pontos sensíveis (nunca fazer)
+
+- Não commitar `.env.local` nem service account.
+- Não hardcodar `firebaseConfig` (somente variáveis `VITE_`).
+- Não ativar billing/Cloud Functions sem pedido explícito (plano Spark/free).
+- Não mudar a landing/páginas públicas para dark por padrão (sempre claras/Paper).
+- Não expor erro técnico ao usuário final (usar `getUserFacingErrorMessage`).
+- Não usar logo de banco sem fonte confiável.
+- Dados financeiros pessoais não vazam para o espaço do casal.
+
+## Validação antes de entregar
+
+`npm run typecheck` · `npm test` · `npm run build`. Deploy de regras: `npx firebase deploy --only firestore:rules --project zerou-26757` (somente regras; não toca billing/functions/hosting).
+
+## Atualização de docs no fim da sessão
+
+Cada arquivo tem uma função. Não duplique histórico no `SESSAO.md`.
+
+| Arquivo | Atualizar quando | Não atualizar quando | Como escrever |
+|---|---|---|---|
+| `CHANGELOG.md` | Entregou código, docs, config, bugfix, decisão de produto ou reorganização relevante | Conversa, análise sem mudança, ajuste mínimo | Resumo curto no topo, 3-8 bullets, linkando para `docs/history/` se houver detalhe |
+| `SESSAO.md` | Mudou estado atual, stack, fluxo, caminhos importantes ou regra essencial | Foi só mais uma sessão/bugfix comum/UI pontual | Brief vivo e curto, sem virar diário |
+| `docs/history/YYYY-MM.md` | A sessão precisa de mais de 8 bullets, tem contexto de decisão, auditoria, plano ou detalhe útil depois | Mudança pequena que cabe no changelog | Registro por mês, título datado, detalhes técnicos/produto |
+| `docs/BUSCA_RAPIDA.md` | Mudaram caminhos, nomes, pastas, assuntos ou comandos de busca | Feature comum que não muda onde procurar | Mapa de navegação, tabelas e comandos `rg` |
+| `docs/planning/TODOS.md` | Abriu, fechou ou repriorizou pendência | A tarefa já entrou no changelog e não gerou pendência | Item acionável ou concluído, critério claro |
+| `docs/design/DESIGN.md` | Mudou token, fonte, componente-base ou regra visual | Ajuste de conteúdo sem mudar o sistema | Sistema vivo: tokens, layout, componentes |
+| `README.md` | Mudou setup, comandos ou entrada do projeto | Mudança interna sem impacto pra quem entra no repo | Onboarding curto |
+
+Regras sem ambiguidade:
+
+- Se nada mudou em arquivo, não atualize docs.
+- Entrega relevante → atualize `CHANGELOG.md`.
+- Detalhe que não cabe em 3-8 bullets → vai pro `docs/history/YYYY-MM.md`, e o `CHANGELOG.md` fica só com o resumo + referência.
+- `SESSAO.md` descreve o presente. Não vire diário.
+- `docs/BUSCA_RAPIDA.md` só muda quando a forma de achar contexto muda.
+
+## Observação de contexto
+
+Arquivos grandes ficam fora da raiz, em `docs/`, de propósito. Não traga histórico gigante de volta pra raiz.

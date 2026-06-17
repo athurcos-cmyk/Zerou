@@ -1,6 +1,18 @@
 # Changelog
 
-Historico resumido do projeto Zerou. Este arquivo foi criado em 2026-06-15 para dar uma visao limpa do que foi implementado ate o estado atual da `main`.
+Resumo das mudanças recentes do Zerou. O histórico detalhado por mês fica em `docs/history/`.
+
+## 2026-06-17 — Redesign Sol, app mobile-nativo, cofrinho do casal e landing nova
+
+- Direção visual "Sol" (areia + tangerina, DM Sans 800 nos números) aplicada no app inteiro.
+- App mobile-nativo: nav inferior com FAB, header de valor nas telas de lançamento, seletores em bottom-sheet, categorias com ícone+cor, onboarding em questionário, empty states ilustrados.
+- Despesa no cartão pelo fluxo de Despesa; novo cartão com header de limite; dashboard compacto.
+- Espaço do casal: divisão flexível (igual/%/valor) + **cofrinho do casal** (meta compartilhada + contribuições por pessoa, opção de descontar de conta pessoal).
+- Tela de **Metas** ligada ao questionário do onboarding.
+- Landing reescrita (CSS 3D) com mockup do app e copy de dor (PAS); promovida para `/`.
+- SVGs oficiais de ~24 bancos; cores tokenizadas (teste `noHardcodedColors` verde).
+- Documentação reorganizada estilo plantão (`CLAUDE.md`, `CODEX.md`, `SESSAO.md`, `docs/`).
+- Detalhe técnico completo em `docs/history/2026-06.md`. Validação: `npm run typecheck`, `npm test`, `npm run build`; regras Firestore publicadas.
 
 ## 2026-06-15 - Estado atual da main
 
