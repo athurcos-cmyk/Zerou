@@ -397,6 +397,29 @@ export async function cleanupExpiredInvites(workspaceId: string, userId: string)
   return changed;
 }
 
+export async function cancelCoupleWorkspace(workspaceId: string, userId: string, confirmed: boolean) {
+  if (!confirmed) {
+    throw new Error('Confirme que deseja cancelar o espaço compartilhado.');
+  }
+  const db = getFirebaseDb();
+  const batch = writeBatch(db);
+  // Deletes are allowed: member (canDeleteWorkspaceTree), workspaceRef (isSelf), workspace (ownerUserId).
+  // No audit log here — the rule requires existsAfter(currentMemberDoc) which would be false.
+  batch.delete(memberRef(workspaceId, userId));
+  batch.delete(userWorkspaceRef(userId, workspaceId));
+  batch.delete(workspaceRef(workspaceId));
+  await batch.commit();
+  // Cleanup leftover invites (non-critical, fire-and-forget)
+  getDocs(query(invitesRef(), where('workspaceId', '==', workspaceId)))
+    .then((snap) => {
+      if (snap.empty) return;
+      const b = writeBatch(db);
+      snap.docs.forEach((d) => b.delete(d.ref));
+      return b.commit();
+    })
+    .catch(() => undefined);
+}
+
 export async function leaveCoupleWorkspace(workspaceId: string, userId: string, confirmed: boolean) {
   if (!confirmed) {
     throw new Error('Confirme que deseja sair do espaço compartilhado.');

@@ -18,6 +18,7 @@ import {
   acceptCoupleInvite,
   acceptSettlement,
   addSharedComment,
+  cancelCoupleWorkspace,
   cleanupExpiredInvites,
   createCoupleInvite,
   createCoupleWorkspace,
@@ -314,17 +315,23 @@ export function SharedSpacePage() {
 
   function handleLeaveOrRemove() {
     if (!workspaceId || !user || !shared.workspace) return;
-    const isOwnerRemovingPartner = shared.workspace.ownerUserId === user.uid && partnerMember;
+    const isOwner = shared.workspace.ownerUserId === user.uid;
+    const isOwnerRemovingPartner = isOwner && Boolean(partnerMember);
+    const isOwnerAlone = isOwner && !partnerMember;
     void guardAction(async () => {
       const ok = await confirm({
-        title: isOwnerRemovingPartner ? 'Remover parceiro?' : 'Sair do espaço compartilhado?',
-        message: 'As despesas e acertos compartilhados deixam de ser atualizados para você.',
-        confirmLabel: isOwnerRemovingPartner ? 'Remover' : 'Sair',
+        title: isOwnerRemovingPartner ? 'Remover parceiro?' : isOwnerAlone ? 'Cancelar espaço compartilhado?' : 'Sair do espaço compartilhado?',
+        message: isOwnerAlone
+          ? 'O espaço compartilhado será excluído. Você pode criar um novo a qualquer momento.'
+          : 'As despesas e acertos compartilhados deixam de ser atualizados para você.',
+        confirmLabel: isOwnerRemovingPartner ? 'Remover' : isOwnerAlone ? 'Excluir' : 'Sair',
         danger: true
       });
       if (!ok) return;
       if (isOwnerRemovingPartner) {
         await removePartner(workspaceId, user.uid, partnerMember!.userId, true);
+      } else if (isOwnerAlone) {
+        await cancelCoupleWorkspace(workspaceId, user.uid, true);
       } else {
         await leaveCoupleWorkspace(workspaceId, user.uid, true);
       }
