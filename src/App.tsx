@@ -3,7 +3,7 @@ import { AuthProvider } from './auth/AuthContext';
 import { FinanceDataProvider } from './finance/FinanceDataContext';
 import { SharedDataProvider } from './shared/SharedDataContext';
 import { LandingCss } from './landing/LandingCss';
-import { PublicOnlyRoute, RequireAuth, RequireOnboardingComplete } from './auth/routeGuards';
+import { PublicOnlyRoute, RequireAdmin, RequireAuth, RequireOnboardingComplete } from './auth/routeGuards';
 import { useAuth } from './auth/AuthContext';
 import { AppearanceSyncBridge } from './settings/AppearanceSyncBridge';
 import { ThemeRuntime } from './theme/ThemeRuntime';
@@ -29,6 +29,7 @@ import { PrivacyCenterPage } from './pages/PrivacyCenterPage';
 import { RecurringPage } from './pages/RecurringPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { SearchPage } from './pages/SearchPage';
+import { AdminPage } from './pages/AdminPage';
 import { SharedSpacePage } from './pages/SharedSpacePage';
 import { TransactionsPage } from './pages/TransactionsPage';
 import { VerifyEmailPage } from './pages/VerifyEmailPage';
@@ -64,6 +65,9 @@ export function App() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         </Route>
         <Route element={<RequireAuth />}>
+          <Route element={<RequireAdmin />}>
+            <Route path="/admin" element={<AdminPage />} />
+          </Route>
           <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/app" element={<AppShell />}>
             <Route path="onboarding" element={<OnboardingPage />} />

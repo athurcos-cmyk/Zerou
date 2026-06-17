@@ -6,6 +6,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isAdmin() {
+      return signedIn() && request.auth.token.email == 'a.thurcos@gmail.com';
+    }
+
     function isSelf(uid) {
       return signedIn() && request.auth.uid == uid;
     }
@@ -1362,13 +1366,13 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow read: if isSelf(uid);
+      allow read: if isSelf(uid) || isAdmin();
       allow create: if validUserFoundationCreate(uid);
       allow update: if isSelf(uid) && onlyAppearanceChanged() && validThemeFields();
       allow delete: if canDeleteUserAccountData(uid);
 
       match /workspaceRefs/{workspaceId} {
-        allow read: if isSelf(uid);
+        allow read: if isSelf(uid) || isAdmin();
         allow create: if validWorkspaceRefFoundationCreate(uid, workspaceId) || validCoupleWorkspaceRefCreate(uid, workspaceId);
         allow update: if validCoupleWorkspaceRefUpdate(uid, workspaceId);
         allow delete: if canDeleteUserAccountData(uid);
@@ -1376,7 +1380,7 @@ service cloud.firestore {
     }
 
     match /workspaces/{workspaceId} {
-      allow read: if isActiveMember(workspaceId);
+      allow read: if isActiveMember(workspaceId) || isAdmin();
       allow create: if validWorkspaceFoundationCreate(workspaceId) || validCoupleWorkspaceCreate(workspaceId);
       allow update: if validCoupleWorkspaceUpdate(workspaceId);
       allow delete: if canDeleteWorkspaceDocument(workspaceId);
@@ -1496,7 +1500,8 @@ service cloud.firestore {
 
     match /coupleInvites/{inviteId} {
       allow read: if resource.data.status == 'active' && resource.data.expiresAt > request.time
-        || (signedIn() && isActiveMember(resource.data.workspaceId));
+        || (signedIn() && isActiveMember(resource.data.workspaceId))
+        || isAdmin();
       allow create: if validInviteCreate(inviteId);
       allow update: if validInviteUpdate();
       allow delete: if signedIn()

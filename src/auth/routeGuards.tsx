@@ -1,6 +1,8 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 
+const ADMIN_EMAIL = 'a.thurcos@gmail.com';
+
 export function RequireAuth() {
   const { user, loading } = useAuth();
   const location = useLocation();
@@ -28,6 +30,13 @@ export function RequireOnboardingComplete() {
     return <Navigate to="/app/onboarding" replace />;
   }
 
+  return <Outlet />;
+}
+
+export function RequireAdmin() {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (!user || user.email !== ADMIN_EMAIL) return <Navigate to="/app" replace />;
   return <Outlet />;
 }
 
