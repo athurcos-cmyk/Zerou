@@ -99,6 +99,16 @@ export function SharedSpacePage() {
     if (storedCode) setPendingInviteCode(storedCode);
   }, []);
 
+  // Auto-preview when a pending invite code lands and user has no couple space yet
+  useEffect(() => {
+    if (!pendingInviteCode || pendingInvitePreview || shared.activeCoupleRef) return;
+    void guardAction(async () => {
+      const preview = await previewCoupleInvite(pendingInviteCode);
+      setPendingInvitePreview(preview);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingInviteCode]);
+
   // Optimistic: fire writes, close immediately, let the live listener reflect them.
   function handleCreateCofrinho(event: FormEvent) {
     event.preventDefault();
@@ -362,28 +372,57 @@ export function SharedSpacePage() {
             title="Organize as contas a dois"
             description="Seu espaço pessoal continua privado. O compartilhado recebe só o resumo das despesas que vocês decidirem dividir."
           />
-          <button className="button button--primary button--block" type="button" onClick={handleCreateWorkspace}>
-            <Plus size={18} aria-hidden="true" /> Criar espaço compartilhado
-          </button>
 
-          <details className="advanced-panel">
-            <summary>Tenho um convite</summary>
-            <form className="form-stack" onSubmit={handlePreviewInvite}>
-              <label className="field">
-                <span>Código do convite</span>
-                <input className="input" value={pendingInviteCode} onChange={(event) => setPendingInviteCode(event.target.value)} placeholder="DUO-7X4K-92" />
-              </label>
-              <button className="button button--secondary" type="submit">Ver convite</button>
+          {pendingInviteCode ? (
+            /* Pending invite — show acceptance as the primary action */
+            <article className="surface surface-pad form-stack">
+              <p className="eyebrow">Convite pendente</p>
               {pendingInvitePreview ? (
-                <div className="notice notice--success">
-                  Convite ativo para {pendingInvitePreview.workspaceName}. Expira em {pendingInvitePreview.expiresAt.toDate().toLocaleString('pt-BR')}.
-                </div>
-              ) : null}
-              <button className="button button--primary" type="button" disabled={!pendingInvitePreview} onClick={handleAcceptInvite}>
-                Aceitar convite
+                <>
+                  <div className="notice notice--success">
+                    <strong>{pendingInvitePreview.workspaceName}</strong>
+                    <br />
+                    <span>Expira em {pendingInvitePreview.expiresAt.toDate().toLocaleString('pt-BR')}</span>
+                  </div>
+                  <button className="button button--primary button--block" type="button" onClick={handleAcceptInvite}>
+                    Entrar no espaço compartilhado
+                  </button>
+                </>
+              ) : (
+                <form className="form-stack" onSubmit={handlePreviewInvite}>
+                  <label className="field">
+                    <span>Código do convite</span>
+                    <input className="input" value={pendingInviteCode} onChange={(event) => setPendingInviteCode(event.target.value)} placeholder="DUO-7X4K-92" />
+                  </label>
+                  <button className="button button--primary" type="submit">Ver convite</button>
+                </form>
+              )}
+              <button
+                className="button button--ghost"
+                type="button"
+                onClick={() => { clearPendingInvite(); setPendingInviteCode(''); setPendingInvitePreview(null); }}
+              >
+                Cancelar
               </button>
-            </form>
-          </details>
+            </article>
+          ) : (
+            /* No pending invite — create workspace or enter a code */
+            <>
+              <button className="button button--primary button--block" type="button" onClick={handleCreateWorkspace}>
+                <Plus size={18} aria-hidden="true" /> Criar espaço compartilhado
+              </button>
+              <details className="advanced-panel">
+                <summary>Tenho um convite</summary>
+                <form className="form-stack" onSubmit={handlePreviewInvite}>
+                  <label className="field">
+                    <span>Código do convite</span>
+                    <input className="input" value={pendingInviteCode} onChange={(event) => setPendingInviteCode(event.target.value)} placeholder="DUO-7X4K-92" />
+                  </label>
+                  <button className="button button--secondary" type="submit">Ver convite</button>
+                </form>
+              </details>
+            </>
+          )}
         </div>
       ) : !partnered ? (
         /* 2) Space exists but waiting for partner — invite hero */
