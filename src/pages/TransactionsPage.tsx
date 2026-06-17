@@ -1,18 +1,18 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { useFinanceContext } from '../finance/FinanceDataContext';
 import { EmptyState } from '../components/EmptyState';
 import { toDateInputValue } from '../finance/financeDates';
 import { transactionTypeLabels } from '../finance/financeLabels';
 import { softDeleteTransaction } from '../finance/financeService';
 import { formatMoney } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
-import { useFinanceData } from '../finance/useFinanceData';
 
 export function TransactionsPage() {
   const { user, profile } = useAuth();
   const workspaceId = profile?.defaultWorkspaceId;
-  const finance = useFinanceData(workspaceId, user?.uid);
+  const finance = useFinanceContext();
   const visibleTransactions = finance.transactions.filter((transaction) => !transaction.deletedAt);
 
   async function handleDelete(transactionId: string) {

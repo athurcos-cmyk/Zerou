@@ -6,6 +6,7 @@ import {
   doc,
   getDocs,
   increment,
+  limit,
   onSnapshot,
   orderBy,
   query,
@@ -391,7 +392,7 @@ export function subscribeTransactions(
   onError: (error: Error) => void
 ): Unsubscribe {
   return onSnapshot(
-    query(collectionRef(workspaceId, 'transactions'), orderBy('date', 'desc')),
+    query(collectionRef(workspaceId, 'transactions'), orderBy('date', 'desc'), limit(300)),
     { includeMetadataChanges: true },
     (snapshot) => onNext(snapshot.docs.map((item) => withLocalSync<Transaction>(item))),
     onError

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Repeat } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { useFinanceContext } from '../finance/FinanceDataContext';
 import { CategoryField } from '../components/CategoryField';
 import { SelectField } from '../components/SelectField';
 import { FormMessage } from '../components/FormMessage';
@@ -10,13 +11,12 @@ import { createCategory, createRecurringRule, deleteCategory, updateCategory } f
 import { recurringFrequencies, type CreateRecurringRuleInput } from '../finance/financeSchemas';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
-import { useFinanceData } from '../finance/useFinanceData';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
 
 export function RecurringPage() {
   const { user, profile } = useAuth();
   const workspaceId = profile?.defaultWorkspaceId;
-  const finance = useFinanceData(workspaceId, user?.uid);
+  const finance = useFinanceContext();
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [frequency, setFrequency] = useState<CreateRecurringRuleInput['frequency']>('monthly');

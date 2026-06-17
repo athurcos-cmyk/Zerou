@@ -44,7 +44,20 @@ export const useAppearanceStore = create<AppearanceState>((set, get) => ({
   preferences: initialPreferences,
   resolvedThemeId: getInitialResolvedTheme(initialPreferences),
   hydrateFromProfile: (preferences) => {
-    set((state) => updatePreferences(state.preferences, { ...DEFAULT_APPEARANCE, ...preferences }));
+    set((state) => {
+      const next = { ...DEFAULT_APPEARANCE, ...preferences };
+      const cur = state.preferences;
+      if (
+        cur.themeMode === next.themeMode &&
+        cur.themeId === next.themeId &&
+        cur.density === next.density &&
+        cur.fontScale === next.fontScale &&
+        cur.reduceMotion === next.reduceMotion
+      ) {
+        return state;
+      }
+      return updatePreferences(state.preferences, next);
+    });
   },
   setThemeMode: (themeMode) => {
     set((state) => updatePreferences(state.preferences, { themeMode }));

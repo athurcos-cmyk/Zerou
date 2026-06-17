@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Wallet } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { useFinanceContext } from '../finance/FinanceDataContext';
 import { CategoryField } from '../components/CategoryField';
 import { FormMessage } from '../components/FormMessage';
 import { SelectField } from '../components/SelectField';
@@ -10,7 +11,7 @@ import { accountTypeLabels, transactionTypeLabels } from '../finance/financeLabe
 import { createCategory, deleteCategory, updateCategory, updateTransaction } from '../finance/financeService';
 import { type SupportedTransactionType } from '../finance/financeSchemas';
 import { centsToInputValue, parseMoneyToCents } from '../finance/money';
-import { useFinanceData } from '../finance/useFinanceData';
+
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
 
 function waitForLocalWrite() {
@@ -32,7 +33,7 @@ export function EditTransactionPage() {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const workspaceId = profile?.defaultWorkspaceId;
-  const finance = useFinanceData(workspaceId, user?.uid);
+  const finance = useFinanceContext();
   const transaction = finance.transactions.find((item) => item.id === transactionId);
   const [type, setType] = useState<SupportedTransactionType>('expense');
   const [amount, setAmount] = useState('');

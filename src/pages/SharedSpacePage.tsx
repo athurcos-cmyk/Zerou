@@ -10,8 +10,9 @@ import { EmptyState } from '../components/EmptyState';
 import { FormMessage } from '../components/FormMessage';
 import { addGoalContribution, createGoal, createTransaction, deleteGoal } from '../finance/financeService';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
-import { useCoupleSavings, type CoupleGoalStats } from '../shared/useCoupleSavings';
-import { useFinanceData } from '../finance/useFinanceData';
+import { type CoupleGoalStats } from '../shared/useCoupleSavings';
+import { useFinanceContext } from '../finance/FinanceDataContext';
+import { useCoupleSavingsContext, useSharedContext } from '../shared/SharedDataContext';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
 import {
   acceptCoupleInvite,
@@ -30,7 +31,6 @@ import {
   revokeCoupleInvite,
   updateSharedExpenseClaimStatus
 } from '../shared/sharedService';
-import { useSharedWorkspaceData } from '../shared/useSharedWorkspaceData';
 import type { CoupleInvite, Settlement, SharedExpenseClaim, WorkspaceMembership } from '../types/contracts';
 
 const claimStatusLabels: Record<SharedExpenseClaim['status'], string> = {
@@ -58,7 +58,7 @@ function memberLabel(member: WorkspaceMembership | undefined, currentUserId?: st
 
 export function SharedSpacePage() {
   const { user, profile } = useAuth();
-  const shared = useSharedWorkspaceData(user?.uid);
+  const shared = useSharedContext();
   const workspaceId = shared.workspace?.id;
   const ownerMember = shared.activeMembers.find((member) => member.role === 'owner');
   const partnerMember = shared.activeMembers.find((member) => member.userId !== user?.uid);
@@ -84,8 +84,8 @@ export function SharedSpacePage() {
   const [settlementPaymentAmount, setSettlementPaymentAmount] = useState('');
 
   // Couple savings ("cofrinho")
-  const savings = useCoupleSavings(workspaceId);
-  const personalFinance = useFinanceData(profile?.defaultWorkspaceId, user?.uid);
+  const savings = useCoupleSavingsContext();
+  const personalFinance = useFinanceContext();
   const [cofrinhoOpen, setCofrinhoOpen] = useState(false);
   const [cofrinhoName, setCofrinhoName] = useState('');
   const [cofrinhoTarget, setCofrinhoTarget] = useState('');

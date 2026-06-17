@@ -2,8 +2,9 @@ import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, CreditCard, Wallet } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { createCardPurchase } from '../cards/cardService';
-import { useCardsData } from '../cards/useCardsData';
+
 import { CategoryField } from '../components/CategoryField';
 import { FormMessage } from '../components/FormMessage';
 import { SelectField } from '../components/SelectField';
@@ -12,7 +13,7 @@ import { accountTypeLabels, transactionTypeLabels } from '../finance/financeLabe
 import { createCategory, createTransaction, deleteCategory, updateCategory } from '../finance/financeService';
 import { type SupportedTransactionType } from '../finance/financeSchemas';
 import { parseMoneyToCents } from '../finance/money';
-import { useFinanceData } from '../finance/useFinanceData';
+
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
 
 const CARD_PREFIX = 'card:';
@@ -35,8 +36,8 @@ export function NewTransactionPage() {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const workspaceId = profile?.defaultWorkspaceId;
-  const finance = useFinanceData(workspaceId, user?.uid);
-  const cardsData = useCardsData(workspaceId);
+  const finance = useFinanceContext();
+  const cardsData = useCardsContext();
   const [type, setType] = useState<SupportedTransactionType>('expense');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');

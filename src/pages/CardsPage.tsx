@@ -2,12 +2,13 @@ import { useState, type FormEvent } from 'react';
 import { CreditCard, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { useCardsContext } from '../finance/FinanceDataContext';
 import { EmptyState } from '../components/EmptyState';
 import { SelectField } from '../components/SelectField';
 import { FormMessage } from '../components/FormMessage';
 import { cardBrandOptions, type CreateCreditCardInput } from '../cards/cardSchemas';
 import { createCreditCard } from '../cards/cardService';
-import { useCardsData } from '../cards/useCardsData';
+
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
@@ -15,7 +16,7 @@ import { getUserFacingErrorMessage } from '../utils/userFacingError';
 export function CardsPage() {
   const { user, profile } = useAuth();
   const workspaceId = profile?.defaultWorkspaceId;
-  const cardsData = useCardsData(workspaceId);
+  const cardsData = useCardsContext();
   const [name, setName] = useState('');
   const [lastFour, setLastFour] = useState('');
   const [brand, setBrand] = useState<CreateCreditCardInput['brand']>('Visa');

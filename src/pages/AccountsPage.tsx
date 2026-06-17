@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Building2, Plus, Trash2, Wallet } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { useFinanceContext } from '../finance/FinanceDataContext';
 import { SelectField } from '../components/SelectField';
 import { FormMessage } from '../components/FormMessage';
 import { findBankInstitution, searchBankInstitutions, type BankInstitution } from '../finance/bankInstitutions';
@@ -9,14 +10,13 @@ import { createAccount, deleteAccount } from '../finance/financeService';
 import { accountTypes } from '../finance/financeSchemas';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
-import { useFinanceData } from '../finance/useFinanceData';
 import type { AccountType } from '../types/contracts';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
 
 export function AccountsPage() {
   const { user, profile } = useAuth();
   const workspaceId = profile?.defaultWorkspaceId;
-  const finance = useFinanceData(workspaceId, user?.uid);
+  const finance = useFinanceContext();
   const [name, setName] = useState('');
   const [type, setType] = useState<AccountType>('checking');
   const [openingBalance, setOpeningBalance] = useState('0,00');

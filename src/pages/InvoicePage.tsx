@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { CheckCircle2, ReceiptText } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { SelectField } from '../components/SelectField';
 import { FormMessage } from '../components/FormMessage';
 import { invoiceStatusLabels, ledgerTypeLabels } from '../cards/cardLabels';
@@ -13,10 +14,10 @@ import {
   recordInvoiceFee,
   recordInvoicePayment
 } from '../cards/cardService';
-import { useCardsData } from '../cards/useCardsData';
+
 import { fromDateInputValue, todayInputValue, toDateInputValue } from '../finance/financeDates';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
-import { useFinanceData } from '../finance/useFinanceData';
+
 import type { InvoiceLedgerEntryType, InvoiceStatus } from '../types/contracts';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
 
@@ -24,8 +25,8 @@ export function InvoicePage() {
   const { cardId, invoiceId } = useParams();
   const { user, profile } = useAuth();
   const workspaceId = profile?.defaultWorkspaceId;
-  const cardsData = useCardsData(workspaceId);
-  const finance = useFinanceData(workspaceId, user?.uid);
+  const cardsData = useCardsContext();
+  const finance = useFinanceContext();
   const card = cardsData.cards.find((item) => item.id === cardId);
   const invoice = cardsData.invoices.find((item) => item.cardId === cardId && item.id === invoiceId);
   const [paymentAmount, setPaymentAmount] = useState('');

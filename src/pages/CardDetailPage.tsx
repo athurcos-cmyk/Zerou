@@ -2,24 +2,25 @@ import { useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { CalendarClock, CreditCard, ReceiptText } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { CategoryField } from '../components/CategoryField';
 import { SelectField } from '../components/SelectField';
 import { FormMessage } from '../components/FormMessage';
 import { invoiceStatusLabels } from '../cards/cardLabels';
 import { createCardPurchase } from '../cards/cardService';
-import { useCardsData } from '../cards/useCardsData';
+
 import { fromDateInputValue, todayInputValue, toDateInputValue } from '../finance/financeDates';
 import { createCategory, deleteCategory, updateCategory } from '../finance/financeService';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
-import { useFinanceData } from '../finance/useFinanceData';
+
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
 
 export function CardDetailPage() {
   const { cardId } = useParams();
   const { user, profile } = useAuth();
   const workspaceId = profile?.defaultWorkspaceId;
-  const cardsData = useCardsData(workspaceId);
-  const finance = useFinanceData(workspaceId, user?.uid);
+  const cardsData = useCardsContext();
+  const finance = useFinanceContext();
   const card = cardsData.cards.find((item) => item.id === cardId);
   const invoices = cardsData.invoices.filter((invoice) => invoice.cardId === cardId);
   const [description, setDescription] = useState('');

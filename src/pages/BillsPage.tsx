@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { CalendarClock } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { useFinanceContext } from '../finance/FinanceDataContext';
 import { CategoryField } from '../components/CategoryField';
 import { SelectField } from '../components/SelectField';
 import { FormMessage } from '../components/FormMessage';
@@ -9,14 +10,13 @@ import { billStatusLabels } from '../finance/financeLabels';
 import { createBill, createCategory, deleteCategory, updateBillStatus, updateCategory } from '../finance/financeService';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
-import { useFinanceData } from '../finance/useFinanceData';
 import type { Bill } from '../types/contracts';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
 
 export function BillsPage() {
   const { user, profile } = useAuth();
   const workspaceId = profile?.defaultWorkspaceId;
-  const finance = useFinanceData(workspaceId, user?.uid);
+  const finance = useFinanceContext();
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [dueDate, setDueDate] = useState(todayInputValue());

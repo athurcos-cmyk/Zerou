@@ -1,15 +1,15 @@
 import { useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { useFinanceContext } from '../finance/FinanceDataContext';
 import { toDateInputValue } from '../finance/financeDates';
 import { billStatusLabels, transactionTypeLabels } from '../finance/financeLabels';
 import { formatMoney } from '../finance/money';
-import { useFinanceData } from '../finance/useFinanceData';
 
 export function SearchPage() {
   const { user, profile } = useAuth();
   const workspaceId = profile?.defaultWorkspaceId;
-  const finance = useFinanceData(workspaceId, user?.uid);
+  const finance = useFinanceContext();
   const [query, setQuery] = useState('');
 
   const normalizedQuery = query.trim().toLocaleLowerCase('pt-BR');

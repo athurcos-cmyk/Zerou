@@ -1,5 +1,7 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthContext';
+import { FinanceDataProvider } from './finance/FinanceDataContext';
+import { SharedDataProvider } from './shared/SharedDataContext';
 import { LandingCss } from './landing/LandingCss';
 import { PublicOnlyRoute, RequireAuth, RequireOnboardingComplete } from './auth/routeGuards';
 import { AppearanceSyncBridge } from './settings/AppearanceSyncBridge';
@@ -58,23 +60,25 @@ export function App() {
           <Route path="/app" element={<AppShell />}>
             <Route path="onboarding" element={<OnboardingPage />} />
             <Route element={<RequireOnboardingComplete />}>
-              <Route index element={<DashboardPage />} />
-              <Route path="dashboard" element={<DashboardPage />} />
-              <Route path="transactions" element={<TransactionsPage />} />
-              <Route path="transactions/new" element={<NewTransactionPage />} />
-              <Route path="transactions/:transactionId/edit" element={<EditTransactionPage />} />
-              <Route path="accounts" element={<AccountsPage />} />
-              <Route path="cards" element={<CardsPage />} />
-              <Route path="cards/:cardId" element={<CardDetailPage />} />
-              <Route path="cards/:cardId/invoices/:invoiceId" element={<InvoicePage />} />
-              <Route path="bills" element={<BillsPage />} />
-              <Route path="goals" element={<GoalsPage />} />
-              <Route path="recurring" element={<RecurringPage />} />
-              <Route path="search" element={<SearchPage />} />
-              <Route path="shared" element={<SharedSpacePage />} />
-              <Route path="settings/appearance" element={<AppearanceSettingsPage />} />
-              <Route path="settings/billing" element={<Navigate to="/app/settings/appearance" replace />} />
-              <Route path="settings/security/login-methods" element={<LoginMethodsPage />} />
+              <Route element={<FinanceDataProvider><SharedDataProvider><Outlet /></SharedDataProvider></FinanceDataProvider>}>
+                <Route index element={<DashboardPage />} />
+                <Route path="dashboard" element={<DashboardPage />} />
+                <Route path="transactions" element={<TransactionsPage />} />
+                <Route path="transactions/new" element={<NewTransactionPage />} />
+                <Route path="transactions/:transactionId/edit" element={<EditTransactionPage />} />
+                <Route path="accounts" element={<AccountsPage />} />
+                <Route path="cards" element={<CardsPage />} />
+                <Route path="cards/:cardId" element={<CardDetailPage />} />
+                <Route path="cards/:cardId/invoices/:invoiceId" element={<InvoicePage />} />
+                <Route path="bills" element={<BillsPage />} />
+                <Route path="goals" element={<GoalsPage />} />
+                <Route path="recurring" element={<RecurringPage />} />
+                <Route path="search" element={<SearchPage />} />
+                <Route path="shared" element={<SharedSpacePage />} />
+                <Route path="settings/appearance" element={<AppearanceSettingsPage />} />
+                <Route path="settings/billing" element={<Navigate to="/app/settings/appearance" replace />} />
+                <Route path="settings/security/login-methods" element={<LoginMethodsPage />} />
+              </Route>
             </Route>
           </Route>
         </Route>

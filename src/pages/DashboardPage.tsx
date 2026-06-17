@@ -1,20 +1,21 @@
 import { CalendarClock, CreditCard, Plus, Target, Wallet } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
-import { useCardsData } from '../cards/useCardsData';
+import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
+
 import { calculateDashboardSummary } from '../finance/financeCalculations';
 import { toDateInputValue } from '../finance/financeDates';
 import { transactionTypeLabels } from '../finance/financeLabels';
 import { formatMoney } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
-import { useFinanceData } from '../finance/useFinanceData';
+
 import { EmptyState } from '../components/EmptyState';
 
 export function DashboardPage() {
   const { user, profile } = useAuth();
   const workspaceId = profile?.defaultWorkspaceId;
-  const finance = useFinanceData(workspaceId, user?.uid);
-  const cardsData = useCardsData(workspaceId);
+  const finance = useFinanceContext();
+  const cardsData = useCardsContext();
   const dashboard = calculateDashboardSummary({
     accounts: finance.accounts,
     transactions: finance.transactions,

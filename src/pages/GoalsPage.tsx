@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Check, Minus, Plus, Trash2 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { useGoalsContext } from '../finance/FinanceDataContext';
 import { BottomSheet } from '../components/BottomSheet';
 import { CategoryIcon, categoryColors, categoryIconKeys } from '../components/categoryIcons';
 import { ACCENT_FOREGROUND } from '../theme/palette';
@@ -9,7 +10,7 @@ import { FormMessage } from '../components/FormMessage';
 import { contributeToGoal, createGoal, deleteGoal } from '../finance/financeService';
 import { fromDateInputValue } from '../finance/financeDates';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
-import { useGoalsData } from '../finance/useGoalsData';
+
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
 import type { Goal } from '../types/contracts';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
@@ -23,7 +24,7 @@ const goalHints: Record<string, string> = {
 export function GoalsPage() {
   const { user, profile } = useAuth();
   const workspaceId = profile?.defaultWorkspaceId;
-  const { goals, loading, pendingWrites } = useGoalsData(workspaceId);
+  const { goals, loading, pendingWrites } = useGoalsContext();
   const [message, setMessage] = useState<string | null>(null);
 
   const [createOpen, setCreateOpen] = useState(false);
