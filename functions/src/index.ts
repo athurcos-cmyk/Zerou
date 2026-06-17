@@ -8,6 +8,7 @@ import { logger } from 'firebase-functions';
 import { createCheckoutSessionSchema, createCustomerPortalSessionSchema } from './billing/schemas.js';
 import { createCheckoutSessionWithStripe, createCustomerPortalSessionWithStripe, createStripeClient, ingestStripeWebhookEvent } from './billing/stripeBillingProvider.js';
 import { processBillingEventDocument, resetStuckBillingEvents, retryFailedBillingEvents as retryFailedBillingEventDocs } from './billing/billingEventProcessor.js';
+export { adminDeleteUser } from './admin.js';
 import { safeReturnUrl } from './billing/urlSafety.js';
 
 initializeApp();

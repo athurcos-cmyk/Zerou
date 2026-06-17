@@ -1,17 +1,20 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  AlertTriangle,
   ArrowLeft,
   Heart,
   Loader2,
   RefreshCw,
   Search,
   Send,
+  Trash2,
   TrendingUp,
   Users,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import {
+  callAdminDeleteUser,
   getAdminCoupleWorkspaces,
   getAdminInvites,
   getAdminUsers,
@@ -232,7 +235,86 @@ function OverviewTab({
   );
 }
 
-function UsersTab({ users }: { users: UserProfile[] }) {
+interface DeleteConfirmProps {
+  user: UserProfile;
+  onConfirm: () => Promise<void>;
+  onCancel: () => void;
+}
+
+function DeleteConfirmModal({ user, onConfirm, onCancel }: DeleteConfirmProps) {
+  const [input, setInput] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const expected = user.name.split(/\s+/)[0]!;
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  async function handleConfirm() {
+    if (input !== expected) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await onConfirm();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao deletar.');
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="admin-modal-backdrop" onClick={onCancel}>
+      <div className="admin-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+        <span className="admin-modal__icon">
+          <AlertTriangle size={22} />
+        </span>
+        <h2 className="admin-modal__title">Deletar conta permanentemente?</h2>
+        <p className="admin-modal__body">
+          Isso vai apagar <strong>{user.name}</strong> ({user.email}) do Firebase Auth e todos os dados
+          do Firestore — workspace pessoal, espaços de casal criados por ele, transações, cartões,
+          metas e billing. <strong>Irreversível.</strong>
+        </p>
+        <label className="admin-modal__label">
+          Digite <strong>{expected}</strong> para confirmar:
+        </label>
+        <input
+          ref={inputRef}
+          className="admin-modal__input"
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && input === expected && !busy && void handleConfirm()}
+          placeholder={expected}
+          disabled={busy}
+        />
+        {error ? <p className="admin-modal__error">{error}</p> : null}
+        <div className="admin-modal__actions">
+          <button
+            type="button"
+            className="button button--ghost"
+            onClick={onCancel}
+            disabled={busy}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            className="button admin-modal__delete-btn"
+            onClick={() => void handleConfirm()}
+            disabled={input !== expected || busy}
+          >
+            {busy ? <Loader2 size={15} className="admin-spin" /> : <Trash2 size={15} />}
+            Deletar conta
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UsersTab({ users, onDelete }: { users: UserProfile[]; onDelete: (u: UserProfile) => void }) {
   const [search, setSearch] = useState('');
   const themeLabels: Record<string, string> = {
     paper: 'Paper (Sol)',
@@ -276,11 +358,12 @@ function UsersTab({ users }: { users: UserProfile[] }) {
               <th>Tema</th>
               <th>Cadastro</th>
               <th>Workspace</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <EmptyRow cols={5} />
+              <EmptyRow cols={6} />
             ) : (
               filtered.map((u) => (
                 <tr key={u.id}>
@@ -304,6 +387,16 @@ function UsersTab({ users }: { users: UserProfile[] }) {
                   </td>
                   <td className="admin-td--muted admin-monospace">
                     {u.defaultWorkspaceId ? u.defaultWorkspaceId.slice(0, 16) + '…' : '—'}
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="admin-delete-row-btn"
+                      title="Deletar conta"
+                      onClick={() => onDelete(u)}
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </td>
                 </tr>
               ))
@@ -471,6 +564,8 @@ export function AdminPage() {
   const [invites, setInvites] = useState<AdminInvite[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<UserProfile | null>(null);
+  const [deleteSuccess, setDeleteSuccess] = useState<string | null>(null);
 
   const userMap = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
 
@@ -496,6 +591,18 @@ export function AdminPage() {
   useEffect(() => {
     void loadAll();
   }, []);
+
+  async function handleDeleteConfirm() {
+    if (!pendingDelete) return;
+    const target = pendingDelete;
+    const result = await callAdminDeleteUser(target.id);
+    setUsers((prev) => prev.filter((u) => u.id !== target.id));
+    setCouples((prev) => prev.filter((w) => w.ownerUserId !== target.id));
+    setInvites((prev) => prev.filter((i) => i.createdBy !== target.id));
+    setPendingDelete(null);
+    setDeleteSuccess(`${target.name} deletado — ${result.docsDeleted} documentos removidos.`);
+    setTimeout(() => setDeleteSuccess(null), 6000);
+  }
 
   const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: 'overview', label: 'Visão Geral' },
@@ -546,6 +653,10 @@ export function AdminPage() {
         </div>
       </header>
 
+      {deleteSuccess ? (
+        <div className="admin-toast admin-toast--success">{deleteSuccess}</div>
+      ) : null}
+
       <div className="admin-body">
         {loading ? (
           <div className="admin-loading">
@@ -564,12 +675,22 @@ export function AdminPage() {
             {tab === 'overview' && (
               <OverviewTab users={users} couples={couples} invites={invites} userMap={userMap} />
             )}
-            {tab === 'users' && <UsersTab users={users} />}
+            {tab === 'users' && (
+              <UsersTab users={users} onDelete={(u) => setPendingDelete(u)} />
+            )}
             {tab === 'couples' && <CouplesTab couples={couples} userMap={userMap} />}
             {tab === 'invites' && <InvitesTab invites={invites} userMap={userMap} />}
           </>
         )}
       </div>
+
+      {pendingDelete ? (
+        <DeleteConfirmModal
+          user={pendingDelete}
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setPendingDelete(null)}
+        />
+      ) : null}
     </div>
   );
 }

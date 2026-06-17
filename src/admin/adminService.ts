@@ -1,7 +1,8 @@
 import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import type { Timestamp } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import type { UserProfile, Workspace } from '../types/contracts';
-import { getFirebaseDb } from '../firebase/config';
+import { getFirebaseDb, getFirebaseFunctions } from '../firebase/config';
 
 export interface AdminInvite {
   id: string;
@@ -38,4 +39,13 @@ export async function getAdminInvites(): Promise<AdminInvite[]> {
     query(collection(db, 'coupleInvites'), orderBy('createdAt', 'desc'), limit(200))
   );
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as AdminInvite));
+}
+
+export async function callAdminDeleteUser(userId: string): Promise<{ docsDeleted: number }> {
+  const fn = httpsCallable<{ userId: string }, { success: boolean; docsDeleted: number }>(
+    getFirebaseFunctions(),
+    'adminDeleteUser'
+  );
+  const result = await fn({ userId });
+  return result.data;
 }

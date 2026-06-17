@@ -3899,3 +3899,161 @@ html[data-reduce-motion='true'] *::after {
     padding: 1rem;
   }
 }
+
+.admin-delete-row-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: background 120ms, color 120ms, opacity 120ms;
+}
+
+.admin-table tbody tr:hover .admin-delete-row-btn {
+  opacity: 1;
+}
+
+.admin-delete-row-btn:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.admin-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: var(--bg-overlay);
+  backdrop-filter: blur(4px);
+}
+
+.admin-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  border: 1px solid var(--border-default);
+  border-radius: 16px;
+  background: var(--bg-surface);
+  padding: 1.75rem;
+  width: min(100%, 26rem);
+  box-shadow: var(--shadow-md);
+  animation: admin-modal-in 180ms ease;
+}
+
+@keyframes admin-modal-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.admin-modal__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 10px;
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.admin-modal__title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.admin-modal__body {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.admin-modal__label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.admin-modal__input {
+  border: 1.5px solid var(--border-default);
+  border-radius: 8px;
+  background: var(--bg-page);
+  padding: 0.55rem 0.75rem;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  width: 100%;
+  transition: border-color 140ms;
+}
+
+.admin-modal__input:focus {
+  outline: none;
+  border-color: var(--danger);
+}
+
+.admin-modal__error {
+  font-size: 0.82rem;
+  color: var(--danger);
+  margin: 0;
+}
+
+.admin-modal__actions {
+  display: flex;
+  gap: 0.65rem;
+  justify-content: flex-end;
+  margin-top: 0.25rem;
+}
+
+.admin-modal__delete-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 8px;
+  background: var(--danger);
+  padding: 0.55rem 1rem;
+  color: var(--text-inverse);
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: opacity 140ms;
+}
+
+.admin-modal__delete-btn:disabled {
+  opacity: 0.45;
+}
+
+.admin-modal__delete-btn:not(:disabled):hover {
+  opacity: 0.88;
+}
+
+.admin-toast {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  border-radius: 10px;
+  padding: 0.75rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  box-shadow: var(--shadow-md);
+  animation: admin-toast-in 220ms ease;
+  white-space: nowrap;
+}
+
+@keyframes admin-toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.admin-toast--success {
+  background: var(--success);
+  color: var(--text-inverse);
+}
