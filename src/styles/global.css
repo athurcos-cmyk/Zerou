@@ -359,11 +359,13 @@ html[data-reduce-motion='true'] *::after {
 .form-stack {
   display: grid;
   gap: 1rem;
+  min-width: 0;
 }
 
 .field {
   display: grid;
   gap: 0.45rem;
+  min-width: 0;
 }
 
 .field label,
@@ -413,6 +415,7 @@ html[data-reduce-motion='true'] *::after {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
+  min-width: 0;
 }
 
 .button {
@@ -1714,6 +1717,7 @@ html[data-reduce-motion='true'] *::after {
 
 .segmented {
   display: inline-flex;
+  max-width: 100%;
   overflow: hidden;
   border: 1px solid var(--border-default);
   border-radius: 999px;
@@ -1722,11 +1726,13 @@ html[data-reduce-motion='true'] *::after {
 }
 
 .segmented button {
+  min-width: 0;
   border-radius: 999px;
   background: transparent;
   color: var(--text-secondary);
   padding: 0.55rem 0.85rem;
   font-weight: 800;
+  overflow-wrap: anywhere;
 }
 
 .segmented button[aria-pressed='true'] {
@@ -2599,6 +2605,8 @@ html[data-reduce-motion='true'] *::after {
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  overflow-x: clip;
+  touch-action: pan-y;
 }
 
 .sheet-backdrop {
@@ -2613,9 +2621,11 @@ html[data-reduce-motion='true'] *::after {
 .sheet-panel {
   position: relative;
   width: min(100%, 34rem);
+  min-width: 0;
   max-height: 88vh;
   display: flex;
   flex-direction: column;
+  overflow-x: clip;
   border-radius: 1.5rem 1.5rem 0 0;
   background: var(--bg-surface);
   box-shadow: var(--shadow-sheet);
@@ -2673,7 +2683,18 @@ html[data-reduce-motion='true'] *::after {
 
 .sheet-body {
   overflow-y: auto;
+  overflow-x: clip;
+  min-width: 0;
   -webkit-overflow-scrolling: touch;
+}
+
+.sheet-body .segmented {
+  display: flex;
+  width: 100%;
+}
+
+.sheet-body .segmented button {
+  flex: 1 1 0;
 }
 
 .sheet-search {
@@ -2864,6 +2885,7 @@ html[data-reduce-motion='true'] *::after {
 .category-create {
   display: grid;
   gap: 1.1rem;
+  min-width: 0;
 }
 
 .category-create-preview {
@@ -2874,8 +2896,9 @@ html[data-reduce-motion='true'] *::after {
 
 .color-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(2.4rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(2.4rem, 1fr));
   gap: 0.55rem;
+  min-width: 0;
 }
 
 .color-dot {
@@ -2897,10 +2920,12 @@ html[data-reduce-motion='true'] *::after {
 
 .icon-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(2.85rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(2.7rem, 1fr));
   gap: 0.5rem;
+  min-width: 0;
   max-height: 13rem;
   overflow-y: auto;
+  overflow-x: clip;
 }
 
 .icon-cell {

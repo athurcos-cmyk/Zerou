@@ -12,6 +12,8 @@ import {
 } from './financeService';
 import type { Account, Bill, Category, RecurringRule, Transaction } from '../types/contracts';
 
+const FINANCE_BOOT_RETRY_DELAYS_MS = [600, 1200, 2400, 4000];
+
 interface FinanceDataState {
   accounts: Array<LocalSynced<Account>>;
   categories: Array<LocalSynced<Category>>;
@@ -31,6 +33,17 @@ const initialState: FinanceDataState = {
   loading: true,
   error: null
 };
+
+function getErrorCode(error: unknown) {
+  return typeof error === 'object' && error && 'code' in error ? String(error.code) : '';
+}
+
+function canRetryFinanceBoot(error: unknown, attempt: number) {
+  return (
+    attempt < FINANCE_BOOT_RETRY_DELAYS_MS.length
+    && ['permission-denied', 'unavailable', 'deadline-exceeded'].includes(getErrorCode(error))
+  );
+}
 
 function setSlice<K extends keyof Pick<FinanceDataState, 'accounts' | 'categories' | 'transactions' | 'bills' | 'recurringRules'>>(
   key: K,
@@ -53,10 +66,35 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
       return undefined;
     }
 
+    const activeWorkspaceId = workspaceId;
     setState((current) => ({ ...current, loading: true, error: null }));
+    let cancelled = false;
+    const timers: number[] = [];
 
-    if (userId) {
-      ensureDefaultCategories(workspaceId).catch(() => {
+    const scheduleRetry = (callback: (attempt: number) => void, attempt: number) => {
+      const timer = window.setTimeout(() => {
+        if (!cancelled) {
+          callback(attempt + 1);
+        }
+      }, FINANCE_BOOT_RETRY_DELAYS_MS[attempt]);
+      timers.push(timer);
+    };
+
+    function prepareDefaultCategories(attempt = 0) {
+      if (!userId) {
+        return;
+      }
+
+      ensureDefaultCategories(activeWorkspaceId).catch((error) => {
+        if (cancelled) {
+          return;
+        }
+
+        if (canRetryFinanceBoot(error, attempt)) {
+          scheduleRetry(prepareDefaultCategories, attempt);
+          return;
+        }
+
         setState((current) => ({
           ...current,
           loading: false,
@@ -73,15 +111,51 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
       }));
     };
 
+    function subscribeWithBootRetry<T>(
+      subscribe: (
+        workspaceId: string,
+        onNext: (items: T[]) => void,
+        onError: (error: Error) => void
+      ) => () => void,
+      onNext: (items: T[]) => void,
+      attempt = 0
+    ): () => void {
+      let unsubscribe: () => void = () => undefined;
+
+      unsubscribe = subscribe(activeWorkspaceId, onNext, (error) => {
+        unsubscribe();
+
+        if (cancelled) {
+          return;
+        }
+
+        if (canRetryFinanceBoot(error, attempt)) {
+          setState((current) => ({ ...current, loading: true, error: null }));
+          scheduleRetry((nextAttempt) => {
+            unsubscribe = subscribeWithBootRetry(subscribe, onNext, nextAttempt);
+          }, attempt);
+          return;
+        }
+
+        onError();
+      });
+
+      return () => unsubscribe();
+    }
+
+    prepareDefaultCategories();
+
     const unsubscribers = [
-      subscribeAccounts(workspaceId, (items) => setState(setSlice('accounts', items)), onError),
-      subscribeCategories(workspaceId, (items) => setState(setSlice('categories', items)), onError),
-      subscribeTransactions(workspaceId, (items) => setState(setSlice('transactions', items)), onError),
-      subscribeBills(workspaceId, (items) => setState(setSlice('bills', items)), onError),
-      subscribeRecurringRules(workspaceId, (items) => setState(setSlice('recurringRules', items)), onError)
+      subscribeWithBootRetry(subscribeAccounts, (items) => setState(setSlice('accounts', items))),
+      subscribeWithBootRetry(subscribeCategories, (items) => setState(setSlice('categories', items))),
+      subscribeWithBootRetry(subscribeTransactions, (items) => setState(setSlice('transactions', items))),
+      subscribeWithBootRetry(subscribeBills, (items) => setState(setSlice('bills', items))),
+      subscribeWithBootRetry(subscribeRecurringRules, (items) => setState(setSlice('recurringRules', items)))
     ];
 
     return () => {
+      cancelled = true;
+      timers.forEach((timer) => window.clearTimeout(timer));
       unsubscribers.forEach((unsubscribe) => unsubscribe());
     };
   }, [userId, workspaceId]);

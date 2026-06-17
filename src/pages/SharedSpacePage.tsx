@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Check, Copy, Handshake, Link2, MessageSquare, PiggyBank, Plus, QrCode, Trash2, Users } from 'lucide-react';
+import { Check, Copy, Handshake, MessageSquare, PiggyBank, Plus, QrCode, Trash2, Users } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { clearPendingInvite, readPendingInvite, savePendingInvite } from '../auth/pendingInvite';
 import { BottomSheet } from '../components/BottomSheet';

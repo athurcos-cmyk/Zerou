@@ -107,11 +107,7 @@ export async function ensurePersonalFoundation({
     globalThis.setTimeout(resolve, FOUNDATION_WRITE_TIMEOUT_MS);
   });
 
-  try {
-    await Promise.race([commit, timeout]);
-  } catch (error) {
-    throw error;
-  }
+  await Promise.race([commit, timeout]);
 
   void commit.catch(() => undefined);
   return { workspaceId, created: true };
