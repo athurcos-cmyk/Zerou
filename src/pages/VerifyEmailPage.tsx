@@ -7,13 +7,13 @@ import { getAuthErrorMessage } from '../auth/authErrors';
 import { sendVerification } from '../auth/authService';
 
 export function VerifyEmailPage() {
-  const { user } = useAuth();
+  const { user, authFromCache } = useAuth();
   const [message, setMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function onSend() {
-    if (!user) {
+    if (!user || authFromCache) {
       setMessage('Entre na Zerou para enviar a verificação.');
       return;
     }
@@ -41,7 +41,7 @@ export function VerifyEmailPage() {
       <div className="form-stack">
         <FormMessage>{message}</FormMessage>
         <FormMessage type="success">{success}</FormMessage>
-        <button className="button button--primary" type="button" onClick={onSend} disabled={busy || !user}>
+        <button className="button button--primary" type="button" onClick={onSend} disabled={busy || !user || authFromCache}>
           Reenviar verificação
         </button>
         <Link className="button button--secondary" to="/app">

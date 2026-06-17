@@ -1,7 +1,9 @@
 import type { User } from 'firebase/auth';
-import { doc, getDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { doc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { getFirebaseDb } from '../firebase/config';
 import type { AppearancePreferences } from '../theme/theme.types';
+
+const FOUNDATION_WRITE_TIMEOUT_MS = 700;
 
 interface EnsurePersonalFoundationInput {
   user: User;
@@ -46,15 +48,6 @@ export async function ensurePersonalFoundation({
   const workspaceRef = doc(db, 'workspaces', workspaceId);
   const memberRef = doc(db, 'workspaces', workspaceId, 'members', user.uid);
   const workspaceRefForUser = doc(db, 'users', user.uid, 'workspaceRefs', workspaceId);
-  const existingUser = await getDoc(userRef);
-
-  if (existingUser.exists()) {
-    if (existingUser.get('defaultWorkspaceId') === workspaceId) {
-      return { workspaceId, created: false };
-    }
-
-    throw new Error('A fundacao da conta esta incompleta. Tente sair e entrar novamente antes de continuar.');
-  }
 
   const now = serverTimestamp();
   const batch = writeBatch(db);
@@ -109,16 +102,17 @@ export async function ensurePersonalFoundation({
       updatedAt: now
   });
 
+  const commit = batch.commit();
+  const timeout = new Promise((resolve) => {
+    globalThis.setTimeout(resolve, FOUNDATION_WRITE_TIMEOUT_MS);
+  });
+
   try {
-    await batch.commit();
-    return { workspaceId, created: true };
+    await Promise.race([commit, timeout]);
   } catch (error) {
-    const refreshedUser = await getDoc(userRef);
-
-    if (refreshedUser.exists() && refreshedUser.get('defaultWorkspaceId') === workspaceId) {
-      return { workspaceId, created: false };
-    }
-
     throw error;
   }
+
+  void commit.catch(() => undefined);
+  return { workspaceId, created: true };
 }

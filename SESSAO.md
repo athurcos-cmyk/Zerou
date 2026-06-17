@@ -6,6 +6,8 @@ SaaS/PWA financeiro mobile-first (React 19 + Firebase Firestore + Vercel). Duas 
 
 A interface segue a direção visual **"Sol"** (areia quente clara + tangerina `#EE5524`, números em DM Sans 800, corpo em Instrument Sans) e é **mobile-nativa**: nav inferior com FAB central, telas de lançamento com header de valor gigante colorido por tipo, seletores em **bottom-sheet** (conta, categoria, bandeira), categorias com ícone e cor editáveis, onboarding em questionário com barra de progresso, e empty states ilustrados. Detalhes em `docs/design/DESIGN.md`.
 
+O app autenticado não usa mais logo persistente no topo; o onboarding também fica sem bloco de marca para preservar altura útil no celular.
+
 A landing pública (`/`) foi reescrita: hero com copy de dor ("Seu salário já chega devendo"), mockup do app em CSS num phone inclinado 3D, bento de recursos, seção do casal com o **cofrinho**, e CTA. Sempre clara (Paper), nunca dark.
 
 ## Leitura inicial
@@ -36,6 +38,8 @@ React 19 (TS strict), Vite, Firebase Web SDK (Auth + Firestore + Storage), Verce
 - Firestore (não RTDB). IDs client-side + `clientMutationId`.
 - Fluxos client-side com Security Rules; sem Cloud Functions (Spark/free).
 - **Offline-first**: Firestore com `persistentLocalCache` + `experimentalAutoDetectLongPolling` (`src/firebase/config.ts`). **Nunca bloquear a UI esperando ack do Firestore** — dispara a escrita (fire-and-forget + `.catch`) e deixa o `onSnapshot` refletir (badge pendente → sincronizado).
+- **Boot em internet fraca**: `AuthContext` usa cache local de perfil (`src/auth/profileCache.ts`) como fallback após 1,8s se Auth/perfil ficarem presos em rede "online ruim". Enquanto `authFromCache` estiver ativo, ações sensíveis de login/verificação ficam bloqueadas até Firebase confirmar a sessão real.
+- **PWA offline**: SVGs também entram no precache do Workbox; logos de banco em `public/bank-logos/` devem funcionar offline após o service worker atualizar.
 - Cores só em `src/styles/themes.css` (+ `src/theme/palette.ts`). Literais quebram o teste `noHardcodedColors` (exceção: `src/landing/`).
 - Componentes-base de UX: `BottomSheet`, `SelectField`, `CategoryField`, `ConfirmDialog`, `EmptyState`.
 - Não expor erro técnico ao usuário; landing sempre clara.

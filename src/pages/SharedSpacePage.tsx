@@ -153,7 +153,7 @@ export function SharedSpacePage() {
     try {
       await action();
     } catch (error) {
-      setMessage(getUserFacingErrorMessage(error, 'Não foi possível concluir esta ação agora.'));
+      setMessage(getUserFacingErrorMessage(error, 'Nao foi possivel atualizar o espaco do casal agora.'));
     }
   }
 

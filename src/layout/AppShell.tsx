@@ -16,7 +16,7 @@ import {
   WalletCards,
   X
 } from 'lucide-react';
-import { BrandLockup, BrandLogo } from '../components/BrandLogo';
+import { BrandLockup } from '../components/BrandLogo';
 import { logout } from '../auth/authService';
 import { useAuth } from '../auth/AuthContext';
 
@@ -99,9 +99,6 @@ export function AppShell() {
       ) : null}
 
       <main className="app-main">
-        <header className="app-header">
-          <BrandLogo compact />
-        </header>
         <Outlet />
       </main>
 

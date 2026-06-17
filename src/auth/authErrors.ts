@@ -24,11 +24,17 @@ export function getAuthErrorMessage(error: unknown) {
       return 'Este acesso pertence a outra conta. A Zerou nao mescla UIDs automaticamente.';
     case 'auth/requires-recent-login':
       return 'Por seguranca, reautentique-se antes de alterar metodos de acesso.';
+    case 'auth/network-request-failed':
+      return 'Sua conexao oscilou. Confira o sinal e tente de novo.';
     case 'permission-denied':
-      return 'Não foi possível salvar agora. Atualize o app e tente novamente. Se continuar, fale com o suporte da Zerou.';
+      return 'Nao foi possivel salvar agora. Atualize o app e tente novamente. Se continuar, fale com o suporte da Zerou.';
     case 'unavailable':
       return 'Sem conexao estavel com o Firebase agora. Tente novamente em instantes.';
     default:
-      return 'Nao foi possivel concluir esta acao agora. Tente novamente.';
+      if (error instanceof Error && error.message && !error.message.includes('FirebaseError')) {
+        return error.message;
+      }
+
+      return 'A conexao oscilou e a Zerou nao conseguiu confirmar a acao. Tente novamente em alguns segundos.';
   }
 }

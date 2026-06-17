@@ -89,6 +89,8 @@ service cloud.firestore {
           'density',
           'fontScale',
           'reduceMotion',
+          'onboardingGoal',
+          'onboardingChallenge',
           'createdAt',
           'updatedAt'
         ])
@@ -123,6 +125,8 @@ service cloud.firestore {
         && request.resource.data.termsVersion == 'zerou-v12.2-foundation'
         && request.resource.data.termsAcceptedAt == request.time
         && request.resource.data.defaultWorkspaceId == workspaceId
+        && (!request.resource.data.keys().hasAny(['onboardingGoal']) || request.resource.data.onboardingGoal is string)
+        && (!request.resource.data.keys().hasAny(['onboardingChallenge']) || request.resource.data.onboardingChallenge is string)
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time
         && validThemeFields()

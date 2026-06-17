@@ -11,7 +11,7 @@ const providerLabels: Record<string, string> = {
 };
 
 export function LoginMethodsPage() {
-  const { user } = useAuth();
+  const { user, authFromCache } = useAuth();
   const [newPassword, setNewPassword] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [message, setMessage] = useState<string | null>(null);
@@ -39,7 +39,7 @@ export function LoginMethodsPage() {
 
   function onUnlink(providerId: string) {
     void run(async () => {
-      if (!user) {
+      if (!user || authFromCache) {
         throw new Error('Entre na Zerou para alterar métodos de acesso.');
       }
 
@@ -82,7 +82,7 @@ export function LoginMethodsPage() {
                 <button
                   className="button button--secondary"
                   type="button"
-                  disabled={busy || providers.length <= 1}
+                  disabled={busy || providers.length <= 1 || authFromCache}
                   onClick={() => onUnlink(providerId)}
                 >
                   <Trash2 size={17} aria-hidden="true" /> Remover
@@ -107,10 +107,10 @@ export function LoginMethodsPage() {
             <button
               className="button button--secondary"
               type="button"
-              disabled={busy || !user}
+              disabled={busy || !user || authFromCache}
               onClick={() =>
                 run(async () => {
-                  if (!user) {
+                  if (!user || authFromCache) {
                     throw new Error('Entre na Zerou para alterar métodos de acesso.');
                   }
                   await linkGoogleProvider(user);
@@ -137,10 +137,10 @@ export function LoginMethodsPage() {
               <button
                 className="button button--primary"
                 type="button"
-                disabled={busy || newPassword.length < 8 || !user}
+                disabled={busy || newPassword.length < 8 || !user || authFromCache}
                 onClick={() =>
                   run(async () => {
-                    if (!user) {
+                    if (!user || authFromCache) {
                       throw new Error('Entre na Zerou para alterar métodos de acesso.');
                     }
                     await addPasswordProvider(user, newPassword);

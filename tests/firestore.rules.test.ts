@@ -34,6 +34,8 @@ function foundationPayload(uid: string) {
       density: 'comfortable',
       fontScale: 'md',
       reduceMotion: false,
+      onboardingGoal: 'organizar',
+      onboardingChallenge: 'para-onde',
       createdAt: now,
       updatedAt: now
     },

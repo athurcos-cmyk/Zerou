@@ -6,10 +6,9 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { readPendingInvite } from '../auth/pendingInvite';
-import { getAuthErrorMessage } from '../auth/authErrors';
-import { BrandLogo } from '../components/BrandLogo';
 import { FormMessage } from '../components/FormMessage';
 import { useAppearanceStore } from '../theme/appearance.store';
+import { getUserFacingErrorMessage } from '../utils/userFacingError';
 import { ensurePersonalFoundation } from '../workspaces/workspaceService';
 
 interface Choice {
@@ -88,7 +87,7 @@ export function OnboardingPage() {
       });
       navigate('/app', { replace: true });
     } catch (error) {
-      setMessage(getAuthErrorMessage(error));
+      setMessage(getUserFacingErrorMessage(error, 'Não foi possível preparar seu espaço agora. Tente novamente.'));
     } finally {
       setBusy(false);
     }
@@ -100,10 +99,6 @@ export function OnboardingPage() {
         {Array.from({ length: TOTAL_STEPS }, (_, index) => (
           <span key={index} className={`onboard-progress-bar${index <= step ? ' onboard-progress-bar--done' : ''}`} />
         ))}
-      </div>
-
-      <div className="onboard-brand">
-        <BrandLogo compact />
       </div>
 
       <FormMessage>{message}</FormMessage>

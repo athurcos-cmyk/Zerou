@@ -24,7 +24,7 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
 ## Layout mobile
 
 - Shell: `AppShell.tsx`. Desktop = sidebar; mobile = **nav inferior com FAB central** elevado (tangerina) para "Lançar".
-- Header do app logado: só a logo (sem tagline, sem glow de fundo).
+- Header do app logado: sem logo persistente; a tela deve priorizar a tarefa.
 - Telas de lançamento (transação, cartão): **header de valor gigante** colorido por contexto, com o valor em DM Sans 800. Tipo via segmented "type-switch".
 
 ## Componentes-base (reutilizar sempre)
