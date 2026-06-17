@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import { addMonths } from 'date-fns';
 import { getFirebaseDb } from '../firebase/config';
+import { fireWrite } from '../firebase/fireWrite';
 import { monthKeyFromDate } from '../finance/financeDates';
 import {
   anticipateInstallmentsSchema,
@@ -154,7 +155,7 @@ export async function createCreditCard(workspaceId: string, userId: string, inpu
   const id = createId('card');
   const now = serverTimestamp();
 
-  await setDoc(cardRef(workspaceId, id), {
+  fireWrite(setDoc(cardRef(workspaceId, id), {
     id,
     workspaceId,
     ownerUserId: userId,
@@ -168,7 +169,7 @@ export async function createCreditCard(workspaceId: string, userId: string, inpu
     isActive: true,
     createdAt: now,
     updatedAt: now
-  });
+  }));
 
   return id;
 }
@@ -255,15 +256,15 @@ export async function createCardPurchase(workspaceId: string, userId: string, in
     })
   );
 
-  await batch.commit();
+  fireWrite(batch.commit());
   return transactionId;
 }
 
 export async function closeInvoice(workspaceId: string, cardId: string, invoiceId: string) {
-  await updateDoc(invoiceRef(workspaceId, cardId, invoiceId), {
+  fireWrite(updateDoc(invoiceRef(workspaceId, cardId, invoiceId), {
     status: 'closed',
     updatedAt: serverTimestamp()
-  });
+  }));
 }
 
 export async function recordInvoicePayment(workspaceId: string, userId: string, input: RecordInvoicePaymentInput) {
@@ -314,7 +315,7 @@ export async function recordInvoicePayment(workspaceId: string, userId: string, 
     updatedAt: now
   });
 
-  await batch.commit();
+  fireWrite(batch.commit());
   return transactionId;
 }
 
@@ -355,7 +356,7 @@ async function addLedgerOnlyEntry(
   const idempotencyKey = `${seed}_${type}`;
   const entryId = idempotentEntryId(idempotencyKey);
 
-  await setDoc(
+  fireWrite(setDoc(
     ledgerDocRef(workspaceId, cardId, invoiceId, entryId),
     ledgerPayload({
       id: entryId,
@@ -368,17 +369,17 @@ async function addLedgerOnlyEntry(
       idempotencyKey,
       createdBy: userId
     })
-  );
+  ));
 
   return entryId;
 }
 
 export async function reconcileInvoice(workspaceId: string, input: ReconcileInvoiceInput) {
   const parsed = reconcileInvoiceSchema.parse(input);
-  await updateDoc(invoiceRef(workspaceId, parsed.cardId, parsed.invoiceId), {
+  fireWrite(updateDoc(invoiceRef(workspaceId, parsed.cardId, parsed.invoiceId), {
     status: parsed.status,
     updatedAt: serverTimestamp()
-  });
+  }));
 }
 
 export function subscribeCards(

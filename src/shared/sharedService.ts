@@ -19,6 +19,7 @@ import {
 import { addHours } from 'date-fns';
 import { getBillingEntitlementsForUser } from '../billing/billingService';
 import { getFirebaseDb } from '../firebase/config';
+import { fireWrite } from '../firebase/fireWrite';
 import { getPersonalWorkspaceId } from '../workspaces/workspaceService';
 import {
   addSharedCommentSchema,
@@ -487,7 +488,7 @@ export async function createSharedExpenseClaim(workspaceId: string, userId: stri
   const audit = auditEntry(workspaceId, userId, 'shared_claim_created', 'claim', id, 'Claim resumido criado.');
   batch.set(audit.reference, audit.payload);
 
-  await batch.commit();
+  fireWrite(batch.commit());
   return id;
 }
 
@@ -511,7 +512,7 @@ export async function updateSharedExpenseClaimStatus(workspaceId: string, userId
   const audit = auditEntry(workspaceId, userId, `shared_claim_${parsed.status}`, 'claim', parsed.claimId, `Claim marcado como ${parsed.status}.`);
   batch.set(audit.reference, audit.payload);
 
-  await batch.commit();
+  fireWrite(batch.commit());
 }
 
 export async function createSettlementProposal(workspaceId: string, userId: string, input: CreateSettlementInput) {
@@ -537,7 +538,7 @@ export async function createSettlementProposal(workspaceId: string, userId: stri
   const audit = auditEntry(workspaceId, userId, 'settlement_proposed', 'settlement', id, 'Proposta de acerto criada.');
   batch.set(audit.reference, audit.payload);
 
-  await batch.commit();
+  fireWrite(batch.commit());
   return id;
 }
 
@@ -560,7 +561,7 @@ export async function acceptSettlement(workspaceId: string, userId: string, sett
   const audit = auditEntry(workspaceId, userId, 'settlement_accepted', 'settlement', settlementId, 'Acerto aceito.');
   batch.set(audit.reference, audit.payload);
 
-  await batch.commit();
+  fireWrite(batch.commit());
 }
 
 export async function recordSettlementPayment(workspaceId: string, userId: string, input: RecordSettlementPaymentInput) {
@@ -586,14 +587,14 @@ export async function recordSettlementPayment(workspaceId: string, userId: strin
   const audit = auditEntry(workspaceId, userId, 'settlement_payment_recorded', 'settlement', parsed.settlementId, 'Pagamento de acerto registrado.');
   batch.set(audit.reference, audit.payload);
 
-  await batch.commit();
+  fireWrite(batch.commit());
 }
 
 export async function addSharedComment(workspaceId: string, userId: string, input: AddSharedCommentInput) {
   const parsed = addSharedCommentSchema.parse(input);
   const id = createId('comment');
 
-  await setDoc(doc(commentsRef(workspaceId), id), {
+  fireWrite(setDoc(doc(commentsRef(workspaceId), id), {
     id,
     workspaceId,
     targetType: parsed.targetType,
@@ -601,7 +602,7 @@ export async function addSharedComment(workspaceId: string, userId: string, inpu
     body: parsed.body,
     createdBy: userId,
     createdAt: serverTimestamp()
-  });
+  }));
 
   return id;
 }

@@ -5,7 +5,8 @@ Resumo das mudanças recentes do Zerou. O histórico detalhado por mês fica em 
 ## 2026-06-17 — correção crítica: app travando/escrita pendente, offline e zoom
 
 - **Firestore travando** (escrita ficava "pendente" e só sincronizava após refresh): `experimentalAutoDetectLongPolling` ligado e `persistentMultipleTabManager` no cache — o transporte WebChannel travava em algumas redes/navegadores.
-- **Escritas otimistas**: criar meta/cofrinho/conta não bloqueia mais a UI esperando o servidor (fim do spinner infinito). Dispara a escrita, fecha na hora e o listener mostra o item (offline-first).
+- **Escritas otimistas em todo o app** (`fireWrite` em finance/cards/shared): nenhuma mutação bloqueia mais a UI esperando o servidor (fim do spinner infinito). Dispara a escrita, responde na hora e o `onSnapshot` mostra o item (offline-first de verdade). Validação síncrona (Zod) continua surgindo pro usuário.
+- **Metas/cofrinho offline**: removido `orderBy('createdAt')` das queries de goals/goalContributions (offline o serverTimestamp fica nulo e escondia o item recém-criado); ordenação no cliente.
 - **Zoom / arrastar lateral**: travado o overflow-x (html/body/app-main) e corrigida a margem negativa do header de valor que estourava a largura no mobile; `viewport-fit=cover`.
 - Detalhe em `docs/history/2026-06.md`. Validação: `npm run typecheck`, `npm test` (37/37), `npm run build`.
 

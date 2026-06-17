@@ -23,7 +23,13 @@ export function useGoalsData(workspaceId?: string) {
 
     return subscribeGoals(
       workspaceId,
-      (goals) => setState({ goals: goals.filter((goal) => goal.isActive !== false), loading: false, error: null }),
+      (goals) => {
+        const active = goals
+          .filter((goal) => goal.isActive !== false)
+          // Mais recentes primeiro; itens pendentes (createdAt nulo offline) vêm no topo.
+          .sort((a, b) => (b.createdAt?.toMillis() ?? Number.MAX_SAFE_INTEGER) - (a.createdAt?.toMillis() ?? Number.MAX_SAFE_INTEGER));
+        setState({ goals: active, loading: false, error: null });
+      },
       (error) => setState({ goals: [], loading: false, error: error.message })
     );
   }, [workspaceId]);

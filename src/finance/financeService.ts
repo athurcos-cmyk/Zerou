@@ -18,6 +18,7 @@ import {
   type Unsubscribe
 } from 'firebase/firestore';
 import { getFirebaseDb } from '../firebase/config';
+import { fireWrite } from '../firebase/fireWrite';
 import { buildDefaultCategory, defaultCategories } from './defaultCategories';
 import { monthKeyFromDate } from './financeDates';
 import {
@@ -106,7 +107,7 @@ export async function createAccount(workspaceId: string, userId: string, input: 
 }
 
 export async function deleteAccount(workspaceId: string, accountId: string) {
-  await deleteDoc(documentRef(workspaceId, 'accounts', accountId));
+  fireWrite(deleteDoc(documentRef(workspaceId, 'accounts', accountId)));
 }
 
 export async function createTransaction(workspaceId: string, userId: string, input: CreateTransactionInput) {
@@ -151,7 +152,7 @@ export async function createCategory(
 ) {
   const id = createId('cat');
   const now = serverTimestamp();
-  await setDoc(documentRef(workspaceId, 'categories', id), omitUndefined({
+  fireWrite(setDoc(documentRef(workspaceId, 'categories', id), omitUndefined({
     id,
     workspaceId,
     name: input.name.trim(),
@@ -163,7 +164,7 @@ export async function createCategory(
     createdBy: userId,
     createdAt: now,
     updatedAt: now
-  }));
+  })));
   return id;
 }
 
@@ -172,19 +173,19 @@ export async function updateCategory(
   categoryId: string,
   patch: { name?: string; icon?: string; color?: string }
 ) {
-  await updateDoc(documentRef(workspaceId, 'categories', categoryId), omitUndefined({
+  fireWrite(updateDoc(documentRef(workspaceId, 'categories', categoryId), omitUndefined({
     name: patch.name?.trim(),
     icon: patch.icon,
     color: patch.color,
     updatedAt: serverTimestamp()
-  }));
+  })));
 }
 
 export async function deleteCategory(workspaceId: string, categoryId: string) {
-  await updateDoc(documentRef(workspaceId, 'categories', categoryId), {
+  fireWrite(updateDoc(documentRef(workspaceId, 'categories', categoryId), {
     isActive: false,
     updatedAt: serverTimestamp()
-  });
+  }));
 }
 
 export async function createGoal(
@@ -249,8 +250,10 @@ export function subscribeGoalContributions(
   onNext: (items: Array<LocalSynced<GoalContribution>>) => void,
   onError: (error: Error) => void
 ): Unsubscribe {
+  // Sem orderBy: a agregação (total/mês/por pessoa) usa monthKey (client-set),
+  // e offline o createdAt pendente esconderia a contribuição recém-criada.
   return onSnapshot(
-    query(collectionRef(workspaceId, 'goalContributions'), orderBy('createdAt', 'desc')),
+    collectionRef(workspaceId, 'goalContributions'),
     { includeMetadataChanges: true },
     (snapshot) => onNext(snapshot.docs.map((item) => withLocalSync<GoalContribution>(item))),
     onError
@@ -258,16 +261,16 @@ export function subscribeGoalContributions(
 }
 
 export async function deleteGoal(workspaceId: string, goalId: string) {
-  await deleteDoc(documentRef(workspaceId, 'goals', goalId));
+  fireWrite(deleteDoc(documentRef(workspaceId, 'goals', goalId)));
 }
 
 export async function softDeleteTransaction(workspaceId: string, userId: string, transactionId: string) {
-  await updateDoc(documentRef(workspaceId, 'transactions', transactionId), {
+  fireWrite(updateDoc(documentRef(workspaceId, 'transactions', transactionId), {
     updatedBy: userId,
     deletedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     version: increment(1)
-  });
+  }));
 }
 
 export async function updateTransaction(
@@ -309,7 +312,7 @@ export async function createBill(workspaceId: string, userId: string, input: Cre
   const id = createId('bill');
   const now = serverTimestamp();
 
-  await setDoc(documentRef(workspaceId, 'bills', id), omitUndefined({
+  fireWrite(setDoc(documentRef(workspaceId, 'bills', id), omitUndefined({
     id,
     workspaceId,
     description: parsed.description,
@@ -321,16 +324,16 @@ export async function createBill(workspaceId: string, userId: string, input: Cre
     createdBy: userId,
     createdAt: now,
     updatedAt: now
-  }));
+  })));
 
   return id;
 }
 
 export async function updateBillStatus(workspaceId: string, billId: string, status: Bill['status']) {
-  await updateDoc(documentRef(workspaceId, 'bills', billId), {
+  fireWrite(updateDoc(documentRef(workspaceId, 'bills', billId), {
     status,
     updatedAt: serverTimestamp()
-  });
+  }));
 }
 
 export async function createRecurringRule(workspaceId: string, userId: string, input: CreateRecurringRuleInput) {
@@ -338,7 +341,7 @@ export async function createRecurringRule(workspaceId: string, userId: string, i
   const id = createId('rec');
   const now = serverTimestamp();
 
-  await setDoc(documentRef(workspaceId, 'recurring', id), omitUndefined({
+  fireWrite(setDoc(documentRef(workspaceId, 'recurring', id), omitUndefined({
     id,
     workspaceId,
     description: parsed.description,
@@ -351,7 +354,7 @@ export async function createRecurringRule(workspaceId: string, userId: string, i
     createdBy: userId,
     createdAt: now,
     updatedAt: now
-  }));
+  })));
 
   return id;
 }
@@ -400,8 +403,10 @@ export function subscribeGoals(
   onNext: (items: Array<LocalSynced<Goal>>) => void,
   onError: (error: Error) => void
 ): Unsubscribe {
+  // Sem orderBy('createdAt'): offline o serverTimestamp fica nulo e a query
+  // esconderia o item recém-criado. Ordenação fica no cliente (useGoalsData).
   return onSnapshot(
-    query(collectionRef(workspaceId, 'goals'), orderBy('createdAt', 'desc')),
+    collectionRef(workspaceId, 'goals'),
     { includeMetadataChanges: true },
     (snapshot) => onNext(snapshot.docs.map((item) => withLocalSync<Goal>(item))),
     onError
