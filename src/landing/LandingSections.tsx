@@ -16,16 +16,16 @@ export function LandingSections() {
       {/* Bento features */}
       <section className="lp-section" id="recursos">
         <div className="lp-section-head">
-          <p className="lp-kicker">Recursos</p>
-          <h2 className="lp-h2">Tudo o que você precisa, sem planilha.</h2>
-          <p>Lançamentos em segundos, cartões sem dupla contagem e uma visão clara de para onde o dinheiro vai.</p>
+          <p className="lp-kicker">O que a Zerou faz por você</p>
+          <h2 className="lp-h2">Tudo o que some no mês, num lugar só.</h2>
+          <p>Sem planilha e sem complicação. Você vê pra onde vai cada real e corta o que não faz sentido — antes de ficar sem.</p>
         </div>
 
         <div className="lp-bento">
           <article className="lp-cell lp-cell--wide lp-cell--accent">
             <span className="lp-cell-ico" style={{ background: '#ee5524' }}><Wallet size={22} /></span>
-            <h3>Lançar é instantâneo</h3>
-            <p>O valor é o herói: digite, escolha categoria e conta. Pronto.</p>
+            <h3>Anote antes de esquecer</h3>
+            <p>O gasto que some é o que você esquece. Aqui você lança em 3 toques — o valor é o herói.</p>
             <div className="lp-demo-hero">
               <span>Valor</span>
               <strong>R$ 318,00</strong>
@@ -34,8 +34,8 @@ export function LandingSections() {
 
           <article className="lp-cell lp-cell--tall">
             <span className="lp-cell-ico" style={{ background: '#6366c9' }}><BarChart3 size={22} /></span>
-            <h3>Gastos por categoria</h3>
-            <p>Veja exageros antes do fim do mês.</p>
+            <h3>Veja o vilão do mês</h3>
+            <p>Descubra qual categoria está comendo seu salário — antes do dia 15.</p>
             <div className="lp-demo-cats">
               <span className="lp-demo-cat"><i style={{ background: '#ee5524' }} /> Mercado</span>
               <span className="lp-demo-cat"><i style={{ background: '#3b82c4' }} /> Casa</span>
@@ -46,22 +46,22 @@ export function LandingSections() {
 
           <article className="lp-cell lp-cell--third">
             <span className="lp-cell-ico" style={{ background: '#1f9e6e' }}><CreditCard size={22} /></span>
-            <h3>Cartões e faturas</h3>
-            <p>Limite usado e disponível num olhar.</p>
+            <h3>Cartão sem susto</h3>
+            <p>Limite usado e o quanto ainda dá, sem contar a fatura duas vezes.</p>
             <div className="lp-demo-bar"><i style={{ width: '64%' }} /></div>
           </article>
 
           <article className="lp-cell lp-cell--third">
             <span className="lp-cell-ico" style={{ background: '#e8911c' }}><Target size={22} /></span>
-            <h3>Metas</h3>
-            <p>Guardar dinheiro ou quitar dívidas com progresso real.</p>
+            <h3>Finalmente sobra</h3>
+            <p>Guarde pra um objetivo ou quite uma dívida, com progresso que cresce na sua frente.</p>
             <div className="lp-demo-bar"><i style={{ width: '42%' }} /></div>
           </article>
 
           <article className="lp-cell lp-cell--third">
             <span className="lp-cell-ico" style={{ background: '#1c1814' }}><LockKeyhole size={22} /></span>
-            <h3>Privado por padrão</h3>
-            <p>O que é seu fica só seu. O dos dois aparece só no espaço compartilhado.</p>
+            <h3>O que é seu, é só seu</h3>
+            <p>Seu pessoal nunca aparece pro outro. Só o que vocês decidem dividir fica em comum.</p>
           </article>
         </div>
       </section>
@@ -95,23 +95,23 @@ export function LandingSections() {
       <section className="lp-section" id="como">
         <div className="lp-section-head">
           <p className="lp-kicker">Como funciona</p>
-          <h2 className="lp-h2">Comece em 3 passos.</h2>
+          <h2 className="lp-h2">Do caos ao controle em 2 minutos.</h2>
         </div>
         <div className="lp-steps">
           <article className="lp-step">
             <span className="lp-step-num">1</span>
-            <h3>Crie sua conta</h3>
-            <p>Responda um questionário rápido e a Zerou monta seu espaço pessoal privado.</p>
+            <h3>Crie em 2 minutos</h3>
+            <p>Responda 2 perguntas e a Zerou monta seu espaço privado na hora.</p>
           </article>
           <article className="lp-step">
             <span className="lp-step-num">2</span>
-            <h3>Lance e acompanhe</h3>
-            <p>Registre gastos, contas e cartões. Veja saldo, disponível e comprometido na hora.</p>
+            <h3>Veja a verdade</h3>
+            <p>Jogue gastos, contas e cartões pra dentro. Descubra pra onde foi cada real.</p>
           </article>
           <article className="lp-step">
             <span className="lp-step-num">3</span>
-            <h3>Convide quem quiser</h3>
-            <p>Quando fizer sentido, divida despesas com outra pessoa e acertem com clareza.</p>
+            <h3>Pare de terminar no zero</h3>
+            <p>Corte o que não faz sentido e junte pro que importa — sozinho ou a dois.</p>
           </article>
         </div>
       </section>
