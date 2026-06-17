@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { calculateSharedBalances, suggestSettlement } from '../domain/shared/calculateSharedBalances';
+import { subscribeWithTransientRetry } from '../firebase/firestoreRetry';
 import {
   subscribeActiveInvites,
   subscribeMembers,
@@ -55,22 +56,27 @@ export function useSharedWorkspaceData(userId?: string) {
 
     setState((current) => ({ ...current, loading: true, error: null }));
 
-    return subscribeWorkspaceRefs(
-      userId,
-      (workspaceRefs) =>
-        setState((current) => ({
-          ...current,
-          workspaceRefs,
-          loading: false,
-          error: null
-        })),
-      () =>
+    return subscribeWithTransientRetry({
+      subscribe: (onError) =>
+        subscribeWorkspaceRefs(
+          userId,
+          (workspaceRefs) =>
+            setState((current) => ({
+              ...current,
+              workspaceRefs,
+              loading: false,
+              error: null
+            })),
+          onError
+        ),
+      onRetrying: () => setState((current) => ({ ...current, loading: true, error: null })),
+      onError: () =>
         setState((current) => ({
           ...current,
           loading: false,
           error: 'Não foi possível carregar seus espaços Zerou.'
         }))
-    );
+    });
   }, [userId]);
 
   const activeCoupleRef = useMemo(
@@ -93,6 +99,7 @@ export function useSharedWorkspaceData(userId?: string) {
     }
 
     const workspaceId = activeCoupleRef.workspaceId;
+    const onRetrying = () => setState((current) => ({ ...current, loading: true, error: null }));
     const onError = () =>
       setState((current) => ({
         ...current,
@@ -101,12 +108,42 @@ export function useSharedWorkspaceData(userId?: string) {
       }));
 
     const unsubscribers = [
-      subscribeWorkspace(workspaceId, (workspace) => setState((current) => ({ ...current, workspace, loading: false })), onError),
-      subscribeMembers(workspaceId, (members) => setState((current) => ({ ...current, members, loading: false })), onError),
-      subscribeActiveInvites(workspaceId, (invites) => setState((current) => ({ ...current, invites, loading: false })), onError),
-      subscribeSharedClaims(workspaceId, (claims) => setState((current) => ({ ...current, claims, loading: false })), onError),
-      subscribeSettlements(workspaceId, (settlements) => setState((current) => ({ ...current, settlements, loading: false })), onError),
-      subscribeSharedComments(workspaceId, (comments) => setState((current) => ({ ...current, comments, loading: false })), onError)
+      subscribeWithTransientRetry({
+        subscribe: (handleError) =>
+          subscribeWorkspace(workspaceId, (workspace) => setState((current) => ({ ...current, workspace, loading: false })), handleError),
+        onRetrying,
+        onError
+      }),
+      subscribeWithTransientRetry({
+        subscribe: (handleError) =>
+          subscribeMembers(workspaceId, (members) => setState((current) => ({ ...current, members, loading: false })), handleError),
+        onRetrying,
+        onError
+      }),
+      subscribeWithTransientRetry({
+        subscribe: (handleError) =>
+          subscribeActiveInvites(workspaceId, (invites) => setState((current) => ({ ...current, invites, loading: false })), handleError),
+        onRetrying,
+        onError
+      }),
+      subscribeWithTransientRetry({
+        subscribe: (handleError) =>
+          subscribeSharedClaims(workspaceId, (claims) => setState((current) => ({ ...current, claims, loading: false })), handleError),
+        onRetrying,
+        onError
+      }),
+      subscribeWithTransientRetry({
+        subscribe: (handleError) =>
+          subscribeSettlements(workspaceId, (settlements) => setState((current) => ({ ...current, settlements, loading: false })), handleError),
+        onRetrying,
+        onError
+      }),
+      subscribeWithTransientRetry({
+        subscribe: (handleError) =>
+          subscribeSharedComments(workspaceId, (comments) => setState((current) => ({ ...current, comments, loading: false })), handleError),
+        onRetrying,
+        onError
+      })
     ];
 
     return () => {

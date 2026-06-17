@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { subscribeWithTransientRetry } from '../firebase/firestoreRetry';
 import { subscribeGoalContributions, subscribeGoals, type LocalSynced } from '../finance/financeService';
 import type { Goal, GoalContribution } from '../types/contracts';
 
@@ -33,26 +34,29 @@ export function useCoupleSavings(workspaceId?: string) {
     }
     setState((current) => ({ ...current, loading: true, error: null }));
 
-    let goals: Array<LocalSynced<Goal>> = [];
-    let contributions: Array<LocalSynced<GoalContribution>> = [];
+    const unsubGoals = subscribeWithTransientRetry({
+      subscribe: (onError) =>
+        subscribeGoals(
+          workspaceId,
+          (items) => {
+            const goals = items.filter((goal) => goal.isActive !== false);
+            setState((current) => ({ ...current, goals, loading: false, error: null }));
+          },
+          onError
+        ),
+      onRetrying: () => setState((current) => ({ ...current, loading: true, error: null })),
+      onError: () => setState((current) => ({ ...current, loading: false, error: 'Não foi possível carregar os cofrinhos.' }))
+    });
 
-    const unsubGoals = subscribeGoals(
-      workspaceId,
-      (items) => {
-        goals = items.filter((goal) => goal.isActive !== false);
-        setState((current) => ({ ...current, goals, loading: false, error: null }));
-      },
-      (error) => setState((current) => ({ ...current, loading: false, error: error.message }))
-    );
-
-    const unsubContribs = subscribeGoalContributions(
-      workspaceId,
-      (items) => {
-        contributions = items;
-        setState((current) => ({ ...current, contributions }));
-      },
-      () => undefined
-    );
+    const unsubContribs = subscribeWithTransientRetry({
+      subscribe: (onError) =>
+        subscribeGoalContributions(
+          workspaceId,
+          (items) => setState((current) => ({ ...current, contributions: items })),
+          onError
+        ),
+      onError: () => setState((current) => ({ ...current, error: 'Não foi possível carregar as contribuições dos cofrinhos.' }))
+    });
 
     return () => {
       unsubGoals();

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { calculateInvoice } from '../domain/invoices/calculateInvoice';
+import { subscribeWithTransientRetry } from '../firebase/firestoreRetry';
 import { toDate } from '../finance/financeDates';
 import {
   subscribeCards,
@@ -36,16 +37,21 @@ export function useCardsData(workspaceId?: string) {
 
     setState((current) => ({ ...current, loading: true, error: null }));
 
-    return subscribeCards(
-      workspaceId,
-      (cards) => setState((current) => ({ ...current, cards, loading: false, error: null })),
-      () =>
+    return subscribeWithTransientRetry({
+      subscribe: (onError) =>
+        subscribeCards(
+          workspaceId,
+          (cards) => setState((current) => ({ ...current, cards, loading: false, error: null })),
+          onError
+        ),
+      onRetrying: () => setState((current) => ({ ...current, loading: true, error: null })),
+      onError: () =>
         setState((current) => ({
           ...current,
           loading: false,
           error: 'Não foi possível carregar os cartões.'
         }))
-    );
+    });
   }, [workspaceId]);
 
   useEffect(() => {
@@ -55,16 +61,20 @@ export function useCardsData(workspaceId?: string) {
     }
 
     const unsubscribers = state.cards.map((card) =>
-      subscribeInvoices(
-        workspaceId,
-        card.id,
-        (items) =>
-          setState((current) => ({
-            ...current,
-            invoices: [...current.invoices.filter((invoice) => invoice.cardId !== card.id), ...items]
-          })),
-        () => setState((current) => ({ ...current, error: 'Não foi possível carregar faturas.' }))
-      )
+      subscribeWithTransientRetry({
+        subscribe: (onError) =>
+          subscribeInvoices(
+            workspaceId,
+            card.id,
+            (items) =>
+              setState((current) => ({
+                ...current,
+                invoices: [...current.invoices.filter((invoice) => invoice.cardId !== card.id), ...items]
+              })),
+            onError
+          ),
+        onError: () => setState((current) => ({ ...current, error: 'Não foi possível carregar faturas.' }))
+      })
     );
 
     return () => {
@@ -79,20 +89,24 @@ export function useCardsData(workspaceId?: string) {
     }
 
     const unsubscribers = state.invoices.map((invoice) =>
-      subscribeInvoiceLedger(
-        workspaceId,
-        invoice.cardId,
-        invoice.id,
-        (items) =>
-          setState((current) => ({
-            ...current,
-            ledgerEntries: [
-              ...current.ledgerEntries.filter((entry) => entry.invoiceId !== invoice.id || entry.cardId !== invoice.cardId),
-              ...items
-            ]
-          })),
-        () => setState((current) => ({ ...current, error: 'Não foi possível carregar o ledger da fatura.' }))
-      )
+      subscribeWithTransientRetry({
+        subscribe: (onError) =>
+          subscribeInvoiceLedger(
+            workspaceId,
+            invoice.cardId,
+            invoice.id,
+            (items) =>
+              setState((current) => ({
+                ...current,
+                ledgerEntries: [
+                  ...current.ledgerEntries.filter((entry) => entry.invoiceId !== invoice.id || entry.cardId !== invoice.cardId),
+                  ...items
+                ]
+              })),
+            onError
+          ),
+        onError: () => setState((current) => ({ ...current, error: 'Não foi possível carregar o ledger da fatura.' }))
+      })
     );
 
     return () => {

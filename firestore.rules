@@ -328,6 +328,7 @@ service cloud.firestore {
           'type',
           'parentCategoryId',
           'icon',
+          'color',
           'isDefault',
           'isActive',
           'createdAt',
@@ -339,6 +340,7 @@ service cloud.firestore {
         && request.resource.data.type in ['income', 'expense', 'both']
         && validOptionalString('parentCategoryId', 120)
         && validOptionalString('icon', 40)
+        && validOptionalString('color', 40)
         && request.resource.data.isDefault is bool
         && request.resource.data.isActive is bool
         && request.resource.data.createdAt == request.time
@@ -355,6 +357,7 @@ service cloud.firestore {
           'type',
           'parentCategoryId',
           'icon',
+          'color',
           'isActive',
           'updatedAt'
         ])
@@ -362,6 +365,7 @@ service cloud.firestore {
         && request.resource.data.type in ['income', 'expense', 'both']
         && validOptionalString('parentCategoryId', 120)
         && validOptionalString('icon', 40)
+        && validOptionalString('color', 40)
         && request.resource.data.isActive is bool
         && request.resource.data.updatedAt == request.time;
     }
@@ -621,6 +625,96 @@ service cloud.firestore {
         && validOptionalString('categoryId', 120)
         && request.resource.data.isActive is bool
         && request.resource.data.updatedAt == request.time;
+    }
+
+    function validGoalCreate(workspaceId, goalId) {
+      return isActiveMember(workspaceId)
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'workspaceId',
+          'name',
+          'kind',
+          'targetCents',
+          'savedCents',
+          'icon',
+          'color',
+          'dueDate',
+          'isActive',
+          'createdBy',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'id',
+          'workspaceId',
+          'name',
+          'kind',
+          'targetCents',
+          'savedCents',
+          'isActive',
+          'createdBy',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.id == goalId
+        && request.resource.data.workspaceId == workspaceId
+        && validShortText(request.resource.data.name, 2, 80)
+        && request.resource.data.kind in ['save', 'debt']
+        && validMoneyCents(request.resource.data.targetCents)
+        && validMoneyCents(request.resource.data.savedCents)
+        && validOptionalString('icon', 40)
+        && validOptionalString('color', 40)
+        && (!request.resource.data.keys().hasAny(['dueDate']) || request.resource.data.dueDate is timestamp)
+        && request.resource.data.isActive is bool
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validGoalUpdate(workspaceId) {
+      return isActiveMember(workspaceId)
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.workspaceId == resource.data.workspaceId
+        && request.resource.data.workspaceId == workspaceId
+        && request.resource.data.name == resource.data.name
+        && request.resource.data.kind == resource.data.kind
+        && request.resource.data.targetCents == resource.data.targetCents
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['savedCents', 'isActive', 'updatedAt'])
+        && validMoneyCents(request.resource.data.savedCents)
+        && request.resource.data.isActive is bool
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validGoalContributionCreate(workspaceId, contribId) {
+      return isActiveMember(workspaceId)
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'workspaceId',
+          'goalId',
+          'userId',
+          'amountCents',
+          'monthKey',
+          'createdAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'id',
+          'workspaceId',
+          'goalId',
+          'userId',
+          'amountCents',
+          'createdAt'
+        ])
+        && request.resource.data.id == contribId
+        && request.resource.data.workspaceId == workspaceId
+        && request.resource.data.goalId is string
+        && exists(/databases/$(database)/documents/workspaces/$(workspaceId)/goals/$(request.resource.data.goalId))
+        && request.resource.data.userId == request.auth.uid
+        && validMoneyCents(request.resource.data.amountCents)
+        && request.resource.data.amountCents > 0
+        && (!request.resource.data.keys().hasAny(['monthKey']) || validMonthKey(request.resource.data.monthKey))
+        && request.resource.data.createdAt == request.time;
     }
 
     function validCardCreate(workspaceId, cardId) {
@@ -1333,20 +1427,14 @@ service cloud.firestore {
 
       match /goals/{goalId} {
         allow read: if isActiveMember(workspaceId);
-        allow create: if isActiveMember(workspaceId)
-          && request.resource.data.id == goalId
-          && request.resource.data.workspaceId == workspaceId;
-        allow update: if isActiveMember(workspaceId)
-          && request.resource.data.workspaceId == workspaceId;
+        allow create: if validGoalCreate(workspaceId, goalId);
+        allow update: if validGoalUpdate(workspaceId);
         allow delete: if isActiveMember(workspaceId);
       }
 
       match /goalContributions/{contribId} {
         allow read: if isActiveMember(workspaceId);
-        allow create: if isActiveMember(workspaceId)
-          && request.resource.data.id == contribId
-          && request.resource.data.workspaceId == workspaceId
-          && request.resource.data.userId == request.auth.uid;
+        allow create: if validGoalContributionCreate(workspaceId, contribId);
         allow update: if false;
         allow delete: if canDeleteWorkspaceTree(workspaceId);
       }

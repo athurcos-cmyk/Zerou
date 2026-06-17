@@ -109,6 +109,57 @@ function accountPayload(workspaceId: string, accountId: string, uid: string, ove
   };
 }
 
+function categoryPayload(workspaceId: string, categoryId: string, overrides: Record<string, unknown> = {}) {
+  const now = serverTimestamp();
+
+  return {
+    id: categoryId,
+    workspaceId,
+    name: 'Categoria teste',
+    type: 'expense',
+    icon: 'tag',
+    color: '#EE5524',
+    isDefault: false,
+    isActive: true,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides
+  };
+}
+
+function goalPayload(workspaceId: string, goalId: string, uid: string, overrides: Record<string, unknown> = {}) {
+  const now = serverTimestamp();
+
+  return {
+    id: goalId,
+    workspaceId,
+    name: 'Reserva',
+    kind: 'save',
+    targetCents: 100000,
+    savedCents: 0,
+    icon: 'piggy',
+    color: '#EE5524',
+    isActive: true,
+    createdBy: uid,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides
+  };
+}
+
+function goalContributionPayload(workspaceId: string, contribId: string, goalId: string, uid: string, overrides: Record<string, unknown> = {}) {
+  return {
+    id: contribId,
+    workspaceId,
+    goalId,
+    userId: uid,
+    amountCents: 2500,
+    monthKey: '2026-06',
+    createdAt: serverTimestamp(),
+    ...overrides
+  };
+}
+
 function transactionPayload(
   workspaceId: string,
   transactionId: string,
@@ -641,6 +692,14 @@ describe('firestore security rules', () => {
     await assertSucceeds(deleteDoc(accountReference));
   });
 
+  it('allows an active member to create and recolor categories', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    const categoryReference = doc(aliceDb, 'workspaces/workspaceA/categories/categoryA');
+
+    await assertSucceeds(setDoc(categoryReference, categoryPayload('workspaceA', 'categoryA')));
+    await assertSucceeds(updateDoc(categoryReference, { color: '#37A24A', updatedAt: serverTimestamp() }));
+  });
+
   it('blocks a user from writing financial accounts in another workspace', async () => {
     const aliceDb = testEnv.authenticatedContext('alice').firestore();
 
@@ -805,6 +864,28 @@ describe('firestore security rules', () => {
     );
 
     await assertFails(updateDoc(ledgerDocument, { amountCents: 1 }));
+  });
+
+  it('validates goal documents and goal contributions', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    const goalReference = doc(aliceDb, 'workspaces/workspaceA/goals/goalA');
+
+    await assertSucceeds(setDoc(goalReference, goalPayload('workspaceA', 'goalA', 'alice')));
+    await assertSucceeds(updateDoc(goalReference, { savedCents: 2500, updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(goalReference, { createdBy: 'bob', updatedAt: serverTimestamp() }));
+    await assertFails(setDoc(doc(aliceDb, 'workspaces/workspaceA/goals/goalForged'), goalPayload('workspaceA', 'goalForged', 'bob')));
+    await assertSucceeds(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/goalContributions/contribA'),
+        goalContributionPayload('workspaceA', 'contribA', 'goalA', 'alice')
+      )
+    );
+    await assertFails(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/goalContributions/contribZero'),
+        goalContributionPayload('workspaceA', 'contribZero', 'goalA', 'alice', { amountCents: 0 })
+      )
+    );
   });
 
   it('allows an owner to create a couple workspace atomically', async () => {
