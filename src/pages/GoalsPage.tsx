@@ -34,7 +34,6 @@ export function GoalsPage() {
   const [dueDate, setDueDate] = useState('');
   const [icon, setIcon] = useState('piggy');
   const [color, setColor] = useState(categoryColors[0]);
-  const [busy, setBusy] = useState(false);
 
   const [contributeGoal, setContributeGoal] = useState<Goal | null>(null);
   const [contributeAmount, setContributeAmount] = useState('');
@@ -53,44 +52,34 @@ export function GoalsPage() {
     setColor(categoryColors[0]);
   }
 
-  async function handleCreate(event: FormEvent) {
+  // Optimistic: fire the write, close immediately and let the live listener show the
+  // result. We never block the UI on the server ack (offline-first; no infinite spinner).
+  function handleCreate(event: FormEvent) {
     event.preventDefault();
     if (!workspaceId || !user || !name.trim()) return;
-    setBusy(true);
     setMessage(null);
-    try {
-      await createGoal(workspaceId, user.uid, {
-        name: name.trim(),
-        kind,
-        targetCents: parseMoneyToCents(target),
-        savedCents: initial ? parseMoneyToCents(initial) : 0,
-        icon,
-        color,
-        dueDate: dueDate ? fromDateInputValue(dueDate) : undefined
-      });
-      resetCreate();
-      setCreateOpen(false);
-    } catch (error) {
-      setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar a meta agora.'));
-    } finally {
-      setBusy(false);
-    }
+    createGoal(workspaceId, user.uid, {
+      name: name.trim(),
+      kind,
+      targetCents: parseMoneyToCents(target),
+      savedCents: initial ? parseMoneyToCents(initial) : 0,
+      icon,
+      color,
+      dueDate: dueDate ? fromDateInputValue(dueDate) : undefined
+    }).catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar a meta agora.')));
+    resetCreate();
+    setCreateOpen(false);
   }
 
-  async function handleContribute(event: FormEvent) {
+  function handleContribute(event: FormEvent) {
     event.preventDefault();
     if (!workspaceId || !contributeGoal) return;
-    setBusy(true);
-    try {
-      await contributeToGoal(workspaceId, contributeGoal.id, contributeSign * parseMoneyToCents(contributeAmount));
-      setContributeGoal(null);
-      setContributeAmount('');
-      setContributeSign(1);
-    } catch (error) {
-      setMessage(getUserFacingErrorMessage(error, 'Não foi possível atualizar a meta agora.'));
-    } finally {
-      setBusy(false);
-    }
+    const delta = contributeSign * parseMoneyToCents(contributeAmount);
+    contributeToGoal(workspaceId, contributeGoal.id, delta)
+      .catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível atualizar a meta agora.')));
+    setContributeGoal(null);
+    setContributeAmount('');
+    setContributeSign(1);
   }
 
   async function handleDelete(goalId: string) {
@@ -226,8 +215,8 @@ export function GoalsPage() {
           </div>
 
           <div className="sheet-actions">
-            <button className="button button--primary" type="submit" disabled={busy || !name.trim() || !target}>
-              {busy ? 'Criando...' : 'Criar meta'}
+            <button className="button button--primary" type="submit" disabled={!name.trim() || !target}>
+              Criar meta
             </button>
           </div>
         </form>
@@ -249,8 +238,8 @@ export function GoalsPage() {
             <input className="input" inputMode="decimal" value={contributeAmount} onChange={(event) => setContributeAmount(event.target.value)} placeholder="0,00" autoFocus />
           </label>
           <div className="sheet-actions">
-            <button className="button button--primary" type="submit" disabled={busy || !contributeAmount}>
-              {busy ? 'Salvando...' : 'Confirmar'}
+            <button className="button button--primary" type="submit" disabled={!contributeAmount}>
+              Confirmar
             </button>
           </div>
         </form>

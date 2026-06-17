@@ -39,18 +39,16 @@ export function AccountsPage() {
       return;
     }
 
-    try {
-      await createAccount(workspaceId, user.uid, {
-        name,
-        type,
-        openingBalanceCents: parseMoneyToCents(openingBalance)
-      });
-      setName('');
-      setType('checking');
-      setOpeningBalance('0,00');
-    } catch (error) {
-      setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar a conta agora.'));
-    }
+    // Optimistic: dispara a escrita e limpa o form na hora; a lista atualiza pelo
+    // listener (com badge de pendente até sincronizar). Nunca bloqueia a UI.
+    createAccount(workspaceId, user.uid, {
+      name,
+      type,
+      openingBalanceCents: parseMoneyToCents(openingBalance)
+    }).catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar a conta agora.')));
+    setName('');
+    setType('checking');
+    setOpeningBalance('0,00');
   }
 
   async function handleDeleteAccount(accountId: string, accountName: string) {

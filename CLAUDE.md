@@ -36,6 +36,7 @@ React 19, TypeScript strict, Vite, Firebase Web SDK (Auth + Firestore + Storage)
 - **Firestore** (não Realtime Database). Não mudar sem redesenhar.
 - **IDs client-side** + `clientMutationId` para idempotência.
 - Onboarding e fluxos financeiros rodam **client-side com Security Rules** restritivas — sem Cloud Functions.
+- **Offline-first / escrita otimista**: Firestore usa `persistentLocalCache` + `experimentalAutoDetectLongPolling` (`src/firebase/config.ts`). **Nunca dê `await` na escrita pra liberar a UI** — dispare (fire-and-forget + `.catch` pra mensagem) e deixe o `onSnapshot` mostrar o item (badge pendente → sincronizado). Bloquear no ack do servidor causa spinner infinito quando o transporte oscila.
 - Coleções por workspace: `workspaces/{id}/{accounts|categories|transactions|bills|recurring|goals|goalContributions|cards|...}`.
 - UI mobile-first. Componentes-base de UX: `BottomSheet`, `SelectField`, `CategoryField`, `ConfirmDialog`, `EmptyState` (ver `docs/design/DESIGN.md`).
 - Cores: tokens em `src/styles/themes.css`. **Não** usar hex/rgba literal fora de `themes.css` e `src/theme/palette.ts` (teste `noHardcodedColors` falha). Zona de marketing `src/landing/` é exceção.

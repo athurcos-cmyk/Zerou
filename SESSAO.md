@@ -35,6 +35,7 @@ React 19 (TS strict), Vite, Firebase Web SDK (Auth + Firestore + Storage), Verce
 - Dinheiro em centavos inteiros (`amountCents`), exibido por `formatMoney()`.
 - Firestore (não RTDB). IDs client-side + `clientMutationId`.
 - Fluxos client-side com Security Rules; sem Cloud Functions (Spark/free).
+- **Offline-first**: Firestore com `persistentLocalCache` + `experimentalAutoDetectLongPolling` (`src/firebase/config.ts`). **Nunca bloquear a UI esperando ack do Firestore** — dispara a escrita (fire-and-forget + `.catch`) e deixa o `onSnapshot` refletir (badge pendente → sincronizado).
 - Cores só em `src/styles/themes.css` (+ `src/theme/palette.ts`). Literais quebram o teste `noHardcodedColors` (exceção: `src/landing/`).
 - Componentes-base de UX: `BottomSheet`, `SelectField`, `CategoryField`, `ConfirmDialog`, `EmptyState`.
 - Não expor erro técnico ao usuário; landing sempre clara.

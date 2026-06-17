@@ -5,7 +5,7 @@ import {
   connectFirestoreEmulator,
   initializeFirestore,
   persistentLocalCache,
-  persistentSingleTabManager,
+  persistentMultipleTabManager,
   type Firestore
 } from 'firebase/firestore';
 import { getStorage, connectStorageEmulator, type FirebaseStorage } from 'firebase/storage';
@@ -76,8 +76,12 @@ export function getFirebaseServices() {
     try {
       dbInstance = initializeFirestore(app, {
         localCache: persistentLocalCache({
-          tabManager: persistentSingleTabManager()
-        })
+          tabManager: persistentMultipleTabManager()
+        }),
+        // Some networks/proxies/browsers break Firestore's WebChannel streaming,
+        // making writes hang on "pending" until a full reload. Auto-detecting long
+        // polling falls back to a compatible transport and keeps the app responsive.
+        experimentalAutoDetectLongPolling: true
       });
     } catch {
       dbInstance = getFirestore(app);

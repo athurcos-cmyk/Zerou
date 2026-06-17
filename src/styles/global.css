@@ -8,6 +8,8 @@
 
 html {
   overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   background: var(--bg-page);
   color: var(--text-primary);
   font-family: 'Instrument Sans', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -30,6 +32,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
+  overflow-x: hidden;
   background: var(--bg-page);
   color: var(--text-primary);
 }
@@ -2293,10 +2296,18 @@ html[data-reduce-motion='true'] *::after {
 
   .app-main {
     padding: 1rem 1rem calc(5.75rem + env(safe-area-inset-bottom));
+    overflow-x: hidden;
   }
 
   .app-layout--focus .app-main {
     padding-bottom: 1rem;
+  }
+
+  /* Hero usa margem negativa para sangrar até a borda; no mobile o padding
+     do app-main é 1rem, então a margem precisa casar para não estourar a tela. */
+  .amount-hero {
+    margin-left: -1rem;
+    margin-right: -1rem;
   }
 
   .mobile-nav {

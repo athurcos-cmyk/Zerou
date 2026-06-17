@@ -93,64 +93,52 @@ export function SharedSpacePage() {
   const [guardarTarget, setGuardarTarget] = useState<CoupleGoalStats | null>(null);
   const [guardarAmount, setGuardarAmount] = useState('');
   const [guardarFromAccount, setGuardarFromAccount] = useState('');
-  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     const storedCode = readPendingInvite();
     if (storedCode) setPendingInviteCode(storedCode);
   }, []);
 
-  async function handleCreateCofrinho(event: FormEvent) {
+  // Optimistic: fire writes, close immediately, let the live listener reflect them.
+  function handleCreateCofrinho(event: FormEvent) {
     event.preventDefault();
     if (!workspaceId || !user || !cofrinhoName.trim()) return;
-    setBusy(true);
-    try {
-      await createGoal(workspaceId, user.uid, {
-        name: cofrinhoName.trim(),
-        kind: 'save',
-        targetCents: cofrinhoTarget ? parseMoneyToCents(cofrinhoTarget) : 0,
-        icon: 'piggy',
-        color: cofrinhoColor
-      });
-      setCofrinhoName('');
-      setCofrinhoTarget('');
-      setCofrinhoColor(categoryColors[0]);
-      setCofrinhoOpen(false);
-    } catch (error) {
-      setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar o cofrinho agora.'));
-    } finally {
-      setBusy(false);
-    }
+    setMessage(null);
+    createGoal(workspaceId, user.uid, {
+      name: cofrinhoName.trim(),
+      kind: 'save',
+      targetCents: cofrinhoTarget ? parseMoneyToCents(cofrinhoTarget) : 0,
+      icon: 'piggy',
+      color: cofrinhoColor
+    }).catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar o cofrinho agora.')));
+    setCofrinhoName('');
+    setCofrinhoTarget('');
+    setCofrinhoColor(categoryColors[0]);
+    setCofrinhoOpen(false);
   }
 
-  async function handleGuardar(event: FormEvent) {
+  function handleGuardar(event: FormEvent) {
     event.preventDefault();
     if (!workspaceId || !user || !guardarTarget) return;
     const amountCents = parseMoneyToCents(guardarAmount);
     if (amountCents <= 0) return;
-    setBusy(true);
     setMessage(null);
-    try {
-      await addGoalContribution(workspaceId, user.uid, guardarTarget.goal.id, amountCents);
-      // Optionally pull the money out of a personal account as an expense.
-      if (guardarFromAccount && profile?.defaultWorkspaceId) {
-        await createTransaction(profile.defaultWorkspaceId, user.uid, {
-          type: 'expense',
-          amountCents,
-          description: `Cofrinho: ${guardarTarget.goal.name}`,
-          accountId: guardarFromAccount,
-          date: new Date(),
-          tags: ['cofrinho']
-        });
-      }
-      setGuardarTarget(null);
-      setGuardarAmount('');
-      setGuardarFromAccount('');
-    } catch (error) {
-      setMessage(getUserFacingErrorMessage(error, 'Não foi possível guardar agora.'));
-    } finally {
-      setBusy(false);
+    addGoalContribution(workspaceId, user.uid, guardarTarget.goal.id, amountCents)
+      .catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível guardar agora.')));
+    // Optionally pull the money out of a personal account as an expense.
+    if (guardarFromAccount && profile?.defaultWorkspaceId) {
+      createTransaction(profile.defaultWorkspaceId, user.uid, {
+        type: 'expense',
+        amountCents,
+        description: `Cofrinho: ${guardarTarget.goal.name}`,
+        accountId: guardarFromAccount,
+        date: new Date(),
+        tags: ['cofrinho']
+      }).catch(() => undefined);
     }
+    setGuardarTarget(null);
+    setGuardarAmount('');
+    setGuardarFromAccount('');
   }
 
   async function handleDeleteCofrinho(goalId: string) {
@@ -740,7 +728,7 @@ export function SharedSpacePage() {
             </div>
           </div>
           <div className="sheet-actions">
-            <button className="button button--primary" type="submit" disabled={busy || !cofrinhoName.trim()}>{busy ? 'Criando...' : 'Criar cofrinho'}</button>
+            <button className="button button--primary" type="submit" disabled={!cofrinhoName.trim()}>Criar cofrinho</button>
           </div>
         </form>
       </BottomSheet>
@@ -765,7 +753,7 @@ export function SharedSpacePage() {
             </p>
           </div>
           <div className="sheet-actions">
-            <button className="button button--primary" type="submit" disabled={busy || !guardarAmount}>{busy ? 'Guardando...' : 'Guardar'}</button>
+            <button className="button button--primary" type="submit" disabled={!guardarAmount}>Guardar</button>
           </div>
         </form>
       </BottomSheet>
