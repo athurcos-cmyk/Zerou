@@ -35,7 +35,7 @@ React 19, TypeScript strict, Vite, Firebase Web SDK (Auth + Firestore + Storage)
 - **Dinheiro sempre em centavos inteiros** (`amountCents`); exibir via `formatMoney()`.
 - **Firestore** (não Realtime Database). Não mudar sem redesenhar.
 - **IDs client-side** + `clientMutationId` para idempotência.
-- Onboarding e fluxos financeiros rodam **client-side com Security Rules** restritivas — sem Cloud Functions.
+- Onboarding e fluxos financeiros rodam **client-side com Security Rules** restritivas — sem Cloud Functions no fluxo principal, mesmo com o projeto Firebase no Blaze.
 - **Offline-first / escrita otimista**: Firestore usa `persistentLocalCache` + `experimentalAutoDetectLongPolling` (`src/firebase/config.ts`). **Nunca dê `await` na escrita pra liberar a UI** — dispare (fire-and-forget + `.catch` pra mensagem) e deixe o `onSnapshot` mostrar o item (badge pendente → sincronizado). Bloquear no ack do servidor causa spinner infinito quando o transporte oscila.
 - Coleções por workspace: `workspaces/{id}/{accounts|categories|transactions|bills|recurring|goals|goalContributions|cards|...}`.
 - UI mobile-first. Componentes-base de UX: `BottomSheet`, `SelectField`, `CategoryField`, `ConfirmDialog`, `EmptyState` (ver `docs/design/DESIGN.md`).
@@ -47,7 +47,7 @@ React 19, TypeScript strict, Vite, Firebase Web SDK (Auth + Firestore + Storage)
 
 - Não commitar `.env.local` nem service account.
 - Não hardcodar `firebaseConfig` (somente variáveis `VITE_`).
-- Não ativar billing/Cloud Functions sem pedido explícito (plano Spark/free).
+- Não ativar Cloud Functions, billing de produto, recursos pagos novos ou serviços Google Cloud extras sem pedido explícito. O projeto Firebase está no Blaze, mas o app segue gratuito e sem checkout ativo.
 - Não mudar a landing/páginas públicas para dark por padrão (sempre claras/Paper).
 - Não expor erro técnico ao usuário final (usar `getUserFacingErrorMessage`).
 - Não usar logo de banco sem fonte confiável.

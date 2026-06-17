@@ -63,4 +63,26 @@ describe('useFinanceData', () => {
     expect(result.current.error).toBeNull();
     expect(result.current.loading).toBe(false);
   });
+
+  it('prepares default categories once per workspace session', async () => {
+    const { rerender, unmount } = renderHook(
+      ({ workspaceId }) => useFinanceData(workspaceId, 'user-1'),
+      { initialProps: { workspaceId: 'personal_user-2' } }
+    );
+
+    await act(async () => undefined);
+
+    expect(financeMocks.ensureDefaultCategories).toHaveBeenCalledTimes(1);
+
+    rerender({ workspaceId: 'personal_user-2' });
+    await act(async () => undefined);
+
+    expect(financeMocks.ensureDefaultCategories).toHaveBeenCalledTimes(1);
+
+    unmount();
+    renderHook(() => useFinanceData('personal_user-2', 'user-1'));
+    await act(async () => undefined);
+
+    expect(financeMocks.ensureDefaultCategories).toHaveBeenCalledTimes(1);
+  });
 });

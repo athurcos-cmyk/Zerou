@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useAppearanceStore } from '../theme/appearance.store';
 import { syncAppearanceForUser } from './appearanceSync';
+import { hasAppearanceChanged } from './appearanceDiff';
 
 export function AppearanceSyncBridge() {
   const { user, profile } = useAuth();
@@ -9,6 +10,10 @@ export function AppearanceSyncBridge() {
 
   useEffect(() => {
     if (!user || !profile) {
+      return undefined;
+    }
+
+    if (!hasAppearanceChanged(profile, preferences)) {
       return undefined;
     }
 

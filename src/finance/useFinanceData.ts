@@ -13,6 +13,7 @@ import {
 import type { Account, Bill, Category, RecurringRule, Transaction } from '../types/contracts';
 
 const FINANCE_BOOT_RETRY_DELAYS_MS = [600, 1200, 2400, 4000];
+const preparedDefaultCategoryWorkspaces = new Set<string>();
 
 interface FinanceDataState {
   accounts: Array<LocalSynced<Account>>;
@@ -81,11 +82,13 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
     };
 
     function prepareDefaultCategories(attempt = 0) {
-      if (!userId) {
+      if (!userId || preparedDefaultCategoryWorkspaces.has(activeWorkspaceId)) {
         return;
       }
 
-      ensureDefaultCategories(activeWorkspaceId).catch((error) => {
+      ensureDefaultCategories(activeWorkspaceId).then(() => {
+        preparedDefaultCategoryWorkspaces.add(activeWorkspaceId);
+      }).catch((error) => {
         if (cancelled) {
           return;
         }
