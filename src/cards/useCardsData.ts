@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { calculateInvoice } from '../domain/invoices/calculateInvoice';
 import { subscribeWithTransientRetry } from '../firebase/firestoreRetry';
 import { toDate } from '../finance/financeDates';
@@ -29,6 +29,21 @@ const initialState: CardsState = {
 export function useCardsData(workspaceId?: string) {
   const [state, setState] = useState<CardsState>(initialState);
 
+  // Refs: effects read current data without triggering re-subscription on data-only changes.
+  const cardsRef = useRef(state.cards);
+  cardsRef.current = state.cards;
+  const invoicesRef = useRef(state.invoices);
+  invoicesRef.current = state.invoices;
+
+  const cardIds = useMemo(
+    () => state.cards.map((c) => c.id).sort().join(','),
+    [state.cards]
+  );
+  const invoiceIds = useMemo(
+    () => state.invoices.map((inv) => inv.id).sort().join(','),
+    [state.invoices]
+  );
+
   useEffect(() => {
     if (!workspaceId) {
       setState({ ...initialState, loading: false });
@@ -55,12 +70,13 @@ export function useCardsData(workspaceId?: string) {
   }, [workspaceId]);
 
   useEffect(() => {
-    if (!workspaceId || state.cards.length === 0) {
+    if (!workspaceId || !cardIds) {
       setState((current) => ({ ...current, invoices: [], ledgerEntries: [] }));
       return undefined;
     }
 
-    const unsubscribers = state.cards.map((card) =>
+    const cards = cardsRef.current;
+    const unsubscribers = cards.map((card) =>
       subscribeWithTransientRetry({
         subscribe: (onError) =>
           subscribeInvoices(
@@ -80,15 +96,16 @@ export function useCardsData(workspaceId?: string) {
     return () => {
       unsubscribers.forEach((unsubscribe) => unsubscribe());
     };
-  }, [state.cards, workspaceId]);
+  }, [cardIds, workspaceId]);
 
   useEffect(() => {
-    if (!workspaceId || state.invoices.length === 0) {
+    if (!workspaceId || !invoiceIds) {
       setState((current) => ({ ...current, ledgerEntries: [] }));
       return undefined;
     }
 
-    const unsubscribers = state.invoices.map((invoice) =>
+    const invoices = invoicesRef.current;
+    const unsubscribers = invoices.map((invoice) =>
       subscribeWithTransientRetry({
         subscribe: (onError) =>
           subscribeInvoiceLedger(
@@ -112,7 +129,7 @@ export function useCardsData(workspaceId?: string) {
     return () => {
       unsubscribers.forEach((unsubscribe) => unsubscribe());
     };
-  }, [state.invoices, workspaceId]);
+  }, [invoiceIds, workspaceId]);
 
   const calculatedInvoices = useMemo(
     () =>
