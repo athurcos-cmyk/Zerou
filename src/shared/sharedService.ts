@@ -251,14 +251,13 @@ export async function createCoupleInvite(workspaceId: string, userId: string, wo
   const db = getFirebaseDb();
   const batch = writeBatch(db);
   const now = serverTimestamp();
-  const activeInvites = await getDocs(query(invitesRef(), where('workspaceId', '==', workspaceId), where('status', '==', 'active')));
-
-  activeInvites.docs.forEach((snapshot) => {
-    batch.update(snapshot.ref, {
-      status: 'revoked',
-      revokedAt: now,
-      updatedAt: now
-    });
+  // Delete ALL previous invites for this workspace (except accepted, which the member rule depends on).
+  // This cleans up revoked/expired/active leftovers so the collection stays small.
+  const oldInvites = await getDocs(query(invitesRef(), where('workspaceId', '==', workspaceId)));
+  oldInvites.docs.forEach((snapshot) => {
+    if ((snapshot.data() as { status: string }).status !== 'accepted') {
+      batch.delete(snapshot.ref);
+    }
   });
 
   batch.set(inviteRef(id), {
@@ -360,15 +359,10 @@ export async function acceptCoupleInvite(code: string, userId: string, confirmed
 }
 
 export async function revokeCoupleInvite(workspaceId: string, inviteId: string, userId: string) {
-  const now = serverTimestamp();
   const db = getFirebaseDb();
   const batch = writeBatch(db);
 
-  batch.update(inviteRef(inviteId), {
-    status: 'revoked',
-    revokedAt: now,
-    updatedAt: now
-  });
+  batch.delete(inviteRef(inviteId));
   const audit = auditEntry(workspaceId, userId, 'couple_invite_revoked', 'invite', inviteId, 'Convite revogado.');
   batch.set(audit.reference, audit.payload);
 
@@ -381,24 +375,22 @@ export async function regenerateCoupleInvite(workspaceId: string, userId: string
 
 export async function cleanupExpiredInvites(workspaceId: string, userId: string) {
   const now = new Date();
-  const expiredInvites = await getDocs(query(invitesRef(), where('workspaceId', '==', workspaceId), where('status', '==', 'active')));
+  const allInvites = await getDocs(query(invitesRef(), where('workspaceId', '==', workspaceId)));
   const batch = writeBatch(getFirebaseDb());
   let changed = 0;
 
-  expiredInvites.docs.forEach((snapshot) => {
+  allInvites.docs.forEach((snapshot) => {
     const invite = snapshot.data() as CoupleInvite;
+    if (invite.status === 'accepted') return;
 
-    if (invite.expiresAt.toDate() <= now) {
+    if (invite.status !== 'active' || invite.expiresAt.toDate() <= now) {
       changed += 1;
-      batch.update(snapshot.ref, {
-        status: 'expired',
-        updatedAt: serverTimestamp()
-      });
+      batch.delete(snapshot.ref);
     }
   });
 
   if (changed > 0) {
-    const audit = auditEntry(workspaceId, userId, 'couple_invites_cleaned', 'invite', workspaceId, 'Convites expirados marcados como expirados.');
+    const audit = auditEntry(workspaceId, userId, 'couple_invites_cleaned', 'invite', workspaceId, 'Convites antigos removidos.');
     batch.set(audit.reference, audit.payload);
     await batch.commit();
   }
