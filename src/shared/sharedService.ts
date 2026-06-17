@@ -2,6 +2,7 @@ import QRCode from 'qrcode';
 import {
   Timestamp,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -251,13 +252,11 @@ export async function createCoupleInvite(workspaceId: string, userId: string, wo
   const db = getFirebaseDb();
   const batch = writeBatch(db);
   const now = serverTimestamp();
-  // Delete ALL previous invites for this workspace (except accepted, which the member rule depends on).
-  // This cleans up revoked/expired/active leftovers so the collection stays small.
+  // Delete ALL previous invites for this workspace — accepted ones are safe to delete
+  // because the member record was already created when the invite was accepted.
   const oldInvites = await getDocs(query(invitesRef(), where('workspaceId', '==', workspaceId)));
   oldInvites.docs.forEach((snapshot) => {
-    if ((snapshot.data() as { status: string }).status !== 'accepted') {
-      batch.delete(snapshot.ref);
-    }
+    batch.delete(snapshot.ref);
   });
 
   batch.set(inviteRef(id), {
@@ -355,6 +354,8 @@ export async function acceptCoupleInvite(code: string, userId: string, confirmed
   batch.set(audit.reference, audit.payload);
 
   await batch.commit();
+  // Member record is created — the invite has no further use. Delete it now.
+  deleteDoc(inviteRef(invite.id)).catch(() => undefined);
   return workspaceId;
 }
 
@@ -381,8 +382,6 @@ export async function cleanupExpiredInvites(workspaceId: string, userId: string)
 
   allInvites.docs.forEach((snapshot) => {
     const invite = snapshot.data() as CoupleInvite;
-    if (invite.status === 'accepted') return;
-
     if (invite.status !== 'active' || invite.expiresAt.toDate() <= now) {
       changed += 1;
       batch.delete(snapshot.ref);
