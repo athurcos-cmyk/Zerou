@@ -464,10 +464,9 @@ export function SharedSpacePage() {
             </details>
           </article>
 
-          <details className="advanced-panel shared-admin-panel">
-            <summary>Gerenciar espaço</summary>
-            <button className="button button--ghost" type="button" onClick={handleLeaveOrRemove}>Sair do espaço</button>
-          </details>
+          <button className="button button--ghost button--block" type="button" onClick={handleLeaveOrRemove}>
+            Cancelar e sair do espaço
+          </button>
         </div>
       ) : (
         /* 3) Partnered — cofrinho, balances, expenses, settlement */

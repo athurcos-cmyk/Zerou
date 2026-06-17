@@ -4,6 +4,7 @@ import { FinanceDataProvider } from './finance/FinanceDataContext';
 import { SharedDataProvider } from './shared/SharedDataContext';
 import { LandingCss } from './landing/LandingCss';
 import { PublicOnlyRoute, RequireAuth, RequireOnboardingComplete } from './auth/routeGuards';
+import { useAuth } from './auth/AuthContext';
 import { AppearanceSyncBridge } from './settings/AppearanceSyncBridge';
 import { ThemeRuntime } from './theme/ThemeRuntime';
 import { AppShell } from './layout/AppShell';
@@ -32,13 +33,20 @@ import { SharedSpacePage } from './pages/SharedSpacePage';
 import { TransactionsPage } from './pages/TransactionsPage';
 import { VerifyEmailPage } from './pages/VerifyEmailPage';
 
+function RootRoute() {
+  const { user, profile, loading } = useAuth();
+  if (loading) return null;
+  if (user) return <Navigate to={profile?.defaultWorkspaceId ? '/app' : '/app/onboarding'} replace />;
+  return <LandingCss />;
+}
+
 export function App() {
   return (
     <AuthProvider>
       <ThemeRuntime />
       <AppearanceSyncBridge />
       <Routes>
-        <Route path="/" element={<LandingCss />} />
+        <Route path="/" element={<RootRoute />} />
         <Route path="/pricing" element={<Navigate to="/" replace />} />
         <Route path="/features" element={<FeaturesPage />} />
         <Route path="/security" element={<SecurityPage />} />

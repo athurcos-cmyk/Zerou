@@ -64,6 +64,7 @@ export function JoinInvitePage() {
   }
 
   if (!user) {
+    const returnTo = `/join/${code ?? ''}`;
     return (
       <AuthLayout
         eyebrow="Convite"
@@ -71,12 +72,12 @@ export function JoinInvitePage() {
         description="Crie uma conta ou entre na Zerou para organizar as finanças juntos. O convite fica salvo."
       >
         <div className="form-stack">
-          <button className="button button--primary" type="button" onClick={() => navigate('/login')}>
+          <button className="button button--primary" type="button" onClick={() => navigate('/login', { state: { returnTo } })}>
             Entrar e manter convite
           </button>
-          <Link className="button button--secondary" to="/register">
+          <button className="button button--secondary" type="button" onClick={() => navigate('/register', { state: { returnTo } })}>
             Criar conta
-          </Link>
+          </button>
         </div>
       </AuthLayout>
     );

@@ -50,9 +50,9 @@ export function OnboardingPage() {
 
   useEffect(() => {
     if (profile?.defaultWorkspaceId) {
-      navigate('/app', { replace: true });
+      navigate(pendingInvite ? `/join/${pendingInvite}` : '/app', { replace: true });
     }
-  }, [navigate, profile?.defaultWorkspaceId]);
+  }, [navigate, pendingInvite, profile?.defaultWorkspaceId]);
 
   useEffect(() => {
     const nextName = profile?.name ?? user?.displayName ?? '';
@@ -85,7 +85,7 @@ export function OnboardingPage() {
         goal: goal || undefined,
         challenge: challenge || undefined
       });
-      navigate('/app', { replace: true });
+      navigate(pendingInvite ? `/join/${pendingInvite}` : '/app', { replace: true });
     } catch (error) {
       setMessage(getUserFacingErrorMessage(error, 'Não foi possível preparar seu espaço agora. Tente novamente.'));
     } finally {
