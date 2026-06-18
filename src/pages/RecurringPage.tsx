@@ -4,12 +4,14 @@ import { useAuth } from '../auth/AuthContext';
 import { useFinanceContext } from '../finance/FinanceDataContext';
 import { CategoryField } from '../components/CategoryField';
 import { SelectField } from '../components/SelectField';
+import { BottomSheet } from '../components/BottomSheet';
 import { FormMessage } from '../components/FormMessage';
 import { fromDateInputValue, todayInputValue, toDateInputValue } from '../finance/financeDates';
 import { recurringFrequencyLabels } from '../finance/financeLabels';
-import { createCategory, createRecurringRule, deleteCategory, updateCategory } from '../finance/financeService';
+import { createCategory, createRecurringRule, deleteCategory, recordRecurringPayment, updateCategory } from '../finance/financeService';
 import { recurringFrequencies, type CreateRecurringRuleInput } from '../finance/financeSchemas';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
+import type { RecurringRule } from '../types/contracts';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
 
@@ -24,6 +26,26 @@ export function RecurringPage() {
   const [accountId, setAccountId] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [message, setMessage] = useState<string | null>(null);
+
+  const [payingRule, setPayingRule] = useState<RecurringRule | null>(null);
+  const [payAccountId, setPayAccountId] = useState('');
+  const [payAmount, setPayAmount] = useState('');
+
+  function handleOpenPay(rule: RecurringRule) {
+    setPayingRule(rule);
+    setPayAccountId(rule.accountId ?? '');
+    setPayAmount(rule.amountCents ? formatMoney(rule.amountCents) : '');
+  }
+
+  function handleConfirmPay() {
+    if (!workspaceId || !user || !payingRule) return;
+    const amount = payAmount.trim() ? parseMoneyToCents(payAmount) : payingRule.amountCents;
+    if (!amount) return;
+    recordRecurringPayment(workspaceId, user.uid, payingRule, { accountId: payAccountId || undefined, amountCents: amount });
+    setPayingRule(null);
+    setPayAccountId('');
+    setPayAmount('');
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -133,6 +155,9 @@ export function RecurringPage() {
                   <div className="list-row-end">
                     <strong>{formatMoney(rule.amountCents ?? 0)}</strong>
                     <SyncStatusBadge status={rule.localSyncStatus} />
+                    <button className="button button--subtle button--compact" type="button" onClick={() => handleOpenPay(rule)}>
+                      Registrar
+                    </button>
                   </div>
                 </div>
               ))}
@@ -142,6 +167,37 @@ export function RecurringPage() {
           )}
         </article>
       </div>
+
+      <BottomSheet open={Boolean(payingRule)} onClose={() => setPayingRule(null)} title="Registrar pagamento" subtitle={payingRule?.description}>
+        <div className="form-stack">
+          <label className="field">
+            <span>Valor pago</span>
+            <input
+              className="input input--money"
+              inputMode="decimal"
+              value={payAmount}
+              onChange={(e) => setPayAmount(e.target.value)}
+              placeholder="0,00"
+              autoFocus
+            />
+          </label>
+          <div className="field">
+            <span className="field-label">De qual conta saiu?</span>
+            <div className="chip-row">
+              <button type="button" className={`chip${!payAccountId ? ' chip--active' : ''}`} onClick={() => setPayAccountId('')}>Sem débito</button>
+              {finance.accounts.map((a) => (
+                <button key={a.id} type="button" className={`chip${payAccountId === a.id ? ' chip--active' : ''}`} onClick={() => setPayAccountId(a.id)}>{a.name}</button>
+              ))}
+            </div>
+            <p className="text-muted" style={{ fontSize: '0.8rem', margin: '0.4rem 0 0' }}>
+              A próxima ocorrência avança para {payingRule ? new Date(payingRule.nextOccurrenceAt.toDate().getTime()).toLocaleDateString('pt-BR') : '–'} + 1 período.
+            </p>
+          </div>
+          <div className="sheet-actions">
+            <button className="button button--primary" type="button" disabled={!payAmount.trim()} onClick={handleConfirmPay}>Confirmar</button>
+          </div>
+        </div>
+      </BottomSheet>
     </section>
   );
 }

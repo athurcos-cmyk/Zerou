@@ -427,6 +427,106 @@ export function subscribeBills(
   );
 }
 
+// ─── nextOccurrenceDate ───────────────────────────────────────────────────────
+
+export function nextOccurrenceDate(current: Date, frequency: 'weekly' | 'monthly' | 'yearly'): Date {
+  const next = new Date(current);
+  if (frequency === 'weekly') next.setDate(next.getDate() + 7);
+  else if (frequency === 'monthly') next.setMonth(next.getMonth() + 1);
+  else next.setFullYear(next.getFullYear() + 1);
+  return next;
+}
+
+// ─── payBill ──────────────────────────────────────────────────────────────────
+// Marca a conta como paga e cria uma transação de despesa na conta informada.
+// Se nenhuma conta for informada, apenas muda o status (sem débito).
+export function payBill(
+  workspaceId: string,
+  userId: string,
+  bill: Pick<Bill, 'id' | 'description' | 'amountCents' | 'categoryId' | 'accountId'>,
+  opts: { accountId?: string; amountCents?: number } = {}
+) {
+  const amount = opts.amountCents ?? bill.amountCents;
+  const acctId = opts.accountId || bill.accountId;
+  const batch = writeBatch(getFirebaseDb());
+  batch.update(documentRef(workspaceId, 'bills', bill.id), { status: 'paid', updatedAt: serverTimestamp() });
+  if (acctId) {
+    const id = createId('txn');
+    const now = new Date();
+    batch.set(documentRef(workspaceId, 'transactions', id), omitUndefined({
+      id, workspaceId, createdBy: userId, updatedBy: userId,
+      type: 'expense', amountCents: amount, description: bill.description,
+      categoryId: bill.categoryId, accountId: acctId,
+      date: Timestamp.fromDate(now), competenceMonth: monthKeyFromDate(now), cashMonth: monthKeyFromDate(now),
+      tags: ['bill'], isRecurring: false, clientMutationId: id,
+      syncStatus: 'synced', version: 1, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+    }));
+  }
+  fireWrite(batch.commit());
+}
+
+// ─── recordRecurringPayment ───────────────────────────────────────────────────
+// Cria transação de despesa e avança nextOccurrenceAt para a próxima data.
+export function recordRecurringPayment(
+  workspaceId: string,
+  userId: string,
+  rule: Pick<RecurringRule, 'id' | 'description' | 'amountCents' | 'categoryId' | 'accountId' | 'frequency' | 'nextOccurrenceAt'>,
+  opts: { accountId?: string; amountCents?: number } = {}
+) {
+  const amount = opts.amountCents ?? rule.amountCents;
+  if (!amount) return;
+  const acctId = opts.accountId || rule.accountId;
+  const nextDate = nextOccurrenceDate(rule.nextOccurrenceAt.toDate(), rule.frequency);
+  const batch = writeBatch(getFirebaseDb());
+  batch.update(documentRef(workspaceId, 'recurring', rule.id), {
+    nextOccurrenceAt: Timestamp.fromDate(nextDate),
+    updatedAt: serverTimestamp()
+  });
+  if (acctId) {
+    const id = createId('txn');
+    const now = new Date();
+    batch.set(documentRef(workspaceId, 'transactions', id), omitUndefined({
+      id, workspaceId, createdBy: userId, updatedBy: userId,
+      type: 'expense', amountCents: amount, description: rule.description,
+      categoryId: rule.categoryId, accountId: acctId,
+      date: Timestamp.fromDate(now), competenceMonth: monthKeyFromDate(now), cashMonth: monthKeyFromDate(now),
+      tags: ['recorrente'], isRecurring: true, recurringId: rule.id, clientMutationId: id,
+      syncStatus: 'synced', version: 1, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+    }));
+  }
+  fireWrite(batch.commit());
+}
+
+// ─── contributeToGoalWithTransaction ─────────────────────────────────────────
+// Atualiza savedCents e, quando conta fornecida e valor positivo, cria despesa.
+// Delta negativo (correção) só ajusta a meta sem criar transação.
+export function contributeToGoalWithTransaction(
+  workspaceId: string,
+  userId: string,
+  goal: Pick<Goal, 'id' | 'name'>,
+  amountCents: number,
+  accountId?: string
+) {
+  const batch = writeBatch(getFirebaseDb());
+  batch.update(documentRef(workspaceId, 'goals', goal.id), {
+    savedCents: increment(amountCents),
+    updatedAt: serverTimestamp()
+  });
+  if (amountCents > 0 && accountId) {
+    const id = createId('txn');
+    const now = new Date();
+    batch.set(documentRef(workspaceId, 'transactions', id), omitUndefined({
+      id, workspaceId, createdBy: userId, updatedBy: userId,
+      type: 'expense', amountCents, description: `Meta: ${goal.name}`,
+      accountId, date: Timestamp.fromDate(now),
+      competenceMonth: monthKeyFromDate(now), cashMonth: monthKeyFromDate(now),
+      tags: ['meta'], isRecurring: false, clientMutationId: id,
+      syncStatus: 'synced', version: 1, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+    }));
+  }
+  fireWrite(batch.commit());
+}
+
 export function subscribeRecurringRules(
   workspaceId: string,
   onNext: (items: Array<LocalSynced<RecurringRule>>) => void,

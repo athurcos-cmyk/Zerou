@@ -7,7 +7,8 @@ import { CategoryIcon, categoryColors, categoryIconKeys } from '../components/ca
 import { ACCENT_FOREGROUND } from '../theme/palette';
 import { EmptyState } from '../components/EmptyState';
 import { FormMessage } from '../components/FormMessage';
-import { contributeToGoal, createGoal, deleteGoal } from '../finance/financeService';
+import { useFinanceContext } from '../finance/FinanceDataContext';
+import { contributeToGoalWithTransaction, createGoal, deleteGoal } from '../finance/financeService';
 import { fromDateInputValue } from '../finance/financeDates';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 
@@ -25,6 +26,7 @@ export function GoalsPage() {
   const { user, profile } = useAuth();
   const workspaceId = profile?.defaultWorkspaceId;
   const { goals, loading, pendingWrites } = useGoalsContext();
+  const finance = useFinanceContext();
   const [message, setMessage] = useState<string | null>(null);
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -39,6 +41,7 @@ export function GoalsPage() {
   const [contributeGoal, setContributeGoal] = useState<Goal | null>(null);
   const [contributeAmount, setContributeAmount] = useState('');
   const [contributeSign, setContributeSign] = useState<1 | -1>(1);
+  const [contributeAccountId, setContributeAccountId] = useState('');
 
   const hintKey = profile?.onboardingGoal ?? profile?.onboardingChallenge ?? '';
   const hint = goalHints[hintKey];
@@ -74,13 +77,14 @@ export function GoalsPage() {
 
   function handleContribute(event: FormEvent) {
     event.preventDefault();
-    if (!workspaceId || !contributeGoal) return;
+    if (!workspaceId || !user || !contributeGoal) return;
     const delta = contributeSign * parseMoneyToCents(contributeAmount);
-    contributeToGoal(workspaceId, contributeGoal.id, delta)
-      .catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível atualizar a meta agora.')));
+    setMessage(null);
+    contributeToGoalWithTransaction(workspaceId, user.uid, contributeGoal, delta, contributeAccountId || undefined);
     setContributeGoal(null);
     setContributeAmount('');
     setContributeSign(1);
+    setContributeAccountId('');
   }
 
   async function handleDelete(goalId: string) {
@@ -224,7 +228,7 @@ export function GoalsPage() {
       </BottomSheet>
 
       {/* Contribute sheet */}
-      <BottomSheet open={Boolean(contributeGoal)} onClose={() => setContributeGoal(null)} title={contributeGoal?.name} subtitle={contributeGoal?.kind === 'debt' ? 'Registrar pagamento' : 'Guardar valor'}>
+      <BottomSheet open={Boolean(contributeGoal)} onClose={() => { setContributeGoal(null); setContributeAccountId(''); }} title={contributeGoal?.name} subtitle={contributeGoal?.kind === 'debt' ? 'Registrar pagamento' : 'Guardar valor'}>
         <form className="form-stack" onSubmit={(event) => void handleContribute(event)}>
           <div className="segmented">
             <button type="button" aria-pressed={contributeSign === 1} onClick={() => setContributeSign(1)}>
@@ -236,8 +240,22 @@ export function GoalsPage() {
           </div>
           <label className="field">
             <span>Valor</span>
-            <input className="input" inputMode="decimal" value={contributeAmount} onChange={(event) => setContributeAmount(event.target.value)} placeholder="0,00" autoFocus />
+            <input className="input input--money" inputMode="decimal" value={contributeAmount} onChange={(event) => setContributeAmount(event.target.value)} placeholder="0,00" autoFocus />
           </label>
+          {contributeSign === 1 && finance.accounts.length > 0 && (
+            <div className="field">
+              <span className="field-label">De qual conta sai?</span>
+              <div className="chip-row">
+                <button type="button" className={`chip${!contributeAccountId ? ' chip--active' : ''}`} onClick={() => setContributeAccountId('')}>Só registrar</button>
+                {finance.accounts.map((account) => (
+                  <button key={account.id} type="button" className={`chip${contributeAccountId === account.id ? ' chip--active' : ''}`} onClick={() => setContributeAccountId(account.id)}>{account.name}</button>
+                ))}
+              </div>
+              <p className="text-muted" style={{ fontSize: '0.8rem', margin: '0.4rem 0 0' }}>
+                {contributeAccountId ? 'Vira uma despesa na sua conta e registra o progresso da meta.' : 'Só registra o progresso — não mexe no saldo das contas.'}
+              </p>
+            </div>
+          )}
           <div className="sheet-actions">
             <button className="button button--primary" type="submit" disabled={!contributeAmount}>
               Confirmar

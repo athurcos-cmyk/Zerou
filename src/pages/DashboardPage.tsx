@@ -31,7 +31,9 @@ export function DashboardPage() {
       (transaction) =>
         !transaction.deletedAt &&
         (transaction.type === 'expense' || transaction.type === 'card_purchase') &&
-        (transaction.cashMonth === currentMonth || transaction.competenceMonth === currentMonth)
+        (transaction.cashMonth === currentMonth || transaction.competenceMonth === currentMonth) &&
+        !transaction.tags?.includes('meta') &&
+        !transaction.tags?.includes('cofrinho')
     )
     .reduce((totals, transaction) => {
       const categoryName = transaction.categoryId ? categoryNames.get(transaction.categoryId) ?? 'Sem categoria' : 'Sem categoria';
