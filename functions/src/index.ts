@@ -11,7 +11,7 @@ import { processBillingEventDocument, resetStuckBillingEvents, retryFailedBillin
 import { safeReturnUrl } from './billing/urlSafety.js';
 
 // ─── Automação server-side ────────────────────────────────────────────────────
-export { closeInvoicesDue, generateRecurrences, sendDueReminders } from './automation.js';
+export { closeInvoicesDue, generateRecurrences, sendDueReminders, sendDailyLogReminder } from './automation.js';
 
 // ─── Admin ────────────────────────────────────────────────────────────────────
 export { adminDeleteUser } from './admin.js';

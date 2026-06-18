@@ -2,6 +2,11 @@
 
 Resumo das mudanças recentes do Zerou. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-06-18 — feat: notificação diária às 20h para registrar gastos
+
+- **`sendDailyLogReminder`** (`functions/src/automation.ts`): Cloud Function scheduled todo dia às 20h (BRT). Busca todos os tokens FCM cadastrados (`collectionGroup('fcmTokens')`), envia push em lotes de 500 com título "Como foi o dia?" e corpo "Registre seus gastos antes de dormir." linkando para `/app/transactions/new`.
+- Exportada em `functions/src/index.ts` e deployada em `billing:sendDailyLogReminder(southamerica-east1)`.
+
 ## 2026-06-18 — perf: boot instantâneo em internet fraca, saldo não pisca mais
 
 - **`AuthContext`**: estado agora inicializa **sincronamente** do `localStorage` — se o usuário já logou antes, `loading` começa como `false` e o app abre direto sem tela "Carregando Zerou...". Firebase confirma a sessão em background. Timeout de fallback: 1800ms → **500ms**. Bug corrigido: sem cache + Firebase não responde → agora libera `loading=false` em vez de travar.

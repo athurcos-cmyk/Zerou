@@ -1,4 +1,5 @@
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
+import { getMessaging } from 'firebase-admin/messaging';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { logger } from 'firebase-functions';
 import { sendPushToUser } from './push.js';
@@ -212,5 +213,45 @@ export const sendDueReminders = onSchedule(
     }
 
     logger.info('due_reminders_finished', { sent });
+  }
+);
+
+// ─── sendDailyLogReminder ─────────────────────────────────────────────────────
+// Roda todo dia às 20h (BRT). Envia push para todos os usuários com token FCM
+// lembrando de registrar os gastos do dia antes de dormir.
+export const sendDailyLogReminder = onSchedule(
+  { schedule: '0 20 * * *', timeZone: 'America/Sao_Paulo', region, maxInstances: 1 },
+  async () => {
+    const db = getFirestore();
+    const tokensSnap = await db.collectionGroup('fcmTokens').get();
+    if (tokensSnap.empty) return;
+
+    const tokens = tokensSnap.docs
+      .map((d) => d.data().token as string)
+      .filter(Boolean);
+
+    if (tokens.length === 0) return;
+
+    const CHUNK = 500;
+    let sent = 0;
+
+    for (let i = 0; i < tokens.length; i += CHUNK) {
+      const chunk = tokens.slice(i, i + CHUNK);
+      await getMessaging().sendEachForMulticast({
+        tokens: chunk,
+        webpush: {
+          notification: {
+            title: 'Como foi o dia?',
+            body: 'Registre seus gastos antes de dormir.',
+            icon: '/brand/zerou-app-icon-192.png',
+            badge: '/brand/zerou-app-icon-192.png',
+          },
+          fcmOptions: { link: 'https://zerou-five.vercel.app/app/transactions/new' },
+        },
+      });
+      sent += chunk.length;
+    }
+
+    logger.info('daily_log_reminder_finished', { sent });
   }
 );
