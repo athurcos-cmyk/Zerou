@@ -2,6 +2,13 @@
 
 Resumo das mudanças recentes do Zerou. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-06-18 — perf: boot instantâneo em internet fraca, saldo não pisca mais
+
+- **`AuthContext`**: estado agora inicializa **sincronamente** do `localStorage` — se o usuário já logou antes, `loading` começa como `false` e o app abre direto sem tela "Carregando Zerou...". Firebase confirma a sessão em background. Timeout de fallback: 1800ms → **500ms**. Bug corrigido: sem cache + Firebase não responde → agora libera `loading=false` em vez de travar.
+- **Google Fonts não-bloqueantes** (`index.html`): `<link rel="stylesheet">` externo era render-blocking em redes lentas. Trocado por `rel="preload" onload` — browser baixa em paralelo sem travar o render.
+- **Workbox runtime cache** (`vite.config.ts`): fontes do googleapis.com e gstatic.com agora são cacheadas com `CacheFirst` 1 ano — ficam disponíveis offline após primeira visita.
+- **Dashboard** (`DashboardPage`): saldo total, disponível e comprometido mostram `—` enquanto `finance.loading` é true, eliminando o flash `R$ 0,00` antes dos dados do Firestore chegarem.
+
 ## 2026-06-18 — fix: fatura aberta permanece aberta com pagamento antecipado
 
 - **`resolveInvoiceStatus`**: fatura com lifecycle `'open'` agora sempre retorna `'open'` (exceto `'overpaid'`). Antes, um pagamento total numa fatura ainda aberta a marcava prematuramente como `'paid'` — comportamento errado, pois novas compras ainda podem entrar antes do fechamento.

@@ -16,15 +16,54 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-const AUTH_BOOT_TIMEOUT_MS = 1800;
+// Tempo máximo para esperar o Firebase Auth responder antes de assumir sem sessão.
+// Se o usuário tem cache local, o boot já é instantâneo e esse timeout raramente dispara.
+const AUTH_BOOT_TIMEOUT_MS = 500;
 const PROFILE_BOOT_TIMEOUT_MS = 1800;
 
+function buildCachedUserFromProfile(cachedProfile: UserProfile): User {
+  return {
+    uid: cachedProfile.id,
+    email: cachedProfile.email,
+    displayName: cachedProfile.name,
+    emailVerified: false,
+    isAnonymous: false,
+    metadata: {} as User['metadata'],
+    phoneNumber: null,
+    photoURL: cachedProfile.avatarUrl ?? null,
+    providerData: [],
+    providerId: 'zerou-cache',
+    refreshToken: '',
+    tenantId: null,
+    delete: async () => undefined,
+    getIdToken: async () => '',
+    getIdTokenResult: async () => {
+      throw new Error('Sessão real ainda não confirmada pelo Firebase.');
+    },
+    reload: async () => undefined,
+    toJSON: () => ({
+      uid: cachedProfile.id,
+      email: cachedProfile.email,
+      displayName: cachedProfile.name,
+      providerId: 'zerou-cache'
+    })
+  } as User;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Inicialização síncrona do cache local: se o usuário já logou antes, o app abre
+  // imediatamente sem tela de loading, e o Firebase confirma a sessão em background.
+  const [user, setUser] = useState<User | null>(() => {
+    if (!isFirebaseConfigured) return null;
+    const c = readLastCachedProfile();
+    return c ? buildCachedUserFromProfile(c) : null;
+  });
+  const [profile, setProfile] = useState<UserProfile | null>(() =>
+    isFirebaseConfigured ? readLastCachedProfile() : null
+  );
+  const [loading, setLoading] = useState(() => !isFirebaseConfigured || !readLastCachedProfile());
   const [profileLoading, setProfileLoading] = useState(false);
-  const [authFromCache, setAuthFromCache] = useState(false);
+  const [authFromCache, setAuthFromCache] = useState(() => isFirebaseConfigured && Boolean(readLastCachedProfile()));
   const [firebaseError, setFirebaseError] = useState<string | null>(null);
   const hydrateFromProfile = useAppearanceStore((state) => state.hydrateFromProfile);
 
@@ -44,33 +83,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       reduceMotion: nextProfile.reduceMotion
     });
   }, [hydrateFromProfile]);
-
-  const buildCachedUser = useCallback((cachedProfile: UserProfile) => ({
-    uid: cachedProfile.id,
-    email: cachedProfile.email,
-    displayName: cachedProfile.name,
-    emailVerified: false,
-    isAnonymous: false,
-    metadata: {},
-    phoneNumber: null,
-    photoURL: cachedProfile.avatarUrl ?? null,
-    providerData: [],
-    providerId: 'zerou-cache',
-    refreshToken: '',
-    tenantId: null,
-    delete: async () => undefined,
-    getIdToken: async () => '',
-    getIdTokenResult: async () => {
-      throw new Error('Sessão real ainda não confirmada pelo Firebase.');
-    },
-    reload: async () => undefined,
-    toJSON: () => ({
-      uid: cachedProfile.id,
-      email: cachedProfile.email,
-      displayName: cachedProfile.name,
-      providerId: 'zerou-cache'
-    })
-  } as User), []);
 
   useEffect(() => {
     if (!isFirebaseConfigured) {
@@ -104,16 +116,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         const cachedProfile = readLastCachedProfile();
-        if (!cachedProfile) {
-          return;
+        if (cachedProfile) {
+          bootResolved = true;
+          setAuthFromCache(true);
+          setUser(buildCachedUserFromProfile(cachedProfile));
+          applyProfile(cachedProfile);
+          setProfileLoading(false);
+          setLoading(false);
+        } else {
+          // Firebase não respondeu e não há cache — assume sem sessão
+          bootResolved = true;
+          setLoading(false);
         }
-
-        bootResolved = true;
-        setAuthFromCache(true);
-        setUser(buildCachedUser(cachedProfile));
-        applyProfile(cachedProfile);
-        setProfileLoading(false);
-        setLoading(false);
       }, AUTH_BOOT_TIMEOUT_MS);
 
       const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
@@ -132,7 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return undefined;
     }
-  }, [applyProfile, buildCachedUser]);
+  }, [applyProfile]);
 
   useEffect(() => {
     if (!user || firebaseError) {

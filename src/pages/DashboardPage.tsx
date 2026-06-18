@@ -18,6 +18,7 @@ export function DashboardPage() {
   const workspaceId = profile?.defaultWorkspaceId;
   const finance = useFinanceContext();
   const cardsData = useCardsContext();
+  const isLoading = finance.loading;
   const dashboard = calculateDashboardSummary({
     accounts: finance.accounts,
     transactions: finance.transactions,
@@ -65,19 +66,19 @@ export function DashboardPage() {
         <article className="surface surface-pad dash-balance dash-hero">
           <p className="eyebrow" style={{ color: 'var(--on-accent-85)' }}>Saldo total</p>
           <strong className="display-number" style={{ color: 'var(--on-accent-95)' }}>
-            {formatMoney(dashboard.totalBalanceCents)}
+            {isLoading ? '—' : formatMoney(dashboard.totalBalanceCents)}
           </strong>
           <span style={{ color: 'var(--on-accent-55)', fontSize: '0.84rem' }}>Soma das contas ativas.</span>
         </article>
         <div className="dash-secondary">
           <article className="surface surface-pad dash-metric dash-metric--available">
             <p className="eyebrow">Disponível</p>
-            <strong className="display-number">{formatMoney(dashboard.freeToSpendCents)}</strong>
+            <strong className="display-number">{isLoading ? '—' : formatMoney(dashboard.freeToSpendCents)}</strong>
             <span className="text-secondary">Livre agora.</span>
           </article>
           <article className="surface surface-pad dash-metric dash-metric--committed">
             <p className="eyebrow">Comprometido</p>
-            <strong className="display-number">{formatMoney(dashboard.committedCents)}</strong>
+            <strong className="display-number">{isLoading ? '—' : formatMoney(dashboard.committedCents)}</strong>
             <span className="text-secondary">Contas e fatura.</span>
           </article>
         </div>
