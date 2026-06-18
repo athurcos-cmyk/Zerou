@@ -2,6 +2,13 @@
 
 Resumo das mudanças recentes do Zerou. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-06-18 — cartão: offline-first na fatura, fatura aberta em destaque, chip-row de conta
+
+- **`InvoicePage`**: removido `guardAction` — pagamento, crédito, tarifa e antecipação são agora fire-and-forget com reset imediato do form. Botão de pagamento desabilitado até valor e conta estarem preenchidos.
+- **`InvoicePage`**: campo "Pagar com qual conta?" trocado de dropdown (`SelectField`) para chip-row (consistência com BillsPage, RecurringPage, GoalsPage).
+- **`CardDetailPage`**: fatura aberta aparece em destaque entre o bloco de limite e o formulário de compra, com link direto para pagar e valor em vermelho.
+- **`CardsPage`**: cada cartão na lista agora exibe fatura aberta (mês de referência, vencimento, valor em vermelho) quando houver saldo pendente.
+
 ## 2026-06-17 — lógica financeira: pagamentos debitam contas, metas não viram gasto
 
 - **`payBill`**: batch atômico marca conta como paga e cria transação de despesa (tag `bill`) debitando a conta selecionada. BillsPage abre sheet de confirmação com valor editável e chip de conta.
