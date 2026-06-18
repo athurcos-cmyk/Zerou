@@ -109,7 +109,8 @@ export function buildUpcomingCommitments(
   bills: Bill[],
   recurringRules: RecurringRule[],
   cutoff: Date,
-  invoices: Invoice[] = []
+  invoices: Invoice[] = [],
+  now: Date = new Date()
 ): UpcomingCommitment[] {
   const billCommitments = bills
     .filter((bill) => bill.status === 'pending' || bill.status === 'overdue')
@@ -139,8 +140,19 @@ export function buildUpcomingCommitments(
     )
     .filter((commitment) => isOnOrBefore(commitment.dueAt, cutoff));
 
+  // Regra de fatura no comprometido:
+  // - 'closed': sempre (já fechou, o pagamento é iminente)
+  // - 'open' do mês atual ou anterior: sim (dívida do ciclo corrente)
+  // - 'open' de meses futuros: não (parcelas futuras — vira comprometido no mês delas)
+  const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const invoiceCommitments = invoices
-    .filter((invoice) => invoice.status !== 'paid' && invoice.status !== 'overpaid' && invoice.outstandingBalanceCents > 0)
+    .filter(
+      (invoice) =>
+        invoice.status !== 'paid' &&
+        invoice.status !== 'overpaid' &&
+        invoice.outstandingBalanceCents > 0 &&
+        (invoice.status === 'closed' || invoice.referenceMonth <= currentYearMonth)
+    )
     .map(
       (invoice) =>
         ({
@@ -150,8 +162,7 @@ export function buildUpcomingCommitments(
           amountCents: invoice.outstandingBalanceCents,
           dueAt: toDate(invoice.dueDate)
         }) satisfies UpcomingCommitment
-    )
-    .filter((commitment) => isOnOrBefore(commitment.dueAt, cutoff));
+    );
 
   return [...billCommitments, ...recurringCommitments, ...invoiceCommitments].sort((left, right) =>
     compareAsc(left.dueAt, right.dueAt)
@@ -170,7 +181,7 @@ export function calculateDashboardSummary(input: {
   const nextIncomeAt = findNextIncomeDate(input.transactions, now);
   const cutoff = nextIncomeAt ?? addDays(now, 30);
   const totalBalanceCents = calculateTotalBalance(input.accounts, input.transactions);
-  const commitments = buildUpcomingCommitments(input.bills, input.recurringRules, cutoff, input.invoices ?? []);
+  const commitments = buildUpcomingCommitments(input.bills, input.recurringRules, cutoff, input.invoices ?? [], now);
   const committedCents = commitments.reduce((total, commitment) => total + commitment.amountCents, 0);
   const recentTransactions = input.transactions
     .filter(isActiveTransaction)

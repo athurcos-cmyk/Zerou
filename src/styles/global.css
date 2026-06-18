@@ -618,6 +618,21 @@ html[data-reduce-motion='true'] *::after {
   line-height: 1.65;
 }
 
+/* inline summary badge in page headers */
+.page-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.75rem;
+  border-radius: 999px;
+  background: var(--action-primary-soft);
+  color: var(--action-primary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+  border: 1px solid var(--action-primary);
+  flex-shrink: 0;
+}
+
 .surface {
   border: 1px solid var(--border-subtle);
   border-radius: 1.1rem;
@@ -881,10 +896,96 @@ html[data-reduce-motion='true'] *::after {
   text-align: right;
 }
 
+/* category icon tile in list rows */
+.category-mark {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.65rem;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  color: var(--accent-foreground);
+}
+
+.list-row-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.list-row--with-icon {
+  gap: 0.75rem;
+}
+
 .account-list-main {
   display: flex;
   min-width: 0;
   align-items: center;
+  gap: 0.75rem;
+}
+
+/* premium account card */
+.account-card-hero {
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+.account-card-hero-inner {
+  padding: 1.1rem 1.25rem 1.25rem;
+  background: var(--gradient-slate);
+  display: grid;
+  gap: 0.55rem;
+}
+
+.account-card-hero-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.account-card-hero-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--on-accent-55);
+}
+
+.account-card-hero-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--on-accent-90);
+  display: block;
+  margin-top: 0.15rem;
+}
+
+.account-card-hero-balance {
+  font-size: clamp(1.75rem, 4.5vw, 2.5rem);
+  font-weight: 800;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  color: var(--on-accent-95);
+  line-height: 1;
+}
+
+.account-card-hero-footer {
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-subtle);
+  padding: 0.65rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.account-card-hero-meta {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+/* stacked card list for accounts */
+.account-card-list {
+  display: grid;
   gap: 0.75rem;
 }
 
@@ -1807,6 +1908,7 @@ html[data-reduce-motion='true'] *::after {
 }
 
 .mobile-nav .nav-link {
+  position: relative;
   min-height: 3.35rem;
   flex-direction: column;
   gap: 0.2rem;
@@ -1818,6 +1920,18 @@ html[data-reduce-motion='true'] *::after {
 .mobile-nav .nav-link.active {
   background: transparent;
   color: var(--action-primary);
+}
+
+.mobile-nav .nav-link.active::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--action-primary);
 }
 
 .mobile-nav span {

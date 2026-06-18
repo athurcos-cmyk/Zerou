@@ -2,6 +2,29 @@
 
 Resumo das mudanças recentes do Zerou. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-06-18 — fix: fatura aberta permanece aberta com pagamento antecipado
+
+- **`resolveInvoiceStatus`**: fatura com lifecycle `'open'` agora sempre retorna `'open'` (exceto `'overpaid'`). Antes, um pagamento total numa fatura ainda aberta a marcava prematuramente como `'paid'` — comportamento errado, pois novas compras ainda podem entrar antes do fechamento.
+- Consequência cascata correta: `advance` no pagamento é sempre `true` enquanto a fatura está aberta (qualquer pagamento antes do fechamento é um adiantamento); `Comprometido` já excluía por `outstandingBalanceCents > 0`, então continua correto.
+- Teste atualizado para usar `lifecycle: 'closed'` nos cenários de `'partial'`/`'paid'`; novo teste cobre fatura aberta com pagamento antecipado permanecendo `'open'`.
+
+## 2026-06-18 — antecipação de parcelas estilo Nubank
+
+- **Novo tipo de ledger** `installment_anticipation_credit`: credita o invoice futuro quando uma parcela é antecipada, reduzindo seu `outstandingBalanceCents` client-side via `calculateInvoice`.
+- **`anticipateInstallments`** reescrito em `cardService.ts`: usa `writeBatch` — adiciona `installment_anticipation_credit` em cada invoice futuro selecionado e `installment_anticipation` (débito total) no invoice atual. Fire-and-forget.
+- **Schema atualizado** (`anticipateInstallmentsSchema`): aceita `currentInvoiceId` + array de `credits` `{invoiceId, amountCents, sourceTransactionId}` em vez de valor manual único.
+- **`InvoicePage`**: painel de antecipação substituído por seleção inteligente — lista parcelas futuras do mesmo cartão agrupadas por invoice, com checkbox por item, total ao vivo e "Confirmar antecipação". Parcelas já antecipadas são ocultadas automaticamente.
+- Comprometido no Dashboard atualiza em cascata: invoices futuros com crédito de antecipação têm `outstandingBalanceCents` reduzido, saindo do cálculo se zerados.
+
+## 2026-06-18 — UI premium: cabeçalhos, ícones de categoria, cards de conta, nav inferior
+
+- **Cabeçalhos**: todas as páginas do app passaram a ter eyebrow + título compacto sem parágrafo de descrição (menos espaço desperdiçado, conteúdo aparece logo de cara).
+- **Ícones de categoria**: `CategoryMark` (tile colorido 36×36 com ícone lucide) adicionado em todos os itens de lista de transações — em `TransactionsPage` e `DashboardPage` (recentes). Fallback por tipo: verde para renda, slate para transferências.
+- **Contas como cards**: `AccountsPage` reescrita — contas exibidas como cards com gradiente escuro (`--gradient-slate`), saldo em destaque, bank-mark no canto. Form de cadastro agora colapsável (igual ao CardsPage).
+- **Nav inferior**: slot 2 trocado de Cartões → Extrato (Transações); slot 4 mantém Cartões. Casal movido para o menu "Mais". Indicador de ponto laranja acima do ícone ativo.
+- **Formulários colapsáveis**: `BillsPage` e `AccountsPage` ganharam mesmo padrão do `CardsPage` — form colapsado por padrão, toggle com chevron animado.
+- **`CategoryMark`** exportado de `src/components/categoryIcons.tsx` — reutilizável em qualquer lista.
+
 ## 2026-06-18 — cartão: offline-first na fatura, fatura aberta em destaque, chip-row de conta
 
 - **`InvoicePage`**: removido `guardAction` — pagamento, crédito, tarifa e antecipação são agora fire-and-forget com reset imediato do form. Botão de pagamento desabilitado até valor e conta estarem preenchidos.

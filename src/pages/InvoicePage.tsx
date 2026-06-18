@@ -36,8 +36,57 @@ export function InvoicePage() {
   const [creditType, setCreditType] = useState<'refund_credit' | 'chargeback_credit' | 'manual_credit'>('refund_credit');
   const [feeAmount, setFeeAmount] = useState('');
   const [feeType, setFeeType] = useState<'interest' | 'fine' | 'iof' | 'fee' | 'manual_debit'>('fee');
-  const [anticipationAmount, setAnticipationAmount] = useState('');
+  const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
+
+  const txnDescriptions = new Map(
+    finance.transactions
+      .filter((t) => t.type === 'card_purchase' && t.cardId === cardId && !t.deletedAt)
+      .map((t) => [t.id, t.description])
+  );
+
+  const anticipatable = cardsData.invoices
+    .filter(
+      (inv) =>
+        inv.cardId === cardId &&
+        inv.id !== invoiceId &&
+        inv.status !== 'paid' &&
+        inv.status !== 'overpaid'
+    )
+    .flatMap((inv) => {
+      const anticipatedIds = new Set(
+        inv.ledgerEntries
+          .filter((e) => e.type === 'installment_anticipation_credit' && e.sourceTransactionId)
+          .map((e) => e.sourceTransactionId!)
+      );
+      return inv.ledgerEntries
+        .filter((e) => e.type === 'purchase' && e.sourceTransactionId && !anticipatedIds.has(e.sourceTransactionId))
+        .map((e) => ({
+          entryId: e.id,
+          invoiceId: inv.id,
+          referenceMonth: inv.referenceMonth,
+          amountCents: e.amountCents,
+          sourceTransactionId: e.sourceTransactionId!,
+          description: txnDescriptions.get(e.sourceTransactionId!) ?? 'Compra parcelada'
+        }));
+    })
+    .sort((a, b) => a.referenceMonth.localeCompare(b.referenceMonth));
+
+  function handleAnticipation() {
+    if (!workspaceId || !user || !cardId || !invoiceId || selectedEntryIds.size === 0) return;
+    const credits = anticipatable
+      .filter((fi) => selectedEntryIds.has(fi.entryId))
+      .map((fi) => ({ invoiceId: fi.invoiceId, amountCents: fi.amountCents, sourceTransactionId: fi.sourceTransactionId }));
+    if (credits.length === 0) return;
+    setSelectedEntryIds(new Set());
+    setMessage(null);
+    anticipateInstallments(workspaceId, user.uid, {
+      cardId,
+      currentInvoiceId: invoiceId,
+      credits,
+      effectiveAt: new Date()
+    }).catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível registrar a antecipação.')));
+  }
 
   function handlePayment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -91,22 +140,6 @@ export function InvoicePage() {
       effectiveAt: new Date(),
       description: ledgerTypeLabels[feeType]
     }).catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível registrar a tarifa.')));
-  }
-
-  function handleAnticipation(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!workspaceId || !user || !cardId || !invoiceId) return;
-    const amount = parseMoneyToCents(anticipationAmount);
-    if (!amount) return;
-    setMessage(null);
-    setAnticipationAmount('');
-    anticipateInstallments(workspaceId, user.uid, {
-      cardId,
-      invoiceId,
-      amountCents: amount,
-      effectiveAt: new Date(),
-      installmentGroupId: `manual-${invoiceId}`
-    }).catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível registrar a antecipação.')));
   }
 
   function handleReconcile(status: InvoiceStatus) {
@@ -275,30 +308,68 @@ export function InvoicePage() {
                 </button>
               </form>
 
-              {/* Antecipar parcelas — com explicação */}
+              {/* Antecipar parcelas — seleção inteligente por compra */}
               <details className="advanced-panel">
-                <summary>Antecipar parcelas de outra fatura</summary>
+                <summary>Antecipar parcelas de faturas futuras</summary>
                 <div className="form-stack" style={{ marginTop: '0.75rem' }}>
                   <div className="anticipation-explain">
-                    <strong>O que é antecipar parcelas?</strong>
-                    Quando você tem uma compra parcelada em faturas futuras, pode trazer as parcelas para esta fatura e pagar tudo agora.
-                    Útil para liberar limite ou quitar tudo de uma vez antes do vencimento.
+                    <strong>O que é antecipar?</strong>
+                    Traz parcelas de faturas futuras para esta fatura. O valor é cobrado aqui, e a fatura futura recebe o crédito — sem juros.
                   </div>
-                  <form className="form-stack" onSubmit={handleAnticipation}>
-                    <label className="field">
-                      <span>Valor a antecipar</span>
-                      <input
-                        className="input"
-                        inputMode="decimal"
-                        value={anticipationAmount}
-                        onChange={(event) => setAnticipationAmount(event.target.value)}
-                        placeholder="0,00"
-                      />
-                    </label>
-                    <button className="button button--secondary" type="submit">
-                      Confirmar antecipação
-                    </button>
-                  </form>
+                  {anticipatable.length === 0 ? (
+                    <p className="text-secondary" style={{ fontSize: '0.86rem' }}>
+                      Nenhuma parcela futura disponível para antecipar.
+                    </p>
+                  ) : (
+                    <>
+                      <div className="item-list">
+                        {anticipatable.map((fi) => (
+                          <label
+                            key={fi.entryId}
+                            className="list-row"
+                            style={{ cursor: 'pointer', gap: '0.75rem', alignItems: 'center' }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedEntryIds.has(fi.entryId)}
+                              onChange={(e) => {
+                                setSelectedEntryIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (e.target.checked) next.add(fi.entryId);
+                                  else next.delete(fi.entryId);
+                                  return next;
+                                });
+                              }}
+                            />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <strong style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {fi.description}
+                              </strong>
+                              <span className="text-secondary">Fatura {fi.referenceMonth}</span>
+                            </div>
+                            <strong className="amount--expense">{formatMoney(fi.amountCents)}</strong>
+                          </label>
+                        ))}
+                      </div>
+                      {selectedEntryIds.size > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-subtle)' }}>
+                          <span className="text-secondary" style={{ fontSize: '0.86rem' }}>
+                            Total:{' '}
+                            <strong>
+                              {formatMoney(
+                                anticipatable
+                                  .filter((fi) => selectedEntryIds.has(fi.entryId))
+                                  .reduce((sum, fi) => sum + fi.amountCents, 0)
+                              )}
+                            </strong>
+                          </span>
+                          <button className="button button--secondary" type="button" onClick={handleAnticipation}>
+                            Confirmar antecipação
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </details>
 

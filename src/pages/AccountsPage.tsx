@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Building2, Plus, Trash2, Wallet } from 'lucide-react';
+import { Building2, ChevronDown, Trash2 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useFinanceContext } from '../finance/FinanceDataContext';
 import { SelectField } from '../components/SelectField';
@@ -22,8 +22,10 @@ export function AccountsPage() {
   const [openingBalance, setOpeningBalance] = useState('0,00');
   const [message, setMessage] = useState<string | null>(null);
   const [removingAccountId, setRemovingAccountId] = useState<string | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
   const suggestions = searchBankInstitutions(name, name.trim() ? 6 : 8);
   const syncStatusByAccountId = new Map(finance.accounts.map((account) => [account.id, account.localSyncStatus]));
+  const totalBalance = finance.accountBalances.reduce((sum, a) => sum + a.balanceCents, 0);
 
   function selectInstitution(institution: BankInstitution) {
     setName(institution.name);
@@ -39,8 +41,6 @@ export function AccountsPage() {
       return;
     }
 
-    // Optimistic: dispara a escrita e limpa o form na hora; a lista atualiza pelo
-    // listener (com badge de pendente até sincronizar). Nunca bloqueia a UI.
     createAccount(workspaceId, user.uid, {
       name,
       type,
@@ -49,6 +49,7 @@ export function AccountsPage() {
     setName('');
     setType('checking');
     setOpeningBalance('0,00');
+    setFormOpen(false);
   }
 
   async function handleDeleteAccount(accountId: string, accountName: string) {
@@ -92,102 +93,110 @@ export function AccountsPage() {
 
   return (
     <section className="page-content">
-      <div className="page-heading-row">
+      <div className="page-heading-row page-heading-row--tight">
         <div>
-          <p className="eyebrow">Contas</p>
-          <h1 className="page-title">Onde seu dinheiro está.</h1>
-          <p className="page-description">Cadastre onde seu dinheiro fica: banco, carteira, poupança ou conta digital.</p>
+          <p className="eyebrow">Pessoal</p>
+          <h1 className="page-title page-title--compact">Contas</h1>
         </div>
-        <SyncStatusBadge status={finance.pendingWrites ? 'pending' : 'synced'} />
+        {finance.accountBalances.length > 0 && (
+          <span className="page-badge">{formatMoney(totalBalance)}</span>
+        )}
       </div>
 
-      <div className="finance-grid">
-        <form className="surface surface-pad form-stack" onSubmit={handleSubmit}>
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Nova conta</p>
-              <h2>Adicionar conta financeira</h2>
-            </div>
-            <span className="empty-icon">
-              <Plus size={20} aria-hidden="true" />
-            </span>
-          </div>
-          <FormMessage>{message}</FormMessage>
-          <label className="field">
-            <span>Nome</span>
-            <input className="input" value={name} onChange={(event) => setName(event.target.value)} placeholder="Nubank, Carteira, Poupança" />
-          </label>
-          <div className="bank-picker" aria-label="Sugestões de instituições">
-            <span className="field-label">{name.trim() ? 'Encontramos estas opções' : 'Sugestões rápidas'}</span>
-            <div className="bank-suggestion-grid">
-              {suggestions.map((institution) => (
-                <button
-                  className="bank-suggestion"
-                  type="button"
-                  key={institution.id}
-                  onClick={() => selectInstitution(institution)}
-                >
-                  <BankMark institution={institution} />
-                  <span>{institution.name}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-          <SelectField
-            label="Tipo"
-            value={type}
-            onChange={(v) => setType(v as AccountType)}
-            options={accountTypes.map((t) => ({ value: t, label: accountTypeLabels[t] }))}
-          />
-          <label className="field">
-            <span>Saldo inicial</span>
-            <input className="input" inputMode="decimal" value={openingBalance} onChange={(event) => setOpeningBalance(event.target.value)} />
-          </label>
-          <button className="button button--primary" type="submit">
-            Criar conta
-          </button>
-        </form>
+      <FormMessage>{message}</FormMessage>
 
-        <article className="surface surface-pad">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Saldos</p>
-              <h2>Contas ativas</h2>
-            </div>
-            <Wallet size={22} aria-hidden="true" />
-          </div>
-          {finance.accountBalances.length > 0 ? (
-            <div className="item-list">
-              {finance.accountBalances.map((account) => (
-                <div className="list-row" key={account.id}>
-                  <div className="account-list-main">
-                    <BankMark institution={findBankInstitution(account.name)} />
+      {finance.accountBalances.length > 0 ? (
+        <div className="account-card-list">
+          {finance.accountBalances.map((account) => {
+            const institution = findBankInstitution(account.name);
+            return (
+              <div className="account-card-hero" key={account.id}>
+                <div className="account-card-hero-inner">
+                  <div className="account-card-hero-header">
                     <div>
-                      <strong>{account.name}</strong>
-                      <span className="text-secondary">{accountTypeLabels[account.type]}</span>
+                      <span className="account-card-hero-eyebrow">{accountTypeLabels[account.type]}</span>
+                      <strong className="account-card-hero-name">{account.name}</strong>
                     </div>
+                    <BankMark institution={institution} />
                   </div>
-                  <div className="list-row-end">
-                    <strong>{formatMoney(account.balanceCents)}</strong>
-                    <SyncStatusBadge status={syncStatusByAccountId.get(account.id) ?? 'synced'} />
-                    <button
-                      className="icon-button"
-                      type="button"
-                      aria-label={`Excluir ${account.name}`}
-                      disabled={removingAccountId === account.id}
-                      onClick={() => void handleDeleteAccount(account.id, account.name)}
-                    >
-                      <Trash2 size={17} aria-hidden="true" />
-                    </button>
-                  </div>
+                  <strong className="account-card-hero-balance">{formatMoney(account.balanceCents)}</strong>
                 </div>
-              ))}
+                <div className="account-card-hero-footer">
+                  <SyncStatusBadge status={syncStatusByAccountId.get(account.id) ?? 'synced'} />
+                  <button
+                    className="icon-button"
+                    type="button"
+                    aria-label={`Excluir ${account.name}`}
+                    disabled={removingAccountId === account.id}
+                    onClick={() => void handleDeleteAccount(account.id, account.name)}
+                  >
+                    <Trash2 size={17} aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="text-secondary" style={{ marginBottom: '1rem' }}>Nenhuma conta criada ainda.</p>
+      )}
+
+      <form className="surface surface-pad form-stack" onSubmit={handleSubmit} style={{ marginTop: '1rem' }}>
+        <button
+          type="button"
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
+          onClick={() => setFormOpen((v) => !v)}
+          aria-expanded={formOpen}
+        >
+          <div>
+            <p className="eyebrow">Nova conta</p>
+            <h2 style={{ margin: 0 }}>Adicionar conta financeira</h2>
+          </div>
+          <ChevronDown
+            size={20}
+            aria-hidden="true"
+            style={{ transform: formOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0, color: 'var(--text-secondary)' }}
+          />
+        </button>
+        {formOpen && (
+          <>
+            <FormMessage>{message}</FormMessage>
+            <label className="field">
+              <span>Nome</span>
+              <input className="input" value={name} onChange={(event) => setName(event.target.value)} placeholder="Nubank, Carteira, Poupança" />
+            </label>
+            <div className="bank-picker" aria-label="Sugestões de instituições">
+              <span className="field-label">{name.trim() ? 'Encontramos estas opções' : 'Sugestões rápidas'}</span>
+              <div className="bank-suggestion-grid">
+                {suggestions.map((institution) => (
+                  <button
+                    className="bank-suggestion"
+                    type="button"
+                    key={institution.id}
+                    onClick={() => selectInstitution(institution)}
+                  >
+                    <BankMark institution={institution} />
+                    <span>{institution.name}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-          ) : (
-            <p className="text-secondary">Nenhuma conta criada ainda.</p>
-          )}
-        </article>
-      </div>
+            <SelectField
+              label="Tipo"
+              value={type}
+              onChange={(v) => setType(v as AccountType)}
+              options={accountTypes.map((t) => ({ value: t, label: accountTypeLabels[t] }))}
+            />
+            <label className="field">
+              <span>Saldo inicial</span>
+              <input className="input" inputMode="decimal" value={openingBalance} onChange={(event) => setOpeningBalance(event.target.value)} />
+            </label>
+            <button className="button button--primary" type="submit">
+              Criar conta
+            </button>
+          </>
+        )}
+      </form>
     </section>
   );
 }

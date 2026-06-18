@@ -57,6 +57,23 @@ export function CategoryIcon({ icon, size = 18 }: { icon?: string; size?: number
   return <Icon size={size} aria-hidden="true" />;
 }
 
+/** Colored tile with the category icon — used in list rows. */
+export function CategoryMark({
+  category,
+  fallback
+}: {
+  category?: { id: string; icon?: string; color?: string } | null;
+  fallback?: { icon?: string; color?: string };
+}) {
+  const color = category ? resolveCategoryColor(category) : (fallback?.color ?? defaultCategoryColor);
+  const icon = category?.icon ?? fallback?.icon;
+  return (
+    <span className="category-mark" style={{ background: color }}>
+      <CategoryIcon icon={icon} size={16} />
+    </span>
+  );
+}
+
 /** Resolve the color to paint a category mark: explicit color → built-in default → hashed palette. */
 export function resolveCategoryColor(category: { id: string; color?: string }) {
   if (category.color) return category.color;

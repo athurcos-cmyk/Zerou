@@ -331,16 +331,48 @@ export async function recordInvoiceFee(workspaceId: string, userId: string, inpu
 
 export async function anticipateInstallments(workspaceId: string, userId: string, input: AnticipateInstallmentsInput) {
   const parsed = anticipateInstallmentsSchema.parse(input);
-  return addLedgerOnlyEntry(
-    workspaceId,
-    userId,
-    parsed.cardId,
-    parsed.invoiceId,
-    'installment_anticipation',
-    parsed.amountCents,
-    parsed.effectiveAt,
-    parsed.installmentGroupId
+  const batch = writeBatch(getFirebaseDb());
+  const totalCents = parsed.credits.reduce((sum, c) => sum + c.amountCents, 0);
+  const seed = createId('anticipation');
+
+  parsed.credits.forEach((credit, index) => {
+    const idempotencyKey = `${seed}_credit_${credit.invoiceId}_${index}`;
+    const entryId = idempotentEntryId(idempotencyKey);
+    batch.set(
+      ledgerDocRef(workspaceId, parsed.cardId, credit.invoiceId, entryId),
+      ledgerPayload({
+        id: entryId,
+        workspaceId,
+        cardId: parsed.cardId,
+        invoiceId: credit.invoiceId,
+        type: 'installment_anticipation_credit',
+        amountCents: credit.amountCents,
+        effectiveAt: parsed.effectiveAt,
+        idempotencyKey,
+        createdBy: userId,
+        sourceTransactionId: credit.sourceTransactionId
+      })
+    );
+  });
+
+  const debitKey = `${seed}_debit`;
+  const debitEntryId = idempotentEntryId(debitKey);
+  batch.set(
+    ledgerDocRef(workspaceId, parsed.cardId, parsed.currentInvoiceId, debitEntryId),
+    ledgerPayload({
+      id: debitEntryId,
+      workspaceId,
+      cardId: parsed.cardId,
+      invoiceId: parsed.currentInvoiceId,
+      type: 'installment_anticipation',
+      amountCents: totalCents,
+      effectiveAt: parsed.effectiveAt,
+      idempotencyKey: debitKey,
+      createdBy: userId
+    })
   );
+
+  fireWrite(batch.commit());
 }
 
 async function addLedgerOnlyEntry(

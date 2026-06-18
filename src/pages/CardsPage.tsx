@@ -59,11 +59,10 @@ export function CardsPage() {
 
   return (
     <section className="page-content">
-      <div className="page-heading-row">
+      <div className="page-heading-row page-heading-row--tight">
         <div>
-          <p className="eyebrow">Cartões</p>
-          <h1 className="page-title">Cartões e faturas sem dupla contagem.</h1>
-          <p className="page-description">Compras reconhecem despesa. Pagamentos quitam passivo sem virar outra despesa.</p>
+          <p className="eyebrow">Pessoal</p>
+          <h1 className="page-title page-title--compact">Cartões</h1>
         </div>
         <SyncStatusBadge status={cardsData.pendingWrites ? 'pending' : 'synced'} />
       </div>

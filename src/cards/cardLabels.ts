@@ -22,5 +22,6 @@ export const ledgerTypeLabels: Record<InvoiceLedgerEntryType, string> = {
   fine: 'Multa',
   iof: 'IOF',
   fee: 'Tarifa',
-  installment_anticipation: 'Antecipação'
+  installment_anticipation: 'Antecipação',
+  installment_anticipation_credit: 'Crédito de antecipação'
 };

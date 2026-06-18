@@ -53,10 +53,13 @@ export const recordInvoiceFeeSchema = z.object({
 
 export const anticipateInstallmentsSchema = z.object({
   cardId: z.string().trim().min(1),
-  invoiceId: z.string().trim().min(1),
-  amountCents: moneyCentsSchema,
-  effectiveAt: z.date(),
-  installmentGroupId: z.string().trim().min(1).max(120)
+  currentInvoiceId: z.string().trim().min(1),
+  credits: z.array(z.object({
+    invoiceId: z.string().trim().min(1),
+    amountCents: moneyCentsSchema,
+    sourceTransactionId: z.string().trim()
+  })).min(1),
+  effectiveAt: z.date()
 });
 
 export const reconcileInvoiceSchema = z.object({

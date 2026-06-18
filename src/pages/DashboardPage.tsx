@@ -8,6 +8,8 @@ import { toDateInputValue } from '../finance/financeDates';
 import { transactionTypeLabels } from '../finance/financeLabels';
 import { formatMoney } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
+import { CategoryMark } from '../components/categoryIcons';
+import { defaultCategoryColors } from '../theme/palette';
 
 import { EmptyState } from '../components/EmptyState';
 
@@ -26,6 +28,7 @@ export function DashboardPage() {
   const syncStatus = finance.pendingWrites || cardsData.pendingWrites ? 'pending' : 'synced';
   const currentMonth = new Date().toISOString().slice(0, 7);
   const categoryNames = new Map(finance.categories.map((category) => [category.id, category.name]));
+  const categoryMap = new Map(finance.categories.map((c) => [c.id, c]));
   const spendingByCategory = finance.transactions
     .filter(
       (transaction) =>
@@ -75,7 +78,7 @@ export function DashboardPage() {
           <article className="surface surface-pad dash-metric dash-metric--committed">
             <p className="eyebrow">Comprometido</p>
             <strong className="display-number">{formatMoney(dashboard.committedCents)}</strong>
-            <span className="text-secondary">Contas e fat.</span>
+            <span className="text-secondary">Contas e fatura.</span>
           </article>
         </div>
       </div>
@@ -202,9 +205,16 @@ export function DashboardPage() {
                 const isIncome = transaction.type === 'income';
                 const isExpense = transaction.type === 'expense' || transaction.type === 'card_purchase';
                 const amountClass = isIncome ? 'amount--income' : isExpense ? 'amount--expense' : 'amount--neutral';
+                const category = transaction.categoryId ? categoryMap.get(transaction.categoryId) : null;
+                const fallback = isIncome
+                  ? { icon: 'money', color: defaultCategoryColors.income_salary }
+                  : transaction.type === 'transfer'
+                  ? { icon: 'repeat', color: defaultCategoryColors.both_transfer }
+                  : undefined;
                 return (
-                  <div className="list-row" key={transaction.id}>
-                    <div>
+                  <div className="list-row list-row--with-icon" key={transaction.id}>
+                    <CategoryMark category={category} fallback={fallback} />
+                    <div className="list-row-body">
                       <strong>{transaction.description}</strong>
                       <span className="text-secondary">
                         {transactionTypeLabels[transaction.type]} · {toDateInputValue(transaction.date)}

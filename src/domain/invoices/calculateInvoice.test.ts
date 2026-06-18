@@ -12,14 +12,24 @@ describe('invoice ledger calculations', () => {
     expect(invoice.status).toBe('partial');
   });
 
-  it('supports two partial payments and total payment', () => {
-    const partial = calculateInvoice([purchase(100000, 'p-1'), payment(30000, 'pay-1'), payment(20000, 'pay-2')]);
-    const paid = calculateInvoice([...partial.appliedEntries, payment(50000, 'pay-3')]);
+  it('supports two partial payments and total payment after closing', () => {
+    const partial = calculateInvoice([purchase(100000, 'p-1'), payment(30000, 'pay-1'), payment(20000, 'pay-2')], 'closed');
+    const paid = calculateInvoice([...partial.appliedEntries, payment(50000, 'pay-3')], 'closed');
 
     expect(partial.outstandingBalanceCents).toBe(50000);
     expect(partial.status).toBe('partial');
     expect(paid.outstandingBalanceCents).toBe(0);
     expect(paid.status).toBe('paid');
+  });
+
+  it('keeps open invoice as open regardless of advance payments', () => {
+    const withPartial = calculateInvoice([purchase(100000, 'p-1'), payment(30000, 'pay-advance')]);
+    const fullyCovered = calculateInvoice([purchase(100000, 'p-1'), payment(100000, 'pay-full')]);
+
+    expect(withPartial.status).toBe('open');
+    expect(withPartial.outstandingBalanceCents).toBe(70000);
+    expect(fullyCovered.status).toBe('open');
+    expect(fullyCovered.outstandingBalanceCents).toBe(0);
   });
 
   it('tracks overpayment as excess credit', () => {

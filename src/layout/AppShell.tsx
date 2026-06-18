@@ -124,8 +124,8 @@ export function AppShell() {
               <NavLink className={getNavClass} to="/app/accounts" onClick={() => setMobileMenuOpen(false)}>
                 <WalletCards size={19} aria-hidden="true" /> Contas
               </NavLink>
-              <NavLink className={getNavClass} to="/app/transactions" onClick={() => setMobileMenuOpen(false)}>
-                <ReceiptText size={19} aria-hidden="true" /> Transações
+              <NavLink className={getNavClass} to="/app/shared" onClick={() => setMobileMenuOpen(false)}>
+                <Users size={19} aria-hidden="true" /> Casal
               </NavLink>
               <NavLink className={getNavClass} to="/app/bills" onClick={() => setMobileMenuOpen(false)}>
                 <CalendarClock size={19} aria-hidden="true" /> Compromissos
@@ -159,16 +159,16 @@ export function AppShell() {
           <Home size={20} aria-hidden="true" />
           <span>Início</span>
         </NavLink>
-        <NavLink className={getNavClass} to="/app/cards" aria-label="Cartões">
-          <WalletCards size={20} aria-hidden="true" />
-          <span>Cartões</span>
+        <NavLink className={getNavClass} to="/app/transactions" aria-label="Transações">
+          <ReceiptText size={20} aria-hidden="true" />
+          <span>Extrato</span>
         </NavLink>
         <NavLink className="mobile-fab" to="/app/transactions/new" aria-label="Adicionar transação">
           <Plus size={26} aria-hidden="true" />
         </NavLink>
-        <NavLink className={getNavClass} to="/app/shared" aria-label="Compartilhado">
-          <Users size={20} aria-hidden="true" />
-          <span>Casal</span>
+        <NavLink className={getNavClass} to="/app/cards" aria-label="Cartões">
+          <WalletCards size={20} aria-hidden="true" />
+          <span>Cartões</span>
         </NavLink>
         <button
           className={`nav-link mobile-more-trigger${mobileMenuOpen ? ' active' : ''}`}

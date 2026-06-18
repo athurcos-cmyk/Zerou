@@ -47,6 +47,11 @@ export function calculateInvoice(entries: InvoiceLedgerInput[], lifecycle: 'open
       return;
     }
 
+    if (entry.type === 'installment_anticipation_credit') {
+      creditsTotalCents += entry.amountCents;
+      return;
+    }
+
     if (feeTypes.has(entry.type)) {
       feesTotalCents += entry.amountCents;
       return;
@@ -99,6 +104,12 @@ function resolveInvoiceStatus(input: {
     return 'overpaid';
   }
 
+  // Fatura aberta permanece aberta até o fechamento, independente de pagamentos antecipados.
+  if (input.lifecycle === 'open') {
+    return 'open';
+  }
+
+  // Lifecycle fechada: resolve pelo estado dos pagamentos.
   if (input.outstandingBalanceCents === 0 && input.paymentsTotalCents > 0) {
     return 'paid';
   }
@@ -107,11 +118,7 @@ function resolveInvoiceStatus(input: {
     return 'partial';
   }
 
-  if (input.lifecycle === 'closed') {
-    return 'closed';
-  }
-
-  return 'open';
+  return 'closed';
 }
 
 export function expenseRecognizedWithoutInvoicePayments(entries: InvoiceLedgerInput[]) {

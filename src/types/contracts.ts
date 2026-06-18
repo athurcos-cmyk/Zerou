@@ -37,7 +37,8 @@ export type InvoiceLedgerEntryType =
   | 'fine'
   | 'iof'
   | 'fee'
-  | 'installment_anticipation';
+  | 'installment_anticipation'
+  | 'installment_anticipation_credit';
 
 export interface UserProfile extends AppearancePreferences {
   id: string;

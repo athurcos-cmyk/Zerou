@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { CalendarClock } from 'lucide-react';
+import { CalendarClock, ChevronDown } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useFinanceContext } from '../finance/FinanceDataContext';
 import { CategoryField } from '../components/CategoryField';
@@ -28,6 +28,7 @@ export function BillsPage() {
   const [payingBill, setPayingBill] = useState<Bill | null>(null);
   const [payAccountId, setPayAccountId] = useState('');
   const [payAmount, setPayAmount] = useState('');
+  const [formOpen, setFormOpen] = useState(false);
 
   function handleOpenPay(bill: Bill) {
     setPayingBill(bill);
@@ -81,18 +82,33 @@ export function BillsPage() {
 
   return (
     <section className="page-content">
-      <div className="page-heading-row">
+      <div className="page-heading-row page-heading-row--tight">
         <div>
-          <p className="eyebrow">Contas a pagar</p>
-          <h1 className="page-title">Contas que já têm data.</h1>
-          <p className="page-description">Anote aluguel, internet, mensalidades e outros compromissos para não se perder no mês.</p>
+          <p className="eyebrow">Pessoal</p>
+          <h1 className="page-title page-title--compact">Compromissos</h1>
         </div>
-        <CalendarClock size={28} aria-hidden="true" />
+        <SyncStatusBadge status={finance.pendingWrites ? 'pending' : 'synced'} />
       </div>
 
       <div className="finance-grid">
         <form className="surface surface-pad form-stack" onSubmit={handleSubmit}>
-          <p className="eyebrow">Novo compromisso</p>
+          <button
+            type="button"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
+            onClick={() => setFormOpen((v) => !v)}
+            aria-expanded={formOpen}
+          >
+            <div>
+              <p className="eyebrow">Novo compromisso</p>
+              <h2 style={{ margin: 0 }}>Adicionar compromisso</h2>
+            </div>
+            <ChevronDown
+              size={20}
+              aria-hidden="true"
+              style={{ transform: formOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0, color: 'var(--text-secondary)' }}
+            />
+          </button>
+          {formOpen && (<>
           <FormMessage>{message}</FormMessage>
           <label className="field">
             <span>Descrição</span>
@@ -135,6 +151,7 @@ export function BillsPage() {
           <button className="button button--primary" type="submit">
             Criar compromisso
           </button>
+          </>)}
         </form>
 
         <article className="surface surface-pad">
