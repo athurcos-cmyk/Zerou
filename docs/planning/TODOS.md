@@ -25,6 +25,10 @@ Itens acionáveis. Fechou? Mova para "Concluído" ou remova. Detalhe histórico 
 - [ ] Billing real (Stripe) — só com decisão explícita de produto (hoje 100% gratuito).
 
 ## Concluído (recente)
+- [x] UI premium em todas as páginas: cabeçalhos compactos, `CategoryMark` nas listas de transações, cards de conta com gradiente escuro, formulários colapsáveis (Contas, Cartões, Compromissos), nav inferior reorganizada (Extrato no slot 2, Cartões no slot 4, Casal no Mais).
+- [x] Antecipação de parcelas estilo Nubank: seleção por compra + invoice com checkbox, `writeBatch` credita faturas futuras e debita a atual. Novo tipo `installment_anticipation_credit` no ledger.
+- [x] Fix de status de fatura: fatura aberta permanece `open` até o fechamento, independente de pagamentos antecipados.
+- [x] Comprometido: faturas `closed` sempre; `open` só se referenceMonth ≤ mês atual.
 - [x] Redesign Sol + app mobile-nativo (bottom-sheets, FAB, header de valor).
 - [x] Cofrinho do casal (meta compartilhada + contribuições por pessoa).
 - [x] Divisão flexível de despesa do casal (igual/%/valor).
