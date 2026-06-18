@@ -358,6 +358,7 @@ html[data-reduce-motion='true'] *::after {
 
 .form-stack {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
   min-width: 0;
 }
@@ -3327,6 +3328,7 @@ html[data-reduce-motion='true'] *::after {
 /* Card limit hero (new card form) */
 .card-limit-hero {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.3rem;
   padding: 1.1rem 1.25rem;
   border-radius: 1.1rem;
