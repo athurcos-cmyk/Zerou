@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { requestAndRegisterPushToken } from '../pwa/notifications';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   CalendarClock,
@@ -25,9 +26,16 @@ function getNavClass({ isActive }: { isActive: boolean }) {
 }
 
 export function AppShell() {
-  const { user, profile } = useAuth();
+  const { user, profile, authFromCache } = useAuth();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Pede permissão de push e registra o token FCM após o Firebase confirmar a sessão
+  useEffect(() => {
+    if (!authFromCache) {
+      requestAndRegisterPushToken().catch(() => {});
+    }
+  }, [authFromCache]);
   const isFoundationPending = location.pathname.startsWith('/app/onboarding') || Boolean(user && !profile?.defaultWorkspaceId);
 
   async function handleClearLocalDataLogout() {

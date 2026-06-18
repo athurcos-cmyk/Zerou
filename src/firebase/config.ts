@@ -146,6 +146,10 @@ export async function initializeOptionalAnalytics() {
   }
 }
 
+export function getFirebaseApp() {
+  return getFirebaseServices().app;
+}
+
 export function getFirebaseAuth() {
   return getFirebaseServices().auth;
 }

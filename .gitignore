@@ -18,6 +18,9 @@ firebase-export-*/
 # Firebase / Google secrets
 serviceAccountKey.json
 *-service-account.json
+
+# Gerado em build time pelo plugin do Vite (contém config do Firebase)
+public/firebase-messaging-sw.js
 firebase-debug.log
 firestore-debug.log
 storage-debug.log

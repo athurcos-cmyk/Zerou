@@ -1377,6 +1377,11 @@ service cloud.firestore {
         allow update: if validCoupleWorkspaceRefUpdate(uid, workspaceId);
         allow delete: if canDeleteUserAccountData(uid);
       }
+
+      match /fcmTokens/{token} {
+        allow read, write: if isSelf(uid);
+        allow delete: if canDeleteUserAccountData(uid);
+      }
     }
 
     match /workspaces/{workspaceId} {

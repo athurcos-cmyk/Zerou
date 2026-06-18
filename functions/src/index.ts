@@ -8,8 +8,21 @@ import { logger } from 'firebase-functions';
 import { createCheckoutSessionSchema, createCustomerPortalSessionSchema } from './billing/schemas.js';
 import { createCheckoutSessionWithStripe, createCustomerPortalSessionWithStripe, createStripeClient, ingestStripeWebhookEvent } from './billing/stripeBillingProvider.js';
 import { processBillingEventDocument, resetStuckBillingEvents, retryFailedBillingEvents as retryFailedBillingEventDocs } from './billing/billingEventProcessor.js';
-export { adminDeleteUser } from './admin.js';
 import { safeReturnUrl } from './billing/urlSafety.js';
+
+// ─── Automação server-side ────────────────────────────────────────────────────
+export { closeInvoicesDue, generateRecurrences, sendDueReminders } from './automation.js';
+
+// ─── Admin ────────────────────────────────────────────────────────────────────
+export { adminDeleteUser } from './admin.js';
+
+// ─── Billing / Stripe ─────────────────────────────────────────────────────────
+// Estas functions implementam cobrança via Stripe (checkout, portal, webhooks).
+// ESTÃO DESATIVADAS — o produto é gratuito hoje.
+// Para ativar: configurar STRIPE_SECRET_KEY e STRIPE_WEBHOOK_SECRET nos secrets
+// do Firebase (ver docs/BILLING.md), deployar as functions abaixo e ligar o
+// webhook no painel do Stripe apontando para a URL da stripeWebhook.
+// ─────────────────────────────────────────────────────────────────────────────
 
 initializeApp();
 
