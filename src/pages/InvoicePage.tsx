@@ -1,15 +1,13 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { CheckCircle2, ReceiptText } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
+import { BottomSheet } from '../components/BottomSheet';
 import { SelectField } from '../components/SelectField';
 import { FormMessage } from '../components/FormMessage';
 import { invoiceStatusLabels, ledgerTypeLabels } from '../cards/cardLabels';
 import {
   anticipateInstallments,
-  closeInvoice,
-  reconcileInvoice,
   recordInvoiceCredit,
   recordInvoiceFee,
   recordInvoicePayment
@@ -18,7 +16,7 @@ import {
 import { fromDateInputValue, todayInputValue, toDateInputValue } from '../finance/financeDates';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 
-import type { InvoiceLedgerEntryType, InvoiceStatus } from '../types/contracts';
+import type { InvoiceLedgerEntryType } from '../types/contracts';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
 
 export function InvoicePage() {
@@ -29,9 +27,12 @@ export function InvoicePage() {
   const finance = useFinanceContext();
   const card = cardsData.cards.find((item) => item.id === cardId);
   const invoice = cardsData.invoices.find((item) => item.cardId === cardId && item.id === invoiceId);
-  const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentAccountId, setPaymentAccountId] = useState('');
-  const [paymentDate, setPaymentDate] = useState(todayInputValue());
+
+  const [paySheetOpen, setPaySheetOpen] = useState(false);
+  const [payAmount, setPayAmount] = useState('');
+  const [payAccountId, setPayAccountId] = useState('');
+  const [payDate, setPayDate] = useState(todayInputValue());
+
   const [creditAmount, setCreditAmount] = useState('');
   const [creditType, setCreditType] = useState<'refund_credit' | 'chargeback_credit' | 'manual_credit'>('refund_credit');
   const [feeAmount, setFeeAmount] = useState('');
@@ -72,6 +73,29 @@ export function InvoicePage() {
     })
     .sort((a, b) => a.referenceMonth.localeCompare(b.referenceMonth));
 
+  function handleOpenPaySheet() {
+    setPayAmount('');
+    setPayAccountId('');
+    setPayDate(todayInputValue());
+    setPaySheetOpen(true);
+  }
+
+  function handlePay() {
+    if (!workspaceId || !user || !cardId || !invoiceId || !payAccountId) return;
+    const amount = payAmount.trim() ? parseMoneyToCents(payAmount) : (invoice?.outstandingBalanceCents ?? 0);
+    if (!amount) return;
+    setPaySheetOpen(false);
+    setMessage(null);
+    recordInvoicePayment(workspaceId, user.uid, {
+      cardId,
+      invoiceId,
+      accountId: payAccountId,
+      amountCents: amount,
+      paidAt: fromDateInputValue(payDate),
+      advance: invoice?.status === 'open'
+    }).catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível registrar o pagamento.')));
+  }
+
   function handleAnticipation() {
     if (!workspaceId || !user || !cardId || !invoiceId || selectedEntryIds.size === 0) return;
     const credits = anticipatable
@@ -86,26 +110,6 @@ export function InvoicePage() {
       credits,
       effectiveAt: new Date()
     }).catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível registrar a antecipação.')));
-  }
-
-  function handlePayment(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!workspaceId || !user || !cardId || !invoiceId || !paymentAccountId) return;
-    const amount = parseMoneyToCents(paymentAmount);
-    if (!amount) return;
-    setMessage(null);
-    const snap = { amount, accountId: paymentAccountId, date: paymentDate, isOpen: invoice?.status === 'open' };
-    setPaymentAmount('');
-    setPaymentAccountId('');
-    setPaymentDate(todayInputValue());
-    recordInvoicePayment(workspaceId, user.uid, {
-      cardId,
-      invoiceId,
-      accountId: snap.accountId,
-      amountCents: snap.amount,
-      paidAt: fromDateInputValue(snap.date),
-      advance: snap.isOpen
-    }).catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível registrar o pagamento.')));
   }
 
   function handleCredit(event: FormEvent<HTMLFormElement>) {
@@ -142,18 +146,6 @@ export function InvoicePage() {
     }).catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível registrar a tarifa.')));
   }
 
-  function handleReconcile(status: InvoiceStatus) {
-    if (!workspaceId || !cardId || !invoiceId) return;
-    setMessage(null);
-    reconcileInvoice(workspaceId, { cardId, invoiceId, status: status as 'closed' | 'partial' | 'paid' | 'overpaid' });
-  }
-
-  function handleClose() {
-    if (!workspaceId || !cardId || !invoiceId) return;
-    setMessage(null);
-    closeInvoice(workspaceId, cardId, invoiceId);
-  }
-
   if (!invoice && !cardsData.loading) {
     return (
       <section className="page-content page-content--narrow">
@@ -168,16 +160,18 @@ export function InvoicePage() {
 
   const isPaid = invoice?.status === 'paid' || invoice?.status === 'overpaid';
   const isOpen = invoice?.status === 'open';
+  const purchases = invoice?.ledgerEntries.filter((e) => e.type === 'purchase') ?? [];
+  const payments = invoice?.ledgerEntries.filter((e) => e.type === 'payment' || e.type === 'advance_payment') ?? [];
 
   return (
-    <section className="page-content">
+    <section className="page-content page-content--narrow">
       <div className="page-heading-row">
         <div>
           <p className="eyebrow">Fatura · {card?.name ?? ''}</p>
-          <h1 className="page-title">{invoice ? `Fatura ${invoice.referenceMonth}` : 'Carregando fatura'}</h1>
+          <h1 className="page-title">{invoice ? invoice.referenceMonth : 'Carregando…'}</h1>
         </div>
         <Link className="button button--secondary" to={`/app/cards/${cardId ?? ''}`}>
-          Voltar ao cartão
+          Voltar
         </Link>
       </div>
 
@@ -185,9 +179,9 @@ export function InvoicePage() {
 
       {invoice ? (
         <>
-          {/* Hero: valor principal em destaque */}
+          {/* Hero */}
           <div className="invoice-hero">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
               <div>
                 <p className="eyebrow" style={{ marginBottom: '0.35rem' }}>
                   {isPaid ? 'Fatura paga' : 'Valor a pagar'}
@@ -195,273 +189,218 @@ export function InvoicePage() {
                 <span className={`invoice-hero-amount ${isPaid ? 'amount--income' : 'amount--expense'}`}>
                   {formatMoney(invoice.outstandingBalanceCents)}
                 </span>
+                <p className="text-secondary" style={{ marginTop: '0.35rem', fontSize: '0.86rem' }}>
+                  Vence {toDateInputValue(invoice.dueDate)}
+                  {isOpen ? ' · fatura ainda aberta' : ''}
+                </p>
               </div>
               <span className="sync-badge sync-badge--synced">{invoiceStatusLabels[invoice.status]}</span>
             </div>
-            <div className="invoice-hero-meta">
-              <span>Vence {toDateInputValue(invoice.dueDate)}</span>
-              {isOpen && <span>· Fatura em aberto — novos lançamentos entram aqui.</span>}
-            </div>
 
-            {/* Detalhamento secundário */}
             <div className="invoice-breakdown">
-              <span>
-                Compras
-                <strong>{formatMoney(invoice.purchasesTotalCents)}</strong>
-              </span>
+              <span>Compras<strong>{formatMoney(invoice.purchasesTotalCents)}</strong></span>
               {invoice.creditsTotalCents > 0 && (
-                <span>
-                  Créditos
-                  <strong className="amount--income">− {formatMoney(invoice.creditsTotalCents)}</strong>
-                </span>
+                <span>Créditos<strong className="amount--income">− {formatMoney(invoice.creditsTotalCents)}</strong></span>
               )}
               {invoice.feesTotalCents > 0 && (
-                <span>
-                  Juros / tarifas
-                  <strong className="amount--expense">+ {formatMoney(invoice.feesTotalCents)}</strong>
-                </span>
+                <span>Juros/tarifas<strong className="amount--expense">+ {formatMoney(invoice.feesTotalCents)}</strong></span>
               )}
               {invoice.paymentsTotalCents > 0 && (
-                <span>
-                  Pagamentos
-                  <strong className="amount--income">− {formatMoney(invoice.paymentsTotalCents)}</strong>
-                </span>
-              )}
-              {invoice.overpaidCreditCents > 0 && (
-                <span>
-                  Crédito sobrando
-                  <strong className="amount--income">{formatMoney(invoice.overpaidCreditCents)}</strong>
-                </span>
+                <span>Pagamentos<strong className="amount--income">− {formatMoney(invoice.paymentsTotalCents)}</strong></span>
               )}
             </div>
 
-            {/* Ações de status — secundárias */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', borderTop: '1px solid var(--border-subtle)', paddingTop: '0.75rem' }}>
-              {!isPaid && (
-                <button
-                  className="button button--subtle button--compact"
-                  type="button"
-                  onClick={handleClose}
-                >
-                  Fechar fatura
-                </button>
-              )}
-              <button
-                className="button button--subtle button--compact"
-                type="button"
-                onClick={() => handleReconcile(invoice.overpaidCreditCents > 0 ? 'overpaid' : invoice.outstandingBalanceCents === 0 ? 'paid' : 'partial')}
-              >
-                <CheckCircle2 size={16} aria-hidden="true" /> Conciliar manualmente
+            {!isPaid && (
+              <button className="button button--primary" type="button" onClick={handleOpenPaySheet}>
+                Pagar fatura
               </button>
-            </div>
+            )}
           </div>
 
-          <div className="finance-grid">
-            <div className="form-stack">
-              {/* Formulário de pagamento — destaque principal */}
-              <form className="surface surface-pad form-stack" onSubmit={handlePayment}>
-                <div className="section-heading">
-                  <div>
-                    <p className="eyebrow">Pagar fatura</p>
-                    <h2>Registrar pagamento</h2>
+          {/* Compras desta fatura */}
+          <article className="surface surface-pad">
+            <p className="eyebrow" style={{ marginBottom: '0.5rem' }}>Compras</p>
+            {purchases.length > 0 ? (
+              <div className="item-list">
+                {purchases.map((entry) => (
+                  <div className="list-row" key={entry.id}>
+                    <div>
+                      <strong>{txnDescriptions.get(entry.sourceTransactionId ?? '') ?? ledgerTypeLabels[entry.type as InvoiceLedgerEntryType]}</strong>
+                      <span className="text-secondary">{toDateInputValue(entry.effectiveAt)}</span>
+                    </div>
+                    <strong className="amount--expense">{formatMoney(entry.amountCents)}</strong>
                   </div>
-                </div>
-                <p className="text-secondary" style={{ margin: 0, fontSize: '0.86rem', lineHeight: 1.55 }}>
-                  Pode pagar o valor completo ou parcial. O saldo restante fica pendente na fatura.
-                </p>
-                <label className="field">
-                  <span>Valor do pagamento</span>
-                  <input
-                    className="input input--money"
-                    inputMode="decimal"
-                    value={paymentAmount}
-                    onChange={(event) => setPaymentAmount(event.target.value)}
-                    placeholder={invoice.outstandingBalanceCents > 0 ? formatMoney(invoice.outstandingBalanceCents) : '0,00'}
-                  />
-                </label>
-                <div className="field">
-                  <span className="field-label">Pagar com qual conta?</span>
-                  <div className="chip-row">
-                    {finance.accounts.map((a) => (
-                      <button
-                        key={a.id}
-                        type="button"
-                        className={`chip${paymentAccountId === a.id ? ' chip--active' : ''}`}
-                        onClick={() => setPaymentAccountId(a.id)}
-                      >
-                        {a.name}
-                      </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-secondary">Nenhuma compra nesta fatura ainda.</p>
+            )}
+          </article>
+
+          {/* Pagamentos registrados */}
+          {payments.length > 0 && (
+            <article className="surface surface-pad">
+              <p className="eyebrow" style={{ marginBottom: '0.5rem' }}>Pagamentos</p>
+              <div className="item-list">
+                {payments.map((entry) => (
+                  <div className="list-row" key={entry.id}>
+                    <div>
+                      <strong>{ledgerTypeLabels[entry.type as InvoiceLedgerEntryType]}</strong>
+                      <span className="text-secondary">{toDateInputValue(entry.effectiveAt)}</span>
+                    </div>
+                    <strong className="amount--income">− {formatMoney(entry.amountCents)}</strong>
+                  </div>
+                ))}
+              </div>
+            </article>
+          )}
+
+          {/* Ações avançadas */}
+          <details className="advanced-panel">
+            <summary>Antecipar parcelas de faturas futuras</summary>
+            <div className="form-stack" style={{ marginTop: '0.75rem' }}>
+              <div className="anticipation-explain">
+                <strong>O que é antecipar?</strong>
+                Traz parcelas de faturas futuras para esta fatura. O valor é cobrado aqui e a fatura futura recebe um crédito — sem juros extras.
+              </div>
+              {anticipatable.length === 0 ? (
+                <p className="text-secondary" style={{ fontSize: '0.86rem' }}>Nenhuma parcela futura disponível.</p>
+              ) : (
+                <>
+                  <div className="item-list">
+                    {anticipatable.map((fi) => (
+                      <label key={fi.entryId} className="list-row" style={{ cursor: 'pointer', gap: '0.75rem', alignItems: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedEntryIds.has(fi.entryId)}
+                          onChange={(e) => {
+                            setSelectedEntryIds((prev) => {
+                              const next = new Set(prev);
+                              if (e.target.checked) next.add(fi.entryId);
+                              else next.delete(fi.entryId);
+                              return next;
+                            });
+                          }}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <strong style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fi.description}</strong>
+                          <span className="text-secondary">Fatura {fi.referenceMonth}</span>
+                        </div>
+                        <strong className="amount--expense">{formatMoney(fi.amountCents)}</strong>
+                      </label>
                     ))}
                   </div>
-                  {finance.accounts.length === 0 && (
-                    <p className="text-muted" style={{ fontSize: '0.82rem', margin: '0.25rem 0 0' }}>
-                      Cadastre uma conta em <Link to="/app/accounts" className="inline-link">Contas</Link> para registrar o pagamento.
-                    </p>
+                  {selectedEntryIds.size > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-subtle)' }}>
+                      <span className="text-secondary" style={{ fontSize: '0.86rem' }}>
+                        Total: <strong>{formatMoney(anticipatable.filter((fi) => selectedEntryIds.has(fi.entryId)).reduce((s, fi) => s + fi.amountCents, 0))}</strong>
+                      </span>
+                      <button className="button button--secondary" type="button" onClick={handleAnticipation}>
+                        Confirmar antecipação
+                      </button>
+                    </div>
                   )}
-                </div>
-                <label className="field">
-                  <span>Data do pagamento</span>
-                  <input className="input" type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} />
-                </label>
-                <button className="button button--primary" type="submit" disabled={!paymentAmount.trim() || !paymentAccountId}>
-                  Registrar pagamento
-                </button>
-              </form>
-
-              {/* Antecipar parcelas — seleção inteligente por compra */}
-              <details className="advanced-panel">
-                <summary>Antecipar parcelas de faturas futuras</summary>
-                <div className="form-stack" style={{ marginTop: '0.75rem' }}>
-                  <div className="anticipation-explain">
-                    <strong>O que é antecipar?</strong>
-                    Traz parcelas de faturas futuras para esta fatura. O valor é cobrado aqui, e a fatura futura recebe o crédito — sem juros.
-                  </div>
-                  {anticipatable.length === 0 ? (
-                    <p className="text-secondary" style={{ fontSize: '0.86rem' }}>
-                      Nenhuma parcela futura disponível para antecipar.
-                    </p>
-                  ) : (
-                    <>
-                      <div className="item-list">
-                        {anticipatable.map((fi) => (
-                          <label
-                            key={fi.entryId}
-                            className="list-row"
-                            style={{ cursor: 'pointer', gap: '0.75rem', alignItems: 'center' }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selectedEntryIds.has(fi.entryId)}
-                              onChange={(e) => {
-                                setSelectedEntryIds((prev) => {
-                                  const next = new Set(prev);
-                                  if (e.target.checked) next.add(fi.entryId);
-                                  else next.delete(fi.entryId);
-                                  return next;
-                                });
-                              }}
-                            />
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <strong style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {fi.description}
-                              </strong>
-                              <span className="text-secondary">Fatura {fi.referenceMonth}</span>
-                            </div>
-                            <strong className="amount--expense">{formatMoney(fi.amountCents)}</strong>
-                          </label>
-                        ))}
-                      </div>
-                      {selectedEntryIds.size > 0 && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-subtle)' }}>
-                          <span className="text-secondary" style={{ fontSize: '0.86rem' }}>
-                            Total:{' '}
-                            <strong>
-                              {formatMoney(
-                                anticipatable
-                                  .filter((fi) => selectedEntryIds.has(fi.entryId))
-                                  .reduce((sum, fi) => sum + fi.amountCents, 0)
-                              )}
-                            </strong>
-                          </span>
-                          <button className="button button--secondary" type="button" onClick={handleAnticipation}>
-                            Confirmar antecipação
-                          </button>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              </details>
-
-              {/* Créditos e tarifas — ações avançadas */}
-              <details className="advanced-panel">
-                <summary>Créditos e tarifas</summary>
-                <div className="form-stack" style={{ marginTop: '0.75rem' }}>
-                  <p className="text-secondary" style={{ margin: 0, fontSize: '0.86rem', lineHeight: 1.55 }}>
-                    Para estornos, chargebacks, juros ou tarifas da operadora.
-                  </p>
-                  <form className="form-stack" onSubmit={handleCredit}>
-                    <p className="eyebrow">Crédito / estorno</p>
-                    <SelectField
-                      label="Tipo de crédito"
-                      value={creditType}
-                      onChange={(v) => setCreditType(v as typeof creditType)}
-                      options={[
-                        { value: 'refund_credit', label: 'Estorno de compra' },
-                        { value: 'chargeback_credit', label: 'Chargeback' },
-                        { value: 'manual_credit', label: 'Crédito manual' }
-                      ]}
-                    />
-                    <input className="input" inputMode="decimal" value={creditAmount} onChange={(event) => setCreditAmount(event.target.value)} placeholder="0,00" />
-                    <button className="button button--secondary" type="submit">
-                      Registrar crédito
-                    </button>
-                  </form>
-                  <form className="form-stack" onSubmit={handleFee} style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '1rem' }}>
-                    <p className="eyebrow">Tarifa / juros</p>
-                    <SelectField
-                      label="Tipo de tarifa"
-                      value={feeType}
-                      onChange={(v) => setFeeType(v as typeof feeType)}
-                      options={[
-                        { value: 'fee', label: 'Tarifa da operadora' },
-                        { value: 'interest', label: 'Juros por atraso' },
-                        { value: 'fine', label: 'Multa' },
-                        { value: 'iof', label: 'IOF' },
-                        { value: 'manual_debit', label: 'Débito manual' }
-                      ]}
-                    />
-                    <input className="input" inputMode="decimal" value={feeAmount} onChange={(event) => setFeeAmount(event.target.value)} placeholder="0,00" />
-                    <button className="button button--secondary" type="submit">
-                      Registrar tarifa
-                    </button>
-                  </form>
-                </div>
-              </details>
-            </div>
-
-            <article className="surface surface-pad">
-              <div className="section-heading">
-                <div>
-                  <p className="eyebrow">Histórico</p>
-                  <h2>Movimentos da fatura</h2>
-                </div>
-                <ReceiptText size={22} aria-hidden="true" />
-              </div>
-              {invoice.ledgerEntries.length > 0 ? (
-                <div className="item-list">
-                  {invoice.ledgerEntries.map((entry) => {
-                    const isCredit = entry.type.includes('credit');
-                    const isPurchase = entry.type === 'purchase';
-                    const isDebit = !isCredit && !isPurchase && entry.type !== 'payment' && entry.type !== 'advance_payment';
-                    const amountClass = isCredit || entry.type === 'payment' || entry.type === 'advance_payment'
-                      ? 'amount--income'
-                      : isPurchase || isDebit
-                      ? 'amount--expense'
-                      : '';
-                    const prefix = isCredit || entry.type === 'payment' || entry.type === 'advance_payment' ? '−' : '';
-                    return (
-                      <div className="list-row" key={entry.id}>
-                        <div>
-                          <strong>{ledgerTypeLabels[entry.type as InvoiceLedgerEntryType]}</strong>
-                          <span className="text-secondary">
-                            {toDateInputValue(entry.effectiveAt)}
-                          </span>
-                        </div>
-                        <strong className={amountClass}>
-                          {prefix}{formatMoney(entry.amountCents)}
-                        </strong>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-secondary">Nenhum movimento nesta fatura ainda.</p>
+                </>
               )}
-            </article>
-          </div>
+            </div>
+          </details>
+
+          <details className="advanced-panel">
+            <summary>Estornos, créditos e tarifas</summary>
+            <div className="form-stack" style={{ marginTop: '0.75rem' }}>
+              <form className="form-stack" onSubmit={handleCredit}>
+                <p className="eyebrow">Crédito / estorno</p>
+                <SelectField
+                  label="Tipo"
+                  value={creditType}
+                  onChange={(v) => setCreditType(v as typeof creditType)}
+                  options={[
+                    { value: 'refund_credit', label: 'Estorno de compra' },
+                    { value: 'chargeback_credit', label: 'Chargeback' },
+                    { value: 'manual_credit', label: 'Crédito manual' }
+                  ]}
+                />
+                <input className="input" inputMode="decimal" value={creditAmount} onChange={(e) => setCreditAmount(e.target.value)} placeholder="0,00" />
+                <button className="button button--secondary" type="submit">Registrar crédito</button>
+              </form>
+              <form className="form-stack" onSubmit={handleFee} style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '1rem' }}>
+                <p className="eyebrow">Tarifa / juros</p>
+                <SelectField
+                  label="Tipo"
+                  value={feeType}
+                  onChange={(v) => setFeeType(v as typeof feeType)}
+                  options={[
+                    { value: 'fee', label: 'Tarifa da operadora' },
+                    { value: 'interest', label: 'Juros por atraso' },
+                    { value: 'fine', label: 'Multa' },
+                    { value: 'iof', label: 'IOF' },
+                    { value: 'manual_debit', label: 'Débito manual' }
+                  ]}
+                />
+                <input className="input" inputMode="decimal" value={feeAmount} onChange={(e) => setFeeAmount(e.target.value)} placeholder="0,00" />
+                <button className="button button--secondary" type="submit">Registrar tarifa</button>
+              </form>
+            </div>
+          </details>
         </>
       ) : null}
+
+      {/* BottomSheet de pagamento */}
+      <BottomSheet
+        open={paySheetOpen}
+        onClose={() => setPaySheetOpen(false)}
+        title="Pagar fatura"
+        subtitle={invoice ? `${invoice.referenceMonth} · ${formatMoney(invoice.outstandingBalanceCents)} em aberto` : undefined}
+      >
+        <div className="form-stack">
+          <label className="field">
+            <span>Valor a pagar</span>
+            <input
+              className="input input--money"
+              inputMode="decimal"
+              value={payAmount}
+              onChange={(e) => setPayAmount(e.target.value)}
+              placeholder={invoice ? formatMoney(invoice.outstandingBalanceCents) : '0,00'}
+              autoFocus
+            />
+            <span className="field-hint">Deixe em branco para pagar o total.</span>
+          </label>
+          <div className="field">
+            <span className="field-label">De qual conta sai?</span>
+            <div className="chip-row">
+              {finance.accounts.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  className={`chip${payAccountId === a.id ? ' chip--active' : ''}`}
+                  onClick={() => setPayAccountId(a.id)}
+                >
+                  {a.name}
+                </button>
+              ))}
+            </div>
+            {finance.accounts.length === 0 && (
+              <p className="text-muted" style={{ fontSize: '0.82rem', margin: '0.25rem 0 0' }}>
+                Cadastre uma conta em <Link to="/app/accounts" className="inline-link">Contas</Link> para registrar o pagamento.
+              </p>
+            )}
+          </div>
+          <label className="field">
+            <span>Data do pagamento</span>
+            <input className="input" type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
+          </label>
+          {isOpen && (
+            <p className="text-muted" style={{ fontSize: '0.8rem', margin: 0 }}>
+              Fatura ainda aberta — pagamentos antes do fechamento liberam limite imediatamente.
+            </p>
+          )}
+          <div className="sheet-actions">
+            <button className="button button--primary" type="button" disabled={!payAccountId} onClick={handlePay}>
+              Confirmar pagamento
+            </button>
+          </div>
+        </div>
+      </BottomSheet>
     </section>
   );
 }

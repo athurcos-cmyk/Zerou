@@ -2515,6 +2515,11 @@ html[data-reduce-motion='true'] *::after {
     grid-template-columns: 1fr;
   }
 
+  .list-row--with-icon {
+    flex-direction: row;
+    align-items: center;
+  }
+
   .list-row-end {
     justify-content: flex-start;
     text-align: left;

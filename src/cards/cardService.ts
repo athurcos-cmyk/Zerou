@@ -174,6 +174,13 @@ export async function createCreditCard(workspaceId: string, userId: string, inpu
   return id;
 }
 
+export function deleteCard(workspaceId: string, cardId: string) {
+  fireWrite(updateDoc(cardRef(workspaceId, cardId), {
+    isActive: false,
+    updatedAt: serverTimestamp()
+  }));
+}
+
 export async function createCardPurchase(workspaceId: string, userId: string, input: CreateCardPurchaseInput) {
   const parsed = createCardPurchaseSchema.parse(input);
   const card = await loadCard(workspaceId, parsed.cardId);

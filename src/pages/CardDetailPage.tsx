@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { CalendarClock, CreditCard } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { CalendarClock, CreditCard, Trash2 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { BottomSheet } from '../components/BottomSheet';
+import { useConfirm } from '../components/ConfirmDialog';
 import { FormMessage } from '../components/FormMessage';
 import { invoiceStatusLabels } from '../cards/cardLabels';
-import { recordInvoicePayment } from '../cards/cardService';
+import { deleteCard, recordInvoicePayment } from '../cards/cardService';
 
 import { toDateInputValue } from '../finance/financeDates';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
@@ -15,6 +16,7 @@ import { getUserFacingErrorMessage } from '../utils/userFacingError';
 
 export function CardDetailPage() {
   const { cardId } = useParams();
+  const navigate = useNavigate();
   const { user, profile } = useAuth();
   const workspaceId = profile?.defaultWorkspaceId;
   const cardsData = useCardsContext();
@@ -22,6 +24,7 @@ export function CardDetailPage() {
   const card = cardsData.cards.find((item) => item.id === cardId);
   const invoices = cardsData.invoices.filter((invoice) => invoice.cardId === cardId);
   const [message, setMessage] = useState<string | null>(null);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [paySheetOpen, setPaySheetOpen] = useState(false);
   const [payAmount, setPayAmount] = useState('');
@@ -31,6 +34,19 @@ export function CardDetailPage() {
     setPayAmount('');
     setPayAccountId('');
     setPaySheetOpen(true);
+  }
+
+  async function handleDeleteCard() {
+    if (!workspaceId || !cardId) return;
+    const ok = await confirm({
+      title: 'Excluir cartão?',
+      message: 'O cartão será removido da sua lista. As faturas e transações já registradas continuam no histórico.',
+      confirmLabel: 'Excluir',
+      danger: true
+    });
+    if (!ok) return;
+    deleteCard(workspaceId, cardId);
+    navigate('/app/cards');
   }
 
   function handleQuickPay() {
@@ -83,9 +99,14 @@ export function CardDetailPage() {
             {card ? `${card.brand} ···· ${card.lastFour} · fecha dia ${card.closingDay} · vence dia ${card.dueDay}` : 'Carregando dados.'}
           </p>
         </div>
-        <Link className="button button--secondary" to="/app/cards">
-          Todos os cartões
-        </Link>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <Link className="button button--secondary" to="/app/cards">
+            Todos os cartões
+          </Link>
+          <button className="button button--ghost" type="button" onClick={() => void handleDeleteCard()} aria-label="Excluir cartão">
+            <Trash2 size={17} aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
       {card ? (
@@ -189,6 +210,7 @@ export function CardDetailPage() {
         )}
       </article>
 
+      {confirmDialog}
       <BottomSheet
         open={paySheetOpen}
         onClose={() => setPaySheetOpen(false)}
