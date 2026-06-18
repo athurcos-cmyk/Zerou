@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { requestAndRegisterPushToken } from '../pwa/notifications';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
+  BarChart2,
   CalendarClock,
   Home,
   LogOut,
@@ -10,7 +11,6 @@ import {
   Plus,
   ReceiptText,
   Repeat,
-  Search,
   Shield,
   Target,
   Users,
@@ -82,7 +82,7 @@ export function AppShell() {
             <Repeat size={19} aria-hidden="true" /> Recorrências
           </NavLink>
           <NavLink className={getNavClass} to="/app/search">
-            <Search size={19} aria-hidden="true" /> Busca
+            <BarChart2 size={19} aria-hidden="true" /> Análise
           </NavLink>
           <NavLink className={getNavClass} to="/app/shared">
             <Users size={19} aria-hidden="true" /> Compartilhado
@@ -145,7 +145,7 @@ export function AppShell() {
                 <Repeat size={19} aria-hidden="true" /> Recorrências
               </NavLink>
               <NavLink className={getNavClass} to="/app/search" onClick={() => setMobileMenuOpen(false)}>
-                <Search size={19} aria-hidden="true" /> Busca
+                <BarChart2 size={19} aria-hidden="true" /> Análise
               </NavLink>
               <NavLink className={getNavClass} to="/app/settings/appearance" onClick={() => setMobileMenuOpen(false)}>
                 <Palette size={19} aria-hidden="true" /> Aparência
