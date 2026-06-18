@@ -1,17 +1,14 @@
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { CalendarClock, ChevronDown, CreditCard, ReceiptText } from 'lucide-react';
+import { CalendarClock, CreditCard } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
-import { CategoryField } from '../components/CategoryField';
-import { SelectField } from '../components/SelectField';
 import { BottomSheet } from '../components/BottomSheet';
 import { FormMessage } from '../components/FormMessage';
 import { invoiceStatusLabels } from '../cards/cardLabels';
-import { createCardPurchase, recordInvoicePayment } from '../cards/cardService';
+import { recordInvoicePayment } from '../cards/cardService';
 
-import { fromDateInputValue, todayInputValue, toDateInputValue } from '../finance/financeDates';
-import { createCategory, deleteCategory, updateCategory } from '../finance/financeService';
+import { toDateInputValue } from '../finance/financeDates';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
@@ -24,13 +21,7 @@ export function CardDetailPage() {
   const finance = useFinanceContext();
   const card = cardsData.cards.find((item) => item.id === cardId);
   const invoices = cardsData.invoices.filter((invoice) => invoice.cardId === cardId);
-  const [description, setDescription] = useState('');
-  const [amount, setAmount] = useState('');
-  const [purchaseDate, setPurchaseDate] = useState(todayInputValue());
-  const [categoryId, setCategoryId] = useState('');
-  const [installments, setInstallments] = useState(1);
   const [message, setMessage] = useState<string | null>(null);
-  const [purchaseFormOpen, setPurchaseFormOpen] = useState(false);
 
   const [paySheetOpen, setPaySheetOpen] = useState(false);
   const [payAmount, setPayAmount] = useState('');
@@ -57,34 +48,6 @@ export function CardDetailPage() {
       paidAt: new Date(),
       advance: openInvoice.status === 'open'
     }).catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível registrar o pagamento.')));
-  }
-
-  async function handlePurchase(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setMessage(null);
-
-    if (!workspaceId || !user || !cardId) {
-      setMessage('Não foi possível localizar o cartão.');
-      return;
-    }
-
-    try {
-      await createCardPurchase(workspaceId, user.uid, {
-        cardId,
-        description,
-        amountCents: parseMoneyToCents(amount),
-        purchaseDate: fromDateInputValue(purchaseDate),
-        categoryId,
-        installments
-      });
-      setDescription('');
-      setAmount('');
-      setPurchaseDate(todayInputValue());
-      setCategoryId('');
-      setInstallments(1);
-    } catch (error) {
-      setMessage(getUserFacingErrorMessage(error, 'Não foi possível registrar a compra agora.'));
-    }
   }
 
   if (!card && !cardsData.loading) {
@@ -182,119 +145,50 @@ export function CardDetailPage() {
         </>
       ) : null}
 
-      <div className="finance-grid">
-        <article className="surface surface-pad">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Faturas</p>
-              <h2>Histórico de faturas</h2>
-            </div>
-            <CalendarClock size={22} aria-hidden="true" />
-          </div>
-          {invoices.length > 0 ? (
-            <div className="item-list">
-              {invoices.map((invoice) => {
-                const isPaid = invoice.status === 'paid' || invoice.status === 'overpaid';
-                return (
-                  <Link className="list-row list-row--link" key={invoice.id} to={`/app/cards/${invoice.cardId}/invoices/${invoice.id}`}>
-                    <div>
-                      <strong>Fatura {invoice.referenceMonth}</strong>
-                      <span className="text-secondary">
-                        {invoiceStatusLabels[invoice.status]} · vence {toDateInputValue(invoice.dueDate)}
-                      </span>
-                    </div>
-                    <div className="list-row-end">
-                      <strong className={isPaid ? 'amount--income' : invoice.outstandingBalanceCents > 0 ? 'amount--expense' : ''}>
-                        {formatMoney(invoice.outstandingBalanceCents)}
-                      </strong>
-                      {isPaid && (
-                        <span className="sync-badge sync-badge--synced">Paga</span>
-                      )}
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="empty-copy">
-              <span className="empty-icon">
-                <CreditCard size={24} aria-hidden="true" />
-              </span>
-              <p className="text-secondary">Nenhuma fatura ainda. Registre a primeira compra abaixo.</p>
-            </div>
-          )}
-        </article>
+      <FormMessage>{message}</FormMessage>
 
-        <form className="surface surface-pad form-stack" onSubmit={handlePurchase}>
-          <button
-            type="button"
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
-            onClick={() => setPurchaseFormOpen((v) => !v)}
-            aria-expanded={purchaseFormOpen}
-          >
-            <div>
-              <p className="eyebrow">Nova compra</p>
-              <h2 style={{ margin: 0 }}>Registrar no cartão</h2>
-            </div>
-            <ChevronDown
-              size={22}
-              aria-hidden="true"
-              style={{ transform: purchaseFormOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0, color: 'var(--text-secondary)' }}
-            />
-          </button>
-          {purchaseFormOpen && (
-            <>
-              <p className="text-secondary" style={{ margin: 0, fontSize: '0.86rem', lineHeight: 1.55 }}>
-                Para parcelado, informe o valor total e o número de parcelas.
-              </p>
-              <FormMessage>{message}</FormMessage>
-              <label className="field">
-                <span>Descrição</span>
-                <input className="input" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Ex: Supermercado, Cinema..." />
-              </label>
-              <label className="field">
-                <span>Valor total da compra</span>
-                <input className="input" inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0,00" />
-              </label>
-              <label className="field">
-                <span>Data da compra</span>
-                <input className="input" type="date" value={purchaseDate} onChange={(event) => setPurchaseDate(event.target.value)} />
-              </label>
-              <CategoryField
-                value={categoryId}
-                onChange={setCategoryId}
-                categories={finance.categories}
-                filterType="expense"
-                onCreateCategory={async (name, icon, type, color) => {
-                  if (!workspaceId || !user) return;
-                  const id = await createCategory(workspaceId, user.uid, { name, icon, type, color });
-                  setCategoryId(id);
-                }}
-                onUpdateCategory={async (id, patch) => {
-                  if (!workspaceId) return;
-                  await updateCategory(workspaceId, id, patch);
-                }}
-                onDeleteCategory={async (id) => {
-                  if (!workspaceId) return;
-                  await deleteCategory(workspaceId, id);
-                }}
-              />
-              <SelectField
-                label="Parcelamento"
-                value={String(installments)}
-                onChange={(v) => setInstallments(Number(v))}
-                options={Array.from({ length: 24 }, (_, i) => i + 1).map((n) => ({
-                  value: String(n),
-                  label: n === 1 ? '1x à vista' : `${n}x`
-                }))}
-              />
-              <button className="button button--primary" type="submit">
-                Registrar compra
-              </button>
-            </>
-          )}
-        </form>
-      </div>
+      <article className="surface surface-pad">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Faturas</p>
+            <h2>Histórico de faturas</h2>
+          </div>
+          <CalendarClock size={22} aria-hidden="true" />
+        </div>
+        {invoices.length > 0 ? (
+          <div className="item-list">
+            {invoices.map((invoice) => {
+              const isPaid = invoice.status === 'paid' || invoice.status === 'overpaid';
+              return (
+                <Link className="list-row list-row--link" key={invoice.id} to={`/app/cards/${invoice.cardId}/invoices/${invoice.id}`}>
+                  <div>
+                    <strong>Fatura {invoice.referenceMonth}</strong>
+                    <span className="text-secondary">
+                      {invoiceStatusLabels[invoice.status]} · vence {toDateInputValue(invoice.dueDate)}
+                    </span>
+                  </div>
+                  <div className="list-row-end">
+                    <strong className={isPaid ? 'amount--income' : invoice.outstandingBalanceCents > 0 ? 'amount--expense' : ''}>
+                      {formatMoney(invoice.outstandingBalanceCents)}
+                    </strong>
+                    {isPaid && (
+                      <span className="sync-badge sync-badge--synced">Paga</span>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="empty-copy">
+            <span className="empty-icon">
+              <CreditCard size={24} aria-hidden="true" />
+            </span>
+            <p className="text-secondary">Nenhuma fatura ainda. Lance a primeira compra em Despesas.</p>
+          </div>
+        )}
+      </article>
+
       <BottomSheet
         open={paySheetOpen}
         onClose={() => setPaySheetOpen(false)}
