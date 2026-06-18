@@ -55,8 +55,9 @@ React 19 (TS strict), Vite, Firebase Web SDK (Auth + Firestore + Storage), Verce
 
 ## Funcionalidades-chave do casal
 
-- **Divisão de despesa** (claims): igual / porcentagem / valor; saldo "quem deve quanto" e acerto (settlement).
-- **Cofrinho do casal**: meta compartilhada (`goals` no workspace do casal) + contribuições por pessoa (`goalContributions`). "Guardar" pode descontar de uma conta pessoal (vira despesa "Cofrinho" no workspace pessoal). Mostra total, juntado no mês e por pessoa.
+- **Modos do espaço** (`coupleMode` no workspace): `savings_only` (só cofrinho, padrão), `transparent` (despesas divididas visíveis, sem acerto formal), `balanced` (idem + barra proporcional de quem cobre mais no mês). Pode mudar a qualquer momento em "Gerenciar espaço".
+- **Divisão de despesa** (claims, apenas nos modos transparent/balanced): igual / porcentagem / valor. Sem acerto de contas formal — o equilíbrio é visual/proporcional.
+- **Cofrinho do casal**: meta compartilhada (`goals` no workspace do casal) + contribuições (`goalContributions`). "Guardar" pode descontar de uma conta pessoal (vira despesa "Cofrinho" no workspace pessoal); valida saldo disponível antes. Mostra total unificado e juntado no mês.
 
 ## Deploy de regras
 

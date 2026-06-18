@@ -2,6 +2,16 @@
 
 Resumo das mudanças recentes do Zerou. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-06-17 — redesign do modo casal e offline-first
+
+- **Sistema de modos** (`coupleMode` no workspace): `savings_only` (só cofrinho), `transparent` (despesas visíveis) e `balanced` (barra proporcional de quem cobre mais). Pode ser escolhido na criação e mudado em qualquer momento via "Gerenciar espaço".
+- **Nomes reais**: `WorkspaceMembership.displayName` salvo na criação do workspace e no aceite do convite; "Dono/Parceiro(a)" substituído pelo nome real da pessoa.
+- **Validação de saldo no cofrinho**: "Guardar" valida o saldo da conta pessoal selecionada e bloqueia com mensagem amigável se insuficiente.
+- **Removido breakdown individual** do cofrinho ("Você juntou / Parceiro juntou"); agora só aparece o total unificado.
+- **Removido fluxo de acerto de contas** (settlements); substituído pelos modos transparent/balanced que mostram proporção sem acerto formal.
+- **Offline-first**: todos os writes em `SharedSpacePage` refatorados para fire-and-forget (`.catch`); `guardAction` removido. Confirm dialogs aguardam normalmente; o write subsequente é fire-and-forget.
+- **CLAUDE.md**: seção `⚠️ REGRA PRINCIPAL` com padrão correto/errado e exemplos de código explicitando que o app deve funcionar offline.
+
 ## 2026-06-17 — painel admin em /admin com deleção de usuário via Cloud Function
 
 - **Rota `/admin`** protegida por `RequireAdmin` (email `a.thurcos@gmail.com`); qualquer outro usuário é redirecionado para `/app`.

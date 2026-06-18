@@ -37,7 +37,7 @@ export function JoinInvitePage() {
     setLoading(true);
     setError(null);
     try {
-      await acceptCoupleInvite(code, user.uid, true);
+      await acceptCoupleInvite(code, user.uid, profile?.name ?? user.displayName ?? '', true);
       clearPendingInvite();
       setAccepted(true);
     } catch (err) {

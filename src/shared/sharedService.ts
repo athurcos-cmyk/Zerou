@@ -11,6 +11,7 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  updateDoc,
   where,
   writeBatch,
   type DocumentData,
@@ -45,6 +46,7 @@ import {
 } from './inviteCode';
 import type {
   AuditLog,
+  CoupleMode,
   CoupleInvite,
   Settlement,
   SharedComment,
@@ -194,7 +196,7 @@ export async function canCreateCoupleWorkspace(userId: string) {
   return { allowed: true };
 }
 
-export async function createCoupleWorkspace(userId: string, ownerName: string) {
+export async function createCoupleWorkspace(userId: string, ownerName: string, mode: CoupleMode = 'savings_only') {
   const entitlement = await canCreateCoupleWorkspace(userId);
 
   if (!entitlement.allowed) {
@@ -214,6 +216,7 @@ export async function createCoupleWorkspace(userId: string, ownerName: string) {
     ownerUserId: userId,
     partnerUserId: '',
     activeMemberCount: 1,
+    coupleMode: mode,
     status: 'active',
     currency: 'BRL',
     locale: 'pt-BR',
@@ -226,6 +229,7 @@ export async function createCoupleWorkspace(userId: string, ownerName: string) {
     workspaceId,
     role: 'owner',
     status: 'active',
+    displayName: ownerName || '',
     joinedAt: now,
     createdAt: now,
     updatedAt: now
@@ -243,6 +247,12 @@ export async function createCoupleWorkspace(userId: string, ownerName: string) {
 
   await batch.commit();
   return workspaceId;
+}
+
+export async function updateCoupleMode(workspaceId: string, userId: string, mode: CoupleMode) {
+  await updateDoc(workspaceRef(workspaceId), { coupleMode: mode, updatedAt: serverTimestamp() });
+  const audit = auditEntry(workspaceId, userId, 'couple_mode_changed', 'workspace', workspaceId, `Modo alterado para ${mode}.`);
+  setDoc(audit.reference, audit.payload).catch(() => undefined);
 }
 
 export async function createCoupleInvite(workspaceId: string, userId: string, workspaceName: string) {
@@ -304,7 +314,7 @@ export async function previewCoupleInvite(code: string) {
   return invite;
 }
 
-export async function acceptCoupleInvite(code: string, userId: string, confirmed: boolean) {
+export async function acceptCoupleInvite(code: string, userId: string, displayName: string, confirmed: boolean) {
   if (!confirmed) {
     throw new Error('Confirme que deseja entrar neste espaço compartilhado.');
   }
@@ -337,6 +347,7 @@ export async function acceptCoupleInvite(code: string, userId: string, confirmed
     workspaceId,
     role: 'partner',
     status: 'active',
+    displayName: displayName || '',
     acceptedInviteId: invite.id,
     joinedAt: now,
     createdAt: now,

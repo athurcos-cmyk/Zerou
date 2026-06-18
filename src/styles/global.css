@@ -3178,6 +3178,78 @@ html[data-reduce-motion='true'] *::after {
   text-align: center;
 }
 
+/* Modo do casal */
+.couple-mode-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 1rem 1.1rem;
+  border-radius: 1rem;
+  border: 1.5px solid var(--border-subtle);
+  background: var(--bg-surface);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: border-color 0.15s;
+}
+.couple-mode-card:hover { border-color: var(--border-default); }
+.couple-mode-card--selected {
+  border-color: var(--action-primary);
+  background: var(--action-primary-soft);
+}
+
+.couple-mode-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 0.65rem;
+  flex-shrink: 0;
+}
+.couple-mode-icon--savings-only { background: var(--success-soft); color: var(--success); }
+.couple-mode-icon--transparent  { background: var(--action-primary-soft); color: var(--action-primary); }
+.couple-mode-icon--balanced     { background: var(--warning-soft); color: var(--warning); }
+
+.couple-mode-text {
+  display: grid;
+  gap: 0.12rem;
+  flex: 1;
+  min-width: 0;
+}
+.couple-mode-text strong { font-size: 0.93rem; }
+.couple-mode-text > span { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; }
+.couple-mode-more { font-size: 0.75rem !important; color: var(--action-primary) !important; }
+
+.couple-upgrade-card {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.9rem 1.1rem;
+  border-radius: 1rem;
+  border: 1.5px dashed var(--border-default);
+  background: var(--bg-surface);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: border-color 0.15s;
+}
+.couple-upgrade-card:hover { border-color: var(--action-primary); }
+.couple-upgrade-text { display: grid; gap: 0.1rem; flex: 1; min-width: 0; }
+.couple-upgrade-text strong { font-size: 0.88rem; }
+.couple-upgrade-text span   { font-size: 0.78rem; color: var(--text-secondary); }
+
+.couple-balance-bar {
+  display: flex;
+  height: 0.6rem;
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 0.5rem 0 0.25rem;
+  gap: 2px;
+}
+.couple-balance-bar-you     { background: var(--action-primary); border-radius: 999px 0 0 999px; }
+.couple-balance-bar-partner { background: var(--action-primary-soft); border-radius: 0 999px 999px 0; }
+
 /* ============================================================
    Goals
    ============================================================ */

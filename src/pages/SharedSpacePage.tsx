@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Check, Copy, Handshake, MessageSquare, PiggyBank, Plus, QrCode, Trash2, Users } from 'lucide-react';
+import { Check, ChevronRight, Copy, Eye, PiggyBank, Plus, QrCode, Scale, Settings2, Trash2, Users } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { calculateAccountBalances } from '../finance/financeCalculations';
 import { clearPendingInvite, readPendingInvite, savePendingInvite } from '../auth/pendingInvite';
 import { BottomSheet } from '../components/BottomSheet';
 import { categoryColors } from '../components/categoryIcons';
@@ -16,45 +17,32 @@ import { useCoupleSavingsContext, useSharedContext } from '../shared/SharedDataC
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
 import {
   acceptCoupleInvite,
-  acceptSettlement,
-  addSharedComment,
   cancelCoupleWorkspace,
   cleanupExpiredInvites,
   createCoupleInvite,
   createCoupleWorkspace,
-  createSettlementProposal,
   createSharedExpenseClaim,
   leaveCoupleWorkspace,
   previewCoupleInvite,
-  recordSettlementPayment,
   regenerateCoupleInvite,
   removePartner,
   revokeCoupleInvite,
-  updateSharedExpenseClaimStatus
+  updateCoupleMode
 } from '../shared/sharedService';
-import type { CoupleInvite, Settlement, SharedExpenseClaim, WorkspaceMembership } from '../types/contracts';
-
-const claimStatusLabels: Record<SharedExpenseClaim['status'], string> = {
-  pending: 'Pendente',
-  accepted: 'Aceito',
-  disputed: 'Contestação',
-  settled: 'Acertado'
-};
-
-const settlementStatusLabels: Record<Settlement['status'], string> = {
-  proposed: 'Proposto',
-  accepted: 'Aceito',
-  partially_paid: 'Parcial',
-  settled: 'Acertado',
-  cancelled: 'Cancelado'
-};
+import type { CoupleInvite, CoupleMode, WorkspaceMembership } from '../types/contracts';
 
 type SplitMode = 'equal' | 'percent' | 'value';
+
+const modeLabels: Record<CoupleMode, string> = {
+  savings_only: 'Só o cofrinho',
+  transparent: 'Transparência',
+  balanced: 'Equilíbrio'
+};
 
 function memberLabel(member: WorkspaceMembership | undefined, currentUserId?: string) {
   if (!member) return 'Parceiro(a)';
   if (member.userId === currentUserId) return 'Você';
-  return member.role === 'owner' ? 'Dono' : 'Parceiro(a)';
+  return member.displayName || (member.role === 'owner' ? 'Dono' : 'Parceiro(a)');
 }
 
 export function SharedSpacePage() {
@@ -78,11 +66,11 @@ export function SharedSpacePage() {
   const [myPercent, setMyPercent] = useState('50');
   const [myValue, setMyValue] = useState('');
 
-  const [commentTargetId, setCommentTargetId] = useState('');
-  const [commentBody, setCommentBody] = useState('');
-  const [settleOpen, setSettleOpen] = useState(false);
-  const [settlementPaymentId, setSettlementPaymentId] = useState('');
-  const [settlementPaymentAmount, setSettlementPaymentAmount] = useState('');
+
+  // Modo do casal
+  const [modeSheetOpen, setModeSheetOpen] = useState(false);
+  const [modeSheetPurpose, setModeSheetPurpose] = useState<'create' | 'change'>('create');
+  const [selectedMode, setSelectedMode] = useState<CoupleMode>('savings_only');
 
   // Couple savings ("cofrinho")
   const savings = useCoupleSavingsContext();
@@ -103,10 +91,9 @@ export function SharedSpacePage() {
   // Auto-preview when a pending invite code lands and user has no couple space yet
   useEffect(() => {
     if (!pendingInviteCode || pendingInvitePreview || shared.activeCoupleRef) return;
-    void guardAction(async () => {
-      const preview = await previewCoupleInvite(pendingInviteCode);
-      setPendingInvitePreview(preview);
-    });
+    previewCoupleInvite(pendingInviteCode)
+      .then(setPendingInvitePreview)
+      .catch((err) => setMessage(getUserFacingErrorMessage(err, 'Convite não encontrado ou expirado.')));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingInviteCode]);
 
@@ -133,6 +120,14 @@ export function SharedSpacePage() {
     if (!workspaceId || !user || !guardarTarget) return;
     const amountCents = parseMoneyToCents(guardarAmount);
     if (amountCents <= 0) return;
+    if (guardarFromAccount) {
+      const balances = calculateAccountBalances(personalFinance.accounts, personalFinance.transactions);
+      const acct = balances.find((a) => a.id === guardarFromAccount);
+      if (acct && amountCents > acct.balanceCents) {
+        setMessage(`Saldo insuficiente. Disponível na conta: ${formatMoney(acct.balanceCents)}`);
+        return;
+      }
+    }
     setMessage(null);
     addGoalContribution(workspaceId, user.uid, guardarTarget.goal.id, amountCents)
       .catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível guardar agora.')));
@@ -156,72 +151,94 @@ export function SharedSpacePage() {
     if (!workspaceId) return;
     const ok = await confirm({ title: 'Excluir este cofrinho?', message: 'O histórico de quanto vocês já juntaram será removido.', confirmLabel: 'Excluir', danger: true });
     if (!ok) return;
-    await deleteGoal(workspaceId, goalId);
-  }
-
-  async function guardAction(action: () => Promise<unknown>) {
-    setMessage(null);
-    try {
-      await action();
-    } catch (error) {
-      setMessage(getUserFacingErrorMessage(error, 'Nao foi possivel atualizar o espaco do casal agora.'));
-    }
+    deleteGoal(workspaceId, goalId)
+      .catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível excluir o cofrinho agora.')));
   }
 
   function handleCreateWorkspace() {
-    if (!user) return;
-    void guardAction(() => createCoupleWorkspace(user.uid, profile?.name ?? user.displayName ?? 'Zerou'));
+    setSelectedMode('savings_only');
+    setModeSheetPurpose('create');
+    setModeSheetOpen(true);
+  }
+
+  function handleConfirmModeSheet() {
+    setModeSheetOpen(false);
+    setMessage(null);
+    if (modeSheetPurpose === 'create') {
+      if (!user) return;
+      createCoupleWorkspace(user.uid, profile?.name ?? user.displayName ?? 'Zerou', selectedMode)
+        .catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível criar o espaço agora.')));
+    } else {
+      if (!workspaceId || !user) return;
+      updateCoupleMode(workspaceId, user.uid, selectedMode)
+        .catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível mudar o modo agora.')));
+    }
+  }
+
+  function handleOpenModeChange() {
+    setSelectedMode(shared.workspace?.coupleMode ?? 'savings_only');
+    setModeSheetPurpose('change');
+    setModeSheetOpen(true);
+  }
+
+  function handleUpgradeMode(mode: CoupleMode) {
+    if (!workspaceId || !user) return;
+    setMessage(null);
+    updateCoupleMode(workspaceId, user.uid, mode)
+      .catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível mudar o modo agora.')));
   }
 
   function handleCreateInvite() {
     if (!workspaceId || !user || !shared.workspace) return;
-    void guardAction(async () => {
-      const invite = await createCoupleInvite(workspaceId, user.uid, shared.workspace!.name);
-      setGeneratedInvite(invite);
-    });
+    setMessage(null);
+    createCoupleInvite(workspaceId, user.uid, shared.workspace.name)
+      .then(setGeneratedInvite)
+      .catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível gerar o convite agora.')));
   }
 
   function handleRegenerateInvite() {
     if (!workspaceId || !user || !shared.workspace) return;
-    void guardAction(async () => {
-      const invite = await regenerateCoupleInvite(workspaceId, user.uid, shared.workspace!.name);
-      setGeneratedInvite(invite);
-    });
+    setMessage(null);
+    regenerateCoupleInvite(workspaceId, user.uid, shared.workspace.name)
+      .then(setGeneratedInvite)
+      .catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível regenerar o convite agora.')));
   }
 
   function handlePreviewInvite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     savePendingInvite(pendingInviteCode);
-    void guardAction(async () => {
-      const preview = await previewCoupleInvite(pendingInviteCode);
-      setPendingInvitePreview(preview);
-    });
+    setMessage(null);
+    previewCoupleInvite(pendingInviteCode)
+      .then(setPendingInvitePreview)
+      .catch((err) => setMessage(getUserFacingErrorMessage(err, 'Convite não encontrado ou expirado.')));
   }
 
-  function handleAcceptInvite() {
+  async function handleAcceptInvite() {
     if (!user) return;
-    void guardAction(async () => {
-      const ok = await confirm({
-        title: 'Entrar neste espaço compartilhado?',
-        message: pendingInvitePreview ? `Você vai compartilhar resumos de despesa com ${pendingInvitePreview.workspaceName}.` : undefined,
-        confirmLabel: 'Entrar'
-      });
-      if (!ok) return;
-      await acceptCoupleInvite(pendingInviteCode, user.uid, true);
-      clearPendingInvite();
-      setPendingInviteCode('');
-      setPendingInvitePreview(null);
+    setMessage(null);
+    const ok = await confirm({
+      title: 'Entrar neste espaço compartilhado?',
+      message: pendingInvitePreview ? `Você vai compartilhar resumos de despesa com ${pendingInvitePreview.workspaceName}.` : undefined,
+      confirmLabel: 'Entrar'
     });
+    if (!ok) return;
+    clearPendingInvite();
+    setPendingInviteCode('');
+    setPendingInvitePreview(null);
+    acceptCoupleInvite(pendingInviteCode, user.uid, profile?.name ?? user.displayName ?? '', true)
+      .catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível aceitar o convite agora.')));
   }
 
   function handleRevokeInvite(inviteId: string) {
     if (!workspaceId || !user) return;
-    void guardAction(() => revokeCoupleInvite(workspaceId, inviteId, user.uid));
+    setMessage(null);
+    revokeCoupleInvite(workspaceId, inviteId, user.uid)
+      .catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível revogar o convite agora.')));
   }
 
   function handleCleanupInvites() {
     if (!workspaceId || !user) return;
-    void guardAction(() => cleanupExpiredInvites(workspaceId, user.uid));
+    cleanupExpiredInvites(workspaceId, user.uid).catch(() => undefined);
   }
 
   async function copyInvite() {
@@ -260,57 +277,21 @@ export function SharedSpacePage() {
       setMessage('A despesa compartilhada precisa de duas pessoas ativas no espaço.');
       return;
     }
-    void guardAction(async () => {
-      const totalCents = parseMoneyToCents(claimAmount);
-      await createSharedExpenseClaim(workspaceId, user.uid, {
-        description: claimDescription,
-        totalAmountCents: totalCents,
-        participantUserIds: shared.activeMembers.map((member) => member.userId),
-        split: splitMode === 'equal' ? undefined : computeSplit(totalCents)
-      });
-      setClaimDescription('');
-      setClaimAmount('');
-      setSplitMode('equal');
-      setMyPercent('50');
-      setMyValue('');
-    });
-  }
-
-  function handleClaimStatus(claimId: string, status: 'accepted' | 'disputed' | 'settled') {
-    if (!workspaceId || !user) return;
-    void guardAction(() => updateSharedExpenseClaimStatus(workspaceId, user.uid, { claimId, status }));
-  }
-
-  function handleCreateSettlement() {
-    if (!workspaceId || !user || !shared.settlementSuggestion) return;
-    void guardAction(() => createSettlementProposal(workspaceId, user.uid, shared.settlementSuggestion!));
-  }
-
-  function handleSettlementPayment(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!workspaceId || !user) return;
-    void guardAction(async () => {
-      await recordSettlementPayment(workspaceId, user.uid, {
-        settlementId: settlementPaymentId,
-        amountCents: parseMoneyToCents(settlementPaymentAmount)
-      });
-      setSettlementPaymentId('');
-      setSettlementPaymentAmount('');
-    });
-  }
-
-  function handleAcceptSettlement(settlementId: string) {
-    if (!workspaceId || !user) return;
-    void guardAction(() => acceptSettlement(workspaceId, user.uid, settlementId));
-  }
-
-  function handleComment(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!workspaceId || !user || !commentTargetId) return;
-    void guardAction(async () => {
-      await addSharedComment(workspaceId, user.uid, { targetType: 'claim', targetId: commentTargetId, body: commentBody });
-      setCommentBody('');
-    });
+    const totalCents = parseMoneyToCents(claimAmount);
+    const description = claimDescription;
+    const split = splitMode === 'equal' ? undefined : computeSplit(totalCents);
+    setMessage(null);
+    setClaimDescription('');
+    setClaimAmount('');
+    setSplitMode('equal');
+    setMyPercent('50');
+    setMyValue('');
+    createSharedExpenseClaim(workspaceId, user.uid, {
+      description,
+      totalAmountCents: totalCents,
+      participantUserIds: shared.activeMembers.map((member) => member.userId),
+      split,
+    }).catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível registrar a despesa agora.')));
   }
 
   function handleLeaveOrRemove() {
@@ -318,7 +299,8 @@ export function SharedSpacePage() {
     const isOwner = shared.workspace.ownerUserId === user.uid;
     const isOwnerRemovingPartner = isOwner && Boolean(partnerMember);
     const isOwnerAlone = isOwner && !partnerMember;
-    void guardAction(async () => {
+    void (async () => {
+      setMessage(null);
       const ok = await confirm({
         title: isOwnerRemovingPartner ? 'Remover parceiro?' : isOwnerAlone ? 'Cancelar espaço compartilhado?' : 'Sair do espaço compartilhado?',
         message: isOwnerAlone
@@ -328,25 +310,27 @@ export function SharedSpacePage() {
         danger: true
       });
       if (!ok) return;
-      if (isOwnerRemovingPartner) {
-        await removePartner(workspaceId, user.uid, partnerMember!.userId, true);
-      } else if (isOwnerAlone) {
-        await cancelCoupleWorkspace(workspaceId, user.uid, true);
-      } else {
-        await leaveCoupleWorkspace(workspaceId, user.uid, true);
-      }
-    });
+      const fn = isOwnerRemovingPartner
+        ? () => removePartner(workspaceId, user.uid, partnerMember!.userId, true)
+        : isOwnerAlone
+        ? () => cancelCoupleWorkspace(workspaceId, user.uid, true)
+        : () => leaveCoupleWorkspace(workspaceId, user.uid, true);
+      fn().catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível sair do espaço agora.')));
+    })();
   }
 
-  const claimOptions = useMemo(() => shared.claims.map((claim) => ({ id: claim.id, label: claim.description })), [shared.claims]);
-
-  useEffect(() => {
-    if (!commentTargetId && claimOptions[0]) setCommentTargetId(claimOptions[0].id);
-  }, [claimOptions, commentTargetId]);
-
   const partnered = shared.activeMembers.length >= 2;
-  const myBalance = shared.balances.find((balance) => balance.userId === user?.uid)?.balanceCents ?? 0;
-  const suggestion = shared.settlementSuggestion;
+  const coupleMode = shared.workspace?.coupleMode ?? null;
+
+  const proportionalBalance = useMemo(() => {
+    if (coupleMode !== 'balanced' || !partnered) return null;
+    const myPaid = shared.claims.filter((c) => c.payerUserId === user?.uid).reduce((sum, c) => sum + c.totalAmountCents, 0);
+    const partnerPaid = shared.claims.filter((c) => c.payerUserId !== user?.uid).reduce((sum, c) => sum + c.totalAmountCents, 0);
+    const total = myPaid + partnerPaid;
+    if (total === 0) return { myPct: 50, partnerPct: 50, myPaid: 0, partnerPaid: 0, total: 0 };
+    const myPct = Math.round((myPaid / total) * 100);
+    return { myPct, partnerPct: 100 - myPct, myPaid, partnerPaid, total };
+  }, [coupleMode, partnered, shared.claims, user?.uid]);
 
   // Live preview of the split for the add-expense form.
   const splitPreview = (() => {
@@ -476,9 +460,10 @@ export function SharedSpacePage() {
           </button>
         </div>
       ) : (
-        /* 3) Partnered — cofrinho, balances, expenses, settlement */
+        /* 3) Partnered — renderização baseada no coupleMode */
         <div className="form-stack">
-          {/* Cofrinho do casal — juntar dinheiro juntos */}
+
+          {/* Cofrinho — sempre presente */}
           <section className="cofrinho-section">
             <div className="section-heading">
               <div>
@@ -487,7 +472,6 @@ export function SharedSpacePage() {
               </div>
               <PiggyBank size={22} aria-hidden="true" />
             </div>
-
             {savings.stats.length === 0 ? (
               <article className="surface surface-pad">
                 <EmptyState
@@ -504,42 +488,32 @@ export function SharedSpacePage() {
               </article>
             ) : (
               <div className="form-stack">
-                {savings.stats.map((stat) => {
-                  const mine = stat.byUser[user?.uid ?? ''] ?? 0;
-                  const partnerCents = Object.entries(stat.byUser)
-                    .filter(([uid]) => uid !== user?.uid)
-                    .reduce((total, [, value]) => total + value, 0);
-                  return (
-                    <article className="surface cofrinho-card" key={stat.goal.id}>
-                      <div className="cofrinho-top">
-                        <span className="cofrinho-mark" style={{ background: stat.goal.color ?? categoryColors[0] }}><PiggyBank size={20} /></span>
-                        <div className="cofrinho-title">
-                          <strong>{stat.goal.name}</strong>
-                          <span>Juntos este mês: {formatMoney(stat.thisMonthCents)}</span>
-                        </div>
-                        <button className="icon-button" type="button" aria-label="Excluir cofrinho" onClick={() => void handleDeleteCofrinho(stat.goal.id)}>
-                          <Trash2 size={16} aria-hidden="true" />
-                        </button>
+                {savings.stats.map((stat) => (
+                  <article className="surface cofrinho-card" key={stat.goal.id}>
+                    <div className="cofrinho-top">
+                      <span className="cofrinho-mark" style={{ background: stat.goal.color ?? categoryColors[0] }}><PiggyBank size={20} /></span>
+                      <div className="cofrinho-title">
+                        <strong>{stat.goal.name}</strong>
+                        {stat.thisMonthCents > 0 && <span>Juntos este mês: {formatMoney(stat.thisMonthCents)}</span>}
                       </div>
-                      <div className="cofrinho-amount">
-                        <strong className="display-number">{formatMoney(stat.totalCents)}</strong>
-                        {stat.goal.targetCents > 0 ? <span> de {formatMoney(stat.goal.targetCents)} · {stat.percent}%</span> : null}
-                      </div>
-                      {stat.goal.targetCents > 0 ? (
-                        <div className="goal-progress-track" aria-hidden="true">
-                          <span className="goal-progress-fill" style={{ width: `${Math.max(3, stat.percent)}%`, background: stat.goal.color }} />
-                        </div>
-                      ) : null}
-                      <div className="cofrinho-people">
-                        <div><span>Você juntou</span><strong>{formatMoney(mine)}</strong></div>
-                        <div><span>{memberLabel(partnerMember, user?.uid)} juntou</span><strong>{formatMoney(partnerCents)}</strong></div>
-                      </div>
-                      <button className="button button--primary button--block" type="button" onClick={() => { setGuardarTarget(stat); setGuardarAmount(''); setGuardarFromAccount(''); }}>
-                        <PiggyBank size={17} aria-hidden="true" /> Guardar no cofrinho
+                      <button className="icon-button" type="button" aria-label="Excluir cofrinho" onClick={() => void handleDeleteCofrinho(stat.goal.id)}>
+                        <Trash2 size={16} aria-hidden="true" />
                       </button>
-                    </article>
-                  );
-                })}
+                    </div>
+                    <div className="cofrinho-amount">
+                      <strong className="display-number">{formatMoney(stat.totalCents)}</strong>
+                      {stat.goal.targetCents > 0 ? <span> de {formatMoney(stat.goal.targetCents)} · {stat.percent}%</span> : null}
+                    </div>
+                    {stat.goal.targetCents > 0 ? (
+                      <div className="goal-progress-track" aria-hidden="true">
+                        <span className="goal-progress-fill" style={{ width: `${Math.max(3, stat.percent)}%`, background: stat.goal.color }} />
+                      </div>
+                    ) : null}
+                    <button className="button button--primary button--block" type="button" onClick={() => { setGuardarTarget(stat); setGuardarAmount(''); setGuardarFromAccount(''); }}>
+                      <PiggyBank size={17} aria-hidden="true" /> Guardar no cofrinho
+                    </button>
+                  </article>
+                ))}
                 <button className="button button--ghost" type="button" onClick={() => setCofrinhoOpen(true)}>
                   <Plus size={16} aria-hidden="true" /> Novo cofrinho
                 </button>
@@ -547,156 +521,189 @@ export function SharedSpacePage() {
             )}
           </section>
 
-          <article className={`surface balance-hero${myBalance > 0 ? ' balance-hero--credit' : myBalance < 0 ? ' balance-hero--debit' : ''}`}>
-            {myBalance === 0 ? (
-              <>
-                <p className="balance-hero-label">Tudo certo entre vocês</p>
-                <strong className="balance-hero-amount display-number">{formatMoney(0)}</strong>
-                <span className="balance-hero-sub">Sem pendências no momento.</span>
-              </>
-            ) : myBalance > 0 ? (
-              <>
-                <p className="balance-hero-label">Você tem a receber</p>
-                <strong className="balance-hero-amount display-number">{formatMoney(myBalance)}</strong>
-                <span className="balance-hero-sub">{memberLabel(partnerMember, user?.uid)} deve esse valor a você.</span>
-              </>
-            ) : (
-              <>
-                <p className="balance-hero-label">Você deve</p>
-                <strong className="balance-hero-amount display-number">{formatMoney(Math.abs(myBalance))}</strong>
-                <span className="balance-hero-sub">para {memberLabel(partnerMember, user?.uid)}.</span>
-              </>
-            )}
-            <button className="button button--block balance-hero-cta" type="button" onClick={() => setSettleOpen(true)}>
-              <Handshake size={18} aria-hidden="true" /> Acertar contas
-            </button>
-          </article>
-
-          {/* Add shared expense with flexible split */}
-          <form className="surface surface-pad form-stack" onSubmit={handleCreateClaim}>
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">Nova despesa</p>
-                <h2>Dividir um gasto</h2>
-              </div>
-              <Plus size={20} aria-hidden="true" />
-            </div>
-            <label className="field">
-              <span>Descrição</span>
-              <input className="input" value={claimDescription} onChange={(event) => setClaimDescription(event.target.value)} placeholder="Mercado do mês" />
-            </label>
-            <label className="field">
-              <span>Valor total</span>
-              <input className="input" inputMode="decimal" value={claimAmount} onChange={(event) => setClaimAmount(event.target.value)} placeholder="0,00" />
-            </label>
-
-            <div className="field">
-              <span className="field-label">Como dividir?</span>
-              <div className="segmented">
-                {(['equal', 'percent', 'value'] as const).map((mode) => (
-                  <button key={mode} type="button" aria-pressed={splitMode === mode} onClick={() => setSplitMode(mode)}>
-                    {mode === 'equal' ? 'Igual' : mode === 'percent' ? 'Porcentagem' : 'Valor'}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {splitMode === 'percent' && (
-              <label className="field">
-                <span>Sua parte (%)</span>
-                <input className="input" inputMode="numeric" value={myPercent} onChange={(event) => setMyPercent(event.target.value)} placeholder="50" />
-              </label>
-            )}
-            {splitMode === 'value' && (
-              <label className="field">
-                <span>Sua parte (R$)</span>
-                <input className="input" inputMode="decimal" value={myValue} onChange={(event) => setMyValue(event.target.value)} placeholder="0,00" />
-              </label>
-            )}
-
-            {splitPreview && (
-              <div className="split-preview">
-                <span><strong>Você</strong> {formatMoney(splitPreview.mine)}</span>
-                <span><strong>{memberLabel(partnerMember, user?.uid)}</strong> {formatMoney(splitPreview.partner)}</span>
-              </div>
-            )}
-
-            <button className="button button--primary button--block" type="submit">Adicionar despesa</button>
-            <p className="text-muted" style={{ margin: 0, fontSize: '0.8rem' }}>Nenhuma conta, cartão ou fatura pessoal entra neste registro.</p>
-          </form>
-
-          {/* Claims list */}
-          <article className="surface surface-pad">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">Despesas</p>
-                <h2>Resumo compartilhado</h2>
-              </div>
-              <Users size={20} aria-hidden="true" />
-            </div>
-            {shared.claims.length > 0 ? (
-              <div className="item-list">
-                {shared.claims.map((claim) => (
-                  <div className="list-row" key={claim.id}>
-                    <div>
-                      <strong>{claim.description}</strong>
-                      <span className="text-secondary">
-                        {formatMoney(claim.totalAmountCents)} · {claimStatusLabels[claim.status]} · pago por {memberLabel(shared.activeMembers.find((member) => member.userId === claim.payerUserId), user?.uid)}
-                      </span>
-                    </div>
-                    <div className="list-row-end">
-                      {claim.status === 'pending' ? (
-                        <>
-                          <button className="button button--subtle button--compact" type="button" onClick={() => handleClaimStatus(claim.id, 'accepted')}>Aceitar</button>
-                          <button className="button button--ghost button--compact" type="button" onClick={() => handleClaimStatus(claim.id, 'disputed')}>Contestar</button>
-                        </>
-                      ) : null}
-                      {claim.status === 'accepted' ? (
-                        <button className="button button--ghost button--compact" type="button" onClick={() => handleClaimStatus(claim.id, 'settled')}>Marcar acertado</button>
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <EmptyState illustration="wallet" compact title="Nenhuma despesa dividida" description="Adicione um gasto acima para começar a dividir." />
-            )}
-          </article>
-
-          {/* Comments */}
-          <details className="advanced-panel">
-            <summary><MessageSquare size={15} aria-hidden="true" /> Comentários</summary>
-            <form className="form-stack" onSubmit={handleComment}>
-              {shared.comments.length > 0 ? (
-                <div className="item-list">
-                  {shared.comments.slice(0, 5).map((comment) => (
-                    <div className="list-row" key={comment.id}>
-                      <div>
-                        <strong>{memberLabel(shared.activeMembers.find((member) => member.userId === comment.createdBy), user?.uid)}</strong>
-                        <span className="text-secondary">{comment.body}</span>
-                      </div>
-                    </div>
-                  ))}
+          {/* Modo não configurado → seleção inline */}
+          {!coupleMode && (
+            <article className="surface surface-pad form-stack">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">Modo do espaço</p>
+                  <h2>Como vocês querem usar?</h2>
                 </div>
-              ) : null}
-              {claimOptions.length > 0 ? (
+                <Settings2 size={20} aria-hidden="true" />
+              </div>
+              <p className="text-secondary" style={{ margin: 0 }}>Escolham o modo que combina com vocês. Dá pra mudar quando quiser.</p>
+              {([
+                { id: 'savings_only' as CoupleMode, icon: <PiggyBank size={18} />, label: 'Só o cofrinho', desc: 'Juntamos dinheiro pra objetivos em comum. Simples assim.', more: 'Despesas podem ser ativadas depois' },
+                { id: 'transparent' as CoupleMode, icon: <Eye size={18} />, label: 'Transparência', desc: 'Cada um vê o que o outro pagou nas despesas divididas. Sem cálculo de dívida.', more: 'Equilíbrio pode ser ativado depois' },
+                { id: 'balanced' as CoupleMode, icon: <Scale size={18} />, label: 'Equilíbrio', desc: 'Vemos quem está cobrindo mais no mês, em proporção. Sem acerto formal.' }
+              ] as const).map((opt) => (
+                <button key={opt.id} type="button" className={`couple-mode-card${selectedMode === opt.id ? ' couple-mode-card--selected' : ''}`} onClick={() => setSelectedMode(opt.id)}>
+                  <span className={`couple-mode-icon couple-mode-icon--${opt.id.replace('_', '-')}`}>{opt.icon}</span>
+                  <span className="couple-mode-text">
+                    <strong>{opt.label}</strong>
+                    <span>{opt.desc}</span>
+                    {'more' in opt && opt.more && <span className="couple-mode-more">{opt.more}</span>}
+                  </span>
+                </button>
+              ))}
+              <button className="button button--primary button--block" type="button" onClick={() => handleUpgradeMode(selectedMode)}>
+                Usar este modo
+              </button>
+            </article>
+          )}
+
+          {/* Equilíbrio — barra proporcional */}
+          {coupleMode === 'balanced' && (
+            <article className="surface surface-pad form-stack">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">Equilíbrio do mês</p>
+                  <h2>Quem está cobrindo mais</h2>
+                </div>
+                <Scale size={20} aria-hidden="true" />
+              </div>
+              {proportionalBalance && proportionalBalance.total > 0 ? (
                 <>
-                  <textarea className="input textarea" value={commentBody} onChange={(event) => setCommentBody(event.target.value)} placeholder="Escreva um comentário sobre a despesa selecionada." />
-                  <button className="button button--secondary" type="submit" disabled={!commentTargetId || !commentBody.trim()}>Comentar</button>
+                  <div className="couple-balance-bar">
+                    <div className="couple-balance-bar-you" style={{ flex: proportionalBalance.myPct }} />
+                    <div className="couple-balance-bar-partner" style={{ flex: proportionalBalance.partnerPct }} />
+                  </div>
+                  <div className="split-preview">
+                    <span><strong>Você</strong>{formatMoney(proportionalBalance.myPaid)} · {proportionalBalance.myPct}%</span>
+                    <span><strong>{memberLabel(partnerMember, user?.uid)}</strong>{formatMoney(proportionalBalance.partnerPaid)} · {proportionalBalance.partnerPct}%</span>
+                  </div>
+                  {proportionalBalance.myPct > 65 && (
+                    <p className="text-muted" style={{ margin: 0, fontSize: '0.82rem' }}>Quando {memberLabel(partnerMember, user?.uid)} pagar a próxima, vai equilibrar.</p>
+                  )}
+                  {proportionalBalance.partnerPct > 65 && (
+                    <p className="text-muted" style={{ margin: 0, fontSize: '0.82rem' }}>Você pode pagar a próxima pra equilibrar.</p>
+                  )}
                 </>
               ) : (
-                <p className="text-secondary">Adicione uma despesa para comentar sobre ela.</p>
+                <p className="text-secondary">Nenhuma despesa registrada ainda.</p>
               )}
-            </form>
-          </details>
+            </article>
+          )}
 
-          {/* Manage */}
+          {/* Despesas divididas — transparent e balanced */}
+          {(coupleMode === 'transparent' || coupleMode === 'balanced') && (
+            <>
+              <form className="surface surface-pad form-stack" onSubmit={handleCreateClaim}>
+                <div className="section-heading">
+                  <div>
+                    <p className="eyebrow">Nova despesa</p>
+                    <h2>Dividir um gasto</h2>
+                  </div>
+                  <Plus size={20} aria-hidden="true" />
+                </div>
+                <label className="field">
+                  <span>Descrição</span>
+                  <input className="input" value={claimDescription} onChange={(event) => setClaimDescription(event.target.value)} placeholder="Mercado do mês" />
+                </label>
+                <label className="field">
+                  <span>Valor total</span>
+                  <input className="input" inputMode="decimal" value={claimAmount} onChange={(event) => setClaimAmount(event.target.value)} placeholder="0,00" />
+                </label>
+                <div className="field">
+                  <span className="field-label">Como dividir?</span>
+                  <div className="segmented">
+                    {(['equal', 'percent', 'value'] as const).map((mode) => (
+                      <button key={mode} type="button" aria-pressed={splitMode === mode} onClick={() => setSplitMode(mode)}>
+                        {mode === 'equal' ? 'Igual' : mode === 'percent' ? 'Porcentagem' : 'Valor'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {splitMode === 'percent' && (
+                  <label className="field">
+                    <span>Sua parte (%)</span>
+                    <input className="input" inputMode="numeric" value={myPercent} onChange={(event) => setMyPercent(event.target.value)} placeholder="50" />
+                  </label>
+                )}
+                {splitMode === 'value' && (
+                  <label className="field">
+                    <span>Sua parte (R$)</span>
+                    <input className="input" inputMode="decimal" value={myValue} onChange={(event) => setMyValue(event.target.value)} placeholder="0,00" />
+                  </label>
+                )}
+                {splitPreview && (
+                  <div className="split-preview">
+                    <span><strong>Você</strong> {formatMoney(splitPreview.mine)}</span>
+                    <span><strong>{memberLabel(partnerMember, user?.uid)}</strong> {formatMoney(splitPreview.partner)}</span>
+                  </div>
+                )}
+                <button className="button button--primary button--block" type="submit">Adicionar despesa</button>
+                <p className="text-muted" style={{ margin: 0, fontSize: '0.8rem' }}>Nenhuma conta, cartão ou fatura pessoal entra neste registro.</p>
+              </form>
+
+              <article className="surface surface-pad">
+                <div className="section-heading">
+                  <div>
+                    <p className="eyebrow">Despesas</p>
+                    <h2>Registradas juntos</h2>
+                  </div>
+                  <Users size={20} aria-hidden="true" />
+                </div>
+                {shared.claims.length > 0 ? (
+                  <div className="item-list">
+                    {shared.claims.map((claim) => (
+                      <div className="list-row" key={claim.id}>
+                        <div>
+                          <strong>{claim.description}</strong>
+                          <span className="text-secondary">
+                            {formatMoney(claim.totalAmountCents)} · pago por {memberLabel(shared.activeMembers.find((m) => m.userId === claim.payerUserId), user?.uid)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState illustration="wallet" compact title="Nenhuma despesa ainda" description="Adicione um gasto acima pra começar a registrar." />
+                )}
+              </article>
+
+              {coupleMode === 'transparent' && (
+                <button type="button" className="couple-upgrade-card" onClick={() => handleUpgradeMode('balanced')}>
+                  <span className="couple-mode-icon couple-mode-icon--balanced"><Scale size={18} aria-hidden="true" /></span>
+                  <span className="couple-upgrade-text">
+                    <strong>Ativar equilíbrio</strong>
+                    <span>Veja a proporção de quem está cobrindo mais no mês.</span>
+                  </span>
+                  <ChevronRight size={16} aria-hidden="true" style={{ marginLeft: 'auto', flexShrink: 0, color: 'var(--text-muted)' }} />
+                </button>
+              )}
+            </>
+          )}
+
+          {/* savings_only: upgrade card */}
+          {coupleMode === 'savings_only' && (
+            <button type="button" className="couple-upgrade-card" onClick={() => handleUpgradeMode('transparent')}>
+              <span className="couple-mode-icon couple-mode-icon--transparent"><Eye size={18} aria-hidden="true" /></span>
+              <span className="couple-upgrade-text">
+                <strong>Ativar transparência</strong>
+                <span>Veja o que cada um paga nas despesas divididas.</span>
+              </span>
+              <ChevronRight size={16} aria-hidden="true" style={{ marginLeft: 'auto', flexShrink: 0, color: 'var(--text-muted)' }} />
+            </button>
+          )}
+
+          {/* Gerenciar */}
           <details className="advanced-panel shared-admin-panel">
             <summary>Gerenciar espaço</summary>
             <div className="form-stack">
               <span className="text-secondary">
                 Dono: {memberLabel(ownerMember, user?.uid)} · Parceiro: {partnerMember ? memberLabel(partnerMember, user?.uid) : 'aguardando'}
               </span>
+              {coupleMode && (
+                <div className="form-stack">
+                  <p className="text-secondary" style={{ margin: 0, fontSize: '0.82rem' }}>
+                    Modo atual: <strong>{modeLabels[coupleMode]}</strong>
+                  </p>
+                  <button className="button button--ghost button--block" type="button" onClick={handleOpenModeChange}>
+                    Mudar modo do espaço
+                  </button>
+                </div>
+              )}
               <button className="button button--ghost button--danger-text" type="button" onClick={handleLeaveOrRemove}>
                 {shared.workspace?.ownerUserId === user?.uid && partnerMember ? 'Remover parceiro' : 'Sair do espaço'}
               </button>
@@ -704,49 +711,6 @@ export function SharedSpacePage() {
           </details>
         </div>
       )}
-
-      {/* Settlement sheet */}
-      <BottomSheet open={settleOpen} onClose={() => setSettleOpen(false)} title="Acertar contas" subtitle="Combine e registre o reembolso">
-        {suggestion ? (
-          <div className="notice notice--success">
-            Sugestão: {memberLabel(shared.activeMembers.find((member) => member.userId === suggestion.fromUserId), user?.uid)} paga {formatMoney(suggestion.amountCents)} para {memberLabel(shared.activeMembers.find((member) => member.userId === suggestion.toUserId), user?.uid)}.
-          </div>
-        ) : (
-          <p className="text-secondary">Sem saldo pendente para sugerir acerto.</p>
-        )}
-        <button className="button button--primary button--block" type="button" disabled={!suggestion} onClick={handleCreateSettlement} style={{ marginTop: '0.75rem' }}>
-          Criar proposta de acerto
-        </button>
-
-        {shared.settlements.length > 0 ? (
-          <div className="item-list" style={{ marginTop: '1rem' }}>
-            {shared.settlements.map((settlement) => (
-              <div className="list-row" key={settlement.id}>
-                <div>
-                  <strong>{formatMoney(settlement.amountCents)}</strong>
-                  <span className="text-secondary">{settlementStatusLabels[settlement.status]} · pago {formatMoney(settlement.paidAmountCents)}</span>
-                </div>
-                <div className="list-row-end">
-                  {settlement.status === 'proposed' ? (
-                    <button className="button button--subtle button--compact" type="button" onClick={() => handleAcceptSettlement(settlement.id)}>Aceitar</button>
-                  ) : null}
-                  <button className="button button--ghost button--compact" type="button" onClick={() => setSettlementPaymentId(settlement.id)}>Pagar</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : null}
-
-        {settlementPaymentId ? (
-          <form className="form-stack" onSubmit={handleSettlementPayment} style={{ marginTop: '1rem' }}>
-            <label className="field">
-              <span>Valor pago</span>
-              <input className="input" inputMode="decimal" value={settlementPaymentAmount} onChange={(event) => setSettlementPaymentAmount(event.target.value)} placeholder="0,00" autoFocus />
-            </label>
-            <button className="button button--secondary button--block" type="submit">Registrar pagamento</button>
-          </form>
-        ) : null}
-      </BottomSheet>
 
       {/* Create cofrinho sheet */}
       <BottomSheet open={cofrinhoOpen} onClose={() => setCofrinhoOpen(false)} title="Novo cofrinho do casal" subtitle="Um objetivo em comum">
@@ -801,6 +765,41 @@ export function SharedSpacePage() {
             <button className="button button--primary" type="submit" disabled={!guardarAmount}>Guardar</button>
           </div>
         </form>
+      </BottomSheet>
+
+      {/* Mode selection sheet — create or change */}
+      <BottomSheet
+        open={modeSheetOpen}
+        onClose={() => setModeSheetOpen(false)}
+        title={modeSheetPurpose === 'create' ? 'Como vocês querem usar?' : 'Modo do espaço'}
+        subtitle="Podem mudar a qualquer momento."
+      >
+        <div className="form-stack">
+          {([
+            { id: 'savings_only' as CoupleMode, icon: <PiggyBank size={18} />, label: 'Só o cofrinho', desc: 'Juntamos dinheiro pra objetivos em comum. Simples assim.', more: 'Despesas podem ser ativadas depois' },
+            { id: 'transparent' as CoupleMode, icon: <Eye size={18} />, label: 'Transparência', desc: 'Cada um vê o que o outro pagou nas despesas divididas. Sem cálculo de dívida.', more: 'Equilíbrio pode ser ativado depois' },
+            { id: 'balanced' as CoupleMode, icon: <Scale size={18} />, label: 'Equilíbrio', desc: 'Vemos quem está cobrindo mais no mês, em proporção. Sem acerto formal.' }
+          ] as const).map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              className={`couple-mode-card${selectedMode === opt.id ? ' couple-mode-card--selected' : ''}`}
+              onClick={() => setSelectedMode(opt.id)}
+            >
+              <span className={`couple-mode-icon couple-mode-icon--${opt.id.replace('_', '-')}`}>{opt.icon}</span>
+              <span className="couple-mode-text">
+                <strong>{opt.label}</strong>
+                <span>{opt.desc}</span>
+                {'more' in opt && opt.more && <span className="couple-mode-more">{opt.more}</span>}
+              </span>
+            </button>
+          ))}
+          <div className="sheet-actions">
+            <button className="button button--primary" type="button" onClick={handleConfirmModeSheet}>
+              {modeSheetPurpose === 'create' ? 'Criar espaço' : 'Confirmar'}
+            </button>
+          </div>
+        </div>
       </BottomSheet>
 
       {dialog}

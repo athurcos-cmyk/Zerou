@@ -30,13 +30,46 @@ SaaS/PWA financeiro mobile-first. Duas frentes: **controle individual** das fina
 
 React 19, TypeScript strict, Vite, Firebase Web SDK (Auth + Firestore + Storage), Vercel, Vite PWA Plugin, React Router, React Hook Form, Zod, Zustand, Lucide React. Node >= 22. Testes: Vitest, Playwright, Firebase Rules Unit Testing.
 
+## ⚠️ REGRA PRINCIPAL: o app deve funcionar offline
+
+O Zerou é mobile-first e usuários perdem sinal o tempo todo. **O app precisa funcionar offline**. Toda escrita no Firestore deve usar o padrão fire-and-forget para que a UI responda imediatamente do cache local, sem depender do servidor.
+
+**Padrão correto (fire-and-forget):**
+```ts
+// Escrita: dispara e trata erro se aparecer
+minhaEscrita(dados).catch((err) => setMessage(getUserFacingErrorMessage(err, 'Mensagem amigável.')));
+// Feche o sheet, limpe o form — ANTES de chamar o write
+setOpen(false);
+```
+
+**Padrão ERRADO (bloqueia na rede):**
+```ts
+// ❌ NÃO FAÇA — trava com spinner se o transporte oscilar
+await minhaEscrita(dados);
+setOpen(false);
+```
+
+**Como funciona:** Firestore usa `persistentLocalCache` + `experimentalAutoDetectLongPolling` (`src/firebase/config.ts`). O write vai pro cache local imediatamente e o `onSnapshot` reflete a mudança. A sync com o servidor acontece em background. Se offline, a operação fica na fila e sincroniza quando voltar.
+
+**Exceção permitida:** operações que *leem* resultado do servidor (gerar convite, preview de invite, confirm dialog) podem usar `await`/`.then()` — mas o *write* subsequente ainda deve ser fire-and-forget.
+
+```ts
+// Correto para fluxo confirm → write:
+const ok = await confirm({ ... });    // await OK — é leitura de UI
+if (!ok) return;
+setEstadoOtimista(...);               // atualiza UI imediatamente
+minhaEscrita(dados).catch(...);      // write é fire-and-forget
+```
+
+---
+
 ## Regras de código
 
 - **Dinheiro sempre em centavos inteiros** (`amountCents`); exibir via `formatMoney()`.
 - **Firestore** (não Realtime Database). Não mudar sem redesenhar.
 - **IDs client-side** + `clientMutationId` para idempotência.
 - Onboarding e fluxos financeiros rodam **client-side com Security Rules** restritivas — sem Cloud Functions no fluxo principal, mesmo com o projeto Firebase no Blaze.
-- **Offline-first / escrita otimista**: Firestore usa `persistentLocalCache` + `experimentalAutoDetectLongPolling` (`src/firebase/config.ts`). **Nunca dê `await` na escrita pra liberar a UI** — dispare (fire-and-forget + `.catch` pra mensagem) e deixe o `onSnapshot` mostrar o item (badge pendente → sincronizado). Bloquear no ack do servidor causa spinner infinito quando o transporte oscila.
+- **Offline-first**: ver seção acima. Nunca use `guardAction` ou wrapper async que dê `await` em escrita pra liberar UI.
 - Coleções por workspace: `workspaces/{id}/{accounts|categories|transactions|bills|recurring|goals|goalContributions|cards|...}`.
 - UI mobile-first. Componentes-base de UX: `BottomSheet`, `SelectField`, `CategoryField`, `ConfirmDialog`, `EmptyState` (ver `docs/design/DESIGN.md`).
 - Cores: tokens em `src/styles/themes.css`. **Não** usar hex/rgba literal fora de `themes.css` e `src/theme/palette.ts` (teste `noHardcodedColors` falha). Zona de marketing `src/landing/` é exceção.

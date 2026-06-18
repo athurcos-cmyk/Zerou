@@ -81,6 +81,8 @@ export interface GoalContribution {
   createdAt?: Timestamp;
 }
 
+export type CoupleMode = 'savings_only' | 'transparent' | 'balanced';
+
 export interface Workspace {
   id: string;
   type: WorkspaceType;
@@ -88,6 +90,7 @@ export interface Workspace {
   ownerUserId: string;
   partnerUserId?: string;
   activeMemberCount?: number;
+  coupleMode?: CoupleMode;
   status: 'active' | 'archived' | 'pending_deletion';
   currency: Currency;
   locale: 'pt-BR';
@@ -102,6 +105,7 @@ export interface WorkspaceMembership {
   workspaceId: string;
   role: WorkspaceRole;
   status: MembershipStatus;
+  displayName?: string;
   joinedAt?: Timestamp;
   removedAt?: Timestamp;
   acceptedInviteId?: string;
