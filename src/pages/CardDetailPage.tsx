@@ -70,11 +70,11 @@ export function CardDetailPage() {
     );
   }
 
-  const usedCents = card
-    ? cardsData.invoices
-        .filter((invoice) => invoice.cardId === card.id && (invoice.status === 'open' || invoice.status === 'closed'))
-        .reduce((total, invoice) => total + invoice.outstandingBalanceCents, 0)
-    : 0;
+  const activeInvoices = card
+    ? cardsData.invoices.filter((invoice) => invoice.cardId === card.id && (invoice.status === 'open' || invoice.status === 'closed'))
+    : [];
+  const openInvoice = activeInvoices.find((inv) => inv.status === 'open') ?? activeInvoices[0] ?? null;
+  const usedCents = activeInvoices.reduce((total, invoice) => total + invoice.outstandingBalanceCents, 0);
   const availableCents = card ? Math.max(0, card.limitCents - usedCents) : 0;
   const usedPercent = card && card.limitCents > 0 ? Math.min(100, Math.round((usedCents / card.limitCents) * 100)) : 0;
   const barClass =
@@ -97,27 +97,51 @@ export function CardDetailPage() {
       </div>
 
       {card ? (
-        <div className="surface surface-pad card-limit-block">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.75rem' }}>
-            <div>
-              <p className="eyebrow" style={{ marginBottom: '0.25rem' }}>Limite disponível</p>
-              <span className="card-limit-available">{formatMoney(availableCents)}</span>
-              <span className="text-secondary" style={{ marginLeft: '0.5rem', fontSize: '0.86rem' }}>de {formatMoney(card.limitCents)}</span>
+        <>
+          <div className="surface surface-pad card-limit-block">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.75rem' }}>
+              <div>
+                <p className="eyebrow" style={{ marginBottom: '0.25rem' }}>Limite disponível</p>
+                <span className="card-limit-available">{formatMoney(availableCents)}</span>
+                <span className="text-secondary" style={{ marginLeft: '0.5rem', fontSize: '0.86rem' }}>de {formatMoney(card.limitCents)}</span>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <p className="eyebrow" style={{ marginBottom: '0.25rem' }}>Fatura em aberto</p>
+                <span className="card-limit-available amount--expense">{formatMoney(usedCents)}</span>
+              </div>
             </div>
-            <div style={{ textAlign: 'right' }}>
-              <p className="eyebrow" style={{ marginBottom: '0.25rem' }}>Fatura em aberto</p>
-              <span className="card-limit-available amount--expense">{formatMoney(usedCents)}</span>
+            <div className="card-limit-bar-track" aria-label={`${usedPercent}% do limite usado`}>
+              <div className={`card-limit-bar-fill ${barClass}`} style={{ width: `${Math.max(2, usedPercent)}%` }} />
             </div>
+            {usedPercent >= 70 && (
+              <p className="text-secondary" style={{ marginTop: '0.5rem', fontSize: '0.82rem' }}>
+                {usedPercent >= 90 ? 'Limite quase esgotado.' : 'Mais de 70% do limite em uso.'}
+              </p>
+            )}
           </div>
-          <div className="card-limit-bar-track" aria-label={`${usedPercent}% do limite usado`}>
-            <div className={`card-limit-bar-fill ${barClass}`} style={{ width: `${Math.max(2, usedPercent)}%` }} />
-          </div>
-          {usedPercent >= 70 && (
-            <p className="text-secondary" style={{ marginTop: '0.5rem', fontSize: '0.82rem' }}>
-              {usedPercent >= 90 ? 'Limite quase esgotado.' : 'Mais de 70% do limite em uso.'}
-            </p>
-          )}
-        </div>
+
+          {openInvoice ? (
+            <Link
+              className="surface surface-pad list-row list-row--link"
+              to={`/app/cards/${card.id}/invoices/${openInvoice.id}`}
+              style={{ borderRadius: '1rem' }}
+            >
+              <div>
+                <p className="eyebrow" style={{ marginBottom: '0.15rem' }}>Fatura atual</p>
+                <strong>{openInvoice.referenceMonth}</strong>
+                <span className="text-secondary">
+                  {openInvoice.status === 'open' ? 'Em aberto' : 'Fechada'} · vence {toDateInputValue(openInvoice.dueDate)}
+                </span>
+              </div>
+              <div className="list-row-end">
+                <strong className={openInvoice.outstandingBalanceCents > 0 ? 'amount--expense' : 'amount--income'} style={{ fontSize: '1.15rem', fontFamily: 'DM Sans, system-ui, sans-serif' }}>
+                  {formatMoney(openInvoice.outstandingBalanceCents)}
+                </strong>
+                <span className="button button--subtle button--compact" aria-hidden="true">Pagar</span>
+              </div>
+            </Link>
+          ) : null}
+        </>
       ) : null}
 
       <div className="finance-grid">

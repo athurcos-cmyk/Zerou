@@ -9,6 +9,7 @@ import { FormMessage } from '../components/FormMessage';
 import { cardBrandOptions, type CreateCreditCardInput } from '../cards/cardSchemas';
 import { createCreditCard } from '../cards/cardService';
 
+import { toDateInputValue } from '../finance/financeDates';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
@@ -129,9 +130,11 @@ export function CardsPage() {
           {cardsData.cards.length > 0 ? (
             <div className="item-list">
               {cardsData.cards.map((card) => {
-                const usedCents = cardsData.invoices
-                  .filter((invoice) => invoice.cardId === card.id && (invoice.status === 'open' || invoice.status === 'closed'))
-                  .reduce((total, invoice) => total + invoice.outstandingBalanceCents, 0);
+                const activeInvoices = cardsData.invoices.filter(
+                  (invoice) => invoice.cardId === card.id && (invoice.status === 'open' || invoice.status === 'closed')
+                );
+                const openInvoice = activeInvoices.find((inv) => inv.status === 'open') ?? activeInvoices[0] ?? null;
+                const usedCents = activeInvoices.reduce((total, invoice) => total + invoice.outstandingBalanceCents, 0);
                 const availableCents = Math.max(0, card.limitCents - usedCents);
                 const usedPercent = card.limitCents > 0 ? Math.min(100, Math.round((usedCents / card.limitCents) * 100)) : 0;
                 const barClass =
@@ -148,9 +151,7 @@ export function CardsPage() {
                             {card.brand} ···· {card.lastFour} · fecha dia {card.closingDay}
                           </span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <CreditCard size={20} aria-hidden="true" />
-                        </div>
+                        <CreditCard size={20} aria-hidden="true" />
                       </div>
                       <div className="card-limit-block" style={{ marginBottom: 0 }}>
                         <div className="card-limit-bar-track" aria-hidden="true">
@@ -162,6 +163,14 @@ export function CardsPage() {
                           </span>
                           <span className="text-secondary">de {formatMoney(card.limitCents)}</span>
                         </div>
+                        {openInvoice && openInvoice.outstandingBalanceCents > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: '0.3rem', fontSize: '0.82rem' }}>
+                            <span className="text-secondary">
+                              Fatura {openInvoice.referenceMonth} · vence {toDateInputValue(openInvoice.dueDate)}
+                            </span>
+                            <strong className="amount--expense">{formatMoney(openInvoice.outstandingBalanceCents)}</strong>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </Link>

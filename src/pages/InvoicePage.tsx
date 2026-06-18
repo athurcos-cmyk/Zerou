@@ -39,84 +39,86 @@ export function InvoicePage() {
   const [anticipationAmount, setAnticipationAmount] = useState('');
   const [message, setMessage] = useState<string | null>(null);
 
-  async function guardAction(action: () => Promise<unknown>) {
-    setMessage(null);
-
-    if (!workspaceId || !user || !cardId || !invoiceId) {
-      setMessage('Não foi possível localizar a fatura.');
-      return;
-    }
-
-    try {
-      await action();
-    } catch (error) {
-      setMessage(getUserFacingErrorMessage(error, 'Não foi possível concluir a ação agora.'));
-    }
-  }
-
   function handlePayment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    void guardAction(async () => {
-      await recordInvoicePayment(workspaceId!, user!.uid, {
-        cardId: cardId!,
-        invoiceId: invoiceId!,
-        accountId: paymentAccountId,
-        amountCents: parseMoneyToCents(paymentAmount),
-        paidAt: fromDateInputValue(paymentDate),
-        advance: invoice?.status === 'open'
-      });
-      setPaymentAmount('');
-      setPaymentAccountId('');
-      setPaymentDate(todayInputValue());
-    });
+    if (!workspaceId || !user || !cardId || !invoiceId || !paymentAccountId) return;
+    const amount = parseMoneyToCents(paymentAmount);
+    if (!amount) return;
+    setMessage(null);
+    const snap = { amount, accountId: paymentAccountId, date: paymentDate, isOpen: invoice?.status === 'open' };
+    setPaymentAmount('');
+    setPaymentAccountId('');
+    setPaymentDate(todayInputValue());
+    recordInvoicePayment(workspaceId, user.uid, {
+      cardId,
+      invoiceId,
+      accountId: snap.accountId,
+      amountCents: snap.amount,
+      paidAt: fromDateInputValue(snap.date),
+      advance: snap.isOpen
+    }).catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível registrar o pagamento.')));
   }
 
   function handleCredit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    void guardAction(async () => {
-      await recordInvoiceCredit(workspaceId!, user!.uid, {
-        cardId: cardId!,
-        invoiceId: invoiceId!,
-        type: creditType,
-        amountCents: parseMoneyToCents(creditAmount),
-        effectiveAt: new Date(),
-        description: ledgerTypeLabels[creditType]
-      });
-      setCreditAmount('');
-    });
+    if (!workspaceId || !user || !cardId || !invoiceId) return;
+    const amount = parseMoneyToCents(creditAmount);
+    if (!amount) return;
+    setMessage(null);
+    setCreditAmount('');
+    recordInvoiceCredit(workspaceId, user.uid, {
+      cardId,
+      invoiceId,
+      type: creditType,
+      amountCents: amount,
+      effectiveAt: new Date(),
+      description: ledgerTypeLabels[creditType]
+    }).catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível registrar o crédito.')));
   }
 
   function handleFee(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    void guardAction(async () => {
-      await recordInvoiceFee(workspaceId!, user!.uid, {
-        cardId: cardId!,
-        invoiceId: invoiceId!,
-        type: feeType,
-        amountCents: parseMoneyToCents(feeAmount),
-        effectiveAt: new Date(),
-        description: ledgerTypeLabels[feeType]
-      });
-      setFeeAmount('');
-    });
+    if (!workspaceId || !user || !cardId || !invoiceId) return;
+    const amount = parseMoneyToCents(feeAmount);
+    if (!amount) return;
+    setMessage(null);
+    setFeeAmount('');
+    recordInvoiceFee(workspaceId, user.uid, {
+      cardId,
+      invoiceId,
+      type: feeType,
+      amountCents: amount,
+      effectiveAt: new Date(),
+      description: ledgerTypeLabels[feeType]
+    }).catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível registrar a tarifa.')));
   }
 
   function handleAnticipation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    void guardAction(async () => {
-      await anticipateInstallments(workspaceId!, user!.uid, {
-        cardId: cardId!,
-        invoiceId: invoiceId!,
-        amountCents: parseMoneyToCents(anticipationAmount),
-        effectiveAt: new Date(),
-        installmentGroupId: `manual-${invoiceId}`
-      });
-      setAnticipationAmount('');
-    });
+    if (!workspaceId || !user || !cardId || !invoiceId) return;
+    const amount = parseMoneyToCents(anticipationAmount);
+    if (!amount) return;
+    setMessage(null);
+    setAnticipationAmount('');
+    anticipateInstallments(workspaceId, user.uid, {
+      cardId,
+      invoiceId,
+      amountCents: amount,
+      effectiveAt: new Date(),
+      installmentGroupId: `manual-${invoiceId}`
+    }).catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível registrar a antecipação.')));
   }
 
   function handleReconcile(status: InvoiceStatus) {
-    void guardAction(() => reconcileInvoice(workspaceId!, { cardId: cardId!, invoiceId: invoiceId!, status: status as 'closed' | 'partial' | 'paid' | 'overpaid' }));
+    if (!workspaceId || !cardId || !invoiceId) return;
+    setMessage(null);
+    reconcileInvoice(workspaceId, { cardId, invoiceId, status: status as 'closed' | 'partial' | 'paid' | 'overpaid' });
+  }
+
+  function handleClose() {
+    if (!workspaceId || !cardId || !invoiceId) return;
+    setMessage(null);
+    closeInvoice(workspaceId, cardId, invoiceId);
   }
 
   if (!invoice && !cardsData.loading) {
@@ -165,7 +167,7 @@ export function InvoicePage() {
             </div>
             <div className="invoice-hero-meta">
               <span>Vence {toDateInputValue(invoice.dueDate)}</span>
-              {isOpen && <span>· Fatura ainda em aberto — novos lançamentos entram aqui.</span>}
+              {isOpen && <span>· Fatura em aberto — novos lançamentos entram aqui.</span>}
             </div>
 
             {/* Detalhamento secundário */}
@@ -206,7 +208,7 @@ export function InvoicePage() {
                 <button
                   className="button button--subtle button--compact"
                   type="button"
-                  onClick={() => void guardAction(() => closeInvoice(workspaceId!, cardId!, invoiceId!))}
+                  onClick={handleClose}
                 >
                   Fechar fatura
                 </button>
@@ -237,25 +239,38 @@ export function InvoicePage() {
                 <label className="field">
                   <span>Valor do pagamento</span>
                   <input
-                    className="input"
+                    className="input input--money"
                     inputMode="decimal"
                     value={paymentAmount}
                     onChange={(event) => setPaymentAmount(event.target.value)}
-                    placeholder={invoice.outstandingBalanceCents > 0 ? formatMoney(invoice.outstandingBalanceCents).replace('R$ ', '') : '0,00'}
+                    placeholder={invoice.outstandingBalanceCents > 0 ? formatMoney(invoice.outstandingBalanceCents) : '0,00'}
                   />
                 </label>
-                <SelectField
-                  label="Pagar com qual conta?"
-                  value={paymentAccountId}
-                  onChange={setPaymentAccountId}
-                  options={finance.accounts.map((a) => ({ value: a.id, label: a.name }))}
-                  placeholder="Escolha uma conta"
-                />
+                <div className="field">
+                  <span className="field-label">Pagar com qual conta?</span>
+                  <div className="chip-row">
+                    {finance.accounts.map((a) => (
+                      <button
+                        key={a.id}
+                        type="button"
+                        className={`chip${paymentAccountId === a.id ? ' chip--active' : ''}`}
+                        onClick={() => setPaymentAccountId(a.id)}
+                      >
+                        {a.name}
+                      </button>
+                    ))}
+                  </div>
+                  {finance.accounts.length === 0 && (
+                    <p className="text-muted" style={{ fontSize: '0.82rem', margin: '0.25rem 0 0' }}>
+                      Cadastre uma conta em <Link to="/app/accounts" className="inline-link">Contas</Link> para registrar o pagamento.
+                    </p>
+                  )}
+                </div>
                 <label className="field">
                   <span>Data do pagamento</span>
                   <input className="input" type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} />
                 </label>
-                <button className="button button--primary" type="submit">
+                <button className="button button--primary" type="submit" disabled={!paymentAmount.trim() || !paymentAccountId}>
                   Registrar pagamento
                 </button>
               </form>
@@ -347,7 +362,13 @@ export function InvoicePage() {
                   {invoice.ledgerEntries.map((entry) => {
                     const isCredit = entry.type.includes('credit');
                     const isPurchase = entry.type === 'purchase';
-                    const amountClass = isCredit ? 'amount--income' : isPurchase || entry.type.includes('fee') || entry.type === 'interest' || entry.type === 'fine' || entry.type === 'iof' || entry.type === 'manual_debit' ? 'amount--expense' : '';
+                    const isDebit = !isCredit && !isPurchase && entry.type !== 'payment' && entry.type !== 'advance_payment';
+                    const amountClass = isCredit || entry.type === 'payment' || entry.type === 'advance_payment'
+                      ? 'amount--income'
+                      : isPurchase || isDebit
+                      ? 'amount--expense'
+                      : '';
+                    const prefix = isCredit || entry.type === 'payment' || entry.type === 'advance_payment' ? '−' : '';
                     return (
                       <div className="list-row" key={entry.id}>
                         <div>
@@ -357,7 +378,7 @@ export function InvoicePage() {
                           </span>
                         </div>
                         <strong className={amountClass}>
-                          {isCredit ? '−' : isPurchase ? '' : '+'}{formatMoney(entry.amountCents)}
+                          {prefix}{formatMoney(entry.amountCents)}
                         </strong>
                       </div>
                     );
