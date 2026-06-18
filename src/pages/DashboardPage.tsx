@@ -59,24 +59,23 @@ export function DashboardPage() {
       {finance.error || cardsData.error ? <div className="notice notice--danger">{finance.error ?? cardsData.error}</div> : null}
 
       <div className="dash-summary">
-        <article className="surface surface-pad dash-balance">
-          <span className="metric-icon">
-            <Wallet size={18} aria-hidden="true" />
-          </span>
-          <p className="eyebrow">Saldo total</p>
-          <strong className="display-number">{formatMoney(dashboard.totalBalanceCents)}</strong>
-          <span className="text-secondary">Soma das contas ativas.</span>
+        <article className="surface surface-pad dash-balance dash-hero">
+          <p className="eyebrow" style={{ color: 'var(--on-accent-85)' }}>Saldo total</p>
+          <strong className="display-number" style={{ color: 'var(--on-accent-95)' }}>
+            {formatMoney(dashboard.totalBalanceCents)}
+          </strong>
+          <span style={{ color: 'var(--on-accent-55)', fontSize: '0.84rem' }}>Soma das contas ativas.</span>
         </article>
         <div className="dash-secondary">
-          <article className="surface surface-pad dash-metric">
-            <p className="eyebrow">Disponível agora</p>
+          <article className="surface surface-pad dash-metric dash-metric--available">
+            <p className="eyebrow">Disponível</p>
             <strong className="display-number">{formatMoney(dashboard.freeToSpendCents)}</strong>
-            <span className="text-secondary">Menos compromissos.</span>
+            <span className="text-secondary">Livre agora.</span>
           </article>
-          <article className="surface surface-pad dash-metric">
+          <article className="surface surface-pad dash-metric dash-metric--committed">
             <p className="eyebrow">Comprometido</p>
             <strong className="display-number">{formatMoney(dashboard.committedCents)}</strong>
-            <span className="text-secondary">Contas e faturas.</span>
+            <span className="text-secondary">Contas e fat.</span>
           </article>
         </div>
       </div>
