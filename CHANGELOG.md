@@ -2,6 +2,16 @@
 
 Resumo das mudanças recentes do Zerou. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-06-18 — feat: gráficos interativos de análise de gastos (Recharts)
+
+- **`SearchPage` → `Análise`**: donut interativo (clique destaca fatia/legenda, centro mostra categoria + valor) e gráfico de barras entradas vs saídas dos últimos 6 meses. Recharts instalado (`v3.8.1`). Nav renomeada de "Busca" para "Análise" com ícone `BarChart2`.
+
+## 2026-06-18 — fix: ícone de categoria, delete de cartão, InvoicePage simplificada
+
+- **CSS mobile**: `.list-row--with-icon` agora mantém `flex-direction: row` dentro do `@media (max-width: 900px)` — ícone de categoria deixou de quebrar para cima do texto.
+- **`deleteCard`** (`cardService.ts`): soft-delete com `isActive: false`. Botão de lixeira adicionado no `CardDetailPage` com `ConfirmDialog` antes de confirmar.
+- **`InvoicePage` simplificada**: "Fechar fatura" e "Conciliar manualmente" removidos da UI principal (automação cuida do fechamento). Pagamento via `BottomSheet`. Compras e pagamentos em seções separadas. Antecipação, créditos e tarifas em `<details>` colapsados.
+
 ## 2026-06-18 — feat: notificação diária às 20h para registrar gastos
 
 - **`sendDailyLogReminder`** (`functions/src/automation.ts`): Cloud Function scheduled todo dia às 20h (BRT). Busca todos os tokens FCM cadastrados (`collectionGroup('fcmTokens')`), envia push em lotes de 500 com título "Como foi o dia?" e corpo "Registre seus gastos antes de dormir." linkando para `/app/transactions/new`.

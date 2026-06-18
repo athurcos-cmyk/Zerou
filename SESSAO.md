@@ -8,6 +8,10 @@ A interface segue a direção visual **"Sol"** (areia quente clara + tangerina `
 
 Todas as páginas autenticadas têm agora **cabeçalho compacto** (eyebrow + título, sem parágrafo), **ícones de categoria** em tile colorido 36×36 (`CategoryMark`) nas listas de transações (Dashboard e TransactionsPage), **cards de conta** com gradiente escuro (`--gradient-slate`) e **formulários de cadastro colapsáveis** (Contas, Cartões, Compromissos).
 
+A aba **Análise** (`/app/search`) exibe: donut interativo de gastos por categoria do mês (Recharts — clique destaca fatia, centro mostra nome/valor) e gráfico de barras entradas vs saídas dos últimos 6 meses. Busca por texto abaixo.
+
+**Cloud Functions** (`functions/src/`): quatro funções scheduled deployadas no codebase `billing` (`southamerica-east1`): `closeInvoicesDue` (meia-noite), `generateRecurrences` (6h), `sendDueReminders` (8h), `sendDailyLogReminder` (20h — lembrete diário via FCM para todos os usuários). Push via `sendPushToUser` (`push.ts`) com limpeza automática de tokens stale. VAPID key configurada no Vercel. Secrets Stripe como placeholder para deploy sem ativar billing.
+
 O app autenticado não usa mais logo persistente no topo; o onboarding também fica sem bloco de marca para preservar altura útil no celular.
 
 A landing pública (`/`) foi reescrita: hero com copy de dor ("Seu salário já chega devendo"), mockup do app em CSS num phone inclinado 3D, bento de recursos, seção do casal com o **cofrinho**, e CTA. Sempre clara (Paper), nunca dark.
@@ -20,7 +24,7 @@ A landing pública (`/`) foi reescrita: hero com copy de dor ("Seu salário já 
 
 ## Stack
 
-React 19 (TS strict), Vite, Firebase Web SDK (Auth + Firestore + Storage), Vercel, Vite PWA, React Router, React Hook Form, Zod, Zustand, Lucide React. Node >= 22.
+React 19 (TS strict), Vite, Firebase Web SDK (Auth + Firestore + Storage), Vercel, Vite PWA, React Router, React Hook Form, Zod, Zustand, Lucide React, **Recharts** (gráficos). Node >= 22.
 
 ## Onde procurar
 
@@ -53,7 +57,7 @@ React 19 (TS strict), Vite, Firebase Web SDK (Auth + Firestore + Storage), Verce
 
 ## Cartões e faturas — comportamentos-chave
 
-- **Fatura aberta** permanece `open` até o fechamento manual ("Fechar fatura"), independente de pagamentos antecipados. Qualquer pagamento em fatura aberta vira `advance_payment`.
+- **Fatura aberta** permanece `open` até o fechamento automático pela `closeInvoicesDue` (meia-noite do dia de fechamento). Qualquer pagamento em fatura aberta vira `advance_payment`. Os botões "Fechar fatura" e "Conciliar manualmente" foram removidos da `InvoicePage` — a automação cuida disso.
 - **Antecipação de parcelas** (`InvoicePage`): painel detecta parcelas futuras do mesmo cartão, exibe por invoice com checkbox. Ao confirmar: `writeBatch` adiciona `installment_anticipation_credit` em cada fatura futura selecionada (reduz saldo delas) e `installment_anticipation` na fatura atual (debita o total). Fire-and-forget.
 - **Comprometido** (Dashboard): faturas `closed` sempre entram; faturas `open` só se `referenceMonth <= mês atual`. Faturas futuras de parcelas não entram até chegarem no mês delas.
 
