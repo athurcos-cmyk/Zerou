@@ -5,9 +5,10 @@ import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { CategoryField } from '../components/CategoryField';
 import { SelectField } from '../components/SelectField';
+import { BottomSheet } from '../components/BottomSheet';
 import { FormMessage } from '../components/FormMessage';
 import { invoiceStatusLabels } from '../cards/cardLabels';
-import { createCardPurchase } from '../cards/cardService';
+import { createCardPurchase, recordInvoicePayment } from '../cards/cardService';
 
 import { fromDateInputValue, todayInputValue, toDateInputValue } from '../finance/financeDates';
 import { createCategory, deleteCategory, updateCategory } from '../finance/financeService';
@@ -29,6 +30,33 @@ export function CardDetailPage() {
   const [categoryId, setCategoryId] = useState('');
   const [installments, setInstallments] = useState(1);
   const [message, setMessage] = useState<string | null>(null);
+
+  const [paySheetOpen, setPaySheetOpen] = useState(false);
+  const [payAmount, setPayAmount] = useState('');
+  const [payAccountId, setPayAccountId] = useState('');
+
+  function handleOpenPaySheet() {
+    setPayAmount('');
+    setPayAccountId('');
+    setPaySheetOpen(true);
+  }
+
+  function handleQuickPay() {
+    if (!workspaceId || !user || !card || !openInvoice || !payAccountId) return;
+    const cents = payAmount.trim() ? parseMoneyToCents(payAmount) : openInvoice.outstandingBalanceCents;
+    if (!cents) return;
+    setPaySheetOpen(false);
+    setPayAmount('');
+    setPayAccountId('');
+    recordInvoicePayment(workspaceId, user.uid, {
+      cardId: card.id,
+      invoiceId: openInvoice.id,
+      accountId: payAccountId,
+      amountCents: cents,
+      paidAt: new Date(),
+      advance: openInvoice.status === 'open'
+    }).catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível registrar o pagamento.')));
+  }
 
   async function handlePurchase(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -121,25 +149,34 @@ export function CardDetailPage() {
           </div>
 
           {openInvoice ? (
-            <Link
-              className="surface surface-pad list-row list-row--link"
-              to={`/app/cards/${card.id}/invoices/${openInvoice.id}`}
-              style={{ borderRadius: '1rem' }}
-            >
-              <div>
-                <p className="eyebrow" style={{ marginBottom: '0.15rem' }}>Fatura atual</p>
-                <strong>{openInvoice.referenceMonth}</strong>
-                <span className="text-secondary">
-                  {openInvoice.status === 'open' ? 'Em aberto' : 'Fechada'} · vence {toDateInputValue(openInvoice.dueDate)}
-                </span>
+            <div className="surface surface-pad" style={{ borderRadius: '1rem', display: 'grid', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                <div>
+                  <p className="eyebrow" style={{ marginBottom: '0.15rem' }}>Fatura atual</p>
+                  <strong style={{ fontSize: '1.1rem', fontFamily: 'DM Sans, system-ui, sans-serif' }}>
+                    <span className={openInvoice.outstandingBalanceCents > 0 ? 'amount--expense' : 'amount--income'}>
+                      {formatMoney(openInvoice.outstandingBalanceCents)}
+                    </span>
+                  </strong>
+                  <span className="text-secondary">
+                    {openInvoice.referenceMonth} · {openInvoice.status === 'open' ? 'em aberto' : 'fechada'} · vence {toDateInputValue(openInvoice.dueDate)}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+                  <button className="button button--primary button--compact" type="button" onClick={handleOpenPaySheet}>
+                    Pagar agora
+                  </button>
+                  <Link className="button button--subtle button--compact" to={`/app/cards/${card.id}/invoices/${openInvoice.id}`}>
+                    Detalhes
+                  </Link>
+                </div>
               </div>
-              <div className="list-row-end">
-                <strong className={openInvoice.outstandingBalanceCents > 0 ? 'amount--expense' : 'amount--income'} style={{ fontSize: '1.15rem', fontFamily: 'DM Sans, system-ui, sans-serif' }}>
-                  {formatMoney(openInvoice.outstandingBalanceCents)}
-                </strong>
-                <span className="button button--subtle button--compact" aria-hidden="true">Pagar</span>
-              </div>
-            </Link>
+              {openInvoice.status === 'open' && (
+                <p className="text-muted" style={{ fontSize: '0.8rem', margin: 0 }}>
+                  Pode pagar antes de fechar — o valor libera seu limite na hora.
+                </p>
+              )}
+            </div>
           ) : null}
         </>
       ) : null}
@@ -244,6 +281,62 @@ export function CardDetailPage() {
           )}
         </article>
       </div>
+      <BottomSheet
+        open={paySheetOpen}
+        onClose={() => setPaySheetOpen(false)}
+        title="Pagar fatura"
+        subtitle={openInvoice ? `${openInvoice.referenceMonth} · ${formatMoney(openInvoice.outstandingBalanceCents)} em aberto` : undefined}
+      >
+        <div className="form-stack">
+          <label className="field">
+            <span>Valor a pagar</span>
+            <input
+              className="input input--money"
+              inputMode="decimal"
+              value={payAmount}
+              onChange={(e) => setPayAmount(e.target.value)}
+              placeholder={openInvoice ? formatMoney(openInvoice.outstandingBalanceCents) : '0,00'}
+              autoFocus
+            />
+            <span className="field-hint">Deixe em branco para pagar o valor total em aberto.</span>
+          </label>
+          <div className="field">
+            <span className="field-label">De qual conta sai?</span>
+            <div className="chip-row">
+              {finance.accounts.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  className={`chip${payAccountId === a.id ? ' chip--active' : ''}`}
+                  onClick={() => setPayAccountId(a.id)}
+                >
+                  {a.name}
+                </button>
+              ))}
+            </div>
+            {finance.accounts.length === 0 && (
+              <p className="text-muted" style={{ fontSize: '0.82rem', margin: '0.25rem 0 0' }}>
+                Cadastre uma conta em <Link to="/app/accounts" className="inline-link">Contas</Link> para registrar o pagamento.
+              </p>
+            )}
+          </div>
+          {openInvoice?.status === 'open' && (
+            <p className="text-muted" style={{ fontSize: '0.8rem', margin: 0 }}>
+              Fatura ainda aberta — pode pagar qualquer valor agora. O limite é liberado imediatamente.
+            </p>
+          )}
+          <div className="sheet-actions">
+            <button
+              className="button button--primary"
+              type="button"
+              disabled={!payAccountId}
+              onClick={handleQuickPay}
+            >
+              Confirmar pagamento
+            </button>
+          </div>
+        </div>
+      </BottomSheet>
     </section>
   );
 }
