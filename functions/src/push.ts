@@ -2,14 +2,13 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { logger } from 'firebase-functions';
 
-const db = getFirestore();
-
 export async function sendPushToUser(
   userId: string,
   title: string,
   body: string,
   link = 'https://zerou-five.vercel.app/app'
 ): Promise<void> {
+  const db = getFirestore();
   const tokensSnap = await db.collection(`users/${userId}/fcmTokens`).get();
   if (tokensSnap.empty) return;
 

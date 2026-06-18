@@ -3,7 +3,6 @@ import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { logger } from 'firebase-functions';
 import { sendPushToUser } from './push.js';
 
-const db = getFirestore();
 const region = 'southamerica-east1';
 
 function nowInBRT(): Date {
@@ -34,6 +33,7 @@ function formatBRL(amountCents: number): string {
 export const closeInvoicesDue = onSchedule(
   { schedule: '0 0 * * *', timeZone: 'America/Sao_Paulo', region, maxInstances: 1 },
   async () => {
+    const db = getFirestore();
     const today = nowInBRT().getDate();
     const currentMonth = currentYearMonth();
     let closed = 0;
@@ -91,6 +91,7 @@ export const closeInvoicesDue = onSchedule(
 export const generateRecurrences = onSchedule(
   { schedule: '0 6 * * *', timeZone: 'America/Sao_Paulo', region, maxInstances: 1 },
   async () => {
+    const db = getFirestore();
     const now = Timestamp.now();
     const nowDate = nowInBRT();
     const monthKey = currentYearMonth();
@@ -172,6 +173,7 @@ export const generateRecurrences = onSchedule(
 export const sendDueReminders = onSchedule(
   { schedule: '0 8 * * *', timeZone: 'America/Sao_Paulo', region, maxInstances: 1 },
   async () => {
+    const db = getFirestore();
     const now = nowInBRT();
     const threeDaysAhead = new Date(now);
     threeDaysAhead.setDate(threeDaysAhead.getDate() + 3);
