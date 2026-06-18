@@ -2,6 +2,14 @@
 
 Resumo das mudanças recentes do Zerou. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-06-17 — lógica financeira: pagamentos debitam contas, metas não viram gasto
+
+- **`payBill`**: batch atômico marca conta como paga e cria transação de despesa (tag `bill`) debitando a conta selecionada. BillsPage abre sheet de confirmação com valor editável e chip de conta.
+- **`recordRecurringPayment`**: batch avança `nextOccurrenceAt` para o próximo período e cria transação de despesa (tag `recorrente`). RecurringPage ganha botão "Registrar" que abre sheet com valor, conta e aviso da próxima data.
+- **`contributeToGoalWithTransaction`**: batch incrementa `savedCents` da meta e, quando conta escolhida, cria despesa (tag `meta`). GoalsPage tem chip "De qual conta sai? / Só registrar" no sheet de contribuição.
+- **`nextOccurrenceDate`**: função pura que avança uma data por `weekly` / `monthly` / `yearly`.
+- **DashboardPage**: `spendingByCategory` exclui transações com tags `meta` e `cofrinho` — contribuições de meta/cofrinho não aparecem mais como gasto no resumo mensal.
+
 ## 2026-06-17 — redesign do modo casal e offline-first
 
 - **Sistema de modos** (`coupleMode` no workspace): `savings_only` (só cofrinho), `transparent` (despesas visíveis) e `balanced` (barra proporcional de quem cobre mais). Pode ser escolhido na criação e mudado em qualquer momento via "Gerenciar espaço".
