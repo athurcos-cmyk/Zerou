@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { CreditCard, Plus } from 'lucide-react';
+import { ChevronDown, CreditCard } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext } from '../finance/FinanceDataContext';
@@ -25,6 +25,7 @@ export function CardsPage() {
   const [closingDay, setClosingDay] = useState(10);
   const [dueDay, setDueDay] = useState(20);
   const [message, setMessage] = useState<string | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -68,62 +69,6 @@ export function CardsPage() {
       </div>
 
       <div className="finance-grid">
-        <form className="surface surface-pad form-stack" onSubmit={handleSubmit}>
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Adicionar cartão</p>
-              <h2>Cadastrar novo cartão</h2>
-            </div>
-            <span className="empty-icon">
-              <Plus size={20} aria-hidden="true" />
-            </span>
-          </div>
-          <FormMessage>{message}</FormMessage>
-
-          <div className="card-limit-hero">
-            <span className="card-limit-hero-label">Limite do cartão</span>
-            <span className="card-limit-hero-wrap">
-              <span className="card-limit-hero-currency">R$</span>
-              <input
-                className="card-limit-hero-input"
-                inputMode="decimal"
-                value={limit}
-                onChange={(event) => setLimit(event.target.value)}
-                placeholder="0,00"
-                aria-label="Limite do cartão"
-              />
-            </span>
-          </div>
-
-          <label className="field">
-            <span>Nome do cartão</span>
-            <input className="input" value={name} onChange={(event) => setName(event.target.value)} placeholder="Cartão principal" />
-          </label>
-          <label className="field">
-            <span>Últimos 4 dígitos</span>
-            <input className="input" inputMode="numeric" maxLength={4} value={lastFour} onChange={(event) => setLastFour(event.target.value)} placeholder="0000" />
-          </label>
-          <SelectField
-            label="Bandeira"
-            value={brand}
-            onChange={(v) => setBrand(v as CreateCreditCardInput['brand'])}
-            options={cardBrandOptions.map((b) => ({ value: b, label: b }))}
-          />
-          <div className="form-grid-2">
-            <label className="field">
-              <span>Dia de fechamento</span>
-              <input className="input" type="number" min={1} max={28} value={closingDay} onChange={(event) => setClosingDay(Number(event.target.value))} />
-            </label>
-            <label className="field">
-              <span>Dia de vencimento</span>
-              <input className="input" type="number" min={1} max={28} value={dueDay} onChange={(event) => setDueDay(Number(event.target.value))} />
-            </label>
-          </div>
-          <button className="button button--primary" type="submit">
-            Adicionar cartão
-          </button>
-        </form>
-
         <article className="surface surface-pad">
           <p className="eyebrow">Seus cartões</p>
           <h2 style={{ margin: '0.25rem 0 1rem' }}>Cartões ativos</h2>
@@ -185,6 +130,71 @@ export function CardsPage() {
             />
           )}
         </article>
+
+        <form className="surface surface-pad form-stack" onSubmit={handleSubmit}>
+          <button
+            type="button"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
+            onClick={() => setFormOpen((v) => !v)}
+            aria-expanded={formOpen}
+          >
+            <div>
+              <p className="eyebrow">Adicionar cartão</p>
+              <h2 style={{ margin: 0 }}>Cadastrar novo cartão</h2>
+            </div>
+            <ChevronDown
+              size={20}
+              aria-hidden="true"
+              style={{ transform: formOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0, color: 'var(--text-secondary)' }}
+            />
+          </button>
+          {formOpen && (
+            <>
+              <FormMessage>{message}</FormMessage>
+              <div className="card-limit-hero">
+                <span className="card-limit-hero-label">Limite do cartão</span>
+                <span className="card-limit-hero-wrap">
+                  <span className="card-limit-hero-currency">R$</span>
+                  <input
+                    className="card-limit-hero-input"
+                    inputMode="decimal"
+                    value={limit}
+                    onChange={(event) => setLimit(event.target.value)}
+                    placeholder="0,00"
+                    aria-label="Limite do cartão"
+                  />
+                </span>
+              </div>
+              <label className="field">
+                <span>Nome do cartão</span>
+                <input className="input" value={name} onChange={(event) => setName(event.target.value)} placeholder="Cartão principal" />
+              </label>
+              <label className="field">
+                <span>Últimos 4 dígitos</span>
+                <input className="input" inputMode="numeric" maxLength={4} value={lastFour} onChange={(event) => setLastFour(event.target.value)} placeholder="0000" />
+              </label>
+              <SelectField
+                label="Bandeira"
+                value={brand}
+                onChange={(v) => setBrand(v as CreateCreditCardInput['brand'])}
+                options={cardBrandOptions.map((b) => ({ value: b, label: b }))}
+              />
+              <div className="form-grid-2">
+                <label className="field">
+                  <span>Dia de fechamento</span>
+                  <input className="input" type="number" min={1} max={28} value={closingDay} onChange={(event) => setClosingDay(Number(event.target.value))} />
+                </label>
+                <label className="field">
+                  <span>Dia de vencimento</span>
+                  <input className="input" type="number" min={1} max={28} value={dueDay} onChange={(event) => setDueDay(Number(event.target.value))} />
+                </label>
+              </div>
+              <button className="button button--primary" type="submit">
+                Adicionar cartão
+              </button>
+            </>
+          )}
+        </form>
       </div>
     </section>
   );

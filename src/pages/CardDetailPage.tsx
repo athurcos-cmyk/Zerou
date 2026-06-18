@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { CalendarClock, CreditCard, ReceiptText } from 'lucide-react';
+import { CalendarClock, ChevronDown, CreditCard, ReceiptText } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { CategoryField } from '../components/CategoryField';
@@ -30,6 +30,7 @@ export function CardDetailPage() {
   const [categoryId, setCategoryId] = useState('');
   const [installments, setInstallments] = useState(1);
   const [message, setMessage] = useState<string | null>(null);
+  const [purchaseFormOpen, setPurchaseFormOpen] = useState(false);
 
   const [paySheetOpen, setPaySheetOpen] = useState(false);
   const [payAmount, setPayAmount] = useState('');
@@ -182,63 +183,6 @@ export function CardDetailPage() {
       ) : null}
 
       <div className="finance-grid">
-        <form className="surface surface-pad form-stack" onSubmit={handlePurchase}>
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Nova compra</p>
-              <h2>Registrar no cartão</h2>
-            </div>
-            <ReceiptText size={22} aria-hidden="true" />
-          </div>
-          <p className="text-secondary" style={{ margin: 0, fontSize: '0.86rem', lineHeight: 1.55 }}>
-            Para parcelado, informe o valor total e o número de parcelas.
-          </p>
-          <FormMessage>{message}</FormMessage>
-          <label className="field">
-            <span>Descrição</span>
-            <input className="input" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Ex: Supermercado, Cinema..." />
-          </label>
-          <label className="field">
-            <span>Valor total da compra</span>
-            <input className="input" inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0,00" />
-          </label>
-          <label className="field">
-            <span>Data da compra</span>
-            <input className="input" type="date" value={purchaseDate} onChange={(event) => setPurchaseDate(event.target.value)} />
-          </label>
-          <CategoryField
-            value={categoryId}
-            onChange={setCategoryId}
-            categories={finance.categories}
-            filterType="expense"
-            onCreateCategory={async (name, icon, type, color) => {
-              if (!workspaceId || !user) return;
-              const id = await createCategory(workspaceId, user.uid, { name, icon, type, color });
-              setCategoryId(id);
-            }}
-            onUpdateCategory={async (id, patch) => {
-              if (!workspaceId) return;
-              await updateCategory(workspaceId, id, patch);
-            }}
-            onDeleteCategory={async (id) => {
-              if (!workspaceId) return;
-              await deleteCategory(workspaceId, id);
-            }}
-          />
-          <SelectField
-            label="Parcelamento"
-            value={String(installments)}
-            onChange={(v) => setInstallments(Number(v))}
-            options={Array.from({ length: 24 }, (_, i) => i + 1).map((n) => ({
-              value: String(n),
-              label: n === 1 ? '1x à vista' : `${n}x`
-            }))}
-          />
-          <button className="button button--primary" type="submit">
-            Registrar compra
-          </button>
-        </form>
-
         <article className="surface surface-pad">
           <div className="section-heading">
             <div>
@@ -276,10 +220,80 @@ export function CardDetailPage() {
               <span className="empty-icon">
                 <CreditCard size={24} aria-hidden="true" />
               </span>
-              <p className="text-secondary">Nenhuma fatura ainda. Registre a primeira compra ao lado.</p>
+              <p className="text-secondary">Nenhuma fatura ainda. Registre a primeira compra abaixo.</p>
             </div>
           )}
         </article>
+
+        <form className="surface surface-pad form-stack" onSubmit={handlePurchase}>
+          <button
+            type="button"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
+            onClick={() => setPurchaseFormOpen((v) => !v)}
+            aria-expanded={purchaseFormOpen}
+          >
+            <div>
+              <p className="eyebrow">Nova compra</p>
+              <h2 style={{ margin: 0 }}>Registrar no cartão</h2>
+            </div>
+            <ChevronDown
+              size={22}
+              aria-hidden="true"
+              style={{ transform: purchaseFormOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0, color: 'var(--text-secondary)' }}
+            />
+          </button>
+          {purchaseFormOpen && (
+            <>
+              <p className="text-secondary" style={{ margin: 0, fontSize: '0.86rem', lineHeight: 1.55 }}>
+                Para parcelado, informe o valor total e o número de parcelas.
+              </p>
+              <FormMessage>{message}</FormMessage>
+              <label className="field">
+                <span>Descrição</span>
+                <input className="input" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Ex: Supermercado, Cinema..." />
+              </label>
+              <label className="field">
+                <span>Valor total da compra</span>
+                <input className="input" inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0,00" />
+              </label>
+              <label className="field">
+                <span>Data da compra</span>
+                <input className="input" type="date" value={purchaseDate} onChange={(event) => setPurchaseDate(event.target.value)} />
+              </label>
+              <CategoryField
+                value={categoryId}
+                onChange={setCategoryId}
+                categories={finance.categories}
+                filterType="expense"
+                onCreateCategory={async (name, icon, type, color) => {
+                  if (!workspaceId || !user) return;
+                  const id = await createCategory(workspaceId, user.uid, { name, icon, type, color });
+                  setCategoryId(id);
+                }}
+                onUpdateCategory={async (id, patch) => {
+                  if (!workspaceId) return;
+                  await updateCategory(workspaceId, id, patch);
+                }}
+                onDeleteCategory={async (id) => {
+                  if (!workspaceId) return;
+                  await deleteCategory(workspaceId, id);
+                }}
+              />
+              <SelectField
+                label="Parcelamento"
+                value={String(installments)}
+                onChange={(v) => setInstallments(Number(v))}
+                options={Array.from({ length: 24 }, (_, i) => i + 1).map((n) => ({
+                  value: String(n),
+                  label: n === 1 ? '1x à vista' : `${n}x`
+                }))}
+              />
+              <button className="button button--primary" type="submit">
+                Registrar compra
+              </button>
+            </>
+          )}
+        </form>
       </div>
       <BottomSheet
         open={paySheetOpen}
