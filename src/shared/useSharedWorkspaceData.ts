@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { calculateSharedBalances, suggestSettlement } from '../domain/shared/calculateSharedBalances';
 import { subscribeWithTransientRetry } from '../firebase/firestoreRetry';
 import {
@@ -74,7 +74,7 @@ export function useSharedWorkspaceData(userId?: string) {
         setState((current) => ({
           ...current,
           loading: false,
-          error: 'Não foi possível carregar seus espaços Zerou.'
+          error: 'Não foi possível carregar seus espaços Granix.'
         }))
     });
   }, [userId]);

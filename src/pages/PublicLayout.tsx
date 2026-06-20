@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+﻿import { Link } from 'react-router-dom';
 import { BrandLockup } from '../components/BrandLogo';
 import type { ReactNode } from 'react';
 
@@ -10,7 +10,7 @@ export function PublicLayout({ children }: PublicLayoutProps) {
   return (
     <main className="marketing-page public-marketing-shell" data-theme="paper">
       <nav className="marketing-nav public-nav" aria-label="Navegação pública">
-        <Link to="/" aria-label="Ir para a página inicial da Zerou">
+        <Link to="/" aria-label="Ir para a página inicial do Granix">
           <BrandLockup />
         </Link>
         <div className="public-nav-links">

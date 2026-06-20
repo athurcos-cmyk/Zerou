@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link } from 'react-router-dom';
@@ -32,7 +32,7 @@ export function ForgotPasswordPage() {
 
     try {
       await sendResetEmail(values.email);
-      setSuccess('Enviamos um email para redefinir sua senha Zerou.');
+      setSuccess('Enviamos um email para redefinir sua senha Granix.');
     } catch (error) {
       setMessage(getAuthErrorMessage(error));
     } finally {
@@ -44,7 +44,7 @@ export function ForgotPasswordPage() {
     <AuthLayout
       eyebrow="Recuperação"
       title="Recupere seu acesso."
-      description="Informe o email usado na Zerou para receber o link de redefinição."
+      description="Informe o email usado no Granix para receber o link de redefinição."
     >
       <form className="form-stack" onSubmit={form.handleSubmit(onSubmit)}>
         <FormMessage>{firebaseError}</FormMessage>

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+﻿import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { BrandLockup } from './BrandLogo';
 
@@ -12,7 +12,7 @@ interface AuthLayoutProps {
 export function AuthLayout({ eyebrow, title, description, children }: AuthLayoutProps) {
   return (
     <main className="public-page" data-theme="paper">
-      <section className="public-shell" aria-label="Acesso Zerou">
+      <section className="public-shell" aria-label="Acesso Granix">
         <aside className="public-panel public-panel--hero">
           <div>
             <Link to="/" aria-label="Ir para início">

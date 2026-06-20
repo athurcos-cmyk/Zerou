@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -60,7 +60,7 @@ export function LoginPage() {
   return (
     <AuthLayout
       eyebrow="Entrar"
-      title="Volte para o seu espaço Zerou."
+      title="Volte para o seu espaço Granix."
       description="Acesse seu espaço pessoal e continue do ponto em que parou."
     >
       <form className="form-stack" onSubmit={form.handleSubmit(onSubmit)}>
@@ -83,7 +83,7 @@ export function LoginPage() {
           <span className="text-muted">{form.formState.errors.password?.message}</span>
         </div>
         <button className="button button--primary" type="submit" disabled={busy || Boolean(firebaseError)}>
-          Entrar na Zerou
+          Entrar no Granix
         </button>
         <button className="button button--secondary" type="button" onClick={onGoogle} disabled={busy || Boolean(firebaseError)}>
           <CircleUserRound size={18} aria-hidden="true" /> Entrar com Google

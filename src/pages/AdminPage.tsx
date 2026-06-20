@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -616,7 +616,7 @@ export function AdminPage() {
       <header className="admin-header">
         <div className="admin-header__left">
           <span className="admin-header__badge">Admin</span>
-          <span className="admin-header__title">Zerou</span>
+          <span className="admin-header__title">Granix</span>
         </div>
 
         <nav className="admin-tabs">

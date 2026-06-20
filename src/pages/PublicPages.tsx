@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+﻿import { Link } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { ArrowRight, CreditCard, HelpCircle, LockKeyhole, Mail, ReceiptText, ShieldCheck, Split, WalletCards } from 'lucide-react';
 import { Seo } from '../components/Seo';
@@ -9,14 +9,14 @@ export function FeaturesPage() {
     <PublicLayout>
       <Seo
         title="Funcionalidades"
-        description="Conheça as funcionalidades atuais da Zerou para finanças pessoais, cartões, faturas e espaço compartilhado."
+        description="Conheça as funcionalidades atuais do Granix para finanças pessoais, cartões, faturas e espaço compartilhado."
         path="/features"
       />
       <section className="public-section pricing-hero">
         <p className="eyebrow">Funcionalidades</p>
         <h1 className="marketing-title">O essencial para organizar sem misturar.</h1>
         <p className="marketing-copy">
-          A Zerou já cobre a rotina de contas, transações, cartões, faturas, compromissos e organização a dois com privacidade.
+          o Granix já cobre a rotina de contas, transações, cartões, faturas, compromissos e organização a dois com privacidade.
         </p>
       </section>
       <section className="public-section feature-grid">
@@ -36,7 +36,7 @@ export function SecurityPage() {
     <PublicLayout>
       <Seo
         title="Segurança"
-        description="Como a Zerou separa dados por usuário e espaço, sem prometer segurança absoluta."
+        description="Como o Granix separa dados por usuário e espaço, sem prometer segurança absoluta."
         path="/security"
       />
       <section className="public-section split-section">
@@ -45,7 +45,7 @@ export function SecurityPage() {
           <h1 className="marketing-title">Clareza sobre proteção e limites.</h1>
         </div>
         <p>
-          A Zerou separa cada conta e cada espaço. O parceiro não vê seu histórico pessoal, e análises opcionais ficam
+          o Granix separa cada conta e cada espaço. O parceiro não vê seu histórico pessoal, e análises opcionais ficam
           desligadas por padrão. Segurança é prática contínua, não promessa absoluta.
         </p>
       </section>
@@ -56,7 +56,7 @@ export function SecurityPage() {
       </section>
       <section className="public-section final-cta">
         <h2>Quer revisar a documentação de privacidade?</h2>
-        <p>Veja como a Zerou trata dados, espaços compartilhados, retenção e solicitações LGPD.</p>
+        <p>Veja como o Granix trata dados, espaços compartilhados, retenção e solicitações LGPD.</p>
         <Link className="button button--primary" to="/legal/privacy">
           Ver política de privacidade
         </Link>
@@ -68,7 +68,7 @@ export function SecurityPage() {
 export function HelpPage() {
   return (
     <PublicLayout>
-      <Seo title="Ajuda" description="Ajuda inicial da Zerou para começar, organizar cartões e usar o espaço compartilhado." path="/help" />
+      <Seo title="Ajuda" description="Ajuda inicial do Granix para começar, organizar cartões e usar o espaço compartilhado." path="/help" />
       <section className="public-section pricing-hero">
         <p className="eyebrow">Ajuda</p>
         <h1 className="marketing-title">Comece pelo seu espaço pessoal.</h1>
@@ -92,7 +92,7 @@ export function HelpPage() {
           </details>
           <details className="surface surface-pad faq-item">
             <summary>Posso usar pelo celular?</summary>
-            <p>Sim. A Zerou foi pensada primeiro para celular. Abra pelo navegador e adicione o atalho na tela inicial se quiser.</p>
+            <p>Sim. o Granix foi pensada primeiro para celular. Abra pelo navegador e adicione o atalho na tela inicial se quiser.</p>
           </details>
         </div>
       </section>
@@ -103,18 +103,18 @@ export function HelpPage() {
 export function ContactPage() {
   return (
     <PublicLayout>
-      <Seo title="Contato" description="Canais de contato da Zerou para suporte e privacidade." path="/contact" />
+      <Seo title="Contato" description="Canais de contato do Granix para suporte e privacidade." path="/contact" />
       <section className="public-section split-section">
         <div>
           <p className="eyebrow">Contato</p>
-          <h1 className="marketing-title">Fale com a Zerou.</h1>
+          <h1 className="marketing-title">Fale com o Granix.</h1>
         </div>
         <div className="contact-list">
           <p>
-            <Mail size={18} aria-hidden="true" /> Suporte: <a className="inline-link" href="mailto:suporte@zerou.app">suporte@zerou.app</a>
+            <Mail size={18} aria-hidden="true" /> Suporte: <a className="inline-link" href="mailto:suporte@Granix.app">suporte@Granix.app</a>
           </p>
           <p>
-            <Mail size={18} aria-hidden="true" /> Privacidade: <a className="inline-link" href="mailto:privacidade@zerou.app">privacidade@zerou.app</a>
+            <Mail size={18} aria-hidden="true" /> Privacidade: <a className="inline-link" href="mailto:privacidade@Granix.app">privacidade@Granix.app</a>
           </p>
           <Link className="button button--primary" to="/legal/privacy">
             Ver política de privacidade <ArrowRight size={18} aria-hidden="true" />

@@ -1,6 +1,22 @@
 # Changelog
 
-Resumo das mudanças recentes do Zerou. O histórico detalhado por mês fica em `docs/history/`.
+Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
+
+## 2026-06-20 — feat: landing page redesenhada com Framer Motion 3D
+
+- **Hero light**: fundo claro (branco → areia), texto estático, stage (phone + badges) inclina em 3D com o mouse via `rotateX/Y` + `preserve-3d` e `useSpring`.
+- **Parallax em camadas**: stage sobe mais devagar no scroll (`useScroll`); badges em Z-depths diferentes (`z: 60 / 30 / -15`) criam profundidade real; phone tem gloss de luz (`useMotionTemplate`) que desloca com o cursor.
+- **Grade perspectiva**: `linear-gradient` com `perspective(700px) rotateX(-62deg)` e mask cria piso de grade laranja recuando para o fundo.
+- **Seções**: stats band, bento com `TiltCard` 3D hover (`rotateX/Y` no `whileHover`), seção do casal com card hover + `rotateZ`, steps com `whileInView`, FAQ accordion, CTA dark. Tudo com `RevealSection` (useInView + stagger).
+- Detalhes técnicos em `docs/history/2026-06.md`.
+
+## 2026-06-20 — rebrand: Zerou → Granix
+
+- **Novo nome**: app renomeado de "Zerou" para **Granix** (grana + ix). Tagline mantida: "Controle individual. Organização a dois."
+- **Novo logo**: ícone de duas bolas sobrepostas (sólida laranja + outline escuro), gerado com IA. Assets em `public/brand/granix-*.png` (`granix-app-icon-180/192/512`, `granix-maskable-512`, `granix-logo-horizontal`, `granix-symbol`).
+- **PWA manifest**: `name`, `short_name`, `theme_color` (`#EE5524`), `background_color` (`#FAF8F5`) e todos os ícones atualizados em `vite.config.ts`.
+- **`index.html`**: `<title>`, meta description, OG tags e `apple-touch-icon` atualizados. Favicon agora é PNG (`/favicon.png`).
+- **Componentes e textos**: todas as ocorrências visíveis de "Zerou" → "Granix" com artigo correto (o/do/no Granix). Version strings internas do Firestore (`zerou-v12.2-*`, `zerou-cache`) mantidas para não invalidar registros existentes.
 
 ## 2026-06-18 — feat: gráficos interativos de análise de gastos (Recharts)
 

@@ -1,12 +1,12 @@
-import { afterEach, describe, expect, it } from 'vitest';
+﻿import { afterEach, describe, expect, it } from 'vitest';
 import type { UserProfile } from '../types/contracts';
 import { clearCachedProfiles, readCachedProfile, readLastCachedProfile, saveCachedProfile } from './profileCache';
 
 function buildProfile(id: string): UserProfile {
   return {
     id,
-    name: 'Ana Zerou',
-    email: 'ana@zerou.test',
+    name: 'Ana Granix',
+    email: 'ana@Granix.test',
     defaultWorkspaceId: `personal_${id}`,
     locale: 'pt-BR',
     timezone: 'America/Sao_Paulo',
@@ -44,7 +44,7 @@ describe('profileCache', () => {
   });
 
   it('ignora cache corrompido sem quebrar o boot', () => {
-    window.localStorage.setItem('zerou.auth.profileCache.v1', '{');
+    window.localStorage.setItem('Granix.auth.profileCache.v1', '{');
 
     expect(readCachedProfile('user-1')).toBeNull();
   });

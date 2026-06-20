@@ -1,4 +1,4 @@
-import { MonitorSmartphone } from 'lucide-react';
+﻿import { MonitorSmartphone } from 'lucide-react';
 import { useAppearanceStore } from '../theme/appearance.store';
 import { THEME_DEFINITIONS } from '../theme/theme.registry';
 import type { Density, FontScale } from '../theme/theme.types';
@@ -17,7 +17,7 @@ export function AppearanceSettingsPage() {
       <p className="eyebrow">Configurações</p>
       <h1 className="page-title">Aparência</h1>
       <p className="page-description">
-        Escolha como a Zerou aparece para você. A preferência é individual e não altera a interface de outra pessoa.
+        Escolha como o Granix aparece para você. A preferência é individual e não altera a interface de outra pessoa.
       </p>
 
       <div className="settings-grid">

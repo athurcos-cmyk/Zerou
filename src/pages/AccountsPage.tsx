@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+﻿import { useState, type FormEvent } from 'react';
 import { Building2, ChevronDown, Trash2 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useFinanceContext } from '../finance/FinanceDataContext';
@@ -71,7 +71,7 @@ export function AccountsPage() {
     }
 
     const confirmed = window.confirm(
-      `Excluir "${accountName}" permanentemente? Como ela não tem histórico ligado, a Zerou vai apagar essa conta financeira do banco de dados.`
+      `Excluir "${accountName}" permanentemente? Como ela não tem histórico ligado, o Granix vai apagar essa conta financeira do banco de dados.`
     );
 
     if (!confirmed) {

@@ -29,10 +29,10 @@ const messaging = firebase.messaging();
 // Notificações recebidas com o app fechado ou em background
 messaging.onBackgroundMessage(function(payload) {
   var n = payload.notification || {};
-  self.registration.showNotification(n.title || 'Zerou', {
+  self.registration.showNotification(n.title || 'Granix', {
     body: n.body || '',
-    icon: '/brand/zerou-app-icon-192.png',
-    badge: '/brand/zerou-app-icon-192.png',
+    icon: '/brand/granix-app-icon-192.png',
+    badge: '/brand/granix-app-icon-192.png',
     data: { link: (payload.fcmOptions || {}).link || '/app' }
   });
 });
@@ -62,29 +62,29 @@ export default defineConfig(({ mode }) => {
       react(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'favicon-16x16.png', 'favicon-32x32.png', 'brand/zerou-app-icon-180.png'],
+        includeAssets: ['favicon.ico', 'favicon.png', 'favicon-16x16.png', 'favicon-32x32.png', 'brand/granix-app-icon-180.png'],
         manifest: {
-          name: 'Zerou',
-          short_name: 'Zerou',
+          name: 'Granix',
+          short_name: 'Granix',
           description: 'Controle individual. Organização a dois.',
-          theme_color: '#5B5BD6',
-          background_color: '#F6F7F9',
+          theme_color: '#EE5524',
+          background_color: '#FAF8F5',
           display: 'standalone',
           start_url: '/',
           scope: '/',
           icons: [
             {
-              src: '/brand/zerou-app-icon-192.png',
+              src: '/brand/granix-app-icon-192.png',
               sizes: '192x192',
               type: 'image/png'
             },
             {
-              src: '/brand/zerou-app-icon-512.png',
+              src: '/brand/granix-app-icon-512.png',
               sizes: '512x512',
               type: 'image/png'
             },
             {
-              src: '/brand/zerou-maskable-512.png',
+              src: '/brand/granix-maskable-512.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'maskable'

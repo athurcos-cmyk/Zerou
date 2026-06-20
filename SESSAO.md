@@ -1,8 +1,10 @@
-# Brief — Zerou
+# Brief — Granix (ex-Zerou)
 
 ## Estado atual
 
-SaaS/PWA financeiro mobile-first (React 19 + Firebase Firestore + Vercel). Duas frentes: controle individual e organização a dois (casal). App em **lançamento gratuito** — sem cobrança, checkout ou página de planos ativa. O projeto Firebase está no **Blaze**, mas o produto segue gratuito e sem Cloud Functions no fluxo principal. Produção: https://zerou-five.vercel.app. Trabalho direto na `main`.
+SaaS/PWA financeiro mobile-first (React 19 + Firebase Firestore + Vercel). Duas frentes: controle individual e organização a dois (casal). App em **lançamento gratuito** — sem cobrança, checkout ou página de planos ativa. O projeto Firebase está no **Blaze**, mas o produto segue gratuito e sem Cloud Functions no fluxo principal. Produção: https://zerou-five.vercel.app (URL legada, ainda no Vercel como "zerou"). Trabalho direto na `main`.
+
+**Rebrand completo**: app renomeado de "Zerou" para **Granix**. Novo logo: duas bolas sobrepostas (sólida laranja + outline). Assets em `public/brand/granix-*.png`. Version strings internas do Firestore mantidas com prefixo `zerou-` para não invalidar registros existentes. LocalStorage keys (`zerou.themeMode`, `zerou.themeId`) também mantidas por ora.
 
 A interface segue a direção visual **"Sol"** (areia quente clara + tangerina `#EE5524`, números em DM Sans 800, corpo em Instrument Sans) e é **mobile-nativa**: nav inferior com FAB central (slot 2 = Extrato/Transações, slot 4 = Cartões, Casal no menu Mais + indicador de ponto ativo), telas de lançamento com header de valor gigante colorido por tipo, seletores em **bottom-sheet** (conta, categoria, bandeira), categorias com ícone e cor editáveis, onboarding em questionário com barra de progresso, e empty states ilustrados. Detalhes em `docs/design/DESIGN.md`.
 
@@ -14,7 +16,7 @@ A aba **Análise** (`/app/search`) exibe: donut interativo de gastos por categor
 
 O app autenticado não usa mais logo persistente no topo; o onboarding também fica sem bloco de marca para preservar altura útil no celular.
 
-A landing pública (`/`) foi reescrita: hero com copy de dor ("Seu salário já chega devendo"), mockup do app em CSS num phone inclinado 3D, bento de recursos, seção do casal com o **cofrinho**, e CTA. Sempre clara (Paper), nunca dark.
+A landing pública (`/`) foi reescrita com Framer Motion: **hero claro** (branco → areia) com grade perspectiva CSS, stage (phone + badges flutuantes) que inclina em 3D com o mouse (`rotateX/Y` + `preserve-3d`, badges em Z-depths distintos), gloss de luz na tela do phone (`useMotionTemplate`), scroll parallax e stagger de entrada. Seções abaixo: stats band, bento com `TiltCard` 3D hover, modo casal, steps, FAQ e CTA dark. Sempre clara (Paper), nunca dark.
 
 ## Leitura inicial
 

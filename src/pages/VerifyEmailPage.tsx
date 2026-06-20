@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AuthLayout } from '../components/AuthLayout';
 import { FormMessage } from '../components/FormMessage';
@@ -14,7 +14,7 @@ export function VerifyEmailPage() {
 
   async function onSend() {
     if (!user || authFromCache) {
-      setMessage('Entre na Zerou para enviar a verificação.');
+      setMessage('Entre no Granix para enviar a verificação.');
       return;
     }
 
@@ -36,7 +36,7 @@ export function VerifyEmailPage() {
     <AuthLayout
       eyebrow="Verificação"
       title="Confirme seu email."
-      description="A verificação ajuda a manter seu acesso Zerou recuperável e confiável."
+      description="A verificação ajuda a manter seu acesso Granix recuperável e confiável."
     >
       <div className="form-stack">
         <FormMessage>{message}</FormMessage>

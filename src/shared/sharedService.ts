@@ -1,4 +1,4 @@
-import QRCode from 'qrcode';
+﻿import QRCode from 'qrcode';
 import {
   Timestamp,
   collection,
@@ -207,7 +207,7 @@ export async function createCoupleWorkspace(userId: string, ownerName: string, m
   const db = getFirebaseDb();
   const batch = writeBatch(db);
   const now = serverTimestamp();
-  const workspaceName = `Espaço compartilhado de ${ownerName || 'Zerou'}`;
+  const workspaceName = `Espaço compartilhado de ${ownerName || 'Granix'}`;
 
   batch.set(workspaceRef(workspaceId), {
     id: workspaceId,

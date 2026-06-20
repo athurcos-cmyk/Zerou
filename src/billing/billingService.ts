@@ -1,4 +1,4 @@
-import { doc, onSnapshot, type Unsubscribe } from 'firebase/firestore';
+﻿import { doc, onSnapshot, type Unsubscribe } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { getFirebaseDb, getFirebaseFunctions } from '../firebase/config';
 import type { BillingAccount, BillingInterval, Entitlements, PlanCatalogItem, PlanId } from '../types/contracts';
@@ -22,7 +22,7 @@ export const defaultPlanCatalog: PlanCatalogItem[] = [
   {
     id: 'free',
     name: 'Gratuito',
-    description: 'Acesso gratuito ao app Zerou enquanto o produto amadurece.',
+    description: 'Acesso gratuito ao app Granix enquanto o produto amadurece.',
     active: true,
     monthlyPriceCents: 0,
     annualPriceCents: 0,

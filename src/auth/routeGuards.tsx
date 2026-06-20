@@ -8,7 +8,7 @@ export function RequireAuth() {
   const location = useLocation();
 
   if (loading) {
-    return <div className="public-page">Carregando Zerou...</div>;
+    return <div className="public-page">Carregando Granix...</div>;
   }
 
   if (!user) {
@@ -23,7 +23,7 @@ export function RequireOnboardingComplete() {
   const location = useLocation();
 
   if (profileLoading) {
-    return <div className="public-page">Preparando seu espaço Zerou...</div>;
+    return <div className="public-page">Preparando seu espaço Granix...</div>;
   }
 
   if (!profile?.defaultWorkspaceId && location.pathname !== '/app/onboarding') {
@@ -44,7 +44,7 @@ export function PublicOnlyRoute() {
   const { user, loading, profile } = useAuth();
 
   if (loading) {
-    return <div className="public-page">Carregando Zerou...</div>;
+    return <div className="public-page">Carregando Granix...</div>;
   }
 
   if (user) {

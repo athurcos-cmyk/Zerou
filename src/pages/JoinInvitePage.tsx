@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { clearPendingInvite, savePendingInvite } from '../auth/pendingInvite';
@@ -69,7 +69,7 @@ export function JoinInvitePage() {
       <AuthLayout
         eyebrow="Convite"
         title="Entre para aceitar o convite."
-        description="Crie uma conta ou entre na Zerou para organizar as finanças juntos. O convite fica salvo."
+        description="Crie uma conta ou entre no Granix para organizar as finanças juntos. O convite fica salvo."
       >
         <div className="form-stack">
           <button className="button button--primary" type="button" onClick={() => navigate('/login', { state: { returnTo } })}>
@@ -103,7 +103,7 @@ export function JoinInvitePage() {
     <AuthLayout
       eyebrow="Convite"
       title="Você foi convidado."
-      description="Alguém quer organizar as finanças juntos com você na Zerou."
+      description="Alguém quer organizar as finanças juntos com você no Granix."
     >
       <div className="form-stack">
         {loading && <p className="text-secondary">Verificando convite...</p>}

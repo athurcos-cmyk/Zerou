@@ -11,12 +11,12 @@ interface LandingShellProps {
 export function LandingShell({ hero, children }: LandingShellProps) {
   return (
     <main className="lp" data-theme="paper">
-      <Seo title="Zerou — finanças simples de entender" description="Organize suas finanças pessoais e do casal, sem misturar o que é seu com o que é compartilhado." path="/" />
+      <Seo title="Granix — finanças simples de entender" description="Organize suas finanças pessoais e do casal, sem misturar o que é seu com o que é compartilhado." path="/" />
 
       <header className="lp-nav">
         <div className="lp-nav-inner">
           <Link className="lp-brand" to="/">
-            <img src="/brand/zerou-symbol.png" alt="" width={30} height={30} /> Zerou
+            <img src="/brand/granix-icon-master-1024.png" alt="" width={30} height={30} /> Granix
           </Link>
           <nav className="lp-nav-links">
             <a href="#recursos">Recursos</a>
@@ -36,7 +36,7 @@ export function LandingShell({ hero, children }: LandingShellProps) {
 
       <div className="lp-wrap">
         <footer className="lp-footer">
-          <Link className="lp-brand" to="/"><img src="/brand/zerou-symbol.png" alt="" width={30} height={30} /> Zerou</Link>
+          <Link className="lp-brand" to="/"><img src="/brand/granix-icon-master-1024.png" alt="" width={30} height={30} /> Granix</Link>
           <nav className="lp-footer-links">
             <Link to="/security">Segurança</Link>
             <Link to="/help">Ajuda</Link>

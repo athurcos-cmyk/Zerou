@@ -1,7 +1,7 @@
-import { ArrowDownLeft, ArrowUpRight, CreditCard, Home, PieChart, Plus, Wallet } from 'lucide-react';
+﻿import { ArrowDownLeft, ArrowUpRight, CreditCard, Home, PieChart, Plus, Wallet } from 'lucide-react';
 
 /**
- * Faithful, self-contained CSS render of the Zerou dashboard for landing showcases.
+ * Faithful, self-contained CSS render of the Granix dashboard for landing showcases.
  * No app dependencies — purely presentational with static data.
  */
 export function AppMockup({ screen = 'dashboard' }: { screen?: 'dashboard' | 'transaction' }) {

@@ -1,4 +1,4 @@
-const INVITE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+﻿const INVITE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
 const INVITE_PREFIX = 'DUO';
 
 function bytesToHex(bytes: ArrayBuffer) {
@@ -23,7 +23,7 @@ export function normalizeInviteCode(code: string) {
     .replace(/^DUO/, '');
 
   if (normalized.length !== 6 || [...normalized].some((char) => !INVITE_ALPHABET.includes(char))) {
-    throw new Error('Informe um código Zerou válido.');
+    throw new Error('Informe um código Granix válido.');
   }
 
   return `${INVITE_PREFIX}-${normalized.slice(0, 4)}-${normalized.slice(4)}`;
@@ -31,7 +31,7 @@ export function normalizeInviteCode(code: string) {
 
 export async function hashInviteCode(code: string) {
   const normalized = normalizeInviteCode(code);
-  const payload = new TextEncoder().encode(`zerou-couple-invite:${normalized}`);
+  const payload = new TextEncoder().encode(`Granix-couple-invite:${normalized}`);
   const digest = await crypto.subtle.digest('SHA-256', payload);
 
   return bytesToHex(digest);

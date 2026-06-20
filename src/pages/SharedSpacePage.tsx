@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+﻿import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Check, ChevronRight, Copy, Eye, PiggyBank, Plus, QrCode, Scale, Settings2, Trash2, Users } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { calculateAccountBalances } from '../finance/financeCalculations';
@@ -166,7 +166,7 @@ export function SharedSpacePage() {
     setMessage(null);
     if (modeSheetPurpose === 'create') {
       if (!user) return;
-      createCoupleWorkspace(user.uid, profile?.name ?? user.displayName ?? 'Zerou', selectedMode)
+      createCoupleWorkspace(user.uid, profile?.name ?? user.displayName ?? 'Granix', selectedMode)
         .catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível criar o espaço agora.')));
     } else {
       if (!workspaceId || !user) return;
@@ -430,7 +430,7 @@ export function SharedSpacePage() {
               <div className="shared-invite-card">
                 <strong>{generatedInvite.code}</strong>
                 <span>{generatedInvite.joinUrl}</span>
-                <img src={generatedInvite.qrDataUrl} alt="QR Code do convite Zerou" />
+                <img src={generatedInvite.qrDataUrl} alt="QR Code do convite Granix" />
                 <button className="button button--subtle button--block" type="button" onClick={() => void copyInvite()}>
                   <Copy size={16} aria-hidden="true" /> {copied ? 'Copiado!' : 'Copiar link e código'}
                 </button>

@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest';
+﻿import { describe, expect, it } from 'vitest';
 import { THEME_DEFINITIONS } from './theme.registry';
 import { DEFAULT_APPEARANCE, resolveThemeId } from './theme.storage';
 
-describe('Zerou theme system', () => {
+describe('Granix theme system', () => {
   it('registers all six official themes', () => {
     expect(THEME_DEFINITIONS.map((theme) => theme.id)).toEqual([
       'paper',
