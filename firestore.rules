@@ -966,6 +966,7 @@ service cloud.firestore {
           'ownerUserId',
           'partnerUserId',
           'activeMemberCount',
+          'coupleMode',
           'status',
           'currency',
           'locale',
@@ -979,6 +980,7 @@ service cloud.firestore {
         && request.resource.data.ownerUserId == uid
         && request.resource.data.partnerUserId == ''
         && request.resource.data.activeMemberCount == 1
+        && request.resource.data.coupleMode in ['savings_only', 'transparent', 'balanced']
         && request.resource.data.status == 'active'
         && request.resource.data.currency == 'BRL'
         && request.resource.data.locale == 'pt-BR'
@@ -1002,7 +1004,8 @@ service cloud.firestore {
         && request.resource.data.locale == resource.data.locale
         && request.resource.data.timezone == resource.data.timezone
         && request.resource.data.createdAt == resource.data.createdAt
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['partnerUserId', 'activeMemberCount', 'updatedAt'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['partnerUserId', 'activeMemberCount', 'coupleMode', 'updatedAt'])
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['coupleMode']) || request.resource.data.coupleMode in ['savings_only', 'transparent', 'balanced'])
         && request.resource.data.updatedAt == request.time
         && (
           (
