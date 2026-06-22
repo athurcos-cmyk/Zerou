@@ -1,4 +1,4 @@
-interface BrandLogoProps {
+﻿interface BrandLogoProps {
   compact?: boolean;
 }
 
@@ -7,8 +7,8 @@ export function BrandLogo({ compact = false }: BrandLogoProps) {
     return (
       <img
         className="brand-mark brand-mark--compact"
-        src="/brand/granix-icon-master-1024.png"
-        alt="Granix"
+        src="/brand/granativa-icon-master-1024.png"
+        alt="Granativa"
         width="48"
         height="48"
       />
@@ -18,18 +18,18 @@ export function BrandLogo({ compact = false }: BrandLogoProps) {
   return (
     <img
       className="brand-mark"
-      src="/brand/granix-logo-primary.png"
-      alt="Granix - Controle individual. Organização a dois."
+      src="/brand/granativa-logo-primary.png"
+      alt="Granativa - Controle individual. Organização a dois."
     />
   );
 }
 
 export function BrandLockup() {
   return (
-    <div className="brand-lockup" aria-label="Granix">
-      <img src="/brand/granix-icon-master-1024.png" alt="" width="48" height="48" aria-hidden="true" />
+    <div className="brand-lockup" aria-label="Granativa">
+      <img src="/brand/granativa-icon-master-1024.png" alt="" width="48" height="48" aria-hidden="true" />
       <div>
-        <strong>Granix</strong>
+        <strong>Granativa</strong>
         <span>Controle individual. Organização a dois.</span>
       </div>
     </div>

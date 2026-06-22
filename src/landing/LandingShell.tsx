@@ -16,7 +16,7 @@ export function LandingShell({ hero, children }: LandingShellProps) {
       <header className="lp-nav">
         <div className="lp-nav-inner">
           <Link className="lp-brand" to="/">
-            <img src="/brand/granativa-icon-master-1024.png" alt="" width={30} height={30} /> Granativa
+            <img src="/brand/granativa-logo-horizontal.png" alt="Granativa" height={28} style={{ width: 'auto' }} />
           </Link>
           <nav className="lp-nav-links">
             <a href="#recursos">Recursos</a>
@@ -36,7 +36,7 @@ export function LandingShell({ hero, children }: LandingShellProps) {
 
       <div className="lp-wrap">
         <footer className="lp-footer">
-          <Link className="lp-brand" to="/"><img src="/brand/granativa-icon-master-1024.png" alt="" width={30} height={30} /> Granativa</Link>
+          <Link className="lp-brand" to="/"><img src="/brand/granativa-logo-horizontal.png" alt="Granativa" height={28} style={{ width: 'auto' }} /></Link>
           <nav className="lp-footer-links">
             <Link to="/security">Segurança</Link>
             <Link to="/help">Ajuda</Link>
