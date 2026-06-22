@@ -10,7 +10,7 @@ A interface segue a direção visual **"Sol"** (areia quente clara + tangerina `
 
 Todas as páginas autenticadas têm agora **cabeçalho compacto** (eyebrow + título, sem parágrafo), **ícones de categoria** em tile colorido 36×36 (`CategoryMark`) nas listas de transações (Dashboard e TransactionsPage), **cards de conta** com gradiente escuro (`--gradient-slate`) e **formulários de cadastro colapsáveis** (Contas, Cartões, Compromissos).
 
-A aba **Análise** (`/app/search`) exibe: donut interativo de gastos por categoria do mês (Recharts — clique destaca fatia, centro mostra nome/valor) e gráfico de barras entradas vs saídas dos últimos 6 meses. Busca por texto abaixo.
+A aba **Análise** (`/app/search`) exibe: KPI strip (gasto total, maior categoria, variação % vs. mês anterior com ícone trending); donut 200px interativo (Recharts — clique destaca fatia, centro mostra nome/valor/%) com legenda de **barras de progresso** por categoria; gráfico de barras (220px) entradas vs saídas dos últimos 6 meses com legenda própria; busca por texto (card oculto quando vazio).
 
 **Cloud Functions** (`functions/src/`): quatro funções scheduled deployadas no codebase `billing` (`southamerica-east1`): `closeInvoicesDue` (meia-noite), `generateRecurrences` (6h), `sendDueReminders` (8h), `sendDailyLogReminder` (20h — lembrete diário via FCM para todos os usuários). Push via `sendPushToUser` (`push.ts`) com limpeza automática de tokens stale. VAPID key configurada no Vercel. Secrets Stripe como placeholder para deploy sem ativar billing.
 

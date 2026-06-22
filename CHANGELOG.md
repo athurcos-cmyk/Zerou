@@ -2,6 +2,13 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-06-22 — feat: redesign página de Análise (SearchPage)
+
+- **KPI strip**: 3 cards no topo — gasto total do mês (destaque laranja), maior categoria com valor, variação % vs. mês anterior com ícone `TrendingUp`/`TrendingDown`/`Minus`.
+- **Donut**: aumentado para 200px; centro exibe nome + valor + percentual da categoria selecionada; legenda substituída por barras de progresso coloridas por categoria.
+- **Histórico mensal**: altura do gráfico de barras aumentada para 220px; legenda própria com quadradinhos no lugar do `<Legend>` padrão do Recharts; tooltip com uppercase label.
+- **Busca**: card de resultados oculto quando campo está vazio.
+
 ## 2026-06-22 — feat: logos oficiais com transparência real + fix Firestore coupleMode
 
 - **Logos oficiais**: todos os PNGs de brand substituídos por versões com alpha real (sem fundo branco). `granativa-logo-horizontal.png` (nav/og:image), `granativa-logo-primary.png`, `granativa-logo-stacked.png` e `granativa-logo-stacked-hq.png` adicionados.
