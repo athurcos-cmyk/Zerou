@@ -2,6 +2,14 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-06-22 — feat: logos oficiais com transparência real + fix Firestore coupleMode
+
+- **Logos oficiais**: todos os PNGs de brand substituídos por versões com alpha real (sem fundo branco). `granativa-logo-horizontal.png` (nav/og:image), `granativa-logo-primary.png`, `granativa-logo-stacked.png` e `granativa-logo-stacked-hq.png` adicionados.
+- **Favicons**: `favicon-16x16.png` e `favicon-32x32.png` transparentes substituem o `favicon.png` legado (784KB). `index.html` atualizado.
+- **Nav/footer landing**: `LandingShell` agora usa a logo horizontal como `<img>` única (sem texto duplicado em HTML). `BrandLogo.tsx`: paths corrigidos para lowercase.
+- **fix Firestore**: `validCoupleWorkspaceCreate` não listava `coupleMode` no `hasOnly()` — qualquer usuário recebia `permission-denied` ao criar espaço compartilhado. Corrigido + validação `in ['savings_only', 'transparent', 'balanced']`. `validCoupleWorkspaceUpdate` também corrigido para permitir troca de modo. Regras deployadas.
+- **`Seo.tsx`**: og:image corrigido para `granativa-logo-horizontal.png` (casing lowercase).
+
 ## 2026-06-22 — rebrand: Granix → Granativa + landing UX mobile
 
 - **Nome final**: app renomeado de "Granix" para **Granativa** (portmanteau: grana + ativa). 35 arquivos atualizados, concordância de gênero corrigida (a/na/da Granativa).

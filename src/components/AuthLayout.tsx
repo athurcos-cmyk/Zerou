@@ -12,7 +12,7 @@ interface AuthLayoutProps {
 export function AuthLayout({ eyebrow, title, description, children }: AuthLayoutProps) {
   return (
     <main className="public-page" data-theme="paper">
-      <section className="public-shell" aria-label="Acesso Granix">
+      <section className="public-shell" aria-label="Acesso Granativa">
         <aside className="public-panel public-panel--hero">
           <div>
             <Link to="/" aria-label="Ir para início">

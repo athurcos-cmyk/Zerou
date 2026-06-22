@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+﻿import { useEffect } from 'react';
 
 interface SeoProps {
   title: string;
@@ -34,7 +34,7 @@ export function Seo({ title, description, path = '/', robots = 'index,follow' }:
   useEffect(() => {
     const origin = window.location.origin;
     const canonicalUrl = `${origin}${path}`;
-    const fullTitle = title === 'Granix' ? 'Granix' : `${title} | Granix`;
+    const fullTitle = title === 'Granativa' ? 'Granativa' : `${title} | Granativa`;
 
     document.title = fullTitle;
     upsertMeta('meta[name="description"]', { name: 'description', content: description });
@@ -43,7 +43,7 @@ export function Seo({ title, description, path = '/', robots = 'index,follow' }:
     upsertMeta('meta[property="og:description"]', { property: 'og:description', content: description });
     upsertMeta('meta[property="og:type"]', { property: 'og:type', content: 'website' });
     upsertMeta('meta[property="og:url"]', { property: 'og:url', content: canonicalUrl });
-    upsertMeta('meta[property="og:image"]', { property: 'og:image', content: `${origin}/brand/granix-logo-horizontal.png` });
+    upsertMeta('meta[property="og:image"]', { property: 'og:image', content: `${origin}/brand/granativa-logo-horizontal.png` });
     upsertCanonical(canonicalUrl);
   }, [description, path, robots, title]);
 
