@@ -60,7 +60,7 @@ export function LoginPage() {
   return (
     <AuthLayout
       eyebrow="Entrar"
-      title="Volte para o seu espaço Granix."
+      title="Volte para o seu espaço Granativa."
       description="Acesse seu espaço pessoal e continue do ponto em que parou."
     >
       <form className="form-stack" onSubmit={form.handleSubmit(onSubmit)}>
@@ -83,7 +83,7 @@ export function LoginPage() {
           <span className="text-muted">{form.formState.errors.password?.message}</span>
         </div>
         <button className="button button--primary" type="submit" disabled={busy || Boolean(firebaseError)}>
-          Entrar no Granix
+          Entrar na Granativa
         </button>
         <button className="button button--secondary" type="button" onClick={onGoogle} disabled={busy || Boolean(firebaseError)}>
           <CircleUserRound size={18} aria-hidden="true" /> Entrar com Google

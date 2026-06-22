@@ -8,7 +8,7 @@ export function PrivacyCenterPage() {
     <PublicLayout>
       <Seo
         title="Privacidade"
-        description="Como o Granix protege a separação entre seu espaço individual e o espaço compartilhado."
+        description="Como a Granativa protege a separação entre seu espaço individual e o espaço compartilhado."
         path="/privacy-center"
         robots="noindex,nofollow"
       />
@@ -16,7 +16,7 @@ export function PrivacyCenterPage() {
         <p className="eyebrow">Privacidade</p>
         <h1 className="marketing-title">Seu espaço pessoal continua seu.</h1>
         <p className="marketing-copy">
-          o Granix foi desenhada para separar o que é individual do que é compartilhado. Esta página resume os controles mais
+          a Granativa foi desenhada para separar o que é individual do que é compartilhado. Esta página resume os controles mais
           importantes e aponta para a política completa.
         </p>
 

@@ -207,7 +207,7 @@ export async function createCoupleWorkspace(userId: string, ownerName: string, m
   const db = getFirebaseDb();
   const batch = writeBatch(db);
   const now = serverTimestamp();
-  const workspaceName = `Espaço compartilhado de ${ownerName || 'Granix'}`;
+  const workspaceName = `Espaço compartilhado de ${ownerName || 'Granativa'}`;
 
   batch.set(workspaceRef(workspaceId), {
     id: workspaceId,

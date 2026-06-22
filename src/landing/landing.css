@@ -1,5 +1,5 @@
-/* ============================================================
-   Granix landing — zona de marketing, cores literais permitidas
+﻿/* ============================================================
+   Granativa landing — zona de marketing, cores literais permitidas
    ============================================================ */
 
 .lp {
@@ -68,7 +68,6 @@
 
 .lp-nav-links { display: flex; gap: 1.5rem; }
 .lp-nav-links a { color: var(--ink-2); font-weight: 600; font-size: 0.9rem; text-decoration: none; }
-.lp-nav-links a:hover { color: var(--ink); }
 .lp-nav-cta { display: flex; gap: 0.45rem; align-items: center; }
 
 /* ── Buttons ── */
@@ -85,24 +84,21 @@
   text-decoration: none;
   transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
   will-change: transform;
+  min-height: 44px;
 }
 .lp-btn--primary {
   background: var(--tang);
   color: #fff;
   box-shadow: 0 6px 20px rgba(238, 85, 36, 0.32);
 }
-.lp-btn--primary:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(238, 85, 36, 0.42); }
 .lp-btn--ghost { background: transparent; color: var(--ink); }
-.lp-btn--ghost:hover { background: rgba(28, 24, 20, 0.06); }
 .lp-btn--ghost-dark {
   background: rgba(255, 255, 255, 0.1);
   color: rgba(255, 255, 255, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
-.lp-btn--ghost-dark:hover { background: rgba(255, 255, 255, 0.16); color: #fff; }
 .lp-btn--lg { padding: 0.9rem 1.6rem; font-size: 1rem; }
 .lp-btn--light { background: #fff; color: var(--ink); box-shadow: 0 6px 20px rgba(28, 24, 20, 0.1); }
-.lp-btn--light:hover { transform: translateY(-2px); }
 
 /* ── Hero ── */
 .lp-hero {
@@ -716,7 +712,6 @@
 }
 .lp-footer-links { display: flex; flex-wrap: wrap; gap: 1.1rem; }
 .lp-footer-links a { color: var(--ink-2); font-size: 0.87rem; font-weight: 600; text-decoration: none; }
-.lp-footer-links a:hover { color: var(--ink); }
 
 /* ── Responsive ── */
 @media (max-width: 900px) {
@@ -736,10 +731,42 @@
 @media (max-width: 520px) {
   .lp-bento { grid-template-columns: 1fr; }
   .lp-cell--wide, .lp-cell--tall, .lp-cell--third { grid-column: span 1; }
-  .lp-stats-band { flex-direction: column; gap: 1rem; }
-  .lp-stat-divider { width: 40px; height: 1px; }
+  .lp-stats-band { padding: 1rem 0.75rem; }
+  .lp-stat { padding: 0 0.35rem; }
+  .lp-stat strong { font-size: 1.35rem; }
+  .lp-stat span { font-size: 0.7rem; }
+  .lp-stat-divider { height: 32px; }
   .lp-hero--dark { padding: 1rem 0 5rem; }
   .mk-phone { width: 240px; }
+}
+
+/* ── Mobile: botões do hero em coluna e largura total ── */
+@media (max-width: 640px) {
+  .lp-hero-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .lp-hero-actions .lp-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ── Nav mobile: esconde "Entrar" em telas muito pequenas ── */
+@media (max-width: 480px) {
+  .lp-nav-cta .lp-btn--ghost {
+    display: none;
+  }
+}
+
+/* ── Hover: apenas em dispositivos com cursor (não-touch) ── */
+@media (hover: hover) {
+  .lp-btn--primary:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(238, 85, 36, 0.42); }
+  .lp-btn--ghost:hover { background: rgba(28, 24, 20, 0.06); }
+  .lp-btn--ghost-dark:hover { background: rgba(255, 255, 255, 0.16); color: #fff; }
+  .lp-btn--light:hover { transform: translateY(-2px); }
+  .lp-nav-links a:hover { color: var(--ink); }
+  .lp-footer-links a:hover { color: var(--ink); }
 }
 
 @media (prefers-reduced-motion: reduce) {

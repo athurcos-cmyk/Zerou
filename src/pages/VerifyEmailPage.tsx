@@ -14,7 +14,7 @@ export function VerifyEmailPage() {
 
   async function onSend() {
     if (!user || authFromCache) {
-      setMessage('Entre no Granix para enviar a verificação.');
+      setMessage('Entre na Granativa para enviar a verificação.');
       return;
     }
 
@@ -36,7 +36,7 @@ export function VerifyEmailPage() {
     <AuthLayout
       eyebrow="Verificação"
       title="Confirme seu email."
-      description="A verificação ajuda a manter seu acesso Granix recuperável e confiável."
+      description="A verificação ajuda a manter seu acesso Granativa recuperável e confiável."
     >
       <div className="form-stack">
         <FormMessage>{message}</FormMessage>

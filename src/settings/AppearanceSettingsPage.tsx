@@ -17,7 +17,7 @@ export function AppearanceSettingsPage() {
       <p className="eyebrow">Configurações</p>
       <h1 className="page-title">Aparência</h1>
       <p className="page-description">
-        Escolha como o Granix aparece para você. A preferência é individual e não altera a interface de outra pessoa.
+        Escolha como a Granativa aparece para você. A preferência é individual e não altera a interface de outra pessoa.
       </p>
 
       <div className="settings-grid">

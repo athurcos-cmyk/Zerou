@@ -2,7 +2,7 @@
 import { THEME_DEFINITIONS } from './theme.registry';
 import { DEFAULT_APPEARANCE, resolveThemeId } from './theme.storage';
 
-describe('Granix theme system', () => {
+describe('Granativa theme system', () => {
   it('registers all six official themes', () => {
     expect(THEME_DEFINITIONS.map((theme) => theme.id)).toEqual([
       'paper',

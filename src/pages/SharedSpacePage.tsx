@@ -166,7 +166,7 @@ export function SharedSpacePage() {
     setMessage(null);
     if (modeSheetPurpose === 'create') {
       if (!user) return;
-      createCoupleWorkspace(user.uid, profile?.name ?? user.displayName ?? 'Granix', selectedMode)
+      createCoupleWorkspace(user.uid, profile?.name ?? user.displayName ?? 'Granativa', selectedMode)
         .catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível criar o espaço agora.')));
     } else {
       if (!workspaceId || !user) return;
@@ -430,7 +430,7 @@ export function SharedSpacePage() {
               <div className="shared-invite-card">
                 <strong>{generatedInvite.code}</strong>
                 <span>{generatedInvite.joinUrl}</span>
-                <img src={generatedInvite.qrDataUrl} alt="QR Code do convite Granix" />
+                <img src={generatedInvite.qrDataUrl} alt="QR Code do convite Granativa" />
                 <button className="button button--subtle button--block" type="button" onClick={() => void copyInvite()}>
                   <Copy size={16} aria-hidden="true" /> {copied ? 'Copiado!' : 'Copiar link e código'}
                 </button>

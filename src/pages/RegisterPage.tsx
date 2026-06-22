@@ -62,7 +62,7 @@ export function RegisterPage() {
     <AuthLayout
       eyebrow="Criar conta"
       title="Comece com seu espaço pessoal."
-      description="o Granix separa o que é individual do que pode ser compartilhado depois."
+      description="a Granativa separa o que é individual do que pode ser compartilhado depois."
     >
       <form className="form-stack" onSubmit={form.handleSubmit(onSubmit)}>
         <FormMessage>{firebaseError}</FormMessage>
@@ -92,12 +92,12 @@ export function RegisterPage() {
           <input type="checkbox" {...form.register('terms')} />
           <span>
             Li e aceito os <Link className="inline-link" to="/legal/terms">termos</Link> e a{' '}
-            <Link className="inline-link" to="/legal/privacy">política de privacidade</Link> do Granix.
+            <Link className="inline-link" to="/legal/privacy">política de privacidade</Link> da Granativa.
           </span>
         </label>
         <span className="text-muted">{form.formState.errors.terms?.message}</span>
         <button className="button button--primary" type="submit" disabled={busy || Boolean(firebaseError)}>
-          Criar conta Granix
+          Criar conta Granativa
         </button>
         <button className="button button--secondary" type="button" onClick={onGoogle} disabled={busy || Boolean(firebaseError)}>
           <CircleUserRound size={18} aria-hidden="true" /> Continuar com Google

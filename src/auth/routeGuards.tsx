@@ -1,4 +1,4 @@
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
+﻿import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 
 const ADMIN_EMAIL = 'a.thurcos@gmail.com';
@@ -8,7 +8,7 @@ export function RequireAuth() {
   const location = useLocation();
 
   if (loading) {
-    return <div className="public-page">Carregando Granix...</div>;
+    return <div className="public-page">Carregando Granativa...</div>;
   }
 
   if (!user) {
@@ -23,7 +23,7 @@ export function RequireOnboardingComplete() {
   const location = useLocation();
 
   if (profileLoading) {
-    return <div className="public-page">Preparando seu espaço Granix...</div>;
+    return <div className="public-page">Preparando seu espaço Granativa...</div>;
   }
 
   if (!profile?.defaultWorkspaceId && location.pathname !== '/app/onboarding') {
@@ -44,7 +44,7 @@ export function PublicOnlyRoute() {
   const { user, loading, profile } = useAuth();
 
   if (loading) {
-    return <div className="public-page">Carregando Granix...</div>;
+    return <div className="public-page">Carregando Granativa...</div>;
   }
 
   if (user) {

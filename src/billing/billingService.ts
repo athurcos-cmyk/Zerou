@@ -22,7 +22,7 @@ export const defaultPlanCatalog: PlanCatalogItem[] = [
   {
     id: 'free',
     name: 'Gratuito',
-    description: 'Acesso gratuito ao app Granix enquanto o produto amadurece.',
+    description: 'Acesso gratuito ao app Granativa enquanto o produto amadurece.',
     active: true,
     monthlyPriceCents: 0,
     annualPriceCents: 0,

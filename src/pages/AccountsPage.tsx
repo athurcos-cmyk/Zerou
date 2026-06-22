@@ -71,7 +71,7 @@ export function AccountsPage() {
     }
 
     const confirmed = window.confirm(
-      `Excluir "${accountName}" permanentemente? Como ela não tem histórico ligado, o Granix vai apagar essa conta financeira do banco de dados.`
+      `Excluir "${accountName}" permanentemente? Como ela não tem histórico ligado, a Granativa vai apagar essa conta financeira do banco de dados.`
     );
 
     if (!confirmed) {

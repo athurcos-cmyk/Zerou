@@ -32,7 +32,7 @@ export function ForgotPasswordPage() {
 
     try {
       await sendResetEmail(values.email);
-      setSuccess('Enviamos um email para redefinir sua senha Granix.');
+      setSuccess('Enviamos um email para redefinir sua senha Granativa.');
     } catch (error) {
       setMessage(getAuthErrorMessage(error));
     } finally {
@@ -44,7 +44,7 @@ export function ForgotPasswordPage() {
     <AuthLayout
       eyebrow="Recuperação"
       title="Recupere seu acesso."
-      description="Informe o email usado no Granix para receber o link de redefinição."
+      description="Informe o email usado na Granativa para receber o link de redefinição."
     >
       <form className="form-stack" onSubmit={form.handleSubmit(onSubmit)}>
         <FormMessage>{firebaseError}</FormMessage>

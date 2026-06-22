@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+﻿import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, ArrowRight, BellRing, CalendarRange, CheckCircle2, FolderOpen,
@@ -75,7 +75,7 @@ export function OnboardingPage() {
     setMessage(null);
     try {
       if (!user) {
-        throw new Error('Entre no Granix para continuar.');
+        throw new Error('Entre na Granativa para continuar.');
       }
       await ensurePersonalFoundation({
         user,
@@ -106,7 +106,7 @@ export function OnboardingPage() {
 
       {step === 0 && (
         <div className="onboard-step">
-          <h1 className="onboard-title">Vamos preparar seu Granix.</h1>
+          <h1 className="onboard-title">Vamos preparar sua Granativa.</h1>
           <p className="onboard-subtitle">Seu espaço pessoal começa privado. Conte como você se chama para começar.</p>
 
           {pendingInvite ? (
@@ -151,7 +151,7 @@ export function OnboardingPage() {
           </div>
           <div className="onboard-finish-hint">
             <Sparkles size={18} aria-hidden="true" />
-            <span>Pronto! O Granix vai montar seu espaço com base nessas respostas.</span>
+            <span>Pronto! a Granativa vai montar seu espaço com base nessas respostas.</span>
           </div>
         </div>
       )}
@@ -175,7 +175,7 @@ export function OnboardingPage() {
         )}
         {step === 2 && (
           <button className="button button--primary onboard-cta" type="button" disabled={busy || Boolean(firebaseError)} onClick={() => void finish()}>
-            {busy ? 'Preparando...' : <>Entrar no Granix <CheckCircle2 size={18} aria-hidden="true" /></>}
+            {busy ? 'Preparando...' : <>Entrar na Granativa <CheckCircle2 size={18} aria-hidden="true" /></>}
           </button>
         )}
       </div>

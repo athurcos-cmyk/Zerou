@@ -5,8 +5,8 @@ import { clearCachedProfiles, readCachedProfile, readLastCachedProfile, saveCach
 function buildProfile(id: string): UserProfile {
   return {
     id,
-    name: 'Ana Granix',
-    email: 'ana@Granix.test',
+    name: 'Ana Granativa',
+    email: 'ana@Granativa.test',
     defaultWorkspaceId: `personal_${id}`,
     locale: 'pt-BR',
     timezone: 'America/Sao_Paulo',
@@ -44,7 +44,7 @@ describe('profileCache', () => {
   });
 
   it('ignora cache corrompido sem quebrar o boot', () => {
-    window.localStorage.setItem('Granix.auth.profileCache.v1', '{');
+    window.localStorage.setItem('Granativa.auth.profileCache.v1', '{');
 
     expect(readCachedProfile('user-1')).toBeNull();
   });

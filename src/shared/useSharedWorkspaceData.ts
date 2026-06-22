@@ -74,7 +74,7 @@ export function useSharedWorkspaceData(userId?: string) {
         setState((current) => ({
           ...current,
           loading: false,
-          error: 'Não foi possível carregar seus espaços Granix.'
+          error: 'Não foi possível carregar seus espaços Granativa.'
         }))
     });
   }, [userId]);

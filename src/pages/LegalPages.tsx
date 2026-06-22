@@ -4,25 +4,25 @@ import { PublicLayout } from './PublicLayout';
 const documents = {
   terms: {
     title: 'Termos de uso',
-    description: 'Termos de uso do Granix para organização financeira pessoal e compartilhada.',
+    description: 'Termos de uso da Granativa para organização financeira pessoal e compartilhada.',
     path: '/legal/terms',
     updatedAt: 'Atualizado em 15/06/2026',
     sections: [
       [
         'Aceitação dos termos',
-        'Ao criar uma conta, acessar ou usar o Granix, você declara que leu e concorda com estes Termos de uso e com a Política de privacidade. Se não concordar, não use o app.'
+        'Ao criar uma conta, acessar ou usar a Granativa, você declara que leu e concorda com estes Termos de uso e com a Política de privacidade. Se não concordar, não use o app.'
       ],
       [
-        'O que é o Granix',
-        'o Granix é um aplicativo web progressivo de organização financeira pessoal e compartilhada. O app ajuda a registrar contas, receitas, despesas, cartões, faturas, compromissos e combinados entre duas pessoas, mantendo separado o que é individual e o que é compartilhado.'
+        'O que é a Granativa',
+        'a Granativa é um aplicativo web progressivo de organização financeira pessoal e compartilhada. O app ajuda a registrar contas, receitas, despesas, cartões, faturas, compromissos e combinados entre duas pessoas, mantendo separado o que é individual e o que é compartilhado.'
       ],
       [
-        'O que o Granix não é',
-        'o Granix não é banco, instituição de pagamento, carteira digital, corretora, consultoria financeira, consultoria contábil, consultoria jurídica ou consultoria tributária. As informações exibidas são organizacionais e dependem dos dados que você inserir. Antes de tomar decisões financeiras relevantes, confira os dados e, quando necessário, procure orientação profissional.'
+        'O que a Granativa não é',
+        'a Granativa não é banco, instituição de pagamento, carteira digital, corretora, consultoria financeira, consultoria contábil, consultoria jurídica ou consultoria tributária. As informações exibidas são organizacionais e dependem dos dados que você inserir. Antes de tomar decisões financeiras relevantes, confira os dados e, quando necessário, procure orientação profissional.'
       ],
       [
         'Conta e segurança',
-        'Você é responsável por manter seus dados de cadastro corretos, proteger seu login, não compartilhar sua conta com terceiros e avisar o Granix se suspeitar de uso indevido. o Granix pode bloquear ou limitar acessos que indiquem fraude, abuso, violação destes termos ou risco de segurança.'
+        'Você é responsável por manter seus dados de cadastro corretos, proteger seu login, não compartilhar sua conta com terceiros e avisar a Granativa se suspeitar de uso indevido. a Granativa pode bloquear ou limitar acessos que indiquem fraude, abuso, violação destes termos ou risco de segurança.'
       ],
       [
         'Dados inseridos pelo usuário',
@@ -34,27 +34,27 @@ const documents = {
       ],
       [
         'Uso gratuito',
-        'O uso atual do Granix é gratuito. Se o Granix oferecer recursos pagos no futuro, qualquer cobrança dependerá de comunicação clara, preço informado e aceite próprio antes da contratação.'
+        'O uso atual da Granativa é gratuito. Se a Granativa oferecer recursos pagos no futuro, qualquer cobrança dependerá de comunicação clara, preço informado e aceite próprio antes da contratação.'
       ],
       [
         'Uso adequado',
-        'Você não deve usar o Granix para atividades ilegais, fraude, lavagem de dinheiro, violação de direitos de terceiros, tentativa de invasão, engenharia reversa indevida, sobrecarga do serviço ou envio de conteúdo abusivo.'
+        'Você não deve usar a Granativa para atividades ilegais, fraude, lavagem de dinheiro, violação de direitos de terceiros, tentativa de invasão, engenharia reversa indevida, sobrecarga do serviço ou envio de conteúdo abusivo.'
       ],
       [
         'Disponibilidade e atualizações',
-        'o Granix busca manter o app estável, mas o serviço pode passar por manutenções, atualizações, falhas de conexão, indisponibilidade de fornecedores, mudanças de navegador, problemas de dispositivo ou ajustes de segurança. Atualizações podem alterar telas, recursos e regras de uso para melhorar o produto.'
+        'a Granativa busca manter o app estável, mas o serviço pode passar por manutenções, atualizações, falhas de conexão, indisponibilidade de fornecedores, mudanças de navegador, problemas de dispositivo ou ajustes de segurança. Atualizações podem alterar telas, recursos e regras de uso para melhorar o produto.'
       ],
       [
         'Propriedade intelectual',
-        'A marca Granix, a interface, os textos, o design, os fluxos, a identidade visual e o código do app pertencem aos seus titulares. O uso do app não transfere propriedade intelectual ao usuário.'
+        'A marca Granativa, a interface, os textos, o design, os fluxos, a identidade visual e o código do app pertencem aos seus titulares. O uso do app não transfere propriedade intelectual ao usuário.'
       ],
       [
         'Encerramento e exclusão',
-        'Você pode parar de usar o Granix a qualquer momento. A exclusão definitiva de conta ocorre pelas Configurações do app, na área de Segurança, com confirmação expressa e reautenticação quando exigida pelo Firebase. Algumas informações podem ser mantidas pelo tempo necessário para segurança, prevenção de fraude, cumprimento legal, resolução de disputas ou exercício regular de direitos.'
+        'Você pode parar de usar a Granativa a qualquer momento. A exclusão definitiva de conta ocorre pelas Configurações do app, na área de Segurança, com confirmação expressa e reautenticação quando exigida pelo Firebase. Algumas informações podem ser mantidas pelo tempo necessário para segurança, prevenção de fraude, cumprimento legal, resolução de disputas ou exercício regular de direitos.'
       ],
       [
         'Responsabilidade',
-        'Na extensão permitida pela lei brasileira, o Granix não se responsabiliza por prejuízos decorrentes de dados inseridos incorretamente pelo usuário, decisões financeiras tomadas sem conferência, indisponibilidade temporária, falhas de internet, falhas do dispositivo, uso indevido da conta ou uso contrário a estes termos.'
+        'Na extensão permitida pela lei brasileira, a Granativa não se responsabiliza por prejuízos decorrentes de dados inseridos incorretamente pelo usuário, decisões financeiras tomadas sem conferência, indisponibilidade temporária, falhas de internet, falhas do dispositivo, uso indevido da conta ou uso contrário a estes termos.'
       ],
       [
         'Lei aplicável',
@@ -62,27 +62,27 @@ const documents = {
       ],
       [
         'Contato',
-        'Dúvidas sobre estes termos podem ser enviadas para suporte@Granix.app. Solicitações sobre privacidade e dados pessoais podem ser enviadas para privacidade@Granix.app.'
+        'Dúvidas sobre estes termos podem ser enviadas para suporte@Granativa.app. Solicitações sobre privacidade e dados pessoais podem ser enviadas para privacidade@Granativa.app.'
       ]
     ]
   },
   privacy: {
     title: 'Política de privacidade',
-    description: 'Política de privacidade do Granix conforme a LGPD e a legislação brasileira aplicável.',
+    description: 'Política de privacidade da Granativa conforme a LGPD e a legislação brasileira aplicável.',
     path: '/legal/privacy',
     updatedAt: 'Atualizado em 15/06/2026',
     sections: [
       [
         'Controlador e contato',
-        'o Granix é responsável por tratar os dados pessoais necessários para operar o app. Para assuntos de privacidade, proteção de dados, dúvidas ou exercício de direitos, use o canal privacidade@Granix.app.'
+        'a Granativa é responsável por tratar os dados pessoais necessários para operar o app. Para assuntos de privacidade, proteção de dados, dúvidas ou exercício de direitos, use o canal privacidade@Granativa.app.'
       ],
       [
         'Dados que podem ser tratados',
-        'Podemos tratar nome, email, identificadores de autenticação, preferências de tema, dados dos seus espaços no Granix, contas, transações, categorias, cartões, faturas, compromissos, recorrências, despesas compartilhadas, comentários, convites, dados técnicos do dispositivo, logs de segurança, registros de suporte e informações que você inserir voluntariamente no app.'
+        'Podemos tratar nome, email, identificadores de autenticação, preferências de tema, dados dos seus espaços na Granativa, contas, transações, categorias, cartões, faturas, compromissos, recorrências, despesas compartilhadas, comentários, convites, dados técnicos do dispositivo, logs de segurança, registros de suporte e informações que você inserir voluntariamente no app.'
       ],
       [
         'Dados financeiros',
-        'o Granix armazena os registros financeiros que você digita para organizar sua rotina. o Granix não acessa conta bancária, não movimenta dinheiro, não consulta saldo bancário real, não solicita senha de banco e não vende dados pessoais.'
+        'a Granativa armazena os registros financeiros que você digita para organizar sua rotina. a Granativa não acessa conta bancária, não movimenta dinheiro, não consulta saldo bancário real, não solicita senha de banco e não vende dados pessoais.'
       ],
       [
         'Finalidades',
@@ -98,15 +98,15 @@ const documents = {
       ],
       [
         'Fornecedores técnicos',
-        'Para funcionar, o Granix pode usar Firebase e Google Cloud para autenticação, banco de dados, segurança e infraestrutura técnica; Vercel para hospedagem, entrega do app, deploy e logs técnicos; e provedores de email ou suporte quando necessários para comunicação operacional. Esses fornecedores processam dados apenas para viabilizar o serviço contratado pelo Granix.'
+        'Para funcionar, a Granativa pode usar Firebase e Google Cloud para autenticação, banco de dados, segurança e infraestrutura técnica; Vercel para hospedagem, entrega do app, deploy e logs técnicos; e provedores de email ou suporte quando necessários para comunicação operacional. Esses fornecedores processam dados apenas para viabilizar o serviço contratado pela Granativa.'
       ],
       [
         'Transferência internacional',
-        'Alguns fornecedores técnicos podem armazenar ou processar dados fora do Brasil. Quando isso ocorrer, o Granix buscará usar fornecedores com mecanismos contratuais, técnicos e organizacionais compatíveis com a LGPD e com padrões reconhecidos de proteção de dados.'
+        'Alguns fornecedores técnicos podem armazenar ou processar dados fora do Brasil. Quando isso ocorrer, a Granativa buscará usar fornecedores com mecanismos contratuais, técnicos e organizacionais compatíveis com a LGPD e com padrões reconhecidos de proteção de dados.'
       ],
       [
         'Cookies e armazenamento local',
-        'o Granix usa tecnologias necessárias como localStorage, IndexedDB, cache do PWA e mecanismos do Firebase Auth para manter login, preferências, funcionamento no celular e segurança básica. Não usamos cookies opcionais de publicidade ou rastreamento por padrão. Se analytics opcional for ativado no futuro, ele deverá respeitar aviso e consentimento quando exigido.'
+        'a Granativa usa tecnologias necessárias como localStorage, IndexedDB, cache do PWA e mecanismos do Firebase Auth para manter login, preferências, funcionamento no celular e segurança básica. Não usamos cookies opcionais de publicidade ou rastreamento por padrão. Se analytics opcional for ativado no futuro, ele deverá respeitar aviso e consentimento quando exigido.'
       ],
       [
         'Retenção e exclusão',
@@ -114,7 +114,7 @@ const documents = {
       ],
       [
         'Segurança',
-        'o Granix usa autenticação, regras de acesso, separação por usuário e por espaço, controles de permissão e práticas de desenvolvimento voltadas à proteção dos dados. Nenhum serviço digital consegue garantir segurança absoluta, por isso também é importante proteger seu login e seu dispositivo.'
+        'a Granativa usa autenticação, regras de acesso, separação por usuário e por espaço, controles de permissão e práticas de desenvolvimento voltadas à proteção dos dados. Nenhum serviço digital consegue garantir segurança absoluta, por isso também é importante proteger seu login e seu dispositivo.'
       ],
       [
         'Seus direitos',
@@ -122,7 +122,7 @@ const documents = {
       ],
       [
         'Menores de idade',
-        'o Granix é voltada a pessoas capazes de gerir a própria vida financeira. O uso por menores de idade deve ocorrer com autorização e acompanhamento do responsável legal.'
+        'a Granativa é voltada a pessoas capazes de gerir a própria vida financeira. O uso por menores de idade deve ocorrer com autorização e acompanhamento do responsável legal.'
       ],
       [
         'Alterações desta política',
@@ -130,7 +130,7 @@ const documents = {
       ],
       [
         'Contato',
-        'Para privacidade e proteção de dados, escreva para privacidade@Granix.app. Para suporte geral, escreva para suporte@Granix.app.'
+        'Para privacidade e proteção de dados, escreva para privacidade@Granativa.app. Para suporte geral, escreva para suporte@Granativa.app.'
       ]
     ]
   }
@@ -151,7 +151,7 @@ function LegalDocument({ kind }: { kind: keyof typeof documents }) {
     <PublicLayout>
       <Seo title={document.title} description={document.description} path={document.path} />
       <article className="public-section legal-document">
-        <p className="eyebrow">Granix</p>
+        <p className="eyebrow">Granativa</p>
         <h1 className="marketing-title">{document.title}</h1>
         <p className="text-secondary">{document.updatedAt}</p>
         {document.sections.map(([title, body]) => (

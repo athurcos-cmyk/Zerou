@@ -10,7 +10,7 @@ export function PublicLayout({ children }: PublicLayoutProps) {
   return (
     <main className="marketing-page public-marketing-shell" data-theme="paper">
       <nav className="marketing-nav public-nav" aria-label="Navegação pública">
-        <Link to="/" aria-label="Ir para a página inicial do Granix">
+        <Link to="/" aria-label="Ir para a página inicial da Granativa">
           <BrandLockup />
         </Link>
         <div className="public-nav-links">

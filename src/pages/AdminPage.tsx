@@ -616,7 +616,7 @@ export function AdminPage() {
       <header className="admin-header">
         <div className="admin-header__left">
           <span className="admin-header__badge">Admin</span>
-          <span className="admin-header__title">Granix</span>
+          <span className="admin-header__title">Granativa</span>
         </div>
 
         <nav className="admin-tabs">

@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+﻿import { useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useInView } from 'framer-motion';
 import {
@@ -28,10 +28,8 @@ function TiltCard({ children, className = '' }: { children: React.ReactNode; cla
   return (
     <motion.article
       className={`lp-cell ${className}`}
-      whileHover={{ rotateX: -4, rotateY: 5, scale: 1.025 }}
-      whileTap={{ scale: 0.98 }}
+      whileTap={{ scale: 0.97 }}
       transition={{ type: 'spring', stiffness: 500, damping: 32 }}
-      style={{ transformPerspective: 900 }}
     >
       {children}
     </motion.article>
@@ -41,35 +39,23 @@ function TiltCard({ children, className = '' }: { children: React.ReactNode; cla
 function CountUp({ to, prefix = '', suffix = '' }: { to: number; prefix?: string; suffix?: string }) {
   const ref = useRef<HTMLSpanElement>(null);
   const inView = useInView(ref, { once: true });
-
   return (
     <motion.span
       ref={ref}
       initial={{ opacity: 0 }}
       animate={inView ? { opacity: 1 } : {}}
+      transition={{ duration: 0.5 }}
     >
-      {inView ? (
-        <motion.span
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3 }}
-        >
-          {prefix}
-          <motion.span>
-            {to.toLocaleString('pt-BR')}
-          </motion.span>
-          {suffix}
-        </motion.span>
-      ) : `${prefix}${to.toLocaleString('pt-BR')}${suffix}`}
+      {prefix}{to.toLocaleString('pt-BR')}{suffix}
     </motion.span>
   );
 }
 
 const faqs = [
-  { q: 'Posso usar sozinho?', a: 'Sim. o Granix funciona muito bem para a sua vida financeira individual. O modo casal entra só quando você quiser.' },
+  { q: 'Posso usar sozinho?', a: 'Sim. a Granativa funciona muito bem para a sua vida financeira individual. O modo casal entra só quando você quiser.' },
   { q: 'O que a outra pessoa vê?', a: 'Apenas o que está no espaço do casal: despesas compartilhadas, divisões e acertos. Suas contas, cartões e lançamentos pessoais continuam privados.' },
   { q: 'Cartão entra no saldo duas vezes?', a: 'Não. Compras ficam na fatura, e o saldo da conta só muda quando você registra o pagamento.' },
-  { q: 'Preciso instalar pela loja?', a: 'Não. o Granix é um app web: abra pelo navegador do celular e adicione o atalho na tela inicial.' }
+  { q: 'Preciso instalar pela loja?', a: 'Não. a Granativa é um app web: abra pelo navegador do celular e adicione o atalho na tela inicial.' }
 ];
 
 export function LandingSections() {
@@ -101,7 +87,7 @@ export function LandingSections() {
       {/* Bento features */}
       <RevealSection id="recursos">
         <div className="lp-section-head">
-          <p className="lp-kicker">O que o Granix faz por você</p>
+          <p className="lp-kicker">O que a Granativa faz por você</p>
           <h2 className="lp-h2">Tudo o que some no mês, num lugar só.</h2>
           <p>Sem planilha e sem complicação. Você vê pra onde vai cada real e corta o que não faz sentido — antes de ficar sem.</p>
         </div>
@@ -176,7 +162,7 @@ export function LandingSections() {
           </div>
           <motion.div
             className="lp-couple-card"
-            whileHover={{ scale: 1.03, rotateZ: 0.5 }}
+            whileTap={{ scale: 0.98 }}
             transition={{ type: 'spring', stiffness: 400, damping: 28 }}
           >
             <div className="lp-cofrinho-head">
@@ -198,7 +184,7 @@ export function LandingSections() {
         </div>
         <div className="lp-steps">
           {[
-            { n: '1', h: 'Crie em 2 minutos', p: 'Responda 2 perguntas e o Granix monta seu espaço privado na hora.' },
+            { n: '1', h: 'Crie em 2 minutos', p: 'Responda 2 perguntas e a Granativa monta seu espaço privado na hora.' },
             { n: '2', h: 'Veja a verdade', p: 'Jogue gastos, contas e cartões pra dentro. Descubra pra onde foi cada real.' },
             { n: '3', h: 'Pare de terminar no zero', p: 'Corte o que não faz sentido e junte pro que importa — sozinho ou a dois.' },
           ].map((step, i) => (

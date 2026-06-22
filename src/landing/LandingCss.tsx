@@ -27,6 +27,10 @@ const fadeUp = {
 
 export function LandingCss() {
   const heroRef = useRef<HTMLElement>(null);
+  /* só dispara tilt quando o dispositivo tem cursor (não-touch) */
+  const canHover = useRef(
+    typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches
+  );
 
   /* scroll parallax — stage sobe mais devagar que a página */
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] });
@@ -67,8 +71,8 @@ export function LandingCss() {
     <section
       className="lp-hero lp-hero--light"
       ref={heroRef}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
+      onMouseMove={canHover.current ? handleMouseMove : undefined}
+      onMouseLeave={canHover.current ? handleMouseLeave : undefined}
     >
       {/* Grade perspectiva recuando para o fundo */}
       <div className="lp-grid-bg" aria-hidden="true" />

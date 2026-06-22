@@ -50,7 +50,7 @@ export function LoginMethodsPage() {
   function onUnlink(providerId: string) {
     void run(async () => {
       if (!user || authFromCache) {
-        throw new Error('Entre no Granix para alterar métodos de acesso.');
+        throw new Error('Entre na Granativa para alterar métodos de acesso.');
       }
 
       if (user.providerData.length <= 1) {
@@ -62,7 +62,7 @@ export function LoginMethodsPage() {
       }
 
       await unlinkProvider(user, providerId);
-    }, 'Método removido da sua conta Granix.');
+    }, 'Método removido da sua conta Granativa.');
   }
 
   async function onDeleteAccount() {
@@ -72,7 +72,7 @@ export function LoginMethodsPage() {
 
     try {
       if (!user || authFromCache) {
-        throw new Error('Entre novamente no Granix antes de excluir a conta.');
+        throw new Error('Entre novamente na Granativa antes de excluir a conta.');
       }
 
       if (deleteConfirmation.trim() !== 'EXCLUIR') {
@@ -106,7 +106,7 @@ export function LoginMethodsPage() {
       <p className="eyebrow">Segurança</p>
       <h1 className="page-title">Métodos de login</h1>
       <p className="page-description">
-        Gerencie como você entra no Granix. A conta mantém o mesmo UID ao vincular Google ou adicionar senha.
+        Gerencie como você entra na Granativa. A conta mantém o mesmo UID ao vincular Google ou adicionar senha.
       </p>
 
       <div className="settings-grid">
@@ -114,7 +114,7 @@ export function LoginMethodsPage() {
           <FormMessage>{message}</FormMessage>
           <FormMessage type="success">{success}</FormMessage>
           <div className="notice">
-            <ShieldAlert size={18} aria-hidden="true" /> o Granix bloqueia desvincular o último método ativo e não faz
+            <ShieldAlert size={18} aria-hidden="true" /> a Granativa bloqueia desvincular o último método ativo e não faz
             merge automático entre UIDs diferentes.
           </div>
 
@@ -123,7 +123,7 @@ export function LoginMethodsPage() {
               <div className="provider-item" key={providerId}>
                 <div>
                   <strong>{providerLabels[providerId] ?? providerId}</strong>
-                  <p className="text-secondary">Vinculado à sua conta Granix.</p>
+                  <p className="text-secondary">Vinculado à sua conta Granativa.</p>
                 </div>
                 <button
                   className="button button--secondary"
@@ -157,7 +157,7 @@ export function LoginMethodsPage() {
               onClick={() =>
                 run(async () => {
                   if (!user || authFromCache) {
-                    throw new Error('Entre no Granix para alterar métodos de acesso.');
+                    throw new Error('Entre na Granativa para alterar métodos de acesso.');
                   }
                   await linkGoogleProvider(user);
                 }, 'Google vinculado mantendo o mesmo UID.')
@@ -187,7 +187,7 @@ export function LoginMethodsPage() {
                 onClick={() =>
                   run(async () => {
                     if (!user || authFromCache) {
-                      throw new Error('Entre no Granix para alterar métodos de acesso.');
+                      throw new Error('Entre na Granativa para alterar métodos de acesso.');
                     }
                     await addPasswordProvider(user, newPassword);
                   }, 'Senha adicionada mantendo o mesmo UID.')

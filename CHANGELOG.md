@@ -1,6 +1,16 @@
-# Changelog
+﻿# Changelog
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
+
+## 2026-06-22 — rebrand: Granix → Granativa + landing UX mobile
+
+- **Nome final**: app renomeado de "Granix" para **Granativa** (portmanteau: grana + ativa). 35 arquivos atualizados, concordância de gênero corrigida (a/na/da Granativa).
+- **Assets**: `public/brand/granativa-*.png` (10 arquivos, casing lowercase). Paths em `index.html` e `LandingShell.tsx` corrigidos.
+- **Landing mobile — hover removido**: `whileHover` eliminado de `TiltCard` e couple-card; eventos de mouse no hero ligados só em `(hover: hover)` via `canHover` ref; estilos `:hover` movidos para `@media (hover: hover)`.
+- **Stats band**: mantido em linha horizontal no mobile (sem `flex-direction: column`), padding e fonte compactados em `≤520px` — números não quebram mais linha.
+- **Botões hero**: `flex-direction: column; width: 100%` em `≤640px` — CTAs empilhados e legíveis no celular.
+- **Nav mobile**: botão ghost "Entrar" oculto em `≤480px` para dar espaço ao "Começar grátis".
+- **`CountUp`**: simplificado para `motion.span` único com texto completo — elimina quebra de linha entre número e sufixo `%`.
 
 ## 2026-06-20 — feat: landing page redesenhada com Framer Motion 3D
 
@@ -10,13 +20,13 @@ Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/his
 - **Seções**: stats band, bento com `TiltCard` 3D hover (`rotateX/Y` no `whileHover`), seção do casal com card hover + `rotateZ`, steps com `whileInView`, FAQ accordion, CTA dark. Tudo com `RevealSection` (useInView + stagger).
 - Detalhes técnicos em `docs/history/2026-06.md`.
 
-## 2026-06-20 — rebrand: Zerou → Granix
+## 2026-06-20 — rebrand: Zerou → Granativa
 
-- **Novo nome**: app renomeado de "Zerou" para **Granix** (grana + ix). Tagline mantida: "Controle individual. Organização a dois."
-- **Novo logo**: ícone de duas bolas sobrepostas (sólida laranja + outline escuro), gerado com IA. Assets em `public/brand/granix-*.png` (`granix-app-icon-180/192/512`, `granix-maskable-512`, `granix-logo-horizontal`, `granix-symbol`).
+- **Novo nome**: app renomeado de "Zerou" para **Granativa**. Tagline mantida: "Controle individual. Organização a dois."
+- **Novo logo**: ícone de duas bolas sobrepostas (sólida laranja + outline escuro), gerado com IA. Assets em `public/brand/Granativa-*.png` (`Granativa-app-icon-180/192/512`, `Granativa-maskable-512`, `Granativa-logo-horizontal`, `Granativa-symbol`).
 - **PWA manifest**: `name`, `short_name`, `theme_color` (`#EE5524`), `background_color` (`#FAF8F5`) e todos os ícones atualizados em `vite.config.ts`.
 - **`index.html`**: `<title>`, meta description, OG tags e `apple-touch-icon` atualizados. Favicon agora é PNG (`/favicon.png`).
-- **Componentes e textos**: todas as ocorrências visíveis de "Zerou" → "Granix" com artigo correto (o/do/no Granix). Version strings internas do Firestore (`zerou-v12.2-*`, `zerou-cache`) mantidas para não invalidar registros existentes.
+- **Componentes e textos**: todas as ocorrências visíveis de "Zerou" → "Granativa" com artigo correto (o/do/na Granativa). Version strings internas do Firestore (`zerou-v12.2-*`, `zerou-cache`) mantidas para não invalidar registros existentes.
 
 ## 2026-06-18 — feat: gráficos interativos de análise de gastos (Recharts)
 
