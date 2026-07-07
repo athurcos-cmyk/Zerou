@@ -20,6 +20,7 @@ import {
 import { BrandLockup } from '../components/BrandLogo';
 import { logout } from '../auth/authService';
 import { useAuth } from '../auth/AuthContext';
+import { useConfirm } from '../components/ConfirmDialog';
 
 function getNavClass({ isActive }: { isActive: boolean }) {
   return `nav-link${isActive ? ' active' : ''}`;
@@ -29,6 +30,7 @@ export function AppShell() {
   const { user, profile, authFromCache } = useAuth();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   // Pede permissão de push e registra o token FCM após o Firebase confirmar a sessão
   useEffect(() => {
@@ -39,11 +41,14 @@ export function AppShell() {
   const isFoundationPending = location.pathname.startsWith('/app/onboarding') || Boolean(user && !profile?.defaultWorkspaceId);
 
   async function handleClearLocalDataLogout() {
-    const confirmed = window.confirm(
-      'Sair deste aparelho e remover os dados salvos localmente? Use isso em celular emprestado ou computador compartilhado.'
-    );
+    const ok = await confirm({
+      title: 'Sair deste aparelho?',
+      message: 'Remove os dados salvos localmente. Use isso em celular emprestado ou computador compartilhado.',
+      confirmLabel: 'Sair',
+      danger: true
+    });
 
-    if (!confirmed) {
+    if (!ok) {
       return;
     }
 
@@ -190,6 +195,8 @@ export function AppShell() {
         </button>
         </nav>
       ) : null}
+
+      {confirmDialog}
     </div>
   );
 }

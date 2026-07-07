@@ -19,6 +19,10 @@ export function DashboardPage() {
   const finance = useFinanceContext();
   const cardsData = useCardsContext();
   const isLoading = finance.loading;
+  // Disponível/Comprometido dependem das faturas de cartão (cardsData) além de
+  // contas/transações — sem isso, mostrariam um "Disponível" inflado por um instante
+  // antes das faturas sincronizarem.
+  const isCommittedLoading = finance.loading || cardsData.loading;
   const dashboard = calculateDashboardSummary({
     accounts: finance.accounts,
     transactions: finance.transactions,
@@ -73,12 +77,12 @@ export function DashboardPage() {
         <div className="dash-secondary">
           <article className="surface surface-pad dash-metric dash-metric--available">
             <p className="eyebrow">Disponível</p>
-            <strong className="display-number">{isLoading ? '—' : formatMoney(dashboard.freeToSpendCents)}</strong>
+            <strong className="display-number">{isCommittedLoading ? '—' : formatMoney(dashboard.freeToSpendCents)}</strong>
             <span className="text-secondary">Livre agora.</span>
           </article>
           <article className="surface surface-pad dash-metric dash-metric--committed">
             <p className="eyebrow">Comprometido</p>
-            <strong className="display-number">{isLoading ? '—' : formatMoney(dashboard.committedCents)}</strong>
+            <strong className="display-number">{isCommittedLoading ? '—' : formatMoney(dashboard.committedCents)}</strong>
             <span className="text-secondary">Contas e fatura.</span>
           </article>
         </div>

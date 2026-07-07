@@ -5,6 +5,7 @@ import { useFinanceContext } from '../finance/FinanceDataContext';
 import { CategoryField } from '../components/CategoryField';
 import { SelectField } from '../components/SelectField';
 import { BottomSheet } from '../components/BottomSheet';
+import { EmptyState } from '../components/EmptyState';
 import { FormMessage } from '../components/FormMessage';
 import { fromDateInputValue, todayInputValue, toDateInputValue } from '../finance/financeDates';
 import { billStatusLabels } from '../finance/financeLabels';
@@ -45,7 +46,7 @@ export function BillsPage() {
     setPayAmount('');
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage(null);
 
@@ -54,30 +55,28 @@ export function BillsPage() {
       return;
     }
 
-    try {
-      await createBill(workspaceId, user.uid, {
-        description,
-        amountCents: parseMoneyToCents(amount),
-        dueDate: fromDateInputValue(dueDate),
-        categoryId,
-        accountId
-      });
-      setDescription('');
-      setAmount('');
-      setDueDate(todayInputValue());
-      setCategoryId('');
-      setAccountId('');
-    } catch (error) {
-      setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar o compromisso agora.'));
-    }
+    createBill(workspaceId, user.uid, {
+      description,
+      amountCents: parseMoneyToCents(amount),
+      dueDate: fromDateInputValue(dueDate),
+      categoryId,
+      accountId
+    }).catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar o compromisso agora.')));
+    setDescription('');
+    setAmount('');
+    setDueDate(todayInputValue());
+    setCategoryId('');
+    setAccountId('');
   }
 
-  async function setStatus(billId: string, status: Bill['status']) {
+  function setStatus(billId: string, status: Bill['status']) {
     if (!workspaceId) {
       return;
     }
 
-    await updateBillStatus(workspaceId, billId, status);
+    updateBillStatus(workspaceId, billId, status).catch((error) =>
+      setMessage(getUserFacingErrorMessage(error, 'Não foi possível atualizar o compromisso agora.'))
+    );
   }
 
   return (
@@ -174,7 +173,7 @@ export function BillsPage() {
                         <button className="button button--subtle button--compact" type="button" onClick={() => handleOpenPay(bill)}>
                           Pago
                         </button>
-                        <button className="button button--ghost button--compact" type="button" onClick={() => void setStatus(bill.id, 'cancelled')}>
+                        <button className="button button--ghost button--compact" type="button" onClick={() => setStatus(bill.id, 'cancelled')}>
                           Cancelar
                         </button>
                       </>
@@ -184,7 +183,11 @@ export function BillsPage() {
               ))}
             </div>
           ) : (
-            <p className="text-secondary">Nenhum compromisso criado ainda.</p>
+            <EmptyState
+              illustration="wallet"
+              title="Nenhum compromisso ainda"
+              description="Cadastre contas a pagar para lembrar dos vencimentos antes que eles cheguem."
+            />
           )}
         </article>
       </div>

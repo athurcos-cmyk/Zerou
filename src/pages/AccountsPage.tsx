@@ -4,6 +4,8 @@ import { useAuth } from '../auth/AuthContext';
 import { useFinanceContext } from '../finance/FinanceDataContext';
 import { SelectField } from '../components/SelectField';
 import { FormMessage } from '../components/FormMessage';
+import { useConfirm } from '../components/ConfirmDialog';
+import { EmptyState } from '../components/EmptyState';
 import { findBankInstitution, searchBankInstitutions, type BankInstitution } from '../finance/bankInstitutions';
 import { accountTypeLabels } from '../finance/financeLabels';
 import { createAccount, deleteAccount } from '../finance/financeService';
@@ -21,8 +23,8 @@ export function AccountsPage() {
   const [type, setType] = useState<AccountType>('checking');
   const [openingBalance, setOpeningBalance] = useState('0,00');
   const [message, setMessage] = useState<string | null>(null);
-  const [removingAccountId, setRemovingAccountId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const suggestions = searchBankInstitutions(name, name.trim() ? 6 : 8);
   const syncStatusByAccountId = new Map(finance.accounts.map((account) => [account.id, account.localSyncStatus]));
   const totalBalance = finance.accountBalances.reduce((sum, a) => sum + a.balanceCents, 0);
@@ -70,25 +72,21 @@ export function AccountsPage() {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Excluir "${accountName}" permanentemente? Como ela não tem histórico ligado, a Granativa vai apagar essa conta financeira do banco de dados.`
-    );
+    const ok = await confirm({
+      title: `Excluir "${accountName}"?`,
+      message: 'Como ela não tem histórico ligado, a Granativa vai apagar essa conta financeira do banco de dados.',
+      confirmLabel: 'Excluir',
+      danger: true
+    });
 
-    if (!confirmed) {
+    if (!ok) {
       return;
     }
 
-    setRemovingAccountId(accountId);
     setMessage(null);
-
-    try {
-      await deleteAccount(workspaceId, accountId);
-      setMessage('Conta financeira excluída.');
-    } catch (error) {
-      setMessage(getUserFacingErrorMessage(error, 'Não foi possível excluir a conta agora.'));
-    } finally {
-      setRemovingAccountId(null);
-    }
+    deleteAccount(workspaceId, accountId).catch((error) =>
+      setMessage(getUserFacingErrorMessage(error, 'Não foi possível excluir a conta agora.'))
+    );
   }
 
   return (
@@ -127,7 +125,6 @@ export function AccountsPage() {
                     className="icon-button"
                     type="button"
                     aria-label={`Excluir ${account.name}`}
-                    disabled={removingAccountId === account.id}
                     onClick={() => void handleDeleteAccount(account.id, account.name)}
                   >
                     <Trash2 size={17} aria-hidden="true" />
@@ -138,7 +135,11 @@ export function AccountsPage() {
           })}
         </div>
       ) : (
-        <p className="text-secondary" style={{ marginBottom: '1rem' }}>Nenhuma conta criada ainda.</p>
+        <EmptyState
+          illustration="wallet"
+          title="Nenhuma conta ainda"
+          description="Adicione sua primeira conta financeira — banco, carteira ou poupança — para começar a registrar seu dinheiro."
+        />
       )}
 
       <form className="surface surface-pad form-stack" onSubmit={handleSubmit} style={{ marginTop: '1rem' }}>
@@ -197,6 +198,8 @@ export function AccountsPage() {
           </>
         )}
       </form>
+
+      {confirmDialog}
     </section>
   );
 }

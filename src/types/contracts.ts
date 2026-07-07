@@ -201,6 +201,12 @@ export interface RecurringRule {
   amountCents?: MoneyCents;
   frequency: 'weekly' | 'monthly' | 'yearly';
   nextOccurrenceAt: Timestamp;
+  // Dia do mês (1-31) pretendido originalmente pelo usuário, capturado na criação.
+  // Usado por nextOccurrenceDate para recalcular a próxima ocorrência sempre a
+  // partir da intenção original — sem isso, uma recorrência no dia 31 que caiu
+  // num fev/28 (mês curto) ficaria ancorada no 28 para sempre, mesmo em meses
+  // com 31 dias.
+  anchorDay?: number;
   accountId?: string;
   categoryId?: string;
   isActive: boolean;

@@ -79,23 +79,23 @@ function KpiCard({ label, value, sub, accent = false, icon }: {
   return (
     <div style={{
       flex: 1, minWidth: 0,
-      background: accent ? 'var(--color-primary, #EE5524)' : 'var(--bg-surface)',
+      background: accent ? 'var(--action-primary)' : 'var(--bg-surface)',
       border: accent ? 'none' : '1px solid var(--border-subtle)',
       borderRadius: '1rem',
       padding: '0.85rem 1rem',
       display: 'flex', flexDirection: 'column', gap: '0.25rem',
     }}>
-      <span style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: accent ? 'rgba(255,255,255,0.75)' : 'var(--text-secondary)' }}>
+      <span style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: accent ? 'var(--on-accent-85)' : 'var(--text-secondary)' }}>
         {label}
       </span>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-        {icon && <span style={{ color: accent ? '#fff' : 'var(--text-primary)' }}>{icon}</span>}
-        <strong style={{ fontSize: '1.05rem', fontWeight: 800, color: accent ? '#fff' : 'var(--text-primary)', lineHeight: 1.2 }}>
+        {icon && <span style={{ color: accent ? 'var(--accent-foreground)' : 'var(--text-primary)' }}>{icon}</span>}
+        <strong style={{ fontSize: '1.05rem', fontWeight: 800, color: accent ? 'var(--accent-foreground)' : 'var(--text-primary)', lineHeight: 1.2 }}>
           {value}
         </strong>
       </div>
       {sub && (
-        <span style={{ fontSize: '0.72rem', color: accent ? 'rgba(255,255,255,0.65)' : 'var(--text-secondary)' }}>
+        <span style={{ fontSize: '0.72rem', color: accent ? 'var(--on-accent-55)' : 'var(--text-secondary)' }}>
           {sub}
         </span>
       )}
@@ -377,19 +377,19 @@ export function SearchPage() {
               width={38}
             />
             <ReTooltip content={<BarTooltip />} cursor={{ fill: 'var(--bg-surface-subtle)', radius: 6 }} />
-            <Bar dataKey="incomeCents" name="Entradas" fill="#1f9e6e" radius={[5, 5, 0, 0]} />
-            <Bar dataKey="expenseCents" name="Saídas" fill="#EE5524" radius={[5, 5, 0, 0]} />
+            <Bar dataKey="incomeCents" name="Entradas" fill="var(--success)" radius={[5, 5, 0, 0]} />
+            <Bar dataKey="expenseCents" name="Saídas" fill="var(--action-primary)" radius={[5, 5, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
 
         {/* legenda própria */}
         <div style={{ display: 'flex', gap: '1.25rem', marginTop: '0.75rem', paddingTop: '0.6rem', borderTop: '1px solid var(--border-subtle)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-            <span style={{ width: 10, height: 10, borderRadius: 3, background: '#1f9e6e', display: 'block' }} />
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: 'var(--success)', display: 'block' }} />
             Entradas
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-            <span style={{ width: 10, height: 10, borderRadius: 3, background: '#EE5524', display: 'block' }} />
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: 'var(--action-primary)', display: 'block' }} />
             Saídas
           </div>
         </div>

@@ -15,12 +15,33 @@ function currentYearMonth(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function nextOccurrenceDate(current: Date, frequency: 'weekly' | 'monthly' | 'yearly'): Date {
-  const next = new Date(current);
-  if (frequency === 'weekly') next.setDate(next.getDate() + 7);
-  else if (frequency === 'monthly') next.setMonth(next.getMonth() + 1);
-  else next.setFullYear(next.getFullYear() + 1);
-  return next;
+// Mantido em sincronia com nextOccurrenceDate em src/finance/financeService.ts —
+// setMonth/setFullYear transbordam quando o mês alvo é mais curto (31/jan viraria
+// 3/mar, pulando fevereiro). Em vez disso, clampamos no último dia válido do mês
+// alvo, usando anchorDay (dia originalmente pretendido) quando disponível, para
+// que a ocorrência "volte" pro dia 31 assim que um mês de 31 dias aparecer.
+function nextOccurrenceDate(current: Date, frequency: 'weekly' | 'monthly' | 'yearly', anchorDay?: number): Date {
+  if (frequency === 'weekly') {
+    const next = new Date(current);
+    next.setDate(next.getDate() + 7);
+    return next;
+  }
+
+  const day = anchorDay ?? current.getDate();
+  const targetYear = frequency === 'yearly' ? current.getFullYear() + 1 : current.getFullYear();
+  const targetMonth = frequency === 'yearly' ? current.getMonth() : current.getMonth() + 1;
+  const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+  const clampedDay = Math.min(day, daysInTargetMonth);
+
+  return new Date(
+    targetYear,
+    targetMonth,
+    clampedDay,
+    current.getHours(),
+    current.getMinutes(),
+    current.getSeconds(),
+    current.getMilliseconds()
+  );
 }
 
 function formatBRL(amountCents: number): string {
@@ -114,13 +135,14 @@ export const generateRecurrences = onSchedule(
         categoryId?: string;
         frequency: 'weekly' | 'monthly' | 'yearly';
         nextOccurrenceAt: Timestamp;
+        anchorDay?: number;
       };
 
       // Sem valor ou conta definida não há como criar a transação
       if (!rule.amountCents || !rule.accountId) continue;
 
       const txnId = db.collection('x').doc().id;
-      const nextDate = nextOccurrenceDate(rule.nextOccurrenceAt.toDate(), rule.frequency);
+      const nextDate = nextOccurrenceDate(rule.nextOccurrenceAt.toDate(), rule.frequency, rule.anchorDay);
 
       const txnPayload: Record<string, unknown> = {
         id: txnId,

@@ -46,14 +46,19 @@ function canRetryFinanceBoot(error: unknown, attempt: number) {
   );
 }
 
-function setSlice<K extends keyof Pick<FinanceDataState, 'accounts' | 'categories' | 'transactions' | 'bills' | 'recurringRules'>>(
+type FinanceSliceKey = keyof Pick<FinanceDataState, 'accounts' | 'categories' | 'transactions' | 'bills' | 'recurringRules'>;
+
+const REQUIRED_SLICES: FinanceSliceKey[] = ['accounts', 'categories', 'transactions', 'bills', 'recurringRules'];
+
+function setSlice<K extends FinanceSliceKey>(
   key: K,
-  value: FinanceDataState[K]
+  value: FinanceDataState[K],
+  stillLoading: boolean
 ) {
   return (state: FinanceDataState): FinanceDataState => ({
     ...state,
     [key]: value,
-    loading: false,
+    loading: stillLoading,
     error: null
   });
 }
@@ -71,6 +76,16 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
     setState((current) => ({ ...current, loading: true, error: null }));
     let cancelled = false;
     const timers: number[] = [];
+    // Só considera o boot concluído quando TODAS as coleções tiverem recebido o
+    // primeiro snapshot (mesmo que do cache local) — não a primeira que chegar.
+    // Caso contrário, o saldo pode piscar R$ 0,00 se `categories`/`bills` resolverem
+    // do cache antes de `accounts`.
+    const loadedSlices = new Set<FinanceSliceKey>();
+
+    function markSliceLoaded(key: FinanceSliceKey) {
+      loadedSlices.add(key);
+      return loadedSlices.size < REQUIRED_SLICES.length;
+    }
 
     const scheduleRetry = (callback: (attempt: number) => void, attempt: number) => {
       const timer = window.setTimeout(() => {
@@ -149,11 +164,11 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
     prepareDefaultCategories();
 
     const unsubscribers = [
-      subscribeWithBootRetry(subscribeAccounts, (items) => setState(setSlice('accounts', items))),
-      subscribeWithBootRetry(subscribeCategories, (items) => setState(setSlice('categories', items))),
-      subscribeWithBootRetry(subscribeTransactions, (items) => setState(setSlice('transactions', items))),
-      subscribeWithBootRetry(subscribeBills, (items) => setState(setSlice('bills', items))),
-      subscribeWithBootRetry(subscribeRecurringRules, (items) => setState(setSlice('recurringRules', items)))
+      subscribeWithBootRetry(subscribeAccounts, (items) => setState(setSlice('accounts', items, markSliceLoaded('accounts')))),
+      subscribeWithBootRetry(subscribeCategories, (items) => setState(setSlice('categories', items, markSliceLoaded('categories')))),
+      subscribeWithBootRetry(subscribeTransactions, (items) => setState(setSlice('transactions', items, markSliceLoaded('transactions')))),
+      subscribeWithBootRetry(subscribeBills, (items) => setState(setSlice('bills', items, markSliceLoaded('bills')))),
+      subscribeWithBootRetry(subscribeRecurringRules, (items) => setState(setSlice('recurringRules', items, markSliceLoaded('recurringRules'))))
     ];
 
     return () => {

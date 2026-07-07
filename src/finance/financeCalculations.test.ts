@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { Timestamp } from 'firebase/firestore';
-import { calculateDashboardSummary, calculateTotalBalance } from './financeCalculations';
-import type { Account, Bill, RecurringRule, Transaction } from '../types/contracts';
+import {
+  buildUpcomingCommitments,
+  calculateAccountBalances,
+  calculateDashboardSummary,
+  calculateTotalBalance,
+  findNextIncomeDate
+} from './financeCalculations';
+import type { Account, Bill, Invoice, RecurringRule, Transaction } from '../types/contracts';
 
-function account(id: string, openingBalanceCents = 0): Account {
+function account(id: string, openingBalanceCents = 0, overrides: Partial<Account> = {}): Account {
   return {
     id,
     workspaceId: 'workspaceA',
@@ -11,7 +17,8 @@ function account(id: string, openingBalanceCents = 0): Account {
     type: 'checking',
     openingBalanceCents,
     isActive: true,
-    createdBy: 'alice'
+    createdBy: 'alice',
+    ...overrides
   };
 }
 
@@ -31,9 +38,9 @@ function transaction(overrides: Partial<Transaction>): Transaction {
     cardId: overrides.cardId,
     invoiceId: overrides.invoiceId,
     date: overrides.date ?? date,
-    competenceMonth: '2026-06',
-    cashMonth: '2026-06',
-    tags: [],
+    competenceMonth: overrides.competenceMonth ?? '2026-06',
+    cashMonth: overrides.cashMonth ?? '2026-06',
+    tags: overrides.tags ?? [],
     isRecurring: false,
     clientMutationId: overrides.clientMutationId ?? 'mutation-id',
     syncStatus: 'synced',
@@ -42,7 +49,48 @@ function transaction(overrides: Partial<Transaction>): Transaction {
   };
 }
 
-describe('financial calculations', () => {
+function bill(overrides: Partial<Bill> = {}): Bill {
+  return {
+    id: overrides.id ?? 'bill-1',
+    workspaceId: 'workspaceA',
+    description: overrides.description ?? 'Conta',
+    amountCents: overrides.amountCents ?? 10000,
+    dueDate: overrides.dueDate ?? Timestamp.fromDate(new Date('2026-06-20T12:00:00')),
+    status: overrides.status ?? 'pending',
+    createdBy: 'alice',
+    ...overrides
+  };
+}
+
+function recurring(overrides: Partial<RecurringRule> = {}): RecurringRule {
+  return {
+    id: overrides.id ?? 'rec-1',
+    workspaceId: 'workspaceA',
+    description: overrides.description ?? 'Assinatura',
+    amountCents: 'amountCents' in overrides ? overrides.amountCents : 5000,
+    frequency: overrides.frequency ?? 'monthly',
+    nextOccurrenceAt: overrides.nextOccurrenceAt ?? Timestamp.fromDate(new Date('2026-06-18T12:00:00')),
+    isActive: overrides.isActive ?? true,
+    createdBy: 'alice',
+    ...overrides
+  };
+}
+
+function invoice(overrides: Partial<Invoice> = {}): Invoice {
+  return {
+    id: overrides.id ?? 'invoice-1',
+    workspaceId: 'workspaceA',
+    cardId: 'card-1',
+    referenceMonth: overrides.referenceMonth ?? '2026-06',
+    dueDate: overrides.dueDate ?? Timestamp.fromDate(new Date('2026-06-10T12:00:00')),
+    status: overrides.status ?? 'open',
+    outstandingBalanceCents: overrides.outstandingBalanceCents ?? 10000,
+    createdBy: 'alice',
+    ...overrides
+  } as Invoice;
+}
+
+describe('financial calculations — movimentação de saldo', () => {
   it('increases balance with income and decreases with expense', () => {
     const total = calculateTotalBalance(
       [account('checking')],
@@ -55,6 +103,18 @@ describe('financial calculations', () => {
     expect(total).toBe(150025);
   });
 
+  it('increases balance with refund and reimbursement, like income', () => {
+    const total = calculateTotalBalance(
+      [account('checking', 10000)],
+      [
+        transaction({ type: 'refund', amountCents: 2000, accountId: 'checking' }),
+        transaction({ type: 'reimbursement', amountCents: 3000, accountId: 'checking' })
+      ]
+    );
+
+    expect(total).toBe(15000);
+  });
+
   it('keeps consolidated net worth unchanged on transfers', () => {
     const total = calculateTotalBalance(
       [account('checking', 50000), account('wallet', 0)],
@@ -64,13 +124,37 @@ describe('financial calculations', () => {
     expect(total).toBe(50000);
   });
 
-  it('applies explicit adjustment and preserves cents', () => {
-    const total = calculateTotalBalance(
+  it('moves money between the two accounts on transfer, not just the consolidated total', () => {
+    const balances = calculateAccountBalances(
+      [account('checking', 50000), account('wallet', 0)],
+      [transaction({ type: 'transfer', amountCents: 12555, accountId: 'checking', destinationAccountId: 'wallet' })]
+    );
+
+    expect(balances.find((a) => a.id === 'checking')?.balanceCents).toBe(37445);
+    expect(balances.find((a) => a.id === 'wallet')?.balanceCents).toBe(12555);
+  });
+
+  it('debits only the source when a transfer has no destination account', () => {
+    const balances = calculateAccountBalances(
+      [account('checking', 50000)],
+      [transaction({ type: 'transfer', amountCents: 10000, accountId: 'checking', destinationAccountId: undefined })]
+    );
+
+    expect(balances.find((a) => a.id === 'checking')?.balanceCents).toBe(40000);
+  });
+
+  it('applies explicit adjustment and preserves cents (positive and negative)', () => {
+    const increased = calculateTotalBalance(
       [account('checking', 10000)],
       [transaction({ type: 'adjustment', amountCents: 199, accountId: 'checking' })]
     );
+    const decreased = calculateTotalBalance(
+      [account('checking', 10000)],
+      [transaction({ type: 'adjustment', amountCents: -199, accountId: 'checking' })]
+    );
 
-    expect(total).toBe(10199);
+    expect(increased).toBe(10199);
+    expect(decreased).toBe(9801);
   });
 
   it('ignores logically deleted transactions', () => {
@@ -87,6 +171,30 @@ describe('financial calculations', () => {
     );
 
     expect(total).toBe(10000);
+  });
+
+  it('restores the balance when a purchase is deleted after being recorded (create → delete round trip)', () => {
+    const purchase = transaction({ id: 'tx-1', type: 'expense', amountCents: 15000, accountId: 'checking' });
+
+    const afterPurchase = calculateTotalBalance([account('checking', 100000)], [purchase]);
+    expect(afterPurchase).toBe(85000);
+
+    const afterSoftDelete = calculateTotalBalance(
+      [account('checking', 100000)],
+      [{ ...purchase, deletedAt: Timestamp.fromDate(new Date('2026-06-16T12:00:00')) }]
+    );
+    expect(afterSoftDelete).toBe(100000);
+  });
+
+  it('reflects only the new amount when a transaction is edited (same id, replaced snapshot)', () => {
+    const original = transaction({ id: 'tx-1', type: 'expense', amountCents: 15000, accountId: 'checking' });
+    const edited = { ...original, amountCents: 40000 };
+
+    const totalBefore = calculateTotalBalance([account('checking', 100000)], [original]);
+    const totalAfter = calculateTotalBalance([account('checking', 100000)], [edited]);
+
+    expect(totalBefore).toBe(85000);
+    expect(totalAfter).toBe(60000);
   });
 
   it('does not reduce cash balance when a card purchase is recorded', () => {
@@ -110,41 +218,284 @@ describe('financial calculations', () => {
     expect(total).toBe(75000);
   });
 
-  it('calculates free to spend from bills and recurring rules', () => {
-    const bills: Bill[] = [
-      {
-        id: 'bill-1',
-        workspaceId: 'workspaceA',
-        description: 'Aluguel',
-        amountCents: 120000,
-        dueDate: Timestamp.fromDate(new Date('2026-06-20T12:00:00')),
-        status: 'pending',
-        createdBy: 'alice'
-      }
-    ];
-    const recurringRules: RecurringRule[] = [
-      {
-        id: 'rec-1',
-        workspaceId: 'workspaceA',
-        description: 'Internet',
-        amountCents: 10000,
-        frequency: 'monthly',
-        nextOccurrenceAt: Timestamp.fromDate(new Date('2026-06-18T12:00:00')),
-        isActive: true,
-        createdBy: 'alice'
-      }
-    ];
+  it('ignores transactions pointing to an account that no longer exists', () => {
+    const total = calculateTotalBalance(
+      [account('checking', 10000)],
+      [transaction({ type: 'expense', amountCents: 5000, accountId: 'closed-account' })]
+    );
 
+    expect(total).toBe(10000);
+  });
+
+  it('combines several accounts and mixed transaction types correctly', () => {
+    const balances = calculateAccountBalances(
+      [account('checking', 100000), account('wallet', 20000), account('savings', 0)],
+      [
+        transaction({ type: 'income', amountCents: 300000, accountId: 'checking' }),
+        transaction({ type: 'expense', amountCents: 50000, accountId: 'checking' }),
+        transaction({ type: 'transfer', amountCents: 40000, accountId: 'checking', destinationAccountId: 'savings' }),
+        transaction({ type: 'expense', amountCents: 5000, accountId: 'wallet' }),
+        transaction({ type: 'adjustment', amountCents: 1000, accountId: 'wallet' }),
+        transaction({
+          type: 'expense',
+          amountCents: 99999,
+          accountId: 'checking',
+          deletedAt: Timestamp.fromDate(new Date('2026-06-16T12:00:00'))
+        })
+      ]
+    );
+
+    const byId = new Map(balances.map((b) => [b.id, b.balanceCents]));
+    expect(byId.get('checking')).toBe(100000 + 300000 - 50000 - 40000);
+    expect(byId.get('wallet')).toBe(20000 - 5000 + 1000);
+    expect(byId.get('savings')).toBe(0 + 40000);
+  });
+
+  it('treats zero-amount transactions as a no-op', () => {
+    const total = calculateTotalBalance(
+      [account('checking', 10000)],
+      [transaction({ type: 'expense', amountCents: 0, accountId: 'checking' })]
+    );
+
+    expect(total).toBe(10000);
+  });
+});
+
+describe('findNextIncomeDate', () => {
+  const now = new Date('2026-06-14T12:00:00');
+
+  it('returns the earliest future income among several', () => {
+    const next = findNextIncomeDate(
+      [
+        transaction({ type: 'income', date: Timestamp.fromDate(new Date('2026-07-01T12:00:00')) }),
+        transaction({ type: 'income', date: Timestamp.fromDate(new Date('2026-06-20T12:00:00')) }),
+        transaction({ type: 'income', date: Timestamp.fromDate(new Date('2026-08-01T12:00:00')) })
+      ],
+      now
+    );
+
+    expect(next?.toISOString().slice(0, 10)).toBe('2026-06-20');
+  });
+
+  it('ignores income dates already in the past', () => {
+    const next = findNextIncomeDate(
+      [transaction({ type: 'income', date: Timestamp.fromDate(new Date('2026-06-01T12:00:00')) })],
+      now
+    );
+
+    expect(next).toBeNull();
+  });
+
+  it('ignores deleted income transactions', () => {
+    const next = findNextIncomeDate(
+      [
+        transaction({
+          type: 'income',
+          date: Timestamp.fromDate(new Date('2026-06-20T12:00:00')),
+          deletedAt: Timestamp.fromDate(new Date('2026-06-15T12:00:00'))
+        })
+      ],
+      now
+    );
+
+    expect(next).toBeNull();
+  });
+
+  it('counts an income scheduled for exactly "now" as upcoming', () => {
+    const next = findNextIncomeDate([transaction({ type: 'income', date: Timestamp.fromDate(now) })], now);
+
+    expect(next?.getTime()).toBe(now.getTime());
+  });
+});
+
+describe('buildUpcomingCommitments', () => {
+  const cutoff = new Date('2026-07-14T12:00:00');
+  const now = new Date('2026-06-14T12:00:00');
+
+  it('includes pending and overdue bills, excludes paid/cancelled', () => {
+    const commitments = buildUpcomingCommitments(
+      [
+        bill({ id: 'b-pending', status: 'pending' }),
+        bill({ id: 'b-overdue', status: 'overdue' }),
+        bill({ id: 'b-paid', status: 'paid' }),
+        bill({ id: 'b-cancelled', status: 'cancelled' })
+      ],
+      [],
+      cutoff
+    );
+
+    expect(commitments.map((c) => c.id).sort()).toEqual(['b-overdue', 'b-pending']);
+  });
+
+  it('excludes bills due after the cutoff', () => {
+    const commitments = buildUpcomingCommitments(
+      [bill({ id: 'b-far', dueDate: Timestamp.fromDate(new Date('2026-09-01T12:00:00')) })],
+      [],
+      cutoff
+    );
+
+    expect(commitments).toHaveLength(0);
+  });
+
+  it('excludes inactive recurring rules and rules without a forecast amount', () => {
+    const commitments = buildUpcomingCommitments(
+      [],
+      [
+        recurring({ id: 'r-inactive', isActive: false }),
+        recurring({ id: 'r-no-amount', amountCents: undefined })
+      ],
+      cutoff
+    );
+
+    expect(commitments).toHaveLength(0);
+  });
+
+  it('always includes a closed invoice, regardless of reference month', () => {
+    const commitments = buildUpcomingCommitments(
+      [],
+      [],
+      cutoff,
+      [invoice({ id: 'inv-closed-past', status: 'closed', referenceMonth: '2026-01', outstandingBalanceCents: 5000 })],
+      now
+    );
+
+    expect(commitments.map((c) => c.id)).toEqual(['inv-closed-past']);
+  });
+
+  it('includes an open invoice for the current or a past month', () => {
+    const commitments = buildUpcomingCommitments(
+      [],
+      [],
+      cutoff,
+      [
+        invoice({ id: 'inv-open-current', status: 'open', referenceMonth: '2026-06', outstandingBalanceCents: 5000 }),
+        invoice({ id: 'inv-open-past', status: 'open', referenceMonth: '2026-05', outstandingBalanceCents: 3000 })
+      ],
+      now
+    );
+
+    expect(commitments.map((c) => c.id).sort()).toEqual(['inv-open-current', 'inv-open-past']);
+  });
+
+  it('excludes an open invoice from a future month (future installments)', () => {
+    const commitments = buildUpcomingCommitments(
+      [],
+      [],
+      cutoff,
+      [invoice({ id: 'inv-open-future', status: 'open', referenceMonth: '2026-07', outstandingBalanceCents: 5000 })],
+      now
+    );
+
+    expect(commitments).toHaveLength(0);
+  });
+
+  it('excludes paid, overpaid and zero-balance invoices', () => {
+    const commitments = buildUpcomingCommitments(
+      [],
+      [],
+      cutoff,
+      [
+        invoice({ id: 'inv-paid', status: 'paid', referenceMonth: '2026-06', outstandingBalanceCents: 0 }),
+        invoice({ id: 'inv-overpaid', status: 'overpaid', referenceMonth: '2026-06', outstandingBalanceCents: 0 }),
+        invoice({ id: 'inv-zero', status: 'closed', referenceMonth: '2026-06', outstandingBalanceCents: 0 })
+      ],
+      now
+    );
+
+    expect(commitments).toHaveLength(0);
+  });
+
+  it('sorts bills, recurring rules and invoices together by due date', () => {
+    const commitments = buildUpcomingCommitments(
+      [bill({ id: 'b-1', dueDate: Timestamp.fromDate(new Date('2026-06-25T12:00:00')) })],
+      [recurring({ id: 'r-1', nextOccurrenceAt: Timestamp.fromDate(new Date('2026-06-16T12:00:00')) })],
+      cutoff,
+      [invoice({ id: 'inv-1', status: 'closed', referenceMonth: '2026-06', dueDate: Timestamp.fromDate(new Date('2026-06-20T12:00:00')), outstandingBalanceCents: 1000 })],
+      now
+    );
+
+    expect(commitments.map((c) => c.id)).toEqual(['r-1', 'inv-1', 'b-1']);
+  });
+});
+
+describe('calculateDashboardSummary', () => {
+  it('calculates free to spend from bills and recurring rules', () => {
     const summary = calculateDashboardSummary({
       accounts: [account('checking', 300000)],
       transactions: [],
-      bills,
-      recurringRules,
+      bills: [bill({ amountCents: 120000, dueDate: Timestamp.fromDate(new Date('2026-06-20T12:00:00')) })],
+      recurringRules: [recurring({ amountCents: 10000, nextOccurrenceAt: Timestamp.fromDate(new Date('2026-06-18T12:00:00')) })],
       now: new Date('2026-06-14T12:00:00')
     });
 
     expect(summary.committedCents).toBe(130000);
     expect(summary.freeToSpendCents).toBe(170000);
     expect(summary.upcomingCommitments).toHaveLength(2);
+  });
+
+  it('sums the committed total across ALL commitments, even beyond the 3 shown on the dashboard', () => {
+    const now = new Date('2026-06-14T12:00:00');
+    const bills = [1, 2, 3, 4, 5].map((n) =>
+      bill({ id: `b-${n}`, amountCents: 1000 * n, dueDate: Timestamp.fromDate(new Date(`2026-06-${15 + n}T12:00:00`)) })
+    );
+
+    const summary = calculateDashboardSummary({
+      accounts: [account('checking', 1000000)],
+      transactions: [],
+      bills,
+      recurringRules: [],
+      now
+    });
+
+    const expectedTotal = bills.reduce((sum, b) => sum + b.amountCents, 0);
+    expect(summary.upcomingCommitments).toHaveLength(3);
+    expect(summary.committedCents).toBe(expectedTotal);
+  });
+
+  it('includes invoices in the committed total when provided', () => {
+    const now = new Date('2026-06-14T12:00:00');
+    const summary = calculateDashboardSummary({
+      accounts: [account('checking', 500000)],
+      transactions: [],
+      bills: [],
+      recurringRules: [],
+      invoices: [invoice({ status: 'closed', referenceMonth: '2026-06', outstandingBalanceCents: 45000 })],
+      now
+    });
+
+    expect(summary.committedCents).toBe(45000);
+    expect(summary.freeToSpendCents).toBe(455000);
+  });
+
+  it('defaults committed invoices to zero when the invoices list is omitted', () => {
+    const summary = calculateDashboardSummary({
+      accounts: [account('checking', 500000)],
+      transactions: [],
+      bills: [],
+      recurringRules: [],
+      now: new Date('2026-06-14T12:00:00')
+    });
+
+    expect(summary.committedCents).toBe(0);
+    expect(summary.freeToSpendCents).toBe(500000);
+  });
+
+  it('lists only the 5 most recent active transactions, most recent first', () => {
+    const dates = ['2026-06-01', '2026-06-05', '2026-06-10', '2026-06-12', '2026-06-13', '2026-06-14'];
+    const transactions = dates.map((d, i) =>
+      transaction({ id: `tx-${i}`, date: Timestamp.fromDate(new Date(`${d}T12:00:00`)) })
+    );
+
+    const summary = calculateDashboardSummary({
+      accounts: [account('checking', 100000)],
+      transactions,
+      bills: [],
+      recurringRules: [],
+      now: new Date('2026-06-14T12:00:00')
+    });
+
+    expect(summary.recentTransactions).toHaveLength(5);
+    expect(summary.recentTransactions[0].id).toBe('tx-5');
+    expect(summary.recentTransactions[4].id).toBe('tx-1');
   });
 });

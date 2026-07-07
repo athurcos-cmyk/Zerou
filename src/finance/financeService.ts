@@ -349,6 +349,7 @@ export async function createRecurringRule(workspaceId: string, userId: string, i
     amountCents: parsed.amountCents,
     frequency: parsed.frequency,
     nextOccurrenceAt: Timestamp.fromDate(parsed.nextOccurrenceAt),
+    anchorDay: parsed.nextOccurrenceAt.getDate(),
     accountId: parsed.accountId,
     categoryId: parsed.categoryId,
     isActive: true,
@@ -429,12 +430,39 @@ export function subscribeBills(
 
 // ─── nextOccurrenceDate ───────────────────────────────────────────────────────
 
-export function nextOccurrenceDate(current: Date, frequency: 'weekly' | 'monthly' | 'yearly'): Date {
-  const next = new Date(current);
-  if (frequency === 'weekly') next.setDate(next.getDate() + 7);
-  else if (frequency === 'monthly') next.setMonth(next.getMonth() + 1);
-  else next.setFullYear(next.getFullYear() + 1);
-  return next;
+export function nextOccurrenceDate(
+  current: Date,
+  frequency: 'weekly' | 'monthly' | 'yearly',
+  anchorDay?: number
+): Date {
+  if (frequency === 'weekly') {
+    const next = new Date(current);
+    next.setDate(next.getDate() + 7);
+    return next;
+  }
+
+  // setMonth/setFullYear transbordam quando o mês alvo é mais curto (ex.: 31/jan
+  // vira 3/mar, pulando fevereiro inteiro). Em vez disso, usamos o dia do mês
+  // alvo, mas limitado (clamp) ao último dia válido desse mês (ex.: 31/jan → 28/fev).
+  // `anchorDay`, quando informado, é o dia original pretendido (guardado na
+  // criação da regra) — usá-lo em vez de `current.getDate()` faz a ocorrência
+  // "voltar" pro dia 31 assim que um mês de 31 dias aparecer, em vez de ficar
+  // ancorada no dia clampado (28) pra sempre.
+  const day = anchorDay ?? current.getDate();
+  const targetYear = frequency === 'yearly' ? current.getFullYear() + 1 : current.getFullYear();
+  const targetMonth = frequency === 'yearly' ? current.getMonth() : current.getMonth() + 1;
+  const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+  const clampedDay = Math.min(day, daysInTargetMonth);
+
+  return new Date(
+    targetYear,
+    targetMonth,
+    clampedDay,
+    current.getHours(),
+    current.getMinutes(),
+    current.getSeconds(),
+    current.getMilliseconds()
+  );
 }
 
 // ─── payBill ──────────────────────────────────────────────────────────────────
@@ -470,13 +498,13 @@ export function payBill(
 export function recordRecurringPayment(
   workspaceId: string,
   userId: string,
-  rule: Pick<RecurringRule, 'id' | 'description' | 'amountCents' | 'categoryId' | 'accountId' | 'frequency' | 'nextOccurrenceAt'>,
+  rule: Pick<RecurringRule, 'id' | 'description' | 'amountCents' | 'categoryId' | 'accountId' | 'frequency' | 'nextOccurrenceAt' | 'anchorDay'>,
   opts: { accountId?: string; amountCents?: number } = {}
 ) {
   const amount = opts.amountCents ?? rule.amountCents;
   if (!amount) return;
   const acctId = opts.accountId || rule.accountId;
-  const nextDate = nextOccurrenceDate(rule.nextOccurrenceAt.toDate(), rule.frequency);
+  const nextDate = nextOccurrenceDate(rule.nextOccurrenceAt.toDate(), rule.frequency, rule.anchorDay);
   const batch = writeBatch(getFirebaseDb());
   batch.update(documentRef(workspaceId, 'recurring', rule.id), {
     nextOccurrenceAt: Timestamp.fromDate(nextDate),

@@ -27,7 +27,7 @@ export function CardsPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage(null);
 
@@ -36,25 +36,21 @@ export function CardsPage() {
       return;
     }
 
-    try {
-      await createCreditCard(workspaceId, user.uid, {
-        name,
-        lastFour,
-        brand,
-        limitCents: parseMoneyToCents(limit),
-        closingDay,
-        dueDay,
-        colorToken: 'chart-1'
-      });
-      setName('');
-      setLastFour('');
-      setBrand('Visa');
-      setLimit('');
-      setClosingDay(10);
-      setDueDay(20);
-    } catch (error) {
-      setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar o cartão agora.'));
-    }
+    createCreditCard(workspaceId, user.uid, {
+      name,
+      lastFour,
+      brand,
+      limitCents: parseMoneyToCents(limit),
+      closingDay,
+      dueDay,
+      colorToken: 'chart-1'
+    }).catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar o cartão agora.')));
+    setName('');
+    setLastFour('');
+    setBrand('Visa');
+    setLimit('');
+    setClosingDay(10);
+    setDueDay(20);
   }
 
   return (

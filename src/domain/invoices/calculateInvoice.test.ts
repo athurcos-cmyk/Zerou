@@ -95,4 +95,66 @@ describe('invoice ledger calculations', () => {
 
     expect(expenseRecognizedWithoutInvoicePayments(invoice)).toBe(80000);
   });
+
+  it('returns all zeros for an invoice with no entries', () => {
+    const open = calculateInvoice([]);
+    const closed = calculateInvoice([], 'closed');
+
+    expect(open).toMatchObject({ purchasesTotalCents: 0, outstandingBalanceCents: 0, status: 'open' });
+    // Fechada sem nenhum pagamento não é "paga" (paymentsTotalCents precisa ser > 0) —
+    // fica como 'closed' mesmo com saldo zerado.
+    expect(closed).toMatchObject({ purchasesTotalCents: 0, outstandingBalanceCents: 0, status: 'closed' });
+  });
+
+  it('produces the same totals regardless of entry order', () => {
+    const entries = [purchase(50000, 'p-1'), payment(10000, 'pay-1'), ledgerEntry('fee', 500, 'fee-1'), ledgerEntry('refund_credit', 2000, 'refund-1')];
+    const forward = calculateInvoice(entries, 'closed');
+    const shuffled = calculateInvoice([...entries].reverse(), 'closed');
+    // appliedEntries preserva a ordem de entrada por design — comparamos só os totais.
+    const { appliedEntries: _forwardEntries, ...forwardTotals } = forward;
+    const { appliedEntries: _shuffledEntries, ...shuffledTotals } = shuffled;
+
+    expect(shuffledTotals).toEqual(forwardTotals);
+  });
+
+  it('treats manual_debit and manual_credit like purchases and credits', () => {
+    const invoice = calculateInvoice([
+      ledgerEntry('manual_debit', 30000, 'manual-debit-1'),
+      ledgerEntry('manual_credit', 5000, 'manual-credit-1')
+    ], 'closed');
+
+    expect(invoice.purchasesTotalCents).toBe(30000);
+    expect(invoice.creditsTotalCents).toBe(5000);
+    expect(invoice.outstandingBalanceCents).toBe(25000);
+  });
+
+  it('allows recognized expense to go negative when credits exceed purchases and fees', () => {
+    const invoice = calculateInvoice([
+      purchase(10000, 'p-1'),
+      ledgerEntry('refund_credit', 30000, 'refund-1')
+    ]);
+
+    expect(invoice.recognizedExpenseCents).toBe(-20000);
+    expect(invoice.overpaidCreditCents).toBe(20000);
+    expect(invoice.status).toBe('overpaid');
+  });
+
+  it('keeps the first entry data when a retried idempotencyKey carries different data', () => {
+    // appendLedgerEntry nunca deixa o duplicado entrar na lista, mas se dois
+    // registros com a mesma chave chegarem juntos (ex.: merge de escritas offline),
+    // calculateInvoice deve preservar o primeiro, não o último.
+    const invoice = calculateInvoice([purchase(10000, 'same-key'), purchase(99999, 'same-key')]);
+
+    expect(invoice.purchasesTotalCents).toBe(10000);
+  });
+
+  it('appendLedgerEntry never appends a duplicate idempotencyKey', () => {
+    const first = appendLedgerEntry([], purchase(10000, 'same-key'));
+    const retry = appendLedgerEntry(first.entries, purchase(99999, 'same-key'));
+
+    expect(first.created).toBe(true);
+    expect(retry.created).toBe(false);
+    expect(retry.entries).toHaveLength(1);
+    expect(calculateInvoice(retry.entries).purchasesTotalCents).toBe(10000);
+  });
 });

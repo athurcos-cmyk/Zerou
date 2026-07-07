@@ -5,6 +5,7 @@ import { useFinanceContext } from '../finance/FinanceDataContext';
 import { CategoryField } from '../components/CategoryField';
 import { SelectField } from '../components/SelectField';
 import { BottomSheet } from '../components/BottomSheet';
+import { EmptyState } from '../components/EmptyState';
 import { FormMessage } from '../components/FormMessage';
 import { fromDateInputValue, todayInputValue, toDateInputValue } from '../finance/financeDates';
 import { recurringFrequencyLabels } from '../finance/financeLabels';
@@ -47,7 +48,7 @@ export function RecurringPage() {
     setPayAmount('');
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage(null);
 
@@ -56,24 +57,20 @@ export function RecurringPage() {
       return;
     }
 
-    try {
-      await createRecurringRule(workspaceId, user.uid, {
-        description,
-        amountCents: amount.trim() ? parseMoneyToCents(amount) : undefined,
-        frequency,
-        nextOccurrenceAt: fromDateInputValue(nextOccurrenceAt),
-        accountId,
-        categoryId
-      });
-      setDescription('');
-      setAmount('');
-      setFrequency('monthly');
-      setNextOccurrenceAt(todayInputValue());
-      setAccountId('');
-      setCategoryId('');
-    } catch (error) {
-      setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar a recorrência agora.'));
-    }
+    createRecurringRule(workspaceId, user.uid, {
+      description,
+      amountCents: amount.trim() ? parseMoneyToCents(amount) : undefined,
+      frequency,
+      nextOccurrenceAt: fromDateInputValue(nextOccurrenceAt),
+      accountId,
+      categoryId
+    }).catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar a recorrência agora.')));
+    setDescription('');
+    setAmount('');
+    setFrequency('monthly');
+    setNextOccurrenceAt(todayInputValue());
+    setAccountId('');
+    setCategoryId('');
   }
 
   return (
@@ -163,7 +160,11 @@ export function RecurringPage() {
               ))}
             </div>
           ) : (
-            <p className="text-secondary">Nenhuma recorrência criada ainda.</p>
+            <EmptyState
+              illustration="transactions"
+              title="Nenhuma recorrência ainda"
+              description="Cadastre assinaturas e contas fixas para acompanhar quando vencem de novo."
+            />
           )}
         </article>
       </div>
