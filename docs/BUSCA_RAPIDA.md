@@ -42,6 +42,7 @@ Use este arquivo como mapa antes de abrir documentos grandes. Regra: leia o meno
 
 | Mês | Arquivo | Use para |
 |---|---|---|
+| Julho 2026 | `docs/history/2026-07.md` | Auditoria pré-lançamento, testes de lógica financeira, `anchorDay` de recorrência |
 | Junho 2026 | `docs/history/2026-06.md` | Redesign Sol, mobile shell, cofrinho do casal, metas, landing nova |
 
 ## Buscas principais

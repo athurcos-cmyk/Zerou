@@ -64,6 +64,10 @@ React 19 (TS strict), Vite, Firebase Web SDK (Auth + Firestore + Storage), Verce
 - **Antecipação de parcelas** (`InvoicePage`): painel detecta parcelas futuras do mesmo cartão, exibe por invoice com checkbox. Ao confirmar: `writeBatch` adiciona `installment_anticipation_credit` em cada fatura futura selecionada (reduz saldo delas) e `installment_anticipation` na fatura atual (debita o total). Fire-and-forget.
 - **Comprometido** (Dashboard): faturas `closed` sempre entram; faturas `open` só se `referenceMonth <= mês atual`. Faturas futuras de parcelas não entram até chegarem no mês delas.
 
+## Recorrências — comportamento-chave
+
+- **`anchorDay`** (2026-07-07): `RecurringRule` guarda o dia do mês (1-31) pretendido na criação. `nextOccurrenceDate` (`src/finance/financeService.ts` e a cópia server-side em `functions/src/automation.ts`) usa esse dia fixo — não o da última ocorrência — pra calcular a próxima, clampando no último dia válido do mês alvo. Uma recorrência no dia 31 clampa em 28/fev, mas **volta pro dia 31** assim que março (31 dias) chega, em vez de ficar presa no dia clampado pra sempre. Mesmo comportamento para recorrência anual em 29/fev. Regras antigas (criadas antes deste campo existir) não têm `anchorDay` e mantêm o comportamento de clamp simples — sem migração retroativa.
+
 ## Firestore (coleções por workspace)
 
 `workspaces/{id}/` → `accounts`, `categories`, `transactions`, `bills`, `recurring`, `goals`, `goalContributions`, `cards/{cardId}/invoices/{invoiceId}/ledger`, `members`, `sharedExpenseClaims`, `settlements`, `comments`, `invites`. Workspace pessoal = `personal_{uid}`; workspace do casal é separado, com membership ativa.

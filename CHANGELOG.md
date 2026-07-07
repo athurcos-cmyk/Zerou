@@ -2,33 +2,15 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
-## 2026-07-07 — fix: recorrência não perde mais o dia-âncora (dia 31 volta a valer)
+## 2026-07-07 — fix: auditoria pré-lançamento, testes de lógica financeira e recorrência com anchorDay
 
-- **Novo campo `anchorDay`** em `RecurringRule` ([contracts.ts](src/types/contracts.ts)): guarda o dia do mês (1-31) que o usuário pretendia na criação da regra. `createRecurringRule` grava esse valor a partir de `nextOccurrenceAt.getDate()`.
-- **`nextOccurrenceDate`** ([financeService.ts](src/finance/financeService.ts)) agora aceita `anchorDay` opcional e o usa em vez do dia da última ocorrência ao calcular a próxima. Antes do fix anterior (clamp), 31/jan pulava fevereiro inteiro; com clamp mas sem âncora, uma vez em 28/fev a regra ficava presa no dia 28 para sempre. Com `anchorDay=31`, a regra clampa em 28/fev mas **volta pro dia 31** assim que março (31 dias) chega. Mesmo comportamento para recorrência anual em 29/fev voltando ao dia 29 no próximo ano bissexto.
-- **`recordRecurringPayment`** (client) e **`generateRecurrences`** (Cloud Function, [functions/src/automation.ts](functions/src/automation.ts) — que roda às 6h mesmo com o app fechado) foram atualizados para passar `rule.anchorDay` adiante. A função duplicada de avanço de data na Cloud Function recebeu o mesmo fix de clamp + âncora, senão o problema continuaria no automation server-side mesmo corrigido no client.
-- **`firestore.rules`**: `anchorDay` liberado em `validRecurringCreate` (`hasOnly` + validação `int` entre 1 e 31). Não precisa entrar em `validRecurringUpdate` — o campo nunca muda depois de criado.
-- **Limitação aceita**: regras criadas *antes* deste fix não têm `anchorDay` — continuam com o comportamento de clamp simples (perdem a âncora na primeira vez que caem num mês curto). Não foi feita migração retroativa dos documentos existentes no Firestore.
-- **Pendente**: as regras do Firestore precisam ser reimplantadas (`npx firebase deploy --only firestore:rules --project zerou-26757`) para que a criação de recorrências com `anchorDay` funcione em produção — ainda não deployado.
+- Design/consistência: cores literais da `SearchPage` viraram tokens (`noHardcodedColors` volta a passar), `window.confirm` trocado por `useConfirm`, empty states ilustrados em Bills/Recurring/Accounts.
+- Fire-and-forget consertado em Bills/Cards/Recurring (formulário não trava mais esperando o servidor) e bug de boot offline corrigido (saldo podia piscar R$ 0,00 antes do cache carregar por completo).
+- Suíte de testes de domínio ampliada de 46 para 113 testes (saldo, faturas de cartão, casal, dinheiro, recorrência).
+- 2 bugs corrigidos: `parseMoneyToCents` inflava 100x um valor com ponto decimal; `nextOccurrenceDate` pulava fevereiro inteiro numa recorrência no dia 31.
+- Novo campo `anchorDay`: recorrência mensal/anual guarda o dia original e volta a ele quando o mês permite (client + Cloud Function + regras do Firestore, já deployadas em produção).
 
-## 2026-07-07 — test: cobertura ampla da lógica financeira (saldo, faturas, casal, datas)
-
-- **`financeCalculations.test.ts`** (31 testes, era 6): todos os tipos de transação (`income`, `expense`, `transfer`, `adjustment`, `card_purchase`, `card_payment`, `refund`, `reimbursement`), múltiplas contas, transação com conta inexistente, valor zero, round-trip criar→excluir (saldo volta) e criar→editar (reflete só o novo valor), `findNextIncomeDate` e `buildUpcomingCommitments` (bills/recorrências/faturas em todas as combinações de status e mês).
-- **`calculateInvoice.test.ts`** (+7 testes): fatura vazia, ordem de entradas não afeta o total, `manual_debit`/`manual_credit`, crédito maior que a compra (despesa reconhecida negativa), idempotência com dado divergente.
-- **`calculateSharedBalances.test.ts`** (+7 testes): settlements `proposed` ignorados, múltiplas claims entre os mesmos dois usuários se compensando, claim 100% de um lado, `paidAmountCents` acima do combinado não gera crédito extra, saldo zerado não sugere acerto, 3+ membros.
-- **`money.test.ts`** (novo, 15 testes) e **`nextOccurrenceDate.test.ts`** (novo, 6 testes) — ver "bugs encontrados" abaixo.
-- **2 bugs reais encontrados e corrigidos**:
-  - `parseMoneyToCents` ([money.ts](src/finance/money.ts)): "10.50" (ponto como decimal) era lido como separador de milhar → gerava R$ 1.050,00 em vez de R$ 10,50 (inflação de 100x). Agora detecta se o ponto é decimal (1-2 dígitos depois) ou separador de milhar (3 dígitos, ou múltiplos pontos), e também reconhece o formato US completo ("1,234.56").
-  - `nextOccurrenceDate` ([financeService.ts](src/finance/financeService.ts)): recorrência mensal ancorada no dia 31 pulava fevereiro inteiro (caía em 3/mar). Agora clampa no último dia válido do mês alvo (31/jan → 28/fev), igual a qualquer sistema de cobrança mensal. Mesmo fix para recorrência anual ancorada em 29/fev num ano bissexto (→ 28/fev no ano seguinte, não bissexto).
-
-## 2026-07-07 — fix: auditoria pré-lançamento (design, fire-and-forget, boot offline)
-
-- **Teste `noHardcodedColors` corrigido**: `SearchPage.tsx` tinha cores hex/rgba literais (do redesign de 22/06) que quebravam o teste. Trocadas por tokens (`--action-primary`, `--success`, `--accent-foreground`, `--on-accent-85/55`), mesmo padrão do `DashboardPage`.
-- **`window.confirm` removido**: `AppShell.tsx` (logout com limpeza local) e `AccountsPage.tsx` (exclusão de conta) agora usam `useConfirm`/`ConfirmDialog`, como o resto do app.
-- **Fire-and-forget consertado** em `BillsPage`, `CardsPage` e `RecurringPage`: os formulários de criação faziam `await create...()` antes de limpar o form, travando com spinner se a rede oscilasse. Agora seguem o mesmo padrão do `NewTransactionPage`/`AccountsPage` (dispara e trata erro com `.catch`). Exclusão de conta também deixou de bloquear em `await`.
-- **Empty states ilustrados**: `BillsPage`, `RecurringPage` e `AccountsPage` tinham texto seco ("Nenhum X criado ainda.") em vez do componente `EmptyState`.
-- **Bug real de boot offline corrigido** (`useFinanceData.ts`): `loading` virava `false` assim que a **primeira** das 5 coleções (contas/categorias/transações/contas a pagar/recorrências) chegava do cache — não quando **todas** chegavam. Se `categories` resolvesse antes de `accounts`, o Dashboard podia piscar "R$ 0,00" por um instante antes do saldo real aparecer. Agora só marca `loading:false` quando as 5 já chegaram pelo menos uma vez.
-- **`DashboardPage`**: "Disponível" e "Comprometido" dependem das faturas de cartão (`cardsData`), mas só esperavam `finance.loading` — podiam mostrar um "Disponível" inflado por um instante antes das faturas sincronizarem. Agora esperam `finance.loading || cardsData.loading`. "Saldo total" continua instantâneo (não depende de cartões).
+Detalhes técnicos completos em [`docs/history/2026-07.md`](docs/history/2026-07.md).
 
 ## 2026-06-22 — feat: redesign página de Análise (SearchPage)
 
