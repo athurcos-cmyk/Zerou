@@ -9,7 +9,8 @@ export const defaultCategories = [
   { id: 'expense_health', name: 'Saúde', type: 'expense', icon: 'heart-pulse' },
   { id: 'expense_leisure', name: 'Lazer', type: 'expense', icon: 'smile' },
   { id: 'both_transfer', name: 'Transferência', type: 'both', icon: 'repeat' },
-  { id: 'both_adjustment', name: 'Ajuste', type: 'both', icon: 'sliders' }
+  { id: 'both_adjustment', name: 'Ajuste', type: 'both', icon: 'sliders' },
+  { id: 'both_cofrinho', name: 'Cofrinho', type: 'both', icon: 'piggy' }
 ] as const;
 
 export function buildDefaultCategory(workspaceId: string, category: (typeof defaultCategories)[number]) {

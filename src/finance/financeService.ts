@@ -235,11 +235,41 @@ export async function addGoalContribution(workspaceId: string, userId: string, g
     goalId,
     userId,
     amountCents,
+    type: 'deposit',
     monthKey: monthKeyFromDate(now),
     createdAt: serverTimestamp()
   });
   batch.update(documentRef(workspaceId, 'goals', goalId), {
     savedCents: increment(amountCents),
+    updatedAt: serverTimestamp()
+  });
+  await batch.commit();
+  return id;
+}
+
+/**
+ * Registra um resgate (retirada) de um cofrinho compartilhado: mesma mecânica de
+ * addGoalContribution, mas em sentido inverso — decrementa savedCents e grava a
+ * contribuição com type: 'withdrawal'. amountCents é sempre a magnitude positiva
+ * do valor resgatado. A regra do Firestore (validMoneyCents em savedCents) rejeita
+ * a escrita caso o resgate deixe o cofrinho negativo.
+ */
+export async function withdrawGoalContribution(workspaceId: string, userId: string, goalId: string, amountCents: number) {
+  const id = createId('contrib');
+  const now = new Date();
+  const batch = writeBatch(getFirebaseDb());
+  batch.set(documentRef(workspaceId, 'goalContributions', id), {
+    id,
+    workspaceId,
+    goalId,
+    userId,
+    amountCents,
+    type: 'withdrawal',
+    monthKey: monthKeyFromDate(now),
+    createdAt: serverTimestamp()
+  });
+  batch.update(documentRef(workspaceId, 'goals', goalId), {
+    savedCents: increment(-amountCents),
     updatedAt: serverTimestamp()
   });
   await batch.commit();

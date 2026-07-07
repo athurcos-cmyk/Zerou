@@ -78,6 +78,9 @@ export interface GoalContribution {
   goalId: string;
   userId: string;
   amountCents: MoneyCents;
+  // Direção do lançamento — 'deposit' (guardar) ou 'withdrawal' (resgatar). amountCents
+  // é sempre a magnitude positiva; ausente = registro legado, tratado como 'deposit'.
+  type?: 'deposit' | 'withdrawal';
   monthKey?: string;
   createdAt?: Timestamp;
 }

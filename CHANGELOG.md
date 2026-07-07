@@ -2,6 +2,16 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-07 — feat: resgatar do cofrinho do casal
+
+- Nova ação "Resgatar" no cofrinho compartilhado: retira do total do casal e, opcionalmente, credita como entrada numa conta pessoal — espelha "Guardar" em sentido inverso.
+- `GoalContribution` ganhou campo `type: 'deposit' | 'withdrawal'`; estatísticas por pessoa/mês extraídas para a função pura `calculateCoupleGoalStats` (12 testes novos).
+- Nova categoria padrão "Cofrinho" (`both_cofrinho`) para as transações de guardar/resgatar não caírem em "Sem categoria".
+- Regras do Firestore atualizadas (`goalContributions` aceita `type`) e deployadas em produção.
+- Revisão de design da `SharedSpacePage`: já seguia os padrões do app; toggle Guardar/Resgatar e botões em linha reaproveitam os mesmos componentes usados no resto do app (sem CSS novo).
+
+Detalhes e decisões de design em [`docs/history/2026-07.md`](docs/history/2026-07.md).
+
 ## 2026-07-07 — fix: auditoria pré-lançamento, testes de lógica financeira e recorrência com anchorDay
 
 - Design/consistência: cores literais da `SearchPage` viraram tokens (`noHardcodedColors` volta a passar), `window.confirm` trocado por `useConfirm`, empty states ilustrados em Bills/Recurring/Accounts.

@@ -76,7 +76,7 @@ React 19 (TS strict), Vite, Firebase Web SDK (Auth + Firestore + Storage), Verce
 
 - **Modos do espaço** (`coupleMode` no workspace): `savings_only` (só cofrinho, padrão), `transparent` (despesas divididas visíveis, sem acerto formal), `balanced` (idem + barra proporcional de quem cobre mais no mês). Pode mudar a qualquer momento em "Gerenciar espaço".
 - **Divisão de despesa** (claims, apenas nos modos transparent/balanced): igual / porcentagem / valor. Sem acerto de contas formal — o equilíbrio é visual/proporcional.
-- **Cofrinho do casal**: meta compartilhada (`goals` no workspace do casal) + contribuições (`goalContributions`). "Guardar" pode descontar de uma conta pessoal (vira despesa "Cofrinho" no workspace pessoal); valida saldo disponível antes. Mostra total unificado e juntado no mês.
+- **Cofrinho do casal**: meta compartilhada (`goals` no workspace do casal) + contribuições (`goalContributions`, campo `type: 'deposit' | 'withdrawal'`). "Guardar" pode descontar de uma conta pessoal (vira despesa "Cofrinho" no workspace pessoal); "Resgatar" (2026-07-07) faz o inverso — desconta do total do casal e pode creditar como entrada numa conta pessoal. Categoria fixa `both_cofrinho` em ambos. Total exibido sempre vem de `goal.savedCents` (fonte da verdade); `goalContributions` só alimenta a quebra por pessoa/mês (`calculateCoupleGoalStats`, `src/domain/shared/`). Resgate valida client-side (não pode exceder o total) e é bloqueado server-side pela regra (`savedCents` nunca fica negativo).
 
 ## Deploy de regras
 

@@ -5,9 +5,7 @@ Itens acionáveis. Fechou? Mova para "Concluído" ou remova. Detalhe histórico 
 ## Abertas
 
 ### Produto / UX
-- [ ] QA manual real no celular (cadastro, login, onboarding, conta, transação, conta a pagar, cartão, fatura, espaço do casal, cofrinho).
-- [ ] Testar fim a fim o **cofrinho do casal** com 2 contas pareadas (guardar com e sem desconto de conta pessoal).
-- [ ] Avaliar "resgatar do cofrinho de volta pra conta" e categoria fixa "Cofrinho".
+- [ ] QA manual real no celular (cadastro, login, onboarding, conta, transação, conta a pagar, cartão, fatura, espaço do casal, cofrinho — incluindo o resgate novo).
 - [ ] Dar a mesma voz de copy às páginas legais/ajuda, se fizer sentido.
 
 ### Técnico
@@ -25,6 +23,7 @@ Itens acionáveis. Fechou? Mova para "Concluído" ou remova. Detalhe histórico 
 - [ ] Billing real (Stripe) — só com decisão explícita de produto (hoje 100% gratuito).
 
 ## Concluído (recente)
+- [x] Resgatar do cofrinho do casal de volta pra conta pessoal (com categoria fixa "Cofrinho"). Cálculo de estatísticas (`byUser`/`thisMonthCents`) extraído para `calculateCoupleGoalStats` (testado, 12 casos).
 - [x] UI premium em todas as páginas: cabeçalhos compactos, `CategoryMark` nas listas de transações, cards de conta com gradiente escuro, formulários colapsáveis (Contas, Cartões, Compromissos), nav inferior reorganizada (Extrato no slot 2, Cartões no slot 4, Casal no Mais).
 - [x] Antecipação de parcelas estilo Nubank: seleção por compra + invoice com checkbox, `writeBatch` credita faturas futuras e debita a atual. Novo tipo `installment_anticipation_credit` no ledger.
 - [x] Fix de status de fatura: fatura aberta permanece `open` até o fechamento, independente de pagamentos antecipados.

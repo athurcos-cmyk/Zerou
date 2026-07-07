@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Check, ChevronRight, Copy, Eye, PiggyBank, Plus, QrCode, Scale, Settings2, Trash2, Users } from 'lucide-react';
+import { Check, ChevronRight, Copy, Eye, Minus, PiggyBank, Plus, QrCode, Scale, Settings2, Trash2, Users } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { calculateAccountBalances } from '../finance/financeCalculations';
 import { clearPendingInvite, readPendingInvite, savePendingInvite } from '../auth/pendingInvite';
@@ -9,7 +9,7 @@ import { ACCENT_FOREGROUND } from '../theme/palette';
 import { useConfirm } from '../components/ConfirmDialog';
 import { EmptyState } from '../components/EmptyState';
 import { FormMessage } from '../components/FormMessage';
-import { addGoalContribution, createGoal, createTransaction, deleteGoal } from '../finance/financeService';
+import { addGoalContribution, createGoal, createTransaction, deleteGoal, withdrawGoalContribution } from '../finance/financeService';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { type CoupleGoalStats } from '../shared/useCoupleSavings';
 import { useFinanceContext } from '../finance/FinanceDataContext';
@@ -82,6 +82,7 @@ export function SharedSpacePage() {
   const [guardarTarget, setGuardarTarget] = useState<CoupleGoalStats | null>(null);
   const [guardarAmount, setGuardarAmount] = useState('');
   const [guardarFromAccount, setGuardarFromAccount] = useState('');
+  const [guardarSign, setGuardarSign] = useState<1 | -1>(1);
 
   useEffect(() => {
     const storedCode = readPendingInvite();
@@ -120,7 +121,13 @@ export function SharedSpacePage() {
     if (!workspaceId || !user || !guardarTarget) return;
     const amountCents = parseMoneyToCents(guardarAmount);
     if (amountCents <= 0) return;
-    if (guardarFromAccount) {
+
+    if (guardarSign === -1 && amountCents > guardarTarget.totalCents) {
+      setMessage(`Só dá pra resgatar até ${formatMoney(guardarTarget.totalCents)} — o que já foi guardado neste cofrinho.`);
+      return;
+    }
+
+    if (guardarSign === 1 && guardarFromAccount) {
       const balances = calculateAccountBalances(personalFinance.accounts, personalFinance.transactions);
       const acct = balances.find((a) => a.id === guardarFromAccount);
       if (acct && amountCents > acct.balanceCents) {
@@ -128,23 +135,45 @@ export function SharedSpacePage() {
         return;
       }
     }
+
     setMessage(null);
-    addGoalContribution(workspaceId, user.uid, guardarTarget.goal.id, amountCents)
-      .catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível guardar agora.')));
-    // Optionally pull the money out of a personal account as an expense.
-    if (guardarFromAccount && profile?.defaultWorkspaceId) {
-      createTransaction(profile.defaultWorkspaceId, user.uid, {
-        type: 'expense',
-        amountCents,
-        description: `Cofrinho: ${guardarTarget.goal.name}`,
-        accountId: guardarFromAccount,
-        date: new Date(),
-        tags: ['cofrinho']
-      }).catch(() => undefined);
+
+    if (guardarSign === 1) {
+      addGoalContribution(workspaceId, user.uid, guardarTarget.goal.id, amountCents)
+        .catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível guardar agora.')));
+      // Optionally pull the money out of a personal account as an expense.
+      if (guardarFromAccount && profile?.defaultWorkspaceId) {
+        createTransaction(profile.defaultWorkspaceId, user.uid, {
+          type: 'expense',
+          amountCents,
+          description: `Cofrinho: ${guardarTarget.goal.name}`,
+          categoryId: 'both_cofrinho',
+          accountId: guardarFromAccount,
+          date: new Date(),
+          tags: ['cofrinho']
+        }).catch(() => undefined);
+      }
+    } else {
+      withdrawGoalContribution(workspaceId, user.uid, guardarTarget.goal.id, amountCents)
+        .catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível resgatar agora.')));
+      // Optionally deposit the money back into a personal account as income.
+      if (guardarFromAccount && profile?.defaultWorkspaceId) {
+        createTransaction(profile.defaultWorkspaceId, user.uid, {
+          type: 'income',
+          amountCents,
+          description: `Cofrinho: ${guardarTarget.goal.name} (resgate)`,
+          categoryId: 'both_cofrinho',
+          accountId: guardarFromAccount,
+          date: new Date(),
+          tags: ['cofrinho']
+        }).catch(() => undefined);
+      }
     }
+
     setGuardarTarget(null);
     setGuardarAmount('');
     setGuardarFromAccount('');
+    setGuardarSign(1);
   }
 
   async function handleDeleteCofrinho(goalId: string) {
@@ -509,9 +538,26 @@ export function SharedSpacePage() {
                         <span className="goal-progress-fill" style={{ width: `${Math.max(3, stat.percent)}%`, background: stat.goal.color }} />
                       </div>
                     ) : null}
-                    <button className="button button--primary button--block" type="button" onClick={() => { setGuardarTarget(stat); setGuardarAmount(''); setGuardarFromAccount(''); }}>
-                      <PiggyBank size={17} aria-hidden="true" /> Guardar no cofrinho
-                    </button>
+                    <div className="button-row">
+                      <button
+                        className="button button--primary"
+                        style={{ flex: 1 }}
+                        type="button"
+                        onClick={() => { setGuardarTarget(stat); setGuardarAmount(''); setGuardarFromAccount(''); setGuardarSign(1); }}
+                      >
+                        <PiggyBank size={17} aria-hidden="true" /> Guardar
+                      </button>
+                      {stat.totalCents > 0 && (
+                        <button
+                          className="button button--subtle"
+                          style={{ flex: 1 }}
+                          type="button"
+                          onClick={() => { setGuardarTarget(stat); setGuardarAmount(''); setGuardarFromAccount(''); setGuardarSign(-1); }}
+                        >
+                          <Minus size={17} aria-hidden="true" /> Resgatar
+                        </button>
+                      )}
+                    </div>
                   </article>
                 ))}
                 <button className="button button--ghost" type="button" onClick={() => setCofrinhoOpen(true)}>
@@ -742,15 +788,33 @@ export function SharedSpacePage() {
         </form>
       </BottomSheet>
 
-      {/* Guardar (contribute) sheet */}
-      <BottomSheet open={Boolean(guardarTarget)} onClose={() => setGuardarTarget(null)} title={guardarTarget ? `Guardar — ${guardarTarget.goal.name}` : ''} subtitle="Quanto você vai guardar?">
+      {/* Guardar/Resgatar (contribute or withdraw) sheet */}
+      <BottomSheet
+        open={Boolean(guardarTarget)}
+        onClose={() => setGuardarTarget(null)}
+        title={guardarTarget ? `${guardarSign === 1 ? 'Guardar' : 'Resgatar'} — ${guardarTarget.goal.name}` : ''}
+        subtitle={guardarSign === 1 ? 'Quanto você vai guardar?' : 'Quanto você vai resgatar?'}
+      >
         <form className="form-stack" onSubmit={(event) => void handleGuardar(event)}>
+          <div className="segmented">
+            <button type="button" aria-pressed={guardarSign === 1} onClick={() => setGuardarSign(1)}>
+              <Plus size={15} aria-hidden="true" /> Guardar
+            </button>
+            <button type="button" aria-pressed={guardarSign === -1} onClick={() => setGuardarSign(-1)}>
+              <Minus size={15} aria-hidden="true" /> Resgatar
+            </button>
+          </div>
           <label className="field">
             <span>Valor</span>
             <input className="input input--money" inputMode="decimal" value={guardarAmount} onChange={(event) => setGuardarAmount(event.target.value)} placeholder="0,00" autoFocus />
           </label>
+          {guardarSign === -1 && guardarTarget && (
+            <p className="text-muted" style={{ fontSize: '0.8rem', margin: 0 }}>
+              Disponível pra resgatar: {formatMoney(guardarTarget.totalCents)}
+            </p>
+          )}
           <div className="field">
-            <span className="field-label">De onde sai o dinheiro?</span>
+            <span className="field-label">{guardarSign === 1 ? 'De onde sai o dinheiro?' : 'Pra qual conta vai?'}</span>
             <div className="chip-row">
               <button type="button" className={`chip${!guardarFromAccount ? ' chip--active' : ''}`} onClick={() => setGuardarFromAccount('')}>Só registrar</button>
               {personalFinance.accounts.map((account) => (
@@ -758,11 +822,19 @@ export function SharedSpacePage() {
               ))}
             </div>
             <p className="text-muted" style={{ fontSize: '0.8rem', margin: '0.4rem 0 0' }}>
-              {guardarFromAccount ? 'Vira uma despesa "Cofrinho" na sua conta pessoal e some no total do casal.' : 'Só soma no cofrinho do casal, sem mexer no saldo das suas contas.'}
+              {guardarSign === 1
+                ? (guardarFromAccount ? 'Vira uma despesa "Cofrinho" na sua conta pessoal e some no total do casal.' : 'Só soma no cofrinho do casal, sem mexer no saldo das suas contas.')
+                : (guardarFromAccount ? 'Vira uma entrada "Cofrinho" na sua conta pessoal e desconta do total do casal.' : 'Só desconta do cofrinho do casal, sem mexer no saldo das suas contas.')}
             </p>
           </div>
           <div className="sheet-actions">
-            <button className="button button--primary" type="submit" disabled={!guardarAmount}>Guardar</button>
+            <button
+              className="button button--primary"
+              type="submit"
+              disabled={!guardarAmount || (guardarSign === -1 && Boolean(guardarTarget) && parseMoneyToCents(guardarAmount) > (guardarTarget?.totalCents ?? 0))}
+            >
+              {guardarSign === 1 ? 'Guardar' : 'Resgatar'}
+            </button>
           </div>
         </form>
       </BottomSheet>

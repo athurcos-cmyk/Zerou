@@ -701,6 +701,7 @@ service cloud.firestore {
           'goalId',
           'userId',
           'amountCents',
+          'type',
           'monthKey',
           'createdAt'
         ])
@@ -719,6 +720,7 @@ service cloud.firestore {
         && request.resource.data.userId == request.auth.uid
         && validMoneyCents(request.resource.data.amountCents)
         && request.resource.data.amountCents > 0
+        && (!request.resource.data.keys().hasAny(['type']) || request.resource.data.type in ['deposit', 'withdrawal'])
         && (!request.resource.data.keys().hasAny(['monthKey']) || validMonthKey(request.resource.data.monthKey))
         && request.resource.data.createdAt == request.time;
     }

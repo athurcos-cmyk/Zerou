@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { subscribeWithTransientRetry } from '../firebase/firestoreRetry';
 import { subscribeGoalContributions, subscribeGoals, type LocalSynced } from '../finance/financeService';
+import { calculateCoupleGoalStats, type CoupleGoalStats } from '../domain/shared/calculateCoupleGoalStats';
 import type { Goal, GoalContribution } from '../types/contracts';
 
 interface CoupleSavingsState {
@@ -16,13 +17,7 @@ function currentMonthKey() {
   return new Date().toISOString().slice(0, 7);
 }
 
-export interface CoupleGoalStats {
-  goal: LocalSynced<Goal>;
-  totalCents: number;
-  thisMonthCents: number;
-  byUser: Record<string, number>;
-  percent: number;
-}
+export type { CoupleGoalStats };
 
 export function useCoupleSavings(workspaceId?: string) {
   const [state, setState] = useState<CoupleSavingsState>(initial);
@@ -64,21 +59,10 @@ export function useCoupleSavings(workspaceId?: string) {
     };
   }, [workspaceId]);
 
-  const stats = useMemo<CoupleGoalStats[]>(() => {
-    const month = currentMonthKey();
-    return state.goals.map((goal) => {
-      const goalContribs = state.contributions.filter((contrib) => contrib.goalId === goal.id);
-      const byUser: Record<string, number> = {};
-      let thisMonthCents = 0;
-      for (const contrib of goalContribs) {
-        byUser[contrib.userId] = (byUser[contrib.userId] ?? 0) + contrib.amountCents;
-        if (contrib.monthKey === month) thisMonthCents += contrib.amountCents;
-      }
-      const totalCents = goal.savedCents;
-      const percent = goal.targetCents > 0 ? Math.min(100, Math.round((totalCents / goal.targetCents) * 100)) : 0;
-      return { goal, totalCents, thisMonthCents, byUser, percent };
-    });
-  }, [state.goals, state.contributions]);
+  const stats = useMemo(
+    () => calculateCoupleGoalStats(state.goals, state.contributions, currentMonthKey()),
+    [state.goals, state.contributions]
+  );
 
   const pendingWrites = state.goals.some((goal) => goal.localSyncStatus === 'pending');
 
