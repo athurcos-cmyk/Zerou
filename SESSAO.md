@@ -50,7 +50,9 @@ React 19 (TS strict), Vite, Firebase Web SDK (Auth + Firestore + Storage), Verce
 - **`useFinanceData` (2026-07-07)**: `loading` só vira `false` quando as 5 coleções (contas/categorias/transações/contas a pagar/recorrências) já entregaram o primeiro snapshot — não na primeira que chegar. Evita o Dashboard piscar "R$ 0,00" se `categories`/`bills` resolverem do cache antes de `accounts`. `DashboardPage` espera `finance.loading || cardsData.loading` para "Disponível"/"Comprometido" (dependem de faturas); "Saldo total" continua instantâneo, só depende de `finance.loading`.
 - **Conta recém-criada**: `ensurePersonalFoundation` pode liberar a UI antes do ack do servidor; hooks financeiros devem tratar `permission-denied`/`unavailable` transitórios com retry curto antes de mostrar erro final.
 - **Listeners protegidos**: para coleções por workspace/membership, preferir `subscribeWithTransientRetry` (`src/firebase/firestoreRetry.ts`) em vez de tratar `onSnapshot` error como falha final imediata.
-- **Higiene de custo Firestore**: antes de gravar preferências, seeds ou metadados automáticos, compare se algo mudou e/ou memorize a preparação por sessão. Evite writes invisíveis em refresh/login/troca de rota; no Blaze isso aparece rapidamente na cota diária.
+- **Higiene de custo Firestore**: antes de gravar preferências, seeds ou metadados automáticos, compare se algo mudou e/ou memorize a preparação por sessão. Evite writes invisíveis em refresh/login/troca de rota; no Blaze isso aparece rapidamente na cota diária. Token FCM (`src/pwa/pushTokenCache.ts`) segue esse padrão: só grava no Firestore quando o token muda de fato, comparando com um cache local antes.
+- **Quando adicionar `.limit()` numa coleção** (2026-07-07): o custo real de um `onSnapshot` é o tamanho da leitura inicial (1 leitura por doc que a query traz na montagem) — não "ter limite ou não". Regra prática: se uma coleção de um único workspace passar de ~500-1000 documentos, cada abertura de tela custa centenas de leituras; abaixo disso não compensa a complexidade. `accounts`/`categories`/`goals`/`recurring` nunca chegam lá (limitados pelo humano). `bills` cresce devagar. `sharedExpenseClaims`/`settlements` do casal são as que mais podem crescer com uso contínuo — reavaliar se algum workspace passar dessa marca. Sinal de alerta no painel do Firestore: leitura **por usuário ativo** subindo ao longo do tempo (não só leitura total crescendo com a base).
+- **TTL nativo do Firestore**: `coupleInvites` tem uma política de TTL configurada no campo `expiresAt` (Google Cloud Console → Firestore → TTL policies) — convites expirados (48h) são apagados automaticamente pelo Firestore, sem Cloud Function. Não remover esse campo sem desligar a política primeiro.
 - **Mobile iOS**: bottom sheets e formulários internos precisam de `min-width: 0`, contenção de `overflow-x` e controles segmentados fluidos; Safari pode permitir arrasto lateral em containers internos mesmo com `body` travado.
 - **PWA offline**: SVGs também entram no precache do Workbox; logos de banco em `public/bank-logos/` devem funcionar offline após o service worker atualizar.
 - **Exclusão de conta**: disponível em `/app/settings/security/login-methods`; exige digitar `EXCLUIR` e reautenticar. Remove perfil, workspace pessoal, dados financeiros/cartões/faturas, billing shell e espaços de casal criados pelo usuário. Parceiro em workspace de outra pessoa sai do espaço sem apagar o workspace do dono.
@@ -63,6 +65,7 @@ React 19 (TS strict), Vite, Firebase Web SDK (Auth + Firestore + Storage), Verce
 - **Fatura aberta** permanece `open` até o fechamento automático pela `closeInvoicesDue` (meia-noite do dia de fechamento). Qualquer pagamento em fatura aberta vira `advance_payment`. Os botões "Fechar fatura" e "Conciliar manualmente" foram removidos da `InvoicePage` — a automação cuida disso.
 - **Antecipação de parcelas** (`InvoicePage`): painel detecta parcelas futuras do mesmo cartão, exibe por invoice com checkbox. Ao confirmar: `writeBatch` adiciona `installment_anticipation_credit` em cada fatura futura selecionada (reduz saldo delas) e `installment_anticipation` na fatura atual (debita o total). Fire-and-forget.
 - **Comprometido** (Dashboard): faturas `closed` sempre entram; faturas `open` só se `referenceMonth <= mês atual`. Faturas futuras de parcelas não entram até chegarem no mês delas.
+- **Faturas carregadas com limite** (2026-07-07): `subscribeInvoices` traz só as 24 mais recentes por cartão (~2 anos). Sem isso, cada fatura abria seu próprio listener de ledger em `useCardsData` e o total de listeners crescia sem parar conforme a conta envelhecia.
 
 ## Recorrências — comportamento-chave
 
@@ -70,7 +73,7 @@ React 19 (TS strict), Vite, Firebase Web SDK (Auth + Firestore + Storage), Verce
 
 ## Firestore (coleções por workspace)
 
-`workspaces/{id}/` → `accounts`, `categories`, `transactions`, `bills`, `recurring`, `goals`, `goalContributions`, `cards/{cardId}/invoices/{invoiceId}/ledger`, `members`, `sharedExpenseClaims`, `settlements`, `comments`, `invites`. Workspace pessoal = `personal_{uid}`; workspace do casal é separado, com membership ativa.
+`workspaces/{id}/` → `accounts`, `categories`, `transactions`, `bills`, `recurring`, `goals`, `goalContributions`, `cards/{cardId}/invoices/{invoiceId}/ledger`, `members`, `sharedExpenseClaims`, `settlements`, `invites`. Workspace pessoal = `personal_{uid}`; workspace do casal é separado, com membership ativa.
 
 ## Funcionalidades-chave do casal
 

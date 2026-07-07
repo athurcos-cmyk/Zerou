@@ -2,6 +2,16 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-07 — fix: auditoria de uso do Firestore (leituras/escritas desnecessárias)
+
+- **`coupleInvites`**: política de TTL nativa configurada no Firestore (campo `expiresAt`) — convites expirados são apagados sozinhos, sem Cloud Function. Configuração manual, feita direto no Console.
+- **Faturas de cartão**: `subscribeInvoices` limitado às 24 mais recentes por cartão (~2 anos). Sem isso, cada fatura carregada abria seu próprio listener de ledger em `useCardsData` e o total de listeners simultâneos crescia sem parar conforme a conta envelhecia.
+- **Feature morta removida**: sistema de comentários do espaço do casal (`SharedComment`, `addSharedComment`, `subscribeSharedComments`, coleção `comments`) — existia o listener e a escrita, mas nenhuma tela nunca chamou nem exibiu isso. Puro custo, zero uso. Removido de ponta a ponta: tipo, schema, serviço, hook, regra do Firestore.
+- **Token FCM**: parava de gravar o mesmo token no Firestore toda vez que o app abria. Agora compara com um cache local (`src/pwa/pushTokenCache.ts`) antes de escrever.
+- **Guia de quando escalonar**: documentado em `SESSAO.md` o critério prático pra decidir quando vale adicionar `.limit()` numa coleção (regra de bolso: ~500-1000 docs por workspace) e o que monitorar no painel do Firestore.
+
+Detalhes e raciocínio completo em [`docs/history/2026-07.md`](docs/history/2026-07.md).
+
 ## 2026-07-07 — feat: resgatar do cofrinho do casal
 
 - Nova ação "Resgatar" no cofrinho compartilhado: retira do total do casal e, opcionalmente, credita como entrada numa conta pessoal — espelha "Guardar" em sentido inverso.

@@ -319,16 +319,6 @@ export interface Settlement {
   version: number;
 }
 
-export interface SharedComment {
-  id: string;
-  workspaceId: string;
-  targetType: 'claim' | 'settlement';
-  targetId: string;
-  body: string;
-  createdBy: string;
-  createdAt?: Timestamp;
-}
-
 export interface AuditLog {
   id: string;
   workspaceId: string;

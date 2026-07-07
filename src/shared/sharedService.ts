@@ -24,12 +24,10 @@ import { getFirebaseDb } from '../firebase/config';
 import { fireWrite } from '../firebase/fireWrite';
 import { getPersonalWorkspaceId } from '../workspaces/workspaceService';
 import {
-  addSharedCommentSchema,
   createSettlementSchema,
   createSharedExpenseClaimSchema,
   recordSettlementPaymentSchema,
   updateClaimStatusSchema,
-  type AddSharedCommentInput,
   type CreateSettlementInput,
   type CreateSharedExpenseClaimInput,
   type RecordSettlementPaymentInput,
@@ -49,7 +47,6 @@ import type {
   CoupleMode,
   CoupleInvite,
   Settlement,
-  SharedComment,
   SharedExpenseClaim,
   SyncStatus,
   Workspace,
@@ -110,10 +107,6 @@ function settlementsRef(workspaceId: string) {
 
 function settlementRef(workspaceId: string, settlementId: string) {
   return doc(getFirebaseDb(), 'workspaces', workspaceId, 'settlements', settlementId);
-}
-
-function commentsRef(workspaceId: string) {
-  return collection(getFirebaseDb(), 'workspaces', workspaceId, 'comments');
 }
 
 function auditLogRef(workspaceId: string, auditId: string) {
@@ -615,23 +608,6 @@ export async function recordSettlementPayment(workspaceId: string, userId: strin
   fireWrite(batch.commit());
 }
 
-export async function addSharedComment(workspaceId: string, userId: string, input: AddSharedCommentInput) {
-  const parsed = addSharedCommentSchema.parse(input);
-  const id = createId('comment');
-
-  fireWrite(setDoc(doc(commentsRef(workspaceId), id), {
-    id,
-    workspaceId,
-    targetType: parsed.targetType,
-    targetId: parsed.targetId,
-    body: parsed.body,
-    createdBy: userId,
-    createdAt: serverTimestamp()
-  }));
-
-  return id;
-}
-
 export function subscribeWorkspaceRefs(
   userId: string,
   onNext: (items: Array<LocalSharedSynced<WorkspaceRef>>) => void,
@@ -706,19 +682,6 @@ export function subscribeSettlements(
     query(settlementsRef(workspaceId), orderBy('createdAt', 'desc')),
     { includeMetadataChanges: true },
     (snapshot) => onNext(snapshot.docs.map((item) => withLocalSync<Settlement>(item))),
-    onError
-  );
-}
-
-export function subscribeSharedComments(
-  workspaceId: string,
-  onNext: (items: Array<LocalSharedSynced<SharedComment>>) => void,
-  onError: (error: Error) => void
-): Unsubscribe {
-  return onSnapshot(
-    query(commentsRef(workspaceId), orderBy('createdAt', 'desc')),
-    { includeMetadataChanges: true },
-    (snapshot) => onNext(snapshot.docs.map((item) => withLocalSync<SharedComment>(item))),
     onError
   );
 }

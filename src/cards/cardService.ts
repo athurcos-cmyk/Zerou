@@ -3,6 +3,7 @@ import {
   collection,
   doc,
   getDoc,
+  limit,
   onSnapshot,
   orderBy,
   query,
@@ -434,6 +435,9 @@ export function subscribeCards(
   );
 }
 
+// Limitado aos 24 ciclos mais recentes (~2 anos de fatura mensal): sem isso, cada
+// fatura carregada abre seu próprio listener de ledger em useCardsData, e o total
+// cresce sem limite pra sempre conforme a conta envelhece.
 export function subscribeInvoices(
   workspaceId: string,
   cardId: string,
@@ -441,7 +445,7 @@ export function subscribeInvoices(
   onError: (error: Error) => void
 ): Unsubscribe {
   return onSnapshot(
-    query(invoicesRef(workspaceId, cardId), orderBy('referenceMonth', 'desc')),
+    query(invoicesRef(workspaceId, cardId), orderBy('referenceMonth', 'desc'), limit(24)),
     { includeMetadataChanges: true },
     (snapshot) => onNext(snapshot.docs.map((item) => withLocalSync<Invoice>(item))),
     onError

@@ -1326,27 +1326,6 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time;
     }
 
-    function validSharedCommentCreate(workspaceId, commentId) {
-      return isActiveMember(workspaceId)
-        && get(workspaceDoc(workspaceId)).data.type == 'couple'
-        && request.resource.data.keys().hasOnly([
-          'id',
-          'workspaceId',
-          'targetType',
-          'targetId',
-          'body',
-          'createdBy',
-          'createdAt'
-        ])
-        && request.resource.data.id == commentId
-        && request.resource.data.workspaceId == workspaceId
-        && request.resource.data.targetType in ['claim', 'settlement']
-        && validShortText(request.resource.data.targetId, 1, 140)
-        && validShortText(request.resource.data.body, 2, 500)
-        && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.createdAt == request.time;
-    }
-
     function validAuditLogCreate(workspaceId, auditId) {
       return signedIn()
         && request.resource.data.keys().hasOnly([
@@ -1487,13 +1466,6 @@ service cloud.firestore {
         allow read: if isActiveMember(workspaceId);
         allow create: if validSettlementCreate(workspaceId, settlementId);
         allow update: if validSettlementUpdate(workspaceId);
-        allow delete: if canDeleteWorkspaceTree(workspaceId);
-      }
-
-      match /comments/{commentId} {
-        allow read: if isActiveMember(workspaceId);
-        allow create: if validSharedCommentCreate(workspaceId, commentId);
-        allow update: if false;
         allow delete: if canDeleteWorkspaceTree(workspaceId);
       }
 

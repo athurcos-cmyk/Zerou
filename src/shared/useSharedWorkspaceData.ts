@@ -6,7 +6,6 @@ import {
   subscribeMembers,
   subscribeSettlements,
   subscribeSharedClaims,
-  subscribeSharedComments,
   subscribeWorkspace,
   subscribeWorkspaceRefs,
   type LocalSharedSynced
@@ -14,7 +13,6 @@ import {
 import type {
   CoupleInvite,
   Settlement,
-  SharedComment,
   SharedExpenseClaim,
   Workspace,
   WorkspaceMembership,
@@ -28,7 +26,6 @@ interface SharedWorkspaceState {
   invites: Array<LocalSharedSynced<CoupleInvite>>;
   claims: Array<LocalSharedSynced<SharedExpenseClaim>>;
   settlements: Array<LocalSharedSynced<Settlement>>;
-  comments: Array<LocalSharedSynced<SharedComment>>;
   loading: boolean;
   error: string | null;
 }
@@ -40,7 +37,6 @@ const initialState: SharedWorkspaceState = {
   invites: [],
   claims: [],
   settlements: [],
-  comments: [],
   loading: true,
   error: null
 };
@@ -92,8 +88,7 @@ export function useSharedWorkspaceData(userId?: string) {
         members: [],
         invites: [],
         claims: [],
-        settlements: [],
-        comments: []
+        settlements: []
       }));
       return undefined;
     }
@@ -137,12 +132,6 @@ export function useSharedWorkspaceData(userId?: string) {
           subscribeSettlements(workspaceId, (settlements) => setState((current) => ({ ...current, settlements, loading: false })), handleError),
         onRetrying,
         onError
-      }),
-      subscribeWithTransientRetry({
-        subscribe: (handleError) =>
-          subscribeSharedComments(workspaceId, (comments) => setState((current) => ({ ...current, comments, loading: false })), handleError),
-        onRetrying,
-        onError
       })
     ];
 
@@ -162,7 +151,6 @@ export function useSharedWorkspaceData(userId?: string) {
         ...state.invites,
         ...state.claims,
         ...state.settlements,
-        ...state.comments,
         ...(state.workspace ? [state.workspace] : [])
       ].some((item) => item.localSyncStatus === 'pending'),
     [state]
