@@ -3,23 +3,31 @@ import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
   ArrowLeft,
+  Ban,
   Heart,
   Loader2,
   RefreshCw,
   Search,
   Send,
+  ShieldCheck,
   Trash2,
   TrendingUp,
   Users,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import {
+  ADMIN_COUPLES_LIMIT,
+  ADMIN_INVITES_LIMIT,
+  ADMIN_USERS_LIMIT,
   callAdminDeleteUser,
   getAdminCoupleWorkspaces,
   getAdminInvites,
   getAdminUsers,
   type AdminInvite,
 } from '../admin/adminService';
+import { revokeCoupleInvite } from '../shared/sharedService';
+import { formatCount } from '../admin/adminFormat';
+import { getUserFacingErrorMessage } from '../utils/userFacingError';
 import type { UserProfile, Workspace } from '../types/contracts';
 import type { Timestamp } from 'firebase/firestore';
 
@@ -133,26 +141,26 @@ function OverviewTab({
         <StatCard
           icon={<Users size={18} />}
           label="Total de usuários"
-          value={users.length}
+          value={formatCount(users.length, ADMIN_USERS_LIMIT)}
           sub="cadastros ativos"
         />
         <StatCard
           icon={<TrendingUp size={18} />}
           label="Novos (30 dias)"
           value={newUsers30d}
-          sub={`de ${users.length} total`}
+          sub={`de ${formatCount(users.length, ADMIN_USERS_LIMIT)} total`}
         />
         <StatCard
           icon={<Heart size={18} />}
           label="Espaços de casal"
-          value={couples.length}
+          value={formatCount(couples.length, ADMIN_COUPLES_LIMIT)}
           sub="workspaces de dupla"
         />
         <StatCard
           icon={<Send size={18} />}
           label="Convites ativos"
           value={activeInvites}
-          sub={`de ${invites.length} total`}
+          sub={`de ${formatCount(invites.length, ADMIN_INVITES_LIMIT)} total`}
         />
       </div>
 
@@ -241,12 +249,18 @@ interface DeleteConfirmProps {
   onCancel: () => void;
 }
 
+// Frase fixa em vez do primeiro nome do usuário: se `user.name` estiver vazio
+// (perfil incompleto), comparar contra '' deixaria o botão liberado sem digitar
+// nada. "EXCLUIR" também segue o mesmo padrão da autoexclusão de conta do usuário
+// (ver docs/PRIVACY.md / LoginMethodsPage).
+const DELETE_CONFIRM_PHRASE = 'EXCLUIR';
+
 function DeleteConfirmModal({ user, onConfirm, onCancel }: DeleteConfirmProps) {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const expected = user.name.split(/\s+/)[0]!;
+  const expected = DELETE_CONFIRM_PHRASE;
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -272,7 +286,7 @@ function DeleteConfirmModal({ user, onConfirm, onCancel }: DeleteConfirmProps) {
         </span>
         <h2 className="admin-modal__title">Deletar conta permanentemente?</h2>
         <p className="admin-modal__body">
-          Isso vai apagar <strong>{user.name}</strong> ({user.email}) do Firebase Auth e todos os dados
+          Isso vai apagar <strong>{user.name || user.email}</strong> ({user.email}) do Firebase Auth e todos os dados
           do Firestore — workspace pessoal, espaços de casal criados por ele, transações, cartões,
           metas e billing. <strong>Irreversível.</strong>
         </p>
@@ -314,7 +328,69 @@ function DeleteConfirmModal({ user, onConfirm, onCancel }: DeleteConfirmProps) {
   );
 }
 
-function UsersTab({ users, onDelete }: { users: UserProfile[]; onDelete: (u: UserProfile) => void }) {
+interface ConfirmModalProps {
+  title: string;
+  body: string;
+  confirmLabel: string;
+  danger?: boolean;
+  onConfirm: () => Promise<void>;
+  onCancel: () => void;
+}
+
+// Confirmação genérica pra ações reversíveis/de menor risco (ex.: revogar
+// convite) — sem exigir digitar nada, diferente do DeleteConfirmModal.
+function ConfirmModal({ title, body, confirmLabel, danger, onConfirm, onCancel }: ConfirmModalProps) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleConfirm() {
+    setBusy(true);
+    setError(null);
+    try {
+      await onConfirm();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível concluir a ação.');
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="admin-modal-backdrop" onClick={onCancel}>
+      <div className="admin-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+        <span className="admin-modal__icon">
+          <AlertTriangle size={22} />
+        </span>
+        <h2 className="admin-modal__title">{title}</h2>
+        <p className="admin-modal__body">{body}</p>
+        {error ? <p className="admin-modal__error">{error}</p> : null}
+        <div className="admin-modal__actions">
+          <button type="button" className="button button--ghost" onClick={onCancel} disabled={busy}>
+            Cancelar
+          </button>
+          <button
+            type="button"
+            className={danger ? 'button admin-modal__delete-btn' : 'button button--primary'}
+            onClick={() => void handleConfirm()}
+            disabled={busy}
+          >
+            {busy ? <Loader2 size={15} className="admin-spin" /> : null}
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UsersTab({
+  users,
+  currentUserId,
+  onDelete,
+}: {
+  users: UserProfile[];
+  currentUserId?: string;
+  onDelete: (u: UserProfile) => void;
+}) {
   const [search, setSearch] = useState('');
   const themeLabels: Record<string, string> = {
     paper: 'Paper (Sol)',
@@ -389,14 +465,20 @@ function UsersTab({ users, onDelete }: { users: UserProfile[]; onDelete: (u: Use
                     {u.defaultWorkspaceId ? u.defaultWorkspaceId.slice(0, 16) + '…' : '—'}
                   </td>
                   <td>
-                    <button
-                      type="button"
-                      className="admin-delete-row-btn"
-                      title="Deletar conta"
-                      onClick={() => onDelete(u)}
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    {u.id === currentUserId ? (
+                      <span className="admin-pill admin-pill--info" title="Você não pode deletar sua própria conta por aqui">
+                        <ShieldCheck size={13} /> Você
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="admin-delete-row-btn"
+                        title="Deletar conta"
+                        onClick={() => onDelete(u)}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))
@@ -415,8 +497,40 @@ function CouplesTab({
   couples: Workspace[];
   userMap: Map<string, UserProfile>;
 }) {
+  const [search, setSearch] = useState('');
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return couples;
+    const q = search.toLowerCase();
+    return couples.filter((w) => {
+      const owner = userMap.get(w.ownerUserId);
+      const partner = w.partnerUserId ? userMap.get(w.partnerUserId) : null;
+      return (
+        w.name.toLowerCase().includes(q) ||
+        owner?.name.toLowerCase().includes(q) ||
+        owner?.email.toLowerCase().includes(q) ||
+        partner?.name.toLowerCase().includes(q) ||
+        partner?.email.toLowerCase().includes(q)
+      );
+    });
+  }, [couples, userMap, search]);
+
   return (
     <div className="admin-content">
+      <div className="admin-search-bar">
+        <Search size={16} className="admin-search-icon" />
+        <input
+          className="admin-search-input"
+          type="search"
+          placeholder="Buscar por nome do espaço, dono ou parceiro…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        {search ? (
+          <span className="admin-search-count">{filtered.length} de {couples.length}</span>
+        ) : null}
+      </div>
+
       <section className="surface">
         <table className="admin-table admin-table--full">
           <thead>
@@ -430,10 +544,10 @@ function CouplesTab({
             </tr>
           </thead>
           <tbody>
-            {couples.length === 0 ? (
+            {filtered.length === 0 ? (
               <EmptyRow cols={6} />
             ) : (
-              couples.map((w) => {
+              filtered.map((w) => {
                 const owner = userMap.get(w.ownerUserId);
                 const partner = w.partnerUserId ? userMap.get(w.partnerUserId) : null;
                 return (
@@ -490,12 +604,60 @@ function CouplesTab({
 function InvitesTab({
   invites,
   userMap,
+  onRevoke,
 }: {
   invites: AdminInvite[];
   userMap: Map<string, UserProfile>;
+  onRevoke: (invite: AdminInvite) => void;
 }) {
+  const [search, setSearch] = useState('');
+
+  const isExpiredInvite = (inv: AdminInvite) =>
+    Boolean(inv.status === 'active' && inv.expiresAt && inv.expiresAt.toDate().getTime() < Date.now());
+
+  const counts = useMemo(() => {
+    const active = invites.filter((i) => i.status === 'active' && !isExpiredInvite(i)).length;
+    const expiredPending = invites.filter(isExpiredInvite).length;
+    const accepted = invites.filter((i) => i.status === 'accepted').length;
+    return { active, expiredPending, accepted };
+  }, [invites]);
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return invites;
+    const q = search.toLowerCase();
+    return invites.filter((inv) => {
+      const creator = userMap.get(inv.createdBy);
+      return (
+        inv.workspaceName.toLowerCase().includes(q) ||
+        inv.codeHint.toLowerCase().includes(q) ||
+        creator?.name.toLowerCase().includes(q) ||
+        creator?.email.toLowerCase().includes(q)
+      );
+    });
+  }, [invites, userMap, search]);
+
   return (
     <div className="admin-content">
+      <div className="admin-stats-grid">
+        <StatCard icon={<Send size={18} />} label="Ativos" value={counts.active} sub="dentro do prazo de 48h" />
+        <StatCard icon={<AlertTriangle size={18} />} label="Expirados" value={counts.expiredPending} sub="aguardando limpeza por TTL" />
+        <StatCard icon={<ShieldCheck size={18} />} label="Aceitos" value={counts.accepted} sub="convite já usado" />
+      </div>
+
+      <div className="admin-search-bar">
+        <Search size={16} className="admin-search-icon" />
+        <input
+          className="admin-search-input"
+          type="search"
+          placeholder="Buscar por espaço, código ou quem criou…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        {search ? (
+          <span className="admin-search-count">{filtered.length} de {invites.length}</span>
+        ) : null}
+      </div>
+
       <section className="surface">
         <table className="admin-table admin-table--full">
           <thead>
@@ -507,16 +669,17 @@ function InvitesTab({
               <th>Status</th>
               <th>Usado por</th>
               <th>Criado em</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
-            {invites.length === 0 ? (
-              <EmptyRow cols={7} />
+            {filtered.length === 0 ? (
+              <EmptyRow cols={8} />
             ) : (
-              invites.map((inv) => {
+              filtered.map((inv) => {
                 const creator = userMap.get(inv.createdBy);
                 const usedByUser = inv.usedBy ? userMap.get(inv.usedBy) : null;
-                const isExpired = inv.expiresAt && inv.expiresAt.toDate().getTime() < Date.now();
+                const isExpired = isExpiredInvite(inv);
                 return (
                   <tr key={inv.id}>
                     <td>
@@ -538,12 +701,24 @@ function InvitesTab({
                         ? <span style={{ color: 'var(--danger)' }}>{fmtDate(inv.expiresAt)}</span>
                         : fmtDate(inv.expiresAt)}
                     </td>
-                    <td><StatusPill status={inv.status} /></td>
+                    <td><StatusPill status={isExpired ? 'expired' : inv.status} /></td>
                     <td className="admin-td--muted">
                       {usedByUser ? usedByUser.name : inv.usedBy ? inv.usedBy.slice(0, 8) + '…' : '—'}
                     </td>
                     <td className="admin-td--muted" title={fmtDateFull(inv.createdAt)}>
                       {fmtDateRelative(inv.createdAt)}
+                    </td>
+                    <td>
+                      {inv.status === 'active' ? (
+                        <button
+                          type="button"
+                          className="admin-delete-row-btn"
+                          title="Revogar convite"
+                          onClick={() => onRevoke(inv)}
+                        >
+                          <Ban size={14} />
+                        </button>
+                      ) : null}
                     </td>
                   </tr>
                 );
@@ -565,7 +740,8 @@ export function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<UserProfile | null>(null);
-  const [deleteSuccess, setDeleteSuccess] = useState<string | null>(null);
+  const [pendingRevoke, setPendingRevoke] = useState<AdminInvite | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const userMap = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
 
@@ -600,15 +776,32 @@ export function AdminPage() {
     setCouples((prev) => prev.filter((w) => w.ownerUserId !== target.id));
     setInvites((prev) => prev.filter((i) => i.createdBy !== target.id));
     setPendingDelete(null);
-    setDeleteSuccess(`${target.name} deletado — ${result.docsDeleted} documentos removidos.`);
-    setTimeout(() => setDeleteSuccess(null), 6000);
+    showToast(`${target.name || target.email} deletado — ${result.docsDeleted} documentos removidos.`);
   }
 
-  const tabs: { id: Tab; label: string; count?: number }[] = [
+  async function handleRevokeConfirm() {
+    if (!pendingRevoke || !user) return;
+    const target = pendingRevoke;
+    try {
+      await revokeCoupleInvite(target.workspaceId, target.id, user.uid);
+    } catch (err) {
+      throw new Error(getUserFacingErrorMessage(err, 'Não foi possível revogar o convite agora.'));
+    }
+    setInvites((prev) => prev.filter((i) => i.id !== target.id));
+    setPendingRevoke(null);
+    showToast(`Convite de "${target.workspaceName}" revogado.`);
+  }
+
+  function showToast(message: string) {
+    setToastMessage(message);
+    setTimeout(() => setToastMessage(null), 6000);
+  }
+
+  const tabs: { id: Tab; label: string; count?: string }[] = [
     { id: 'overview', label: 'Visão Geral' },
-    { id: 'users', label: 'Usuários', count: users.length },
-    { id: 'couples', label: 'Casais', count: couples.length },
-    { id: 'invites', label: 'Convites', count: invites.length },
+    { id: 'users', label: 'Usuários', count: formatCount(users.length, ADMIN_USERS_LIMIT) },
+    { id: 'couples', label: 'Casais', count: formatCount(couples.length, ADMIN_COUPLES_LIMIT) },
+    { id: 'invites', label: 'Convites', count: formatCount(invites.length, ADMIN_INVITES_LIMIT) },
   ];
 
   return (
@@ -653,8 +846,8 @@ export function AdminPage() {
         </div>
       </header>
 
-      {deleteSuccess ? (
-        <div className="admin-toast admin-toast--success">{deleteSuccess}</div>
+      {toastMessage ? (
+        <div className="admin-toast admin-toast--success">{toastMessage}</div>
       ) : null}
 
       <div className="admin-body">
@@ -676,10 +869,12 @@ export function AdminPage() {
               <OverviewTab users={users} couples={couples} invites={invites} userMap={userMap} />
             )}
             {tab === 'users' && (
-              <UsersTab users={users} onDelete={(u) => setPendingDelete(u)} />
+              <UsersTab users={users} currentUserId={user?.uid} onDelete={(u) => setPendingDelete(u)} />
             )}
             {tab === 'couples' && <CouplesTab couples={couples} userMap={userMap} />}
-            {tab === 'invites' && <InvitesTab invites={invites} userMap={userMap} />}
+            {tab === 'invites' && (
+              <InvitesTab invites={invites} userMap={userMap} onRevoke={(inv) => setPendingRevoke(inv)} />
+            )}
           </>
         )}
       </div>
@@ -689,6 +884,17 @@ export function AdminPage() {
           user={pendingDelete}
           onConfirm={handleDeleteConfirm}
           onCancel={() => setPendingDelete(null)}
+        />
+      ) : null}
+
+      {pendingRevoke ? (
+        <ConfirmModal
+          title="Revogar este convite?"
+          body={`O convite de "${pendingRevoke.workspaceName}" para de funcionar imediatamente. Quem criou pode gerar um novo a qualquer momento.`}
+          confirmLabel="Revogar convite"
+          danger
+          onConfirm={handleRevokeConfirm}
+          onCancel={() => setPendingRevoke(null)}
         />
       ) : null}
     </div>

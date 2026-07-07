@@ -2,6 +2,16 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-07 — feat: painel admin funcional (QA + UX)
+
+- **2 bugs de segurança corrigidos**: admin podia deletar a própria conta sem aviso especial (sem proteção contra auto-exclusão); confirmação de exclusão comparava com o primeiro nome do usuário — se o nome estivesse vazio, o botão de deletar ficava liberado sem digitar nada. Trocado por frase fixa "EXCLUIR" (mesmo padrão da autoexclusão do usuário) + linha "Você" bloqueada na própria conta.
+- **Convites agora são gerenciáveis**: aba Convites ganhou busca, tira-teimas de status (Ativos/Expirados aguardando TTL/Aceitos) e botão "Revogar" — antes só dava pra visualizar. Regra do Firestore liberada pra admin revogar (`isAdmin()` em `validInvite`... delete).
+- **Busca adicionada** nas abas Casais e Convites — só existia em Usuários antes.
+- **Contagens truncadas sinalizadas**: "500+"/"200+" em vez de um número que parece exato quando a query bate no teto (`ADMIN_USERS_LIMIT`/`ADMIN_COUPLES_LIMIT`/`ADMIN_INVITES_LIMIT`).
+- Limpeza: `WORKSPACE_COLLECTIONS` na Cloud Function `adminDeleteUser` não referencia mais `comments` (feature removida na sessão anterior).
+
+Detalhes em [`docs/history/2026-07.md`](docs/history/2026-07.md).
+
 ## 2026-07-07 — fix: auditoria de uso do Firestore (leituras/escritas desnecessárias)
 
 - **`coupleInvites`**: política de TTL nativa configurada no Firestore (campo `expiresAt`) — convites expirados são apagados sozinhos, sem Cloud Function. Configuração manual, feita direto no Console.

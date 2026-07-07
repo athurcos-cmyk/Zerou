@@ -1493,6 +1493,7 @@ service cloud.firestore {
           resource.data.createdBy == request.auth.uid
           || get(workspaceDoc(resource.data.workspaceId)).data.ownerUserId == request.auth.uid
           || (resource.data.status == 'accepted' && resource.data.usedBy == request.auth.uid)
+          || isAdmin()
         );
     }
 

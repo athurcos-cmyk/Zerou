@@ -81,6 +81,13 @@ React 19 (TS strict), Vite, Firebase Web SDK (Auth + Firestore + Storage), Verce
 - **Divisão de despesa** (claims, apenas nos modos transparent/balanced): igual / porcentagem / valor. Sem acerto de contas formal — o equilíbrio é visual/proporcional.
 - **Cofrinho do casal**: meta compartilhada (`goals` no workspace do casal) + contribuições (`goalContributions`, campo `type: 'deposit' | 'withdrawal'`). "Guardar" pode descontar de uma conta pessoal (vira despesa "Cofrinho" no workspace pessoal); "Resgatar" (2026-07-07) faz o inverso — desconta do total do casal e pode creditar como entrada numa conta pessoal. Categoria fixa `both_cofrinho` em ambos. Total exibido sempre vem de `goal.savedCents` (fonte da verdade); `goalContributions` só alimenta a quebra por pessoa/mês (`calculateCoupleGoalStats`, `src/domain/shared/`). Resgate valida client-side (não pode exceder o total) e é bloqueado server-side pela regra (`savedCents` nunca fica negativo).
 
+## Admin (`/admin`) — comportamento-chave
+
+- **Único admin**: `a.thurcos@gmail.com`, hardcoded em `src/auth/routeGuards.tsx` (`RequireAdmin`), `functions/src/admin.ts` (`ADMIN_EMAIL`) e `firestore.rules` (`isAdmin()`). Precisa mudar nos 3 lugares se um dia virar multi-admin.
+- **Confirmação de ações destrutivas**: exclusão de conta exige digitar `EXCLUIR` (frase fixa — nunca comparar com um campo de usuário como nome, que pode estar vazio). Auto-exclusão bloqueada na UI (linha da própria conta não mostra botão de deletar).
+- **Convites são revogáveis por admin** (2026-07-07): regra do Firestore para `coupleInvites` inclui `isAdmin()` no `allow delete`. Reusa `revokeCoupleInvite` de `sharedService.ts` — não duplicar lógica de revogação no admin.
+- **Contagens têm teto**: `getAdminUsers`/`getAdminCoupleWorkspaces`/`getAdminInvites` (`src/admin/adminService.ts`) limitam a 500/200/200. UI mostra `"500+"` (via `formatCount`, `src/admin/adminFormat.ts`) quando a contagem bate o teto — não confiar no número exibido como total real acima disso.
+
 ## Deploy de regras
 
 `npx firebase deploy --only firestore:rules --project zerou-26757` (só regras de segurança; não toca billing/functions/hosting).

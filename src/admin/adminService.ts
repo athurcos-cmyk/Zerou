@@ -17,10 +17,17 @@ export interface AdminInvite {
   updatedAt?: Timestamp | null;
 }
 
+// Tetos das queries — usados também pra sinalizar na UI quando o resultado pode
+// estar truncado (contagem == limite não significa "é exatamente isso", significa
+// "pode ter mais").
+export const ADMIN_USERS_LIMIT = 500;
+export const ADMIN_COUPLES_LIMIT = 200;
+export const ADMIN_INVITES_LIMIT = 200;
+
 export async function getAdminUsers(): Promise<UserProfile[]> {
   const db = getFirebaseDb();
   const snap = await getDocs(
-    query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(500))
+    query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(ADMIN_USERS_LIMIT))
   );
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as UserProfile));
 }
@@ -28,7 +35,7 @@ export async function getAdminUsers(): Promise<UserProfile[]> {
 export async function getAdminCoupleWorkspaces(): Promise<Workspace[]> {
   const db = getFirebaseDb();
   const snap = await getDocs(
-    query(collection(db, 'workspaces'), where('type', '==', 'couple'), orderBy('createdAt', 'desc'), limit(200))
+    query(collection(db, 'workspaces'), where('type', '==', 'couple'), orderBy('createdAt', 'desc'), limit(ADMIN_COUPLES_LIMIT))
   );
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Workspace));
 }
@@ -36,7 +43,7 @@ export async function getAdminCoupleWorkspaces(): Promise<Workspace[]> {
 export async function getAdminInvites(): Promise<AdminInvite[]> {
   const db = getFirebaseDb();
   const snap = await getDocs(
-    query(collection(db, 'coupleInvites'), orderBy('createdAt', 'desc'), limit(200))
+    query(collection(db, 'coupleInvites'), orderBy('createdAt', 'desc'), limit(ADMIN_INVITES_LIMIT))
   );
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as AdminInvite));
 }

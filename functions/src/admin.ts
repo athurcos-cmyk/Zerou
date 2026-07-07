@@ -18,7 +18,6 @@ const WORKSPACE_COLLECTIONS = [
   'members',
   'sharedExpenseClaims',
   'settlements',
-  'comments',
   'auditLogs',
 ];
 
