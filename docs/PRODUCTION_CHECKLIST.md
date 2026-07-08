@@ -23,7 +23,7 @@ Do not mark broad public production as ready until every blocking item is comple
 ## Vercel
 
 - [ ] Production environment variables `VITE_FIREBASE_*` configured.
-- [ ] Production URL and canonical URL updated from `zerou-five.vercel.app` to the final domain.
+- [ ] Production URL and canonical URL updated from `zerou-five.vercel.app` to the final domain — `granativa.com.br` bought and added in Vercel (2026-07-08); code (canonical/OG, sitemap, robots.txt, Cloud Functions push links) already points to it. Still pending: DNS records at registro.br (blocked for a few hours on newly-registered domains — "domínio em transição"), authorizing the domain in Firebase Auth, and deploying `functions` for `APP_BASE_URL` to take effect in production.
 - [ ] CSP verified against Auth, Firestore, Analytics and PWA.
 - [ ] Preview and production deployment policy confirmed.
 

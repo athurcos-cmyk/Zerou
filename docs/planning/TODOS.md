@@ -13,7 +13,7 @@ Itens acionáveis. Fechou? Mova para "Concluído" ou remova. Detalhe histórico 
 - [ ] Code splitting — bundle inicial > 500 kB (warning no build).
 - [ ] App Check, backups do Firestore, alertas de custo Firebase/Vercel.
 - [ ] Corrigir Java local (erro 3221226505) para `npm run test:rules`.
-- [ ] Domínio final + canonical/sitemap.
+- [ ] Domínio `granativa.com.br` comprado e código já aponta pra ele (canonical/OG/sitemap/robots.txt/links de push das Functions) — falta: (1) configurar a zona DNS no registro.br (bloqueado por algumas horas em domínio recém-registrado, ver `SESSAO.md`), (2) autorizar o domínio em Firebase Auth → Authorized domains, (3) deploy de `functions` pra `APP_BASE_URL` valer em produção.
 - [ ] Emails oficiais de suporte/privacidade.
 
 ### Automação server-side (futuro — exige worker/Functions)

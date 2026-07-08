@@ -33,7 +33,7 @@ const db = getFirestore();
 const region = 'southamerica-east1';
 const stripeSecretKey = defineSecret('STRIPE_SECRET_KEY');
 const stripeWebhookSecret = defineSecret('STRIPE_WEBHOOK_SECRET');
-const appBaseUrl = defineString('APP_BASE_URL', { default: 'https://zerou-five.vercel.app' });
+const appBaseUrl = defineString('APP_BASE_URL', { default: 'https://granativa.com.br' });
 
 function assertAuthenticated(request: CallableRequest) {
   const uid = request.auth?.uid;

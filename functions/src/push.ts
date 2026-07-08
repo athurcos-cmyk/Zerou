@@ -6,7 +6,7 @@ export async function sendPushToUser(
   userId: string,
   title: string,
   body: string,
-  link = 'https://zerou-five.vercel.app/app'
+  link = 'https://granativa.com.br/app'
 ): Promise<void> {
   const db = getFirestore();
   const tokensSnap = await db.collection(`users/${userId}/fcmTokens`).get();

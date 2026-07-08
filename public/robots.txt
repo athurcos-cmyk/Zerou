@@ -4,4 +4,4 @@ Disallow: /app
 Disallow: /verify-email
 Disallow: /privacy-center
 
-Sitemap: https://zerou-five.vercel.app/sitemap.xml
+Sitemap: https://granativa.com.br/sitemap.xml

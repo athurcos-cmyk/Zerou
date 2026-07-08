@@ -24,7 +24,7 @@
 
 ## Projeto
 
-SaaS/PWA financeiro mobile-first. Duas frentes: **controle individual** das finanças e **organização a dois** (casal). Tagline: "Controle individual. Organização a dois." Produção: https://zerou-five.vercel.app · Repo: `athurcos-cmyk/Zerou` · Branch: `main` (direto, sem PR, por pedido do dono).
+SaaS/PWA financeiro mobile-first. Duas frentes: **controle individual** das finanças e **organização a dois** (casal). Tagline: "Controle individual. Organização a dois." Produção: https://granativa.com.br (domínio próprio; `zerou-five.vercel.app` continua funcionando como URL legada do Vercel) · Repo: `athurcos-cmyk/Zerou` · Branch: `main` (direto, sem PR, por pedido do dono).
 
 ## Stack
 

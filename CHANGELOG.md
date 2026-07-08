@@ -2,6 +2,15 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-08 — feat: domínio próprio granativa.com.br
+
+- Domínio comprado no registro.br e adicionado no Vercel (apex `A` + `www` CNAME).
+- Código atualizado pra `https://granativa.com.br`: canonical e `og:image` em `index.html`, todas as URLs de `public/sitemap.xml` e `public/robots.txt`, links de notificação push nas Cloud Functions (`functions/src/automation.ts`, `push.ts`, `index.ts`, `.env`).
+- `src/components/Seo.tsx` já era dinâmico (`window.location.origin`) — não precisou mudar.
+- Pendente (fora do código): configurar a zona DNS no registro.br (domínio recém-registrado fica bloqueado pra edição por algumas horas), autorizar `granativa.com.br` no Firebase Auth, e deploy de `functions` pra `APP_BASE_URL` valer em produção.
+
+Detalhes em [`docs/history/2026-07.md`](docs/history/2026-07.md).
+
 ## 2026-07-08 — fix: "Gasto no mês" cortava o valor com "..." na Análise
 
 - O card destaque "Gasto no mês" ficava estreito (dois cards lado a lado no mobile) e a fonte grande do valor não cabia, cortando "R$ 430,..." com reticências.

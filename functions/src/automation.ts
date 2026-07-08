@@ -96,7 +96,7 @@ export const closeInvoicesDue = onSchedule(
             ownerUserId,
             `Fatura ${card.name} fechada`,
             `Valor a pagar: ${amount}`,
-            'https://zerou-five.vercel.app/app/cards'
+            'https://granativa.com.br/app/cards'
           ).catch(() => {});
         }
       }
@@ -229,7 +229,7 @@ export const sendDueReminders = onSchedule(
         bill.createdBy,
         'Conta vence em breve',
         `${bill.description}: ${formatBRL(bill.amountCents)} vence em ${dayLabel}`,
-        'https://zerou-five.vercel.app/app/bills'
+        'https://granativa.com.br/app/bills'
       ).catch(() => {});
       sent++;
     }
@@ -268,7 +268,7 @@ export const sendDailyLogReminder = onSchedule(
             icon: '/brand/zerou-app-icon-192.png',
             badge: '/brand/zerou-app-icon-192.png',
           },
-          fcmOptions: { link: 'https://zerou-five.vercel.app/app/transactions/new' },
+          fcmOptions: { link: 'https://granativa.com.br/app/transactions/new' },
         },
       });
       sent += chunk.length;
