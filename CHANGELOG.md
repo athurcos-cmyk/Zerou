@@ -2,6 +2,26 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-08 — feat: reestruturação da tela de Análise (mês, empty states, busca)
+
+- Cards de KPI e cabeçalhos passaram a reaproveitar `.metric-card`/`.metric-icon`/`.section-heading` do design system (classes que já existiam em `global.css`, nunca usadas) em vez de ~40 blocos de estilo inline.
+- Empty states com `EmptyState` (ilustração) no gráfico de categoria e no histórico mensal, no lugar de texto seco.
+- Navegação por mês nova (seletor `‹ Mês ›`) — KPI, categoria e "vs. mês anterior" acompanham o mês escolhido; histórico de 6 meses continua fixo como tendência.
+- Busca por texto saiu do meio da rolagem e virou `BottomSheet` sob demanda (ícone no cabeçalho); link "Buscar" do Dashboard agora abre a busca direto.
+- Corrigido ao testar com dado real: legenda do donut cortando nomes curtos ("Casa" → "C...") e nome de categoria longo cortando no card "Maior categoria" ("Alimenta...").
+
+Detalhes em [`docs/history/2026-07.md`](docs/history/2026-07.md).
+
+## 2026-07-08 — feat: reestruturação da UI do espaço do casal + 2 bugs corrigidos nas regras do Firestore
+
+- `SharedSpacePage.tsx` (880 linhas) dividida em `src/pages/shared/` (`CoupleInviteSection`, `CoupleModeSheet`, `CoupleSavingsSection`, `CoupleExpensesSection`) — página principal virou orquestrador.
+- Fluxo de convite reescrito: uma ação primária por estado (gerar/compartilhar/regenerar/cancelar) em vez de até 6 botões simultâneos; "Compartilhar" usa `navigator.share` com fallback pra copiar.
+- Bug real corrigido: recarregar a página depois de gerar um convite fazia o app "esquecer" que já existia um ativo — clicar em gerar de novo invalidava silenciosamente o código já enviado. Agora mostra "Convite ativo, expira em..." e avisa antes de invalidar.
+- 2 bugs achados e corrigidos em `firestore.rules` (impediam criar o espaço/aceitar convite de verdade): checagem de entitlement de billing não seguia o mesmo default do cliente; regras de criação do membro (dono/parceiro) não incluíam `displayName` na lista de campos permitidos.
+- Formulário de nova despesa virou `BottomSheet` (padrão do app); seleção de modo do casal deixou de estar duplicada (uma lista só, reusada em criar/trocar).
+
+Detalhes em [`docs/history/2026-07.md`](docs/history/2026-07.md).
+
 ## 2026-07-08 — feat: prompt de instalação do PWA no Dashboard
 
 - Verificação do manifest (`vite.config.ts`, plugin VitePWA): conteúdo correto, mas achei 2 bugs pequenos — `lang` não estava setado (caía no default `en` num app em português) e os caminhos dos ícones referenciavam `Granativa-app-icon-*.png` (G maiúsculo) enquanto os arquivos reais em `public/brand/` são todos minúsculos. Confirmei ao vivo contra a produção que o Vercel serve como case-insensitive (não estava 404, mas ficava frágil) — corrigido de qualquer forma.

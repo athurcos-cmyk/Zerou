@@ -167,7 +167,7 @@ export function DashboardPage() {
             <p className="eyebrow">Resumo de gastos</p>
             <h2>Para onde foi o dinheiro este mês</h2>
           </div>
-          <Link className="inline-link" to="/app/search">
+          <Link className="inline-link" to="/app/search" state={{ autoOpenSearch: true }}>
             Buscar
           </Link>
         </div>

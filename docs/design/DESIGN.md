@@ -39,6 +39,7 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
 | `ConfirmDialog` (`useConfirm`) | Confirmação destrutiva em sheet — nunca `window.confirm`. |
 | `EmptyState` | Estado vazio com ilustração SVG própria. |
 | `categoryIcons` / `palette` | 36 ícones + paleta de cores de categoria/meta. |
+| `.metric-card` / `.metric-icon` / `.metric-strip` (`global.css`) | Cartão de métrica/KPI compacto (usado em `SearchPage.tsx`). `.metric-card--accent` para o destaque principal (mesmo tratamento gradiente do `.dash-hero`). Valor de **texto longo** (não dinheiro/porcentagem) precisa do modificador `.metric-card-value--compact` — a tipografia padrão do card é grande demais e corta nomes como "Alimentação". |
 
 ## Padrões de UX
 
@@ -47,6 +48,8 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
 - Empty states sempre com ilustração + CTA, não texto seco.
 - Barras de progresso para limite de cartão, metas e cofrinho.
 - Nunca expor termo técnico ao usuário (sem "ledger", "workspace", "checkout").
+- **Navegação por mês/período** (`.month-switcher`, `global.css`): `‹ Mês de Ano › ` com `.icon-button`, introduzido em `SearchPage.tsx` (2026-07-08) — padrão a reaproveitar se outra tela precisar filtrar por mês, em vez de inventar um novo controle.
+- Ação em cartão do casal/despesa que muda estado do servidor (gerar/regenerar/revogar convite): sempre com `confirm()` explicando a consequência antes de agir, principalmente se for destrutiva ou invalidar algo que já foi compartilhado com outra pessoa.
 
 ## Landing (`src/landing/`)
 

@@ -31,7 +31,8 @@ Use este arquivo como mapa antes de abrir documentos grandes. Regra: leia o meno
 | Ícones + cores de categoria | `src/components/categoryIcons.tsx`, `src/theme/palette.ts` |
 | Serviço financeiro | `src/finance/financeService.ts` |
 | Cartões / faturas | `src/cards/` |
-| Espaço do casal + cofrinho | `src/pages/SharedSpacePage.tsx`, `src/shared/`, `src/shared/useCoupleSavings.ts` |
+| Espaço do casal + cofrinho | `src/pages/SharedSpacePage.tsx` (orquestrador), `src/pages/shared/` (convite/modo/cofrinho/despesas), `src/shared/` (serviço/hooks) |
+| Análise / gráficos / busca | `src/pages/SearchPage.tsx` |
 | Metas (pessoais) | `src/pages/GoalsPage.tsx`, `src/finance/useGoalsData.ts` |
 | Tokens de cor / temas | `src/styles/themes.css` |
 | CSS global | `src/styles/global.css` |

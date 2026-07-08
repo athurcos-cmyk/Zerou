@@ -744,12 +744,82 @@ html[data-reduce-motion='true'] *::after {
   font-size: clamp(1.4rem, 4vw, 1.9rem);
 }
 
+.metric-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.metric-card {
+  flex: 1;
+  min-width: 8.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.metric-card .eyebrow {
+  margin: 0;
+}
+
 .metric-card strong {
   font-family: 'DM Sans', system-ui, sans-serif;
   font-size: clamp(1.65rem, 3vw, 2.35rem);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Text values (e.g. a category name) don't fit the big money typography — wrap instead of cutting. */
+.metric-card strong.metric-card-value--compact {
+  font-size: 1.05rem;
+  font-variant-numeric: normal;
+  line-height: 1.25;
+  white-space: normal;
+  text-overflow: clip;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.metric-card--accent {
+  background: var(--gradient-brand);
+  border-color: transparent;
+  box-shadow: var(--shadow-brand-26);
+}
+
+.metric-card--accent .eyebrow {
+  color: var(--on-accent-85);
+}
+
+.metric-card--accent strong {
+  color: var(--on-accent-95);
+}
+
+.metric-card--accent .metric-card-sub {
+  color: var(--on-accent-55);
+}
+
+.metric-card-sub {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.month-switcher {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.month-switcher strong {
+  min-width: 9rem;
+  text-align: center;
+  font-size: 0.92rem;
 }
 
 .display-number {
@@ -761,10 +831,11 @@ html[data-reduce-motion='true'] *::after {
 
 .metric-icon {
   display: inline-grid;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 1.7rem;
+  height: 1.7rem;
+  flex-shrink: 0;
   place-items: center;
-  border-radius: 0.8rem;
+  border-radius: 0.55rem;
   background: var(--action-primary-soft);
   color: var(--action-primary);
 }

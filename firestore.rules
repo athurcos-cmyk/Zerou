@@ -889,10 +889,16 @@ service cloud.firestore {
         && get(currentMemberDoc(workspaceId)).data.role == 'owner';
     }
 
+    // Mirrors the client's own default in billingService.ts (subscribeBillingAccount): a billing
+    // account only ever *removes* this entitlement if it's explicitly set to false — a missing
+    // doc, a free plan, or an entitlements map without the key all default to allowed. Reading
+    // the raw field directly here (without that default) let a stale/partial billing doc pass the
+    // client-side pre-check but still get denied by this rule.
     function canCreateCoupleWorkspaceByEntitlement(uid) {
       return !exists(billingAccountDoc(uid))
         || get(billingAccountDoc(uid)).data.currentPlanId == 'free'
-        || get(billingAccountDoc(uid)).data.entitlements.canCreateCoupleWorkspace == true;
+        || get(billingAccountDoc(uid)).data.get('subscriptionStatus', '') == 'free'
+        || get(billingAccountDoc(uid)).data.get('entitlements', {}).get('canCreateCoupleWorkspace', true) == true;
     }
 
     function validPrivacyRequestCreate(requestId) {
@@ -1040,6 +1046,7 @@ service cloud.firestore {
           'workspaceId',
           'role',
           'status',
+          'displayName',
           'joinedAt',
           'createdAt',
           'updatedAt'
@@ -1048,6 +1055,7 @@ service cloud.firestore {
         && request.resource.data.workspaceId == workspaceId
         && request.resource.data.role == 'owner'
         && request.resource.data.status == 'active'
+        && validOptionalString('displayName', 120)
         && getAfter(workspaceDoc(workspaceId)).data.ownerUserId == uid
         && request.resource.data.joinedAt == request.time
         && request.resource.data.createdAt == request.time
@@ -1062,6 +1070,7 @@ service cloud.firestore {
           'workspaceId',
           'role',
           'status',
+          'displayName',
           'acceptedInviteId',
           'joinedAt',
           'createdAt',
@@ -1071,6 +1080,7 @@ service cloud.firestore {
         && request.resource.data.workspaceId == workspaceId
         && request.resource.data.role == 'partner'
         && request.resource.data.status == 'active'
+        && validOptionalString('displayName', 120)
         && request.resource.data.acceptedInviteId is string
         && getAfter(/databases/$(database)/documents/coupleInvites/$(request.resource.data.acceptedInviteId)).data.status == 'accepted'
         && getAfter(/databases/$(database)/documents/coupleInvites/$(request.resource.data.acceptedInviteId)).data.usedBy == uid
