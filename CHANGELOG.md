@@ -2,6 +2,11 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-08 — fix: "Gasto no mês" cortava o valor com "..." na Análise
+
+- O card destaque "Gasto no mês" ficava estreito (dois cards lado a lado no mobile) e a fonte grande do valor não cabia, cortando "R$ 430,..." com reticências.
+- Faixa de KPI virou grid: o card destaque ocupa a linha inteira (número herói, valor nunca trunca — testado até 7 dígitos), e "Maior categoria" + "vs. mês anterior" ficam lado a lado embaixo. Mesma hierarquia do Dashboard.
+
 ## 2026-07-08 — fix: clareza visual dos modos do casal (pareciam se acumular)
 
 - Os 3 modos são níveis progressivos (cada um mostra as seções do anterior + a sua), o que dava a impressão de "ativar os 3 juntos" ao trocar. É sempre um modo só.

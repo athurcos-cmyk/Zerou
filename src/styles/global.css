@@ -745,14 +745,18 @@ html[data-reduce-motion='true'] *::after {
 }
 
 .metric-strip {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 0.65rem;
 }
 
+/* "Gasto no mês" is the hero number — full width so the money value never truncates. */
+.metric-card--accent {
+  grid-column: 1 / -1;
+}
+
 .metric-card {
-  flex: 1;
-  min-width: 8.5rem;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
