@@ -23,7 +23,7 @@
     case 'auth/credential-already-in-use':
       return 'Este acesso pertence a outra conta. a Granativa nao mescla UIDs automaticamente.';
     case 'auth/requires-recent-login':
-      return 'Por seguranca, reautentique-se antes de alterar metodos de acesso.';
+      return 'Por seguranca, saia e entre novamente na Granativa antes de continuar.';
     case 'auth/network-request-failed':
       return 'Sua conexao oscilou. Confira o sinal e tente de novo.';
     case 'permission-denied':

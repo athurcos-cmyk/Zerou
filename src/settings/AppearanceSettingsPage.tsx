@@ -1,16 +1,12 @@
-﻿import { MonitorSmartphone } from 'lucide-react';
+import { MonitorSmartphone } from 'lucide-react';
 import { useAppearanceStore } from '../theme/appearance.store';
 import { THEME_DEFINITIONS } from '../theme/theme.registry';
-import type { Density, FontScale } from '../theme/theme.types';
 
 export function AppearanceSettingsPage() {
   const preferences = useAppearanceStore((state) => state.preferences);
   const resolvedThemeId = useAppearanceStore((state) => state.resolvedThemeId);
   const setThemeMode = useAppearanceStore((state) => state.setThemeMode);
   const setThemeId = useAppearanceStore((state) => state.setThemeId);
-  const setDensity = useAppearanceStore((state) => state.setDensity);
-  const setFontScale = useAppearanceStore((state) => state.setFontScale);
-  const setReduceMotion = useAppearanceStore((state) => state.setReduceMotion);
 
   return (
     <section className="page-content">
@@ -61,78 +57,12 @@ export function AppearanceSettingsPage() {
                   </span>
                 </span>
                 <strong>{theme.name}</strong>
-                <span className="text-secondary">{theme.description}</span>
               </button>
             ))}
           </div>
           <p className="text-muted">Tema aplicado agora: {resolvedThemeId}</p>
         </section>
-
-        <section className="surface surface-pad" aria-labelledby="comfort-title">
-          <h2 id="comfort-title">Conforto de leitura</h2>
-          <div className="option-row">
-            <div>
-              <strong>Densidade</strong>
-              <p className="text-secondary">Controle o respiro da interface autenticada.</p>
-            </div>
-            <Segmented<Density>
-              value={preferences.density}
-              options={[
-                ['comfortable', 'Confortável'],
-                ['compact', 'Compacta']
-              ]}
-              onChange={setDensity}
-            />
-          </div>
-          <div className="option-row">
-            <div>
-              <strong>Tamanho da fonte</strong>
-              <p className="text-secondary">Ajuste sem quebrar os tokens do tema.</p>
-            </div>
-            <Segmented<FontScale>
-              value={preferences.fontScale}
-              options={[
-                ['sm', 'P'],
-                ['md', 'M'],
-                ['lg', 'G']
-              ]}
-              onChange={setFontScale}
-            />
-          </div>
-          <div className="option-row">
-            <div>
-              <strong>Reduzir animações</strong>
-              <p className="text-secondary">Preferência individual para interações mais discretas.</p>
-            </div>
-            <button
-              className="button button--secondary"
-              type="button"
-              aria-pressed={preferences.reduceMotion}
-              onClick={() => setReduceMotion(!preferences.reduceMotion)}
-            >
-              {preferences.reduceMotion ? 'Ativo' : 'Inativo'}
-            </button>
-          </div>
-        </section>
       </div>
     </section>
-  );
-}
-
-interface SegmentedProps<T extends string> {
-  value: T;
-  options: Array<[T, string]>;
-  onChange: (value: T) => void;
-}
-
-function Segmented<T extends string>({ value, options, onChange }: SegmentedProps<T>) {
-  return (
-    <div className="segmented">
-      {options.map(([option, label]) => (
-        <button key={option} type="button" aria-pressed={value === option} onClick={() => onChange(option)}>
-          {label}
-        </button>
-      ))}
-    </div>
   );
 }

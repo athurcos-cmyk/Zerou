@@ -8,6 +8,7 @@ import { useAuth } from './auth/AuthContext';
 import { AppearanceSyncBridge } from './settings/AppearanceSyncBridge';
 import { ThemeRuntime } from './theme/ThemeRuntime';
 import { AppShell } from './layout/AppShell';
+import { ScrollToTop } from './layout/ScrollToTop';
 import { AppearanceSettingsPage } from './settings/AppearanceSettingsPage';
 import { AccountsPage } from './pages/AccountsPage';
 import { BillsPage } from './pages/BillsPage';
@@ -46,6 +47,7 @@ export function App() {
     <AuthProvider>
       <ThemeRuntime />
       <AppearanceSyncBridge />
+      <ScrollToTop />
       <Routes>
         <Route path="/" element={<RootRoute />} />
         <Route path="/pricing" element={<Navigate to="/" replace />} />

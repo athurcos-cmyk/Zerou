@@ -2,6 +2,8 @@
 
 Direção visual do Zerou. Antes de mexer em UI, leia este arquivo. Tokens de cor vivem em `src/styles/themes.css`; nunca use hex/rgba literal em componentes (teste `noHardcodedColors`).
 
+**Atenção ao criar `<button>`/`<input>`/`<select>`/`<textarea>` nativos sem classe**: o preflight do Tailwind não roda neste projeto (v4 instalado, diretivas `@tailwind` legadas em `global.css` — ver `SESSAO.md`), então `color`/`font` não herdam do contexto por padrão nesses elementos nativos. `global.css` tem um reset manual (`button, input, select, textarea { font: inherit; color: inherit; }`) cobrindo o caso geral — mas prefira sempre reaproveitar os componentes-base (`.button`, `.input`, `SelectField`) em vez de elemento nativo cru.
+
 ## Princípio
 
 Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara de app nativo — não de painel web.

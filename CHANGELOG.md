@@ -2,6 +2,22 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-08 — fix: texto preto ilegível nos 4 temas escuros
+
+- Causa raiz: `global.css` usa as diretivas legadas `@tailwind base/components/utilities` (estilo v3), mas o Tailwind instalado é v4 — o plugin `@tailwindcss/postcss` v4 não processa essa sintaxe, então o preflight nunca rodava. Sem o reset `button/input/select/textarea { color: inherit }` do preflight, qualquer elemento nativo sem classe (ex.: `<h2>` dentro de `<button>` sem estilo) caía no preto padrão do navegador — invisível nos 4 temas escuros (Obsidian, Midnight, Aurora, Rose Gold). Reproduzido em 5 páginas com o mesmo padrão de botão colapsável (Contas, Cartões, Compromissos, Metas, Compartilhado).
+- Fix: reset explícito em `global.css` (`button, input, select, textarea { font: inherit; color: inherit; }`), independente do Tailwind. Não migrei a diretiva pra `@import "tailwindcss"` (mudança maior no pipeline de build) — só resolvi o sintoma real com uma regra CSS padrão.
+
+## 2026-07-08 — fix: UX de aparência, segurança da conta e navegação
+
+- **Saldo do Dashboard**: mostrava "—" por 1-2s a cada reload enquanto o Firestore sincronizava. Cache local (`dashboardSummaryCache.ts`, mesmo padrão do `profileCache.ts`) mostra o último valor conhecido até o dado real chegar.
+- **Bug de troca de tema**: clicar num tema às vezes revertia pro anterior. Causa: `hydrateFromProfile` aplicava qualquer snapshot do perfil vindo do Firestore, inclusive um em trânsito com o tema antigo. Fix: `hasLocalOverride` no `appearance.store.ts` — depois da primeira escolha manual na sessão, o Firestore só hidrata, nunca mais sobrescreve.
+- **Tela de Segurança reescrita** (`LoginMethodsPage.tsx`): bloco de Perfil (nome/email) no topo, UID e "workspace" removidos da tela, métodos de login como lista com badge "Ativo", explicação clara pra quem loga só com Google. Exclusão de conta agora só exige digitar EXCLUIR — sem campo de senha.
+- **Aparência simplificada**: seção "Conforto de leitura" (densidade/fonte/reduzir animações) removida. Grid de temas compactado — ficava 1 coluna gigante no mobile por um `@media` que colapsava `.theme-grid`; agora sempre 3 colunas, cards menores.
+- **Navegação**: nenhuma tela resetava o scroll ao trocar de rota (abria no meio da página anterior). `ScrollToTop.tsx` novo, montado uma vez em `App.tsx`.
+- **Menu**: Aparência e Segurança agora ficam agrupadas sob o rótulo "Conta" na sidebar e no menu "Mais" do mobile, em vez de soltas entre os outros itens.
+
+Detalhes em [`docs/history/2026-07.md`](docs/history/2026-07.md).
+
 ## 2026-07-07 — fix: `adminDeleteUser` duplicada em 2 codebases de Cloud Functions
 
 - Deploy de functions revelou uma duplicata real: `adminDeleteUser` existia tanto em `functions/src/admin.ts` (codebase `billing`) quanto em `functions-admin/src/index.ts` (codebase `admin`, isolado de propósito desde 17/06 pra deployar sem depender de secrets do Stripe). O Firebase rejeitou o deploy ("More than one codebase claims...").

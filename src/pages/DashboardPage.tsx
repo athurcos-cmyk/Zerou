@@ -1,9 +1,11 @@
+import { useEffect, useMemo } from 'react';
 import { CalendarClock, CreditCard, Plus, Target, Wallet } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 
 import { calculateDashboardSummary } from '../finance/financeCalculations';
+import { readCachedDashboardSummary, saveCachedDashboardSummary } from '../finance/dashboardSummaryCache';
 import { toDateInputValue } from '../finance/financeDates';
 import { transactionTypeLabels } from '../finance/financeLabels';
 import { formatMoney } from '../finance/money';
@@ -30,6 +32,34 @@ export function DashboardPage() {
     recurringRules: finance.recurringRules,
     invoices: cardsData.invoices
   });
+  // Mostra o último saldo conhecido (cache local) enquanto os listeners do
+  // Firestore ainda não entregaram o primeiro snapshot — evita o "—" piscando
+  // por 1-2s a cada reload, sem alterar a lógica de correção do loading em si.
+  const cachedSummary = useMemo(() => readCachedDashboardSummary(workspaceId), [workspaceId]);
+  useEffect(() => {
+    if (!isCommittedLoading && workspaceId) {
+      saveCachedDashboardSummary(workspaceId, {
+        totalBalanceCents: dashboard.totalBalanceCents,
+        freeToSpendCents: dashboard.freeToSpendCents,
+        committedCents: dashboard.committedCents
+      });
+    }
+  }, [isCommittedLoading, workspaceId, dashboard.totalBalanceCents, dashboard.freeToSpendCents, dashboard.committedCents]);
+  const totalBalanceDisplay = isLoading
+    ? cachedSummary
+      ? formatMoney(cachedSummary.totalBalanceCents)
+      : '—'
+    : formatMoney(dashboard.totalBalanceCents);
+  const freeToSpendDisplay = isCommittedLoading
+    ? cachedSummary
+      ? formatMoney(cachedSummary.freeToSpendCents)
+      : '—'
+    : formatMoney(dashboard.freeToSpendCents);
+  const committedDisplay = isCommittedLoading
+    ? cachedSummary
+      ? formatMoney(cachedSummary.committedCents)
+      : '—'
+    : formatMoney(dashboard.committedCents);
   const syncStatus = finance.pendingWrites || cardsData.pendingWrites ? 'pending' : 'synced';
   const currentMonth = new Date().toISOString().slice(0, 7);
   const categoryNames = new Map(finance.categories.map((category) => [category.id, category.name]));
@@ -70,19 +100,19 @@ export function DashboardPage() {
         <article className="surface surface-pad dash-balance dash-hero">
           <p className="eyebrow" style={{ color: 'var(--on-accent-85)' }}>Saldo total</p>
           <strong className="display-number" style={{ color: 'var(--on-accent-95)' }}>
-            {isLoading ? '—' : formatMoney(dashboard.totalBalanceCents)}
+            {totalBalanceDisplay}
           </strong>
           <span style={{ color: 'var(--on-accent-55)', fontSize: '0.84rem' }}>Soma das contas ativas.</span>
         </article>
         <div className="dash-secondary">
           <article className="surface surface-pad dash-metric dash-metric--available">
             <p className="eyebrow">Disponível</p>
-            <strong className="display-number">{isCommittedLoading ? '—' : formatMoney(dashboard.freeToSpendCents)}</strong>
+            <strong className="display-number">{freeToSpendDisplay}</strong>
             <span className="text-secondary">Livre agora.</span>
           </article>
           <article className="surface surface-pad dash-metric dash-metric--committed">
             <p className="eyebrow">Comprometido</p>
-            <strong className="display-number">{isCommittedLoading ? '—' : formatMoney(dashboard.committedCents)}</strong>
+            <strong className="display-number">{committedDisplay}</strong>
             <span className="text-secondary">Contas e fatura.</span>
           </article>
         </div>

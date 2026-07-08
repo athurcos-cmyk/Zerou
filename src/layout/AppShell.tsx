@@ -92,6 +92,7 @@ export function AppShell() {
           <NavLink className={getNavClass} to="/app/shared">
             <Users size={19} aria-hidden="true" /> Compartilhado
           </NavLink>
+          <p className="eyebrow" style={{ margin: '0.75rem 0 0.15rem 0.6rem' }}>Conta</p>
           <NavLink className={getNavClass} to="/app/settings/appearance">
             <Palette size={19} aria-hidden="true" /> Aparência
           </NavLink>
@@ -152,6 +153,7 @@ export function AppShell() {
               <NavLink className={getNavClass} to="/app/search" onClick={() => setMobileMenuOpen(false)}>
                 <BarChart2 size={19} aria-hidden="true" /> Análise
               </NavLink>
+              <p className="eyebrow" style={{ gridColumn: '1 / -1', margin: '0.5rem 0 0' }}>Conta</p>
               <NavLink className={getNavClass} to="/app/settings/appearance" onClick={() => setMobileMenuOpen(false)}>
                 <Palette size={19} aria-hidden="true" /> Aparência
               </NavLink>

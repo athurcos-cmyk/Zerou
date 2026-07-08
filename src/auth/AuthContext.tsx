@@ -66,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authFromCache, setAuthFromCache] = useState(() => isFirebaseConfigured && Boolean(readLastCachedProfile()));
   const [firebaseError, setFirebaseError] = useState<string | null>(null);
   const hydrateFromProfile = useAppearanceStore((state) => state.hydrateFromProfile);
+  const resetLocalOverride = useAppearanceStore((state) => state.resetLocalOverride);
 
   const applyProfile = useCallback((nextProfile: UserProfile | null) => {
     setProfile(nextProfile);
@@ -152,6 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user || firebaseError) {
       setProfile(null);
       setProfileLoading(false);
+      resetLocalOverride();
       return undefined;
     }
 
@@ -188,7 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(profileTimeout);
       unsubscribe();
     };
-  }, [applyProfile, firebaseError, user]);
+  }, [applyProfile, firebaseError, user, resetLocalOverride]);
 
   const value = useMemo(
     () => ({ user, profile, loading, profileLoading, authFromCache, firebaseError }),
