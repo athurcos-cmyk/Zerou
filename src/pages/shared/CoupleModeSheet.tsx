@@ -44,12 +44,14 @@ interface CoupleModeSheetProps {
   onClose: () => void;
   purpose: 'create' | 'change';
   selectedMode: CoupleMode;
+  /** The mode the space is actually on right now — tagged "Atual" so changing isn't ambiguous. */
+  currentMode?: CoupleMode | null;
   onSelect: (mode: CoupleMode) => void;
   onConfirm: () => void;
 }
 
 /** Single source for the mode-picker list — used both when creating the space and when changing its mode later. */
-export function CoupleModeSheet({ open, onClose, purpose, selectedMode, onSelect, onConfirm }: CoupleModeSheetProps) {
+export function CoupleModeSheet({ open, onClose, purpose, selectedMode, currentMode, onSelect, onConfirm }: CoupleModeSheetProps) {
   return (
     <BottomSheet
       open={open}
@@ -71,7 +73,10 @@ export function CoupleModeSheet({ open, onClose, purpose, selectedMode, onSelect
                 <Icon size={18} aria-hidden="true" />
               </span>
               <span className="couple-mode-text">
-                <strong>{opt.label}</strong>
+                <strong>
+                  {opt.label}
+                  {purpose === 'change' && currentMode === opt.id && <span className="couple-mode-current-tag">Atual</span>}
+                </strong>
                 <span>{opt.desc}</span>
                 {opt.more && <span className="couple-mode-more">{opt.more}</span>}
               </span>

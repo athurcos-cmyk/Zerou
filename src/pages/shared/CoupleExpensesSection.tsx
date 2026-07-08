@@ -108,8 +108,8 @@ export function CoupleExpensesSection({
       <button type="button" className="couple-upgrade-card" onClick={() => onUpgradeMode('transparent')}>
         <span className="couple-mode-icon couple-mode-icon--transparent"><Eye size={18} aria-hidden="true" /></span>
         <span className="couple-upgrade-text">
-          <strong>Ativar transparência</strong>
-          <span>Veja o que cada um paga nas despesas divididas.</span>
+          <strong>Mudar pra transparência</strong>
+          <span>Troca o modo do espaço — veja o que cada um paga nas despesas divididas.</span>
         </span>
         <ChevronRight size={16} aria-hidden="true" style={{ marginLeft: 'auto', flexShrink: 0, color: 'var(--text-muted)' }} />
       </button>
@@ -192,8 +192,8 @@ export function CoupleExpensesSection({
         <button type="button" className="couple-upgrade-card" onClick={() => onUpgradeMode('balanced')}>
           <span className="couple-mode-icon couple-mode-icon--balanced"><Scale size={18} aria-hidden="true" /></span>
           <span className="couple-upgrade-text">
-            <strong>Ativar equilíbrio</strong>
-            <span>Veja a proporção de quem está cobrindo mais no mês.</span>
+            <strong>Mudar pra equilíbrio</strong>
+            <span>Troca o modo do espaço — veja a proporção de quem está cobrindo mais no mês.</span>
           </span>
           <ChevronRight size={16} aria-hidden="true" style={{ marginLeft: 'auto', flexShrink: 0, color: 'var(--text-muted)' }} />
         </button>

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Plus, Settings2 } from 'lucide-react';
+import { ChevronRight, Plus, Settings2 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { clearPendingInvite, readPendingInvite, savePendingInvite } from '../auth/pendingInvite';
 import { useConfirm } from '../components/ConfirmDialog';
@@ -19,7 +19,7 @@ import {
 } from '../shared/sharedService';
 import { CoupleExpensesSection } from './shared/CoupleExpensesSection';
 import { CoupleInviteSection } from './shared/CoupleInviteSection';
-import { CoupleModeSheet, coupleModeLabels } from './shared/CoupleModeSheet';
+import { CoupleModeSheet, coupleModeLabels, coupleModeOptions } from './shared/CoupleModeSheet';
 import { CoupleSavingsSection } from './shared/CoupleSavingsSection';
 import { memberLabel } from './shared/memberLabel';
 import type { CoupleInvite, CoupleMode } from '../types/contracts';
@@ -241,6 +241,22 @@ export function SharedSpacePage() {
       ) : (
         /* 3) Partnered — cofrinho + despesas + gerenciar */
         <div className="form-stack">
+          {coupleMode && (
+            <div>
+              <button type="button" className="couple-mode-badge" onClick={handleOpenModeChange}>
+                {(() => {
+                  const ModeIcon = coupleModeOptions.find((opt) => opt.id === coupleMode)?.icon;
+                  return ModeIcon ? <ModeIcon size={15} aria-hidden="true" /> : null;
+                })()}
+                <span>Modo: <strong>{coupleModeLabels[coupleMode]}</strong></span>
+                <ChevronRight size={14} aria-hidden="true" />
+              </button>
+              <p className="text-muted" style={{ fontSize: '0.78rem', margin: '0.35rem 0 0' }}>
+                O cofrinho abaixo funciona em qualquer modo — isso só muda como despesas divididas aparecem.
+              </p>
+            </div>
+          )}
+
           {workspaceId && user ? (
             <CoupleSavingsSection
               workspaceId={workspaceId}
@@ -311,6 +327,7 @@ export function SharedSpacePage() {
         onClose={() => setModeSheetOpen(false)}
         purpose={modeSheetPurpose}
         selectedMode={selectedMode}
+        currentMode={coupleMode}
         onSelect={setSelectedMode}
         onConfirm={handleConfirmModeSheet}
       />

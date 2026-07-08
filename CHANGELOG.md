@@ -2,6 +2,15 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-08 — fix: clareza visual dos modos do casal (pareciam se acumular)
+
+- Os 3 modos são níveis progressivos (cada um mostra as seções do anterior + a sua), o que dava a impressão de "ativar os 3 juntos" ao trocar. É sempre um modo só.
+- Badge do modo atual visível no topo do espaço parceirado (antes só aparecia escondido em "Gerenciar espaço"), clicável pra trocar, com texto deixando claro que o cofrinho funciona em qualquer modo.
+- Botões "Ativar transparência/equilíbrio" renomeados pra "Mudar pra..." (deixa claro que troca, não soma).
+- Tag "Atual" no seletor de modo marcando o modo vigente, distinto do que está sendo selecionado — evita trocar sem querer.
+
+Detalhes em [`docs/history/2026-07.md`](docs/history/2026-07.md).
+
 ## 2026-07-08 — fix: 3 bugs no espaço do casal achados testando com dispositivos reais
 
 - Corrigida race condition no botão "Cancelar espaço compartilhado" — ficava clicável (mas inerte) por 1-2s antes do workspace terminar de carregar.

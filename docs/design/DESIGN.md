@@ -50,6 +50,7 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
 - Nunca expor termo técnico ao usuário (sem "ledger", "workspace", "checkout").
 - **Navegação por mês/período** (`.month-switcher`, `global.css`): `‹ Mês de Ano › ` com `.icon-button`, introduzido em `SearchPage.tsx` (2026-07-08) — padrão a reaproveitar se outra tela precisar filtrar por mês, em vez de inventar um novo controle.
 - Ação em cartão do casal/despesa que muda estado do servidor (gerar/regenerar/revogar convite): sempre com `confirm()` explicando a consequência antes de agir, principalmente se for destrutiva ou invalidar algo que já foi compartilhado com outra pessoa.
+- **Estado exclusivo/progressivo precisa de indicador visível do que está ativo** (aprendido nos modos do casal, 2026-07-08): quando uma escolha é um valor único mas as opções são níveis cumulativos (cada uma mostra mais UI), o usuário acha que está "acumulando". Sempre mostrar um badge do estado atual na tela (não escondido em acordeão), usar verbo de troca ("Mudar pra X", não "Ativar X"), e no seletor marcar o valor vigente ("Atual") distinto do tentativamente selecionado.
 
 ## Landing (`src/landing/`)
 
