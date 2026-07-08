@@ -2,6 +2,13 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-08 — feat: prompt de instalação do PWA no Dashboard
+
+- Verificação do manifest (`vite.config.ts`, plugin VitePWA): conteúdo correto, mas achei 2 bugs pequenos — `lang` não estava setado (caía no default `en` num app em português) e os caminhos dos ícones referenciavam `Granativa-app-icon-*.png` (G maiúsculo) enquanto os arquivos reais em `public/brand/` são todos minúsculos. Confirmei ao vivo contra a produção que o Vercel serve como case-insensitive (não estava 404, mas ficava frágil) — corrigido de qualquer forma.
+- Novo `InstallPromptSheet` (montado só na tela inicial `/app`, via `DashboardPage`): mostra um bottom sheet central com botão "Instalar agora" quando o navegador suporta o evento nativo `beforeinstallprompt` (Android/Chrome/Edge/desktop); no iPhone/iPad (sem esse evento no Safari) mostra um tutorial visual de 3 passos (Compartilhar → Adicionar à Tela de Início → Adicionar).
+- Nunca aparece pra quem já instalou (`display-mode: standalone` / `navigator.standalone`) nem pra quem já dispensou uma vez (`localStorage`, permanente).
+- Captura do `beforeinstallprompt` acontece desde o boot (`src/pwa/installPrompt.ts`, importado em `main.tsx`), não só quando a tela do Dashboard monta — o evento pode disparar antes.
+
 ## 2026-07-08 — fix: texto preto ilegível nos 4 temas escuros
 
 - Causa raiz: `global.css` usa as diretivas legadas `@tailwind base/components/utilities` (estilo v3), mas o Tailwind instalado é v4 — o plugin `@tailwindcss/postcss` v4 não processa essa sintaxe, então o preflight nunca rodava. Sem o reset `button/input/select/textarea { color: inherit }` do preflight, qualquer elemento nativo sem classe (ex.: `<h2>` dentro de `<button>` sem estilo) caía no preto padrão do navegador — invisível nos 4 temas escuros (Obsidian, Midnight, Aurora, Rose Gold). Reproduzido em 5 páginas com o mesmo padrão de botão colapsável (Contas, Cartões, Compromissos, Metas, Compartilhado).

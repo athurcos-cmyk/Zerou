@@ -31,8 +31,8 @@ messaging.onBackgroundMessage(function(payload) {
   var n = payload.notification || {};
   self.registration.showNotification(n.title || 'Granativa', {
     body: n.body || '',
-    icon: '/brand/Granativa-app-icon-192.png',
-    badge: '/brand/Granativa-app-icon-192.png',
+    icon: '/brand/granativa-app-icon-192.png',
+    badge: '/brand/granativa-app-icon-192.png',
     data: { link: (payload.fcmOptions || {}).link || '/app' }
   });
 });
@@ -62,11 +62,12 @@ export default defineConfig(({ mode }) => {
       react(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'favicon.png', 'favicon-16x16.png', 'favicon-32x32.png', 'brand/Granativa-app-icon-180.png'],
+        includeAssets: ['favicon.ico', 'favicon.png', 'favicon-16x16.png', 'favicon-32x32.png', 'brand/granativa-app-icon-180.png'],
         manifest: {
           name: 'Granativa',
           short_name: 'Granativa',
           description: 'Controle individual. Organização a dois.',
+          lang: 'pt-BR',
           theme_color: '#EE5524',
           background_color: '#FAF8F5',
           display: 'standalone',
@@ -74,17 +75,17 @@ export default defineConfig(({ mode }) => {
           scope: '/',
           icons: [
             {
-              src: '/brand/Granativa-app-icon-192.png',
+              src: '/brand/granativa-app-icon-192.png',
               sizes: '192x192',
               type: 'image/png'
             },
             {
-              src: '/brand/Granativa-app-icon-512.png',
+              src: '/brand/granativa-app-icon-512.png',
               sizes: '512x512',
               type: 'image/png'
             },
             {
-              src: '/brand/Granativa-maskable-512.png',
+              src: '/brand/granativa-maskable-512.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'maskable'

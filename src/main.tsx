@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { App } from './App';
 import { connectFirebaseEmulators } from './firebase/config';
 import { registerServiceWorkerUpdates } from './pwa/registerServiceWorker';
+import './pwa/installPrompt';
 import './styles/themes.css';
 import './styles/global.css';
 

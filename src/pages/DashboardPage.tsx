@@ -12,6 +12,7 @@ import { formatMoney } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
 import { CategoryMark } from '../components/categoryIcons';
 import { defaultCategoryColors } from '../theme/palette';
+import { InstallPromptSheet } from '../pwa/InstallPromptSheet';
 
 import { EmptyState } from '../components/EmptyState';
 
@@ -86,6 +87,7 @@ export function DashboardPage() {
 
   return (
     <section className="page-content">
+      <InstallPromptSheet />
       <div className="page-heading-row page-heading-row--tight">
         <div>
           <p className="eyebrow">Olá{profile?.name ? `, ${profile.name.split(' ')[0]}` : ''}</p>

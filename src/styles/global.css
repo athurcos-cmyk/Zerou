@@ -2886,6 +2886,54 @@ html[data-reduce-motion='true'] *::after {
   flex: 1 1 0;
 }
 
+.install-prompt {
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+  text-align: center;
+  padding-bottom: 0.5rem;
+}
+
+.install-prompt-icon {
+  width: 4rem;
+  height: 4rem;
+  border-radius: 1.1rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.install-prompt h2 {
+  margin: 0;
+}
+
+.install-prompt .button {
+  width: 100%;
+}
+
+.install-steps {
+  display: grid;
+  gap: 0.75rem;
+  width: 100%;
+  margin: 0.25rem 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.install-steps li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 0.85rem;
+  background: var(--bg-surface-subtle);
+  color: var(--text-secondary);
+}
+
+.install-steps li svg {
+  flex-shrink: 0;
+  color: var(--action-primary);
+}
+
 .sheet-search {
   margin-bottom: 0.85rem;
 }
