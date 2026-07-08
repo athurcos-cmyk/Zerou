@@ -2,6 +2,12 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-07 — fix: `adminDeleteUser` duplicada em 2 codebases de Cloud Functions
+
+- Deploy de functions revelou uma duplicata real: `adminDeleteUser` existia tanto em `functions/src/admin.ts` (codebase `billing`) quanto em `functions-admin/src/index.ts` (codebase `admin`, isolado de propósito desde 17/06 pra deployar sem depender de secrets do Stripe). O Firebase rejeitou o deploy ("More than one codebase claims...").
+- `firebase functions:list` confirmou: a função ao vivo já pertencia ao codebase `admin`. Removido o duplicado de `functions/src/admin.ts` (arquivo deletado, export tirado de `functions/src/index.ts`) — `functions-admin/` continua sendo a única fonte de verdade.
+- As 10 functions dos 2 codebases foram redeployadas com sucesso (`npx firebase deploy --only functions`), incluindo a limpeza da referência a `comments` (feature já removida) que só tinha sido sincronizada no codebase errado antes.
+
 ## 2026-07-07 — feat: painel admin funcional (QA + UX)
 
 - **2 bugs de segurança corrigidos**: admin podia deletar a própria conta sem aviso especial (sem proteção contra auto-exclusão); confirmação de exclusão comparava com o primeiro nome do usuário — se o nome estivesse vazio, o botão de deletar ficava liberado sem digitar nada. Trocado por frase fixa "EXCLUIR" (mesmo padrão da autoexclusão do usuário) + linha "Você" bloqueada na própria conta.

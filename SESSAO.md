@@ -12,7 +12,7 @@ Todas as páginas autenticadas têm agora **cabeçalho compacto** (eyebrow + tí
 
 A aba **Análise** (`/app/search`) exibe: KPI strip (gasto total, maior categoria, variação % vs. mês anterior com ícone trending); donut 200px interativo (Recharts — clique destaca fatia, centro mostra nome/valor/%) com legenda de **barras de progresso** por categoria; gráfico de barras (220px) entradas vs saídas dos últimos 6 meses com legenda própria; busca por texto (card oculto quando vazio).
 
-**Cloud Functions** (`functions/src/`): quatro funções scheduled deployadas no codebase `billing` (`southamerica-east1`): `closeInvoicesDue` (meia-noite), `generateRecurrences` (6h), `sendDueReminders` (8h), `sendDailyLogReminder` (20h — lembrete diário via FCM para todos os usuários). Push via `sendPushToUser` (`push.ts`) com limpeza automática de tokens stale. VAPID key configurada no Vercel. Secrets Stripe como placeholder para deploy sem ativar billing.
+**Cloud Functions — dois codebases** (`firebase.json`, `southamerica-east1`): `functions/` (codebase `billing`) tem as 4 funções scheduled — `closeInvoicesDue` (meia-noite), `generateRecurrences` (6h), `sendDueReminders` (8h), `sendDailyLogReminder` (20h — lembrete diário via FCM) — mais o scaffold Stripe (inativo). `functions-admin/` (codebase `admin`) é **isolado de propósito** (desde 17/06) e tem só `adminDeleteUser` — sem depender de secrets do Stripe, deploya independente. **`adminDeleteUser` só existe em `functions-admin/src/index.ts`** — nunca recriar em `functions/src/`, isso já causou um conflito real de deploy ("More than one codebase claims...") em 07/07. Deploy: `npx firebase deploy --only functions --project zerou-26757` (deploya os dois codebases). Push via `sendPushToUser` (`push.ts`) com limpeza automática de tokens stale. VAPID key configurada no Vercel. Secrets Stripe como placeholder para deploy sem ativar billing.
 
 O app autenticado não usa mais logo persistente no topo; o onboarding também fica sem bloco de marca para preservar altura útil no celular.
 
@@ -83,7 +83,7 @@ React 19 (TS strict), Vite, Firebase Web SDK (Auth + Firestore + Storage), Verce
 
 ## Admin (`/admin`) — comportamento-chave
 
-- **Único admin**: `a.thurcos@gmail.com`, hardcoded em `src/auth/routeGuards.tsx` (`RequireAdmin`), `functions/src/admin.ts` (`ADMIN_EMAIL`) e `firestore.rules` (`isAdmin()`). Precisa mudar nos 3 lugares se um dia virar multi-admin.
+- **Único admin**: `a.thurcos@gmail.com`, hardcoded em `src/auth/routeGuards.tsx` (`RequireAdmin`), `functions-admin/src/index.ts` (`ADMIN_EMAIL`) e `firestore.rules` (`isAdmin()`). Precisa mudar nos 3 lugares se um dia virar multi-admin.
 - **Confirmação de ações destrutivas**: exclusão de conta exige digitar `EXCLUIR` (frase fixa — nunca comparar com um campo de usuário como nome, que pode estar vazio). Auto-exclusão bloqueada na UI (linha da própria conta não mostra botão de deletar).
 - **Convites são revogáveis por admin** (2026-07-07): regra do Firestore para `coupleInvites` inclui `isAdmin()` no `allow delete`. Reusa `revokeCoupleInvite` de `sharedService.ts` — não duplicar lógica de revogação no admin.
 - **Contagens têm teto**: `getAdminUsers`/`getAdminCoupleWorkspaces`/`getAdminInvites` (`src/admin/adminService.ts`) limitam a 500/200/200. UI mostra `"500+"` (via `formatCount`, `src/admin/adminFormat.ts`) quando a contagem bate o teto — não confiar no número exibido como total real acima disso.

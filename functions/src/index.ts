@@ -14,7 +14,10 @@ import { safeReturnUrl } from './billing/urlSafety.js';
 export { closeInvoicesDue, generateRecurrences, sendDueReminders, sendDailyLogReminder } from './automation.js';
 
 // ─── Admin ────────────────────────────────────────────────────────────────────
-export { adminDeleteUser } from './admin.js';
+// adminDeleteUser NÃO fica aqui — vive isolado em functions-admin/ (codebase
+// "admin"), sem dependência do Stripe, pra poder deployar independente do
+// codebase "billing". Ver firebase.json. Não recriar aqui — isso já causou um
+// conflito de deploy ("More than one codebase claims following functions").
 
 // ─── Billing / Stripe ─────────────────────────────────────────────────────────
 // Estas functions implementam cobrança via Stripe (checkout, portal, webhooks).
