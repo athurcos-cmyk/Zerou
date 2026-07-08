@@ -80,6 +80,11 @@ async function collectUserWorkspaceRefs(userId: string) {
   return snapshot.docs.map((item) => ({ id: item.id, ref: item.ref, data: item.data() as WorkspaceRef }));
 }
 
+async function collectFcmTokens(userId: string) {
+  const snapshot = await getDocs(collection(getFirebaseDb(), 'users', userId, 'fcmTokens'));
+  return snapshot.docs.map((item) => item.ref);
+}
+
 async function collectCoupleInvites(workspaceId: string) {
   const snapshot = await getDocs(query(collection(getFirebaseDb(), 'coupleInvites'), where('workspaceId', '==', workspaceId)));
   return snapshot.docs.map((item) => item.ref);
@@ -157,6 +162,7 @@ export async function deleteAccountData(userId: string) {
 
   refs.push(...workspaceRefs.map((workspaceRef) => workspaceRef.ref));
   refs.push(...(await collectBillingRefs(userId)));
+  refs.push(...(await collectFcmTokens(userId)));
   refs.push(doc(getFirebaseDb(), 'users', userId));
 
   await commitDeletes(refs);

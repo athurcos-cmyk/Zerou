@@ -2,6 +2,16 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-08 — feat: admin com paginação/detalhe de usuário + fix de vazamento na exclusão de conta
+
+- Bug real corrigido: `users/{uid}/fcmTokens` (token de push) nunca era apagado nem na autoexclusão (`accountDeletionService.ts`) nem na exclusão pelo admin (`functions-admin/src/index.ts`) — ficava órfão no Firestore pra sempre. Corrigido nos dois fluxos; alinhei também a lista de subcoleções (`comments`) entre os dois arquivos.
+- Admin (`/admin`): teto fixo de 500/200 usuários/casais/convites virou paginação de verdade por cursor (`startAfter`, 100 por página, botão "Carregar mais").
+- Novo painel de detalhes por usuário (clicar na linha): perfil + lista de espaços (pessoal/casal, papel, status) — só metadados que o admin já podia ler, sem tocar em regra de dado financeiro.
+- Nova ação "Forçar logout" (`adminForceLogout`, nova Cloud Function em `functions-admin/`, `auth.revokeRefreshTokens`) — precisa de deploy de functions antes de funcionar em produção.
+- Filtros por status (Casais: ativo/arquivado/deletando; Convites: ativo/expirado/aceito) via StatCards clicáveis, mais ordenação por coluna nas 3 tabelas.
+
+Detalhes em [`docs/history/2026-07.md`](docs/history/2026-07.md).
+
 ## 2026-07-08 — feat: reestruturação da tela de Análise (mês, empty states, busca)
 
 - Cards de KPI e cabeçalhos passaram a reaproveitar `.metric-card`/`.metric-icon`/`.section-heading` do design system (classes que já existiam em `global.css`, nunca usadas) em vez de ~40 blocos de estilo inline.

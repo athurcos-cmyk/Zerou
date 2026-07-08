@@ -1,11 +1,13 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
   ArrowLeft,
+  ArrowUpDown,
   Ban,
   Heart,
   Loader2,
+  LogOut,
   RefreshCw,
   Search,
   Send,
@@ -16,14 +18,16 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import {
-  ADMIN_COUPLES_LIMIT,
-  ADMIN_INVITES_LIMIT,
-  ADMIN_USERS_LIMIT,
   callAdminDeleteUser,
+  callAdminForceLogout,
   getAdminCoupleWorkspaces,
   getAdminInvites,
   getAdminUsers,
+  getAdminUserWorkspaceRefs,
+  getAdminWorkspacesByIds,
+  type AdminCursor,
   type AdminInvite,
+  type AdminWorkspaceRef,
 } from '../admin/adminService';
 import { revokeCoupleInvite } from '../shared/sharedService';
 import { formatCount } from '../admin/adminFormat';
@@ -32,6 +36,7 @@ import type { UserProfile, Workspace } from '../types/contracts';
 import type { Timestamp } from 'firebase/firestore';
 
 type Tab = 'overview' | 'users' | 'couples' | 'invites';
+type SortDir = 'asc' | 'desc';
 
 function fmtDate(ts: Timestamp | null | undefined): string {
   if (!ts) return '—';
@@ -58,6 +63,19 @@ function fmtDateFull(ts: Timestamp | null | undefined): string {
   });
 }
 
+// Compara datas do Firestore ou strings — o bastante pra ordenar as 3 tabelas
+// do admin sem precisar de uma lib de comparação genérica.
+function compareField(a: string | Timestamp | null | undefined, b: string | Timestamp | null | undefined): number {
+  if (a && typeof a === 'object' && 'toMillis' in a) {
+    const bMillis = b && typeof b === 'object' && 'toMillis' in b ? b.toMillis() : 0;
+    return a.toMillis() - bMillis;
+  }
+  if (typeof a === 'string' && typeof b === 'string') {
+    return a.localeCompare(b, 'pt-BR');
+  }
+  return 0;
+}
+
 function Initials({ name }: { name: string }) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   const init = parts.length >= 2
@@ -72,7 +90,7 @@ function StatusPill({ status }: { status: string }) {
   let cls = 'admin-pill';
   if (status === 'active') cls += ' admin-pill--success';
   else if (status === 'accepted') cls += ' admin-pill--info';
-  else if (status === 'revoked' || status === 'pending_deletion') cls += ' admin-pill--danger';
+  else if (status === 'revoked' || status === 'pending_deletion' || status === 'removed') cls += ' admin-pill--danger';
   else cls += ' admin-pill--muted';
 
   const labels: Record<string, string> = {
@@ -82,6 +100,8 @@ function StatusPill({ status }: { status: string }) {
     expired: 'Expirado',
     archived: 'Arquivado',
     pending_deletion: 'Deletando',
+    invited: 'Convidado',
+    removed: 'Removido',
   };
   return <span className={cls}>{labels[status] ?? status}</span>;
 }
@@ -91,41 +111,93 @@ function StatCard({
   label,
   value,
   sub,
+  active,
+  onClick,
 }: {
   icon: React.ReactNode;
   label: string;
   value: number | string;
   sub?: string;
+  active?: boolean;
+  onClick?: () => void;
 }) {
+  const Tag = onClick ? 'button' : 'article';
   return (
-    <article className="admin-stat">
+    <Tag
+      type={onClick ? 'button' : undefined}
+      className={`admin-stat${onClick ? ' admin-stat--clickable' : ''}${active ? ' admin-stat--active' : ''}`}
+      onClick={onClick}
+    >
       <span className="admin-stat__icon">{icon}</span>
       <p className="admin-stat__label">{label}</p>
       <strong className="admin-stat__value display-number">{value}</strong>
       {sub ? <span className="admin-stat__sub">{sub}</span> : null}
-    </article>
+    </Tag>
   );
 }
 
-function EmptyRow({ cols }: { cols: number }) {
+function EmptyRow({ cols, filtered }: { cols: number; filtered?: boolean }) {
   return (
     <tr>
       <td colSpan={cols} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-        Nenhum registro encontrado.
+        {filtered ? 'Nenhum resultado para esse filtro/busca.' : 'Nenhum registro encontrado.'}
       </td>
     </tr>
   );
 }
 
+function SortableTh({
+  label,
+  active,
+  dir,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  dir: SortDir;
+  onClick: () => void;
+}) {
+  return (
+    <th className={`admin-th-sortable${active ? ' admin-th-sortable--active' : ''}`} onClick={onClick}>
+      <span>
+        {label}
+        {active ? (
+          <span className="admin-sort-arrow">{dir === 'asc' ? '↑' : '↓'}</span>
+        ) : (
+          <ArrowUpDown size={11} className="admin-sort-icon" />
+        )}
+      </span>
+    </th>
+  );
+}
+
+function LoadMoreButton({ hasMore, loading, onClick }: { hasMore: boolean; loading: boolean; onClick: () => void }) {
+  if (!hasMore) return null;
+  return (
+    <div className="admin-load-more">
+      <button type="button" className="button button--subtle" onClick={onClick} disabled={loading}>
+        {loading ? <Loader2 size={15} className="admin-spin" /> : null}
+        Carregar mais
+      </button>
+    </div>
+  );
+}
+
 function OverviewTab({
   users,
+  usersHasMore,
   couples,
+  couplesHasMore,
   invites,
+  invitesHasMore,
   userMap,
 }: {
   users: UserProfile[];
+  usersHasMore: boolean;
   couples: Workspace[];
+  couplesHasMore: boolean;
   invites: AdminInvite[];
+  invitesHasMore: boolean;
   userMap: Map<string, UserProfile>;
 }) {
   const now = Date.now();
@@ -140,27 +212,27 @@ function OverviewTab({
       <div className="admin-stats-grid">
         <StatCard
           icon={<Users size={18} />}
-          label="Total de usuários"
-          value={formatCount(users.length, ADMIN_USERS_LIMIT)}
+          label="Usuários carregados"
+          value={formatCount(users.length, usersHasMore)}
           sub="cadastros ativos"
         />
         <StatCard
           icon={<TrendingUp size={18} />}
           label="Novos (30 dias)"
           value={newUsers30d}
-          sub={`de ${formatCount(users.length, ADMIN_USERS_LIMIT)} total`}
+          sub={`de ${formatCount(users.length, usersHasMore)} carregados`}
         />
         <StatCard
           icon={<Heart size={18} />}
           label="Espaços de casal"
-          value={formatCount(couples.length, ADMIN_COUPLES_LIMIT)}
+          value={formatCount(couples.length, couplesHasMore)}
           sub="workspaces de dupla"
         />
         <StatCard
           icon={<Send size={18} />}
           label="Convites ativos"
           value={activeInvites}
-          sub={`de ${formatCount(invites.length, ADMIN_INVITES_LIMIT)} total`}
+          sub={`de ${formatCount(invites.length, invitesHasMore)} carregados`}
         />
       </div>
 
@@ -288,7 +360,7 @@ function DeleteConfirmModal({ user, onConfirm, onCancel }: DeleteConfirmProps) {
         <p className="admin-modal__body">
           Isso vai apagar <strong>{user.name || user.email}</strong> ({user.email}) do Firebase Auth e todos os dados
           do Firestore — workspace pessoal, espaços de casal criados por ele, transações, cartões,
-          metas e billing. <strong>Irreversível.</strong>
+          metas, convites e billing. <strong>Irreversível.</strong>
         </p>
         <label className="admin-modal__label">
           Digite <strong>{expected}</strong> para confirmar:
@@ -338,7 +410,7 @@ interface ConfirmModalProps {
 }
 
 // Confirmação genérica pra ações reversíveis/de menor risco (ex.: revogar
-// convite) — sem exigir digitar nada, diferente do DeleteConfirmModal.
+// convite, forçar logout) — sem exigir digitar nada, diferente do DeleteConfirmModal.
 function ConfirmModal({ title, body, confirmLabel, danger, onConfirm, onCancel }: ConfirmModalProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -382,32 +454,173 @@ function ConfirmModal({ title, body, confirmLabel, danger, onConfirm, onCancel }
   );
 }
 
+const THEME_LABELS: Record<string, string> = {
+  paper: 'Paper (Sol)',
+  sakura: 'Sakura',
+  obsidian: 'Obsidian',
+  midnight: 'Midnight',
+  aurora: 'Aurora',
+  'rose-gold': 'Rose Gold',
+};
+
+// Painel de detalhes — só mostra metadados que o admin já consegue ler hoje
+// (perfil + workspaceRefs), nunca dados financeiros (transações/contas/faturas
+// exigem isActiveMember nas regras, de propósito — ver docs/PRIVACY.md).
+function UserDetailModal({
+  user,
+  canDelete,
+  onClose,
+  onRequestDelete,
+  onRequestForceLogout,
+}: {
+  user: UserProfile;
+  canDelete: boolean;
+  onClose: () => void;
+  onRequestDelete: () => void;
+  onRequestForceLogout: () => void;
+}) {
+  const [refs, setRefs] = useState<AdminWorkspaceRef[]>([]);
+  const [workspaces, setWorkspaces] = useState<Map<string, Workspace>>(new Map());
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    getAdminUserWorkspaceRefs(user.id)
+      .then(async (items) => {
+        if (cancelled) return null;
+        setRefs(items);
+        return getAdminWorkspacesByIds(items.filter((item) => item.type === 'couple').map((item) => item.id));
+      })
+      .then((ws) => {
+        if (!cancelled && ws) setWorkspaces(ws);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Erro ao carregar espaços do usuário.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user.id]);
+
+  return (
+    <div className="admin-modal-backdrop" onClick={onClose}>
+      <div className="admin-modal admin-modal--wide" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+        <div className="admin-detail-header">
+          <Initials name={user.name || user.email} />
+          <div>
+            <h2 className="admin-modal__title">{user.name || 'Sem nome'}</h2>
+            <p className="admin-td--muted">{user.email}</p>
+          </div>
+        </div>
+
+        <dl className="admin-detail-grid">
+          <div>
+            <dt>UID</dt>
+            <dd className="admin-monospace">{user.id}</dd>
+          </div>
+          <div>
+            <dt>Tema</dt>
+            <dd>{THEME_LABELS[user.themeId] ?? user.themeId}</dd>
+          </div>
+          <div>
+            <dt>Cadastro</dt>
+            <dd>{fmtDateFull(user.createdAt)}</dd>
+          </div>
+          <div>
+            <dt>Workspace padrão</dt>
+            <dd className="admin-monospace">{user.defaultWorkspaceId ?? '—'}</dd>
+          </div>
+        </dl>
+
+        <h3 className="admin-detail-subtitle">Espaços</h3>
+        {loading ? (
+          <p className="admin-td--muted">Carregando…</p>
+        ) : error ? (
+          <p className="admin-modal__error">{error}</p>
+        ) : refs.length === 0 ? (
+          <p className="admin-td--muted">Nenhum espaço encontrado.</p>
+        ) : (
+          <ul className="admin-workspace-list">
+            {refs.map((ref) => {
+              const isPersonal = ref.type === 'personal';
+              const ws = isPersonal ? null : workspaces.get(ref.id);
+              return (
+                <li key={ref.id}>
+                  <span className="admin-name-cell">
+                    <strong>{isPersonal ? 'Espaço pessoal' : ws?.name ?? 'Espaço compartilhado'}</strong>
+                    <span className="admin-td--muted admin-uid admin-monospace">{ref.id.slice(0, 16)}…</span>
+                  </span>
+                  <span className="admin-pill admin-pill--info">{ref.role}</span>
+                  <StatusPill status={ref.status} />
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        <div className="admin-modal__actions admin-modal__actions--spread">
+          <button type="button" className="admin-detail-action" onClick={onRequestForceLogout}>
+            <LogOut size={15} /> Forçar logout
+          </button>
+          <div className="admin-modal__actions">
+            {canDelete ? (
+              <button type="button" className="button admin-modal__delete-btn" onClick={onRequestDelete}>
+                <Trash2 size={15} /> Deletar conta
+              </button>
+            ) : null}
+            <button type="button" className="button button--ghost" onClick={onClose}>
+              Fechar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type UserSortKey = 'name' | 'createdAt';
+
 function UsersTab({
   users,
+  hasMore,
+  loadingMore,
+  onLoadMore,
   currentUserId,
-  onDelete,
+  onOpenDetail,
 }: {
   users: UserProfile[];
+  hasMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => void;
   currentUserId?: string;
-  onDelete: (u: UserProfile) => void;
+  onOpenDetail: (u: UserProfile) => void;
 }) {
   const [search, setSearch] = useState('');
-  const themeLabels: Record<string, string> = {
-    paper: 'Paper (Sol)',
-    sakura: 'Sakura',
-    obsidian: 'Obsidian',
-    midnight: 'Midnight',
-    aurora: 'Aurora',
-    'rose-gold': 'Rose Gold',
-  };
+  const [sort, setSort] = useState<{ key: UserSortKey; dir: SortDir }>({ key: 'createdAt', dir: 'desc' });
+
+  function toggleSort(key: UserSortKey) {
+    setSort((prev) => (prev.key === key ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }));
+  }
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return users;
-    const q = search.toLowerCase();
-    return users.filter(
-      (u) => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
-    );
-  }, [users, search]);
+    const q = search.trim().toLowerCase();
+    const base = q
+      ? users.filter((u) => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
+      : users;
+    const sorted = [...base].sort((a, b) => {
+      const cmp = sort.key === 'name' ? compareField(a.name, b.name) : compareField(a.createdAt ?? null, b.createdAt ?? null);
+      return sort.dir === 'asc' ? cmp : -cmp;
+    });
+    return sorted;
+  }, [users, search, sort]);
 
   return (
     <div className="admin-content">
@@ -429,20 +642,20 @@ function UsersTab({
         <table className="admin-table admin-table--full">
           <thead>
             <tr>
-              <th>Usuário</th>
+              <SortableTh label="Usuário" active={sort.key === 'name'} dir={sort.dir} onClick={() => toggleSort('name')} />
               <th>Email</th>
               <th>Tema</th>
-              <th>Cadastro</th>
+              <SortableTh label="Cadastro" active={sort.key === 'createdAt'} dir={sort.dir} onClick={() => toggleSort('createdAt')} />
               <th>Workspace</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <EmptyRow cols={6} />
+              <EmptyRow cols={6} filtered={Boolean(search)} />
             ) : (
               filtered.map((u) => (
-                <tr key={u.id}>
+                <tr key={u.id} className="admin-row--clickable" onClick={() => onOpenDetail(u)}>
                   <td>
                     <span className="admin-name-cell">
                       <Initials name={u.name} />
@@ -455,7 +668,7 @@ function UsersTab({
                   <td className="admin-td--muted">{u.email}</td>
                   <td>
                     <span className="admin-pill admin-pill--muted">
-                      {themeLabels[u.themeId] ?? u.themeId}
+                      {THEME_LABELS[u.themeId] ?? u.themeId}
                     </span>
                   </td>
                   <td className="admin-td--muted" title={fmtDateFull(u.createdAt)}>
@@ -469,16 +682,7 @@ function UsersTab({
                       <span className="admin-pill admin-pill--info" title="Você não pode deletar sua própria conta por aqui">
                         <ShieldCheck size={13} /> Você
                       </span>
-                    ) : (
-                      <button
-                        type="button"
-                        className="admin-delete-row-btn"
-                        title="Deletar conta"
-                        onClick={() => onDelete(u)}
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
+                    ) : null}
                   </td>
                 </tr>
               ))
@@ -486,37 +690,72 @@ function UsersTab({
           </tbody>
         </table>
       </section>
+
+      <LoadMoreButton hasMore={hasMore} loading={loadingMore} onClick={onLoadMore} />
     </div>
   );
 }
 
+type CoupleStatusFilter = 'all' | 'active' | 'archived' | 'pending_deletion';
+type CoupleSortKey = 'name' | 'createdAt';
+
 function CouplesTab({
   couples,
+  hasMore,
+  loadingMore,
+  onLoadMore,
   userMap,
 }: {
   couples: Workspace[];
+  hasMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => void;
   userMap: Map<string, UserProfile>;
 }) {
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<CoupleStatusFilter>('all');
+  const [sort, setSort] = useState<{ key: CoupleSortKey; dir: SortDir }>({ key: 'createdAt', dir: 'desc' });
+
+  function toggleSort(key: CoupleSortKey) {
+    setSort((prev) => (prev.key === key ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }));
+  }
+
+  const counts = useMemo(() => ({
+    active: couples.filter((w) => w.status === 'active').length,
+    archived: couples.filter((w) => w.status === 'archived').length,
+    pending_deletion: couples.filter((w) => w.status === 'pending_deletion').length,
+  }), [couples]);
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return couples;
-    const q = search.toLowerCase();
-    return couples.filter((w) => {
-      const owner = userMap.get(w.ownerUserId);
-      const partner = w.partnerUserId ? userMap.get(w.partnerUserId) : null;
-      return (
-        w.name.toLowerCase().includes(q) ||
-        owner?.name.toLowerCase().includes(q) ||
-        owner?.email.toLowerCase().includes(q) ||
-        partner?.name.toLowerCase().includes(q) ||
-        partner?.email.toLowerCase().includes(q)
-      );
+    const q = search.trim().toLowerCase();
+    const byStatus = statusFilter === 'all' ? couples : couples.filter((w) => w.status === statusFilter);
+    const byQuery = q
+      ? byStatus.filter((w) => {
+          const owner = userMap.get(w.ownerUserId);
+          const partner = w.partnerUserId ? userMap.get(w.partnerUserId) : null;
+          return (
+            w.name.toLowerCase().includes(q) ||
+            owner?.name.toLowerCase().includes(q) ||
+            owner?.email.toLowerCase().includes(q) ||
+            partner?.name.toLowerCase().includes(q) ||
+            partner?.email.toLowerCase().includes(q)
+          );
+        })
+      : byStatus;
+    return [...byQuery].sort((a, b) => {
+      const cmp = sort.key === 'name' ? compareField(a.name, b.name) : compareField(a.createdAt ?? null, b.createdAt ?? null);
+      return sort.dir === 'asc' ? cmp : -cmp;
     });
-  }, [couples, userMap, search]);
+  }, [couples, userMap, search, statusFilter, sort]);
 
   return (
     <div className="admin-content">
+      <div className="admin-stats-grid">
+        <StatCard icon={<Heart size={18} />} label="Ativos" value={counts.active} active={statusFilter === 'active'} onClick={() => setStatusFilter(statusFilter === 'active' ? 'all' : 'active')} />
+        <StatCard icon={<AlertTriangle size={18} />} label="Arquivados" value={counts.archived} active={statusFilter === 'archived'} onClick={() => setStatusFilter(statusFilter === 'archived' ? 'all' : 'archived')} />
+        <StatCard icon={<Trash2 size={18} />} label="Deletando" value={counts.pending_deletion} active={statusFilter === 'pending_deletion'} onClick={() => setStatusFilter(statusFilter === 'pending_deletion' ? 'all' : 'pending_deletion')} />
+      </div>
+
       <div className="admin-search-bar">
         <Search size={16} className="admin-search-icon" />
         <input
@@ -526,7 +765,7 @@ function CouplesTab({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        {search ? (
+        {search || statusFilter !== 'all' ? (
           <span className="admin-search-count">{filtered.length} de {couples.length}</span>
         ) : null}
       </div>
@@ -535,17 +774,17 @@ function CouplesTab({
         <table className="admin-table admin-table--full">
           <thead>
             <tr>
-              <th>Nome do espaço</th>
+              <SortableTh label="Nome do espaço" active={sort.key === 'name'} dir={sort.dir} onClick={() => toggleSort('name')} />
               <th>Dono</th>
               <th>Parceiro</th>
               <th>Membros</th>
               <th>Status</th>
-              <th>Criado em</th>
+              <SortableTh label="Criado em" active={sort.key === 'createdAt'} dir={sort.dir} onClick={() => toggleSort('createdAt')} />
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <EmptyRow cols={6} />
+              <EmptyRow cols={6} filtered={Boolean(search) || statusFilter !== 'all'} />
             ) : (
               filtered.map((w) => {
                 const owner = userMap.get(w.ownerUserId);
@@ -597,23 +836,46 @@ function CouplesTab({
           </tbody>
         </table>
       </section>
+
+      <LoadMoreButton hasMore={hasMore} loading={loadingMore} onClick={onLoadMore} />
     </div>
   );
 }
 
+type InviteStatusFilter = 'all' | 'active' | 'expired' | 'accepted';
+type InviteSortKey = 'workspaceName' | 'createdAt';
+
 function InvitesTab({
   invites,
+  hasMore,
+  loadingMore,
+  onLoadMore,
   userMap,
   onRevoke,
 }: {
   invites: AdminInvite[];
+  hasMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => void;
   userMap: Map<string, UserProfile>;
   onRevoke: (invite: AdminInvite) => void;
 }) {
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<InviteStatusFilter>('all');
+  const [sort, setSort] = useState<{ key: InviteSortKey; dir: SortDir }>({ key: 'createdAt', dir: 'desc' });
 
   const isExpiredInvite = (inv: AdminInvite) =>
     Boolean(inv.status === 'active' && inv.expiresAt && inv.expiresAt.toDate().getTime() < Date.now());
+
+  function effectiveStatus(inv: AdminInvite): InviteStatusFilter {
+    if (isExpiredInvite(inv)) return 'expired';
+    if (inv.status === 'accepted') return 'accepted';
+    return 'active';
+  }
+
+  function toggleSort(key: InviteSortKey) {
+    setSort((prev) => (prev.key === key ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }));
+  }
 
   const counts = useMemo(() => {
     const active = invites.filter((i) => i.status === 'active' && !isExpiredInvite(i)).length;
@@ -623,25 +885,33 @@ function InvitesTab({
   }, [invites]);
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return invites;
-    const q = search.toLowerCase();
-    return invites.filter((inv) => {
-      const creator = userMap.get(inv.createdBy);
-      return (
-        inv.workspaceName.toLowerCase().includes(q) ||
-        inv.codeHint.toLowerCase().includes(q) ||
-        creator?.name.toLowerCase().includes(q) ||
-        creator?.email.toLowerCase().includes(q)
-      );
+    const q = search.trim().toLowerCase();
+    const byStatus = statusFilter === 'all' ? invites : invites.filter((inv) => effectiveStatus(inv) === statusFilter);
+    const byQuery = q
+      ? byStatus.filter((inv) => {
+          const creator = userMap.get(inv.createdBy);
+          return (
+            inv.workspaceName.toLowerCase().includes(q) ||
+            inv.codeHint.toLowerCase().includes(q) ||
+            creator?.name.toLowerCase().includes(q) ||
+            creator?.email.toLowerCase().includes(q)
+          );
+        })
+      : byStatus;
+    return [...byQuery].sort((a, b) => {
+      const cmp = sort.key === 'workspaceName'
+        ? compareField(a.workspaceName, b.workspaceName)
+        : compareField(a.createdAt ?? null, b.createdAt ?? null);
+      return sort.dir === 'asc' ? cmp : -cmp;
     });
-  }, [invites, userMap, search]);
+  }, [invites, userMap, search, statusFilter, sort]);
 
   return (
     <div className="admin-content">
       <div className="admin-stats-grid">
-        <StatCard icon={<Send size={18} />} label="Ativos" value={counts.active} sub="dentro do prazo de 48h" />
-        <StatCard icon={<AlertTriangle size={18} />} label="Expirados" value={counts.expiredPending} sub="aguardando limpeza por TTL" />
-        <StatCard icon={<ShieldCheck size={18} />} label="Aceitos" value={counts.accepted} sub="convite já usado" />
+        <StatCard icon={<Send size={18} />} label="Ativos" value={counts.active} sub="dentro do prazo de 48h" active={statusFilter === 'active'} onClick={() => setStatusFilter(statusFilter === 'active' ? 'all' : 'active')} />
+        <StatCard icon={<AlertTriangle size={18} />} label="Expirados" value={counts.expiredPending} sub="aguardando limpeza por TTL" active={statusFilter === 'expired'} onClick={() => setStatusFilter(statusFilter === 'expired' ? 'all' : 'expired')} />
+        <StatCard icon={<ShieldCheck size={18} />} label="Aceitos" value={counts.accepted} sub="convite já usado" active={statusFilter === 'accepted'} onClick={() => setStatusFilter(statusFilter === 'accepted' ? 'all' : 'accepted')} />
       </div>
 
       <div className="admin-search-bar">
@@ -653,7 +923,7 @@ function InvitesTab({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        {search ? (
+        {search || statusFilter !== 'all' ? (
           <span className="admin-search-count">{filtered.length} de {invites.length}</span>
         ) : null}
       </div>
@@ -662,19 +932,19 @@ function InvitesTab({
         <table className="admin-table admin-table--full">
           <thead>
             <tr>
-              <th>Workspace</th>
+              <SortableTh label="Workspace" active={sort.key === 'workspaceName'} dir={sort.dir} onClick={() => toggleSort('workspaceName')} />
               <th>Hint</th>
               <th>Criado por</th>
               <th>Expira em</th>
               <th>Status</th>
               <th>Usado por</th>
-              <th>Criado em</th>
+              <SortableTh label="Criado em" active={sort.key === 'createdAt'} dir={sort.dir} onClick={() => toggleSort('createdAt')} />
               <th></th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <EmptyRow cols={8} />
+              <EmptyRow cols={8} filtered={Boolean(search) || statusFilter !== 'all'} />
             ) : (
               filtered.map((inv) => {
                 const creator = userMap.get(inv.createdBy);
@@ -727,6 +997,8 @@ function InvitesTab({
           </tbody>
         </table>
       </section>
+
+      <LoadMoreButton hasMore={hasMore} loading={loadingMore} onClick={onLoadMore} />
     </div>
   );
 }
@@ -734,12 +1006,27 @@ function InvitesTab({
 export function AdminPage() {
   const { user } = useAuth();
   const [tab, setTab] = useState<Tab>('overview');
+
   const [users, setUsers] = useState<UserProfile[]>([]);
+  const [usersCursor, setUsersCursor] = useState<AdminCursor>(null);
+  const [usersHasMore, setUsersHasMore] = useState(false);
+  const [usersLoadingMore, setUsersLoadingMore] = useState(false);
+
   const [couples, setCouples] = useState<Workspace[]>([]);
+  const [couplesCursor, setCouplesCursor] = useState<AdminCursor>(null);
+  const [couplesHasMore, setCouplesHasMore] = useState(false);
+  const [couplesLoadingMore, setCouplesLoadingMore] = useState(false);
+
   const [invites, setInvites] = useState<AdminInvite[]>([]);
+  const [invitesCursor, setInvitesCursor] = useState<AdminCursor>(null);
+  const [invitesHasMore, setInvitesHasMore] = useState(false);
+  const [invitesLoadingMore, setInvitesLoadingMore] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pendingDetailUser, setPendingDetailUser] = useState<UserProfile | null>(null);
   const [pendingDelete, setPendingDelete] = useState<UserProfile | null>(null);
+  const [pendingForceLogout, setPendingForceLogout] = useState<UserProfile | null>(null);
   const [pendingRevoke, setPendingRevoke] = useState<AdminInvite | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -754,9 +1041,15 @@ export function AdminPage() {
         getAdminCoupleWorkspaces(),
         getAdminInvites(),
       ]);
-      setUsers(u);
-      setCouples(c);
-      setInvites(i);
+      setUsers(u.items);
+      setUsersCursor(u.cursor);
+      setUsersHasMore(u.hasMore);
+      setCouples(c.items);
+      setCouplesCursor(c.cursor);
+      setCouplesHasMore(c.hasMore);
+      setInvites(i.items);
+      setInvitesCursor(i.cursor);
+      setInvitesHasMore(i.hasMore);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar dados.');
     } finally {
@@ -768,6 +1061,42 @@ export function AdminPage() {
     void loadAll();
   }, []);
 
+  async function loadMoreUsers() {
+    setUsersLoadingMore(true);
+    try {
+      const page = await getAdminUsers(usersCursor);
+      setUsers((prev) => [...prev, ...page.items]);
+      setUsersCursor(page.cursor);
+      setUsersHasMore(page.hasMore);
+    } finally {
+      setUsersLoadingMore(false);
+    }
+  }
+
+  async function loadMoreCouples() {
+    setCouplesLoadingMore(true);
+    try {
+      const page = await getAdminCoupleWorkspaces(couplesCursor);
+      setCouples((prev) => [...prev, ...page.items]);
+      setCouplesCursor(page.cursor);
+      setCouplesHasMore(page.hasMore);
+    } finally {
+      setCouplesLoadingMore(false);
+    }
+  }
+
+  async function loadMoreInvites() {
+    setInvitesLoadingMore(true);
+    try {
+      const page = await getAdminInvites(invitesCursor);
+      setInvites((prev) => [...prev, ...page.items]);
+      setInvitesCursor(page.cursor);
+      setInvitesHasMore(page.hasMore);
+    } finally {
+      setInvitesLoadingMore(false);
+    }
+  }
+
   async function handleDeleteConfirm() {
     if (!pendingDelete) return;
     const target = pendingDelete;
@@ -776,7 +1105,17 @@ export function AdminPage() {
     setCouples((prev) => prev.filter((w) => w.ownerUserId !== target.id));
     setInvites((prev) => prev.filter((i) => i.createdBy !== target.id));
     setPendingDelete(null);
+    setPendingDetailUser(null);
     showToast(`${target.name || target.email} deletado — ${result.docsDeleted} documentos removidos.`);
+  }
+
+  async function handleForceLogoutConfirm() {
+    if (!pendingForceLogout) return;
+    const target = pendingForceLogout;
+    await callAdminForceLogout(target.id);
+    setPendingForceLogout(null);
+    setPendingDetailUser(null);
+    showToast(`Sessões de ${target.name || target.email} invalidadas.`);
   }
 
   async function handleRevokeConfirm() {
@@ -799,9 +1138,9 @@ export function AdminPage() {
 
   const tabs: { id: Tab; label: string; count?: string }[] = [
     { id: 'overview', label: 'Visão Geral' },
-    { id: 'users', label: 'Usuários', count: formatCount(users.length, ADMIN_USERS_LIMIT) },
-    { id: 'couples', label: 'Casais', count: formatCount(couples.length, ADMIN_COUPLES_LIMIT) },
-    { id: 'invites', label: 'Convites', count: formatCount(invites.length, ADMIN_INVITES_LIMIT) },
+    { id: 'users', label: 'Usuários', count: formatCount(users.length, usersHasMore) },
+    { id: 'couples', label: 'Casais', count: formatCount(couples.length, couplesHasMore) },
+    { id: 'invites', label: 'Convites', count: formatCount(invites.length, invitesHasMore) },
   ];
 
   return (
@@ -866,24 +1205,74 @@ export function AdminPage() {
         ) : (
           <>
             {tab === 'overview' && (
-              <OverviewTab users={users} couples={couples} invites={invites} userMap={userMap} />
+              <OverviewTab
+                users={users}
+                usersHasMore={usersHasMore}
+                couples={couples}
+                couplesHasMore={couplesHasMore}
+                invites={invites}
+                invitesHasMore={invitesHasMore}
+                userMap={userMap}
+              />
             )}
             {tab === 'users' && (
-              <UsersTab users={users} currentUserId={user?.uid} onDelete={(u) => setPendingDelete(u)} />
+              <UsersTab
+                users={users}
+                hasMore={usersHasMore}
+                loadingMore={usersLoadingMore}
+                onLoadMore={() => void loadMoreUsers()}
+                currentUserId={user?.uid}
+                onOpenDetail={(u) => setPendingDetailUser(u)}
+              />
             )}
-            {tab === 'couples' && <CouplesTab couples={couples} userMap={userMap} />}
+            {tab === 'couples' && (
+              <CouplesTab
+                couples={couples}
+                hasMore={couplesHasMore}
+                loadingMore={couplesLoadingMore}
+                onLoadMore={() => void loadMoreCouples()}
+                userMap={userMap}
+              />
+            )}
             {tab === 'invites' && (
-              <InvitesTab invites={invites} userMap={userMap} onRevoke={(inv) => setPendingRevoke(inv)} />
+              <InvitesTab
+                invites={invites}
+                hasMore={invitesHasMore}
+                loadingMore={invitesLoadingMore}
+                onLoadMore={() => void loadMoreInvites()}
+                userMap={userMap}
+                onRevoke={(inv) => setPendingRevoke(inv)}
+              />
             )}
           </>
         )}
       </div>
+
+      {pendingDetailUser ? (
+        <UserDetailModal
+          user={pendingDetailUser}
+          canDelete={pendingDetailUser.id !== user?.uid}
+          onClose={() => setPendingDetailUser(null)}
+          onRequestDelete={() => setPendingDelete(pendingDetailUser)}
+          onRequestForceLogout={() => setPendingForceLogout(pendingDetailUser)}
+        />
+      ) : null}
 
       {pendingDelete ? (
         <DeleteConfirmModal
           user={pendingDelete}
           onConfirm={handleDeleteConfirm}
           onCancel={() => setPendingDelete(null)}
+        />
+      ) : null}
+
+      {pendingForceLogout ? (
+        <ConfirmModal
+          title="Forçar logout deste usuário?"
+          body={`Todas as sessões de "${pendingForceLogout.name || pendingForceLogout.email}" são invalidadas na próxima renovação de token (não é instantâneo — o dispositivo continua logado até o token atual expirar, cerca de 1h).`}
+          confirmLabel="Forçar logout"
+          onConfirm={handleForceLogoutConfirm}
+          onCancel={() => setPendingForceLogout(null)}
         />
       ) : null}
 

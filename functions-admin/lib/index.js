@@ -18,6 +18,7 @@ const WORKSPACE_COLLECTIONS = [
     'members',
     'sharedExpenseClaims',
     'settlements',
+    'comments',
     'auditLogs',
 ];
 function assertAdmin(email) {
@@ -79,6 +80,7 @@ export const adminDeleteUser = onCall({ region: REGION, maxInstances: 5 }, async
     const refs = [];
     const personalWorkspaceId = `personal_${userId}`;
     refs.push(...(await collectWorkspaceTree(personalWorkspaceId)));
+    refs.push(...(await collectSubcollection(`users/${userId}/fcmTokens`)));
     const workspaceRefsSnap = await db.collection(`users/${userId}/workspaceRefs`).get();
     for (const wsRefDoc of workspaceRefsSnap.docs) {
         const wsId = wsRefDoc.id;
@@ -120,5 +122,25 @@ export const adminDeleteUser = onCall({ region: REGION, maxInstances: 5 }, async
         docsDeleted: refs.length,
     });
     return { success: true, docsDeleted: refs.length };
+});
+export const adminForceLogout = onCall({ region: REGION, maxInstances: 5 }, async (request) => {
+    assertAdmin(request.auth?.token.email);
+    const userId = request.data?.userId;
+    if (!userId || typeof userId !== 'string') {
+        throw new HttpsError('invalid-argument', 'userId obrigatório.');
+    }
+    const auth = getAuth();
+    try {
+        await auth.getUser(userId);
+    }
+    catch {
+        throw new HttpsError('not-found', 'Usuário não encontrado no Firebase Auth.');
+    }
+    await auth.revokeRefreshTokens(userId);
+    logger.info('admin_forced_logout', {
+        targetUserId: userId,
+        actorUserId: request.auth?.uid,
+    });
+    return { success: true };
 });
 //# sourceMappingURL=index.js.map

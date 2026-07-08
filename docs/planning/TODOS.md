@@ -10,6 +10,7 @@ Itens acionáveis. Fechou? Mova para "Concluído" ou remova. Detalhe histórico 
 - [ ] Testar aceitar convite do espaço do casal com uma segunda conta/dispositivo de verdade — a reestruturação do fluxo de convite (2026-07-08) foi validada ponta a ponta do lado de quem cria o espaço, mas o lado de quem aceita (`validCouplePartnerMemberCreate` no Firestore, mesmo fix de `displayName`) ainda não foi exercitado com uma conta real.
 
 ### Técnico
+- [ ] Deploy de `functions-admin` (`npx firebase deploy --only functions --project zerou-26757`) pra ativar a nova função `adminForceLogout` em produção — código pronto, deploy pendente de confirmação explícita do dono.
 - [ ] Code splitting — bundle inicial > 500 kB (warning no build).
 - [ ] App Check, backups do Firestore, alertas de custo Firebase/Vercel.
 - [ ] Corrigir Java local (erro 3221226505) para `npm run test:rules`.
