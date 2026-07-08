@@ -7,7 +7,6 @@ Itens acionáveis. Fechou? Mova para "Concluído" ou remova. Detalhe histórico 
 ### Produto / UX
 - [ ] QA manual real no celular (cadastro, login, onboarding, conta, transação, conta a pagar, cartão, fatura, espaço do casal, cofrinho — incluindo o resgate novo).
 - [ ] Dar a mesma voz de copy às páginas legais/ajuda, se fizer sentido.
-- [ ] Testar aceitar convite do espaço do casal com uma segunda conta/dispositivo de verdade — a reestruturação do fluxo de convite (2026-07-08) foi validada ponta a ponta do lado de quem cria o espaço, mas o lado de quem aceita (`validCouplePartnerMemberCreate` no Firestore, mesmo fix de `displayName`) ainda não foi exercitado com uma conta real.
 
 ### Técnico
 - [ ] Deploy de `functions-admin` (`npx firebase deploy --only functions --project zerou-26757`) pra ativar a nova função `adminForceLogout` em produção — código pronto, deploy pendente de confirmação explícita do dono.
@@ -25,6 +24,7 @@ Itens acionáveis. Fechou? Mova para "Concluído" ou remova. Detalhe histórico 
 - [ ] Billing real (Stripe) — só com decisão explícita de produto (hoje 100% gratuito).
 
 ## Concluído (recente)
+- [x] Testado aceitar convite do espaço do casal com uma segunda conta real (ponta a ponta, sem reload) + 3º bug corrigido em `firestore.rules` (trocar o modo do espaço dava "Missing or insufficient permissions" — `validCoupleWorkspaceUpdate` só previa as transições de aceitar/sair, não mudança de modo isolada) + race condition no botão "Cancelar espaço compartilhado" corrigida.
 - [x] Reestruturação da UI do espaço do casal (`src/pages/shared/`) — fluxo de convite com um estado por vez, formulário de despesa em BottomSheet, seleção de modo deduplicada — e 2 bugs corrigidos em `firestore.rules` (assimetria de entitlement de billing, `displayName` faltando nas regras de membro).
 - [x] Reestruturação da tela de Análise (`SearchPage.tsx`) — consistência visual com o design system, empty states com ilustração, navegação por mês nova, busca em `BottomSheet` sob demanda.
 - [x] Resgatar do cofrinho do casal de volta pra conta pessoal (com categoria fixa "Cofrinho"). Cálculo de estatísticas (`byUser`/`thisMonthCents`) extraído para `calculateCoupleGoalStats` (testado, 12 casos).

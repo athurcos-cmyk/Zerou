@@ -2,6 +2,14 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-08 — fix: 3 bugs no espaço do casal achados testando com dispositivos reais
+
+- Corrigida race condition no botão "Cancelar espaço compartilhado" — ficava clicável (mas inerte) por 1-2s antes do workspace terminar de carregar.
+- Corrigido bug real em `firestore.rules`: trocar o modo do espaço (`updateCoupleMode`) sempre dava "Missing or insufficient permissions" pros dois lados — a regra só previa as transições de aceitar/sair, não uma mudança isolada de modo.
+- Testado ponta a ponta com uma segunda conta real aceitando o convite (sem reload na aba de quem convidou) — página atualizou sozinha; terceiro problema relatado não reproduziu, provável consequência dos outros dois.
+
+Detalhes em [`docs/history/2026-07.md`](docs/history/2026-07.md).
+
 ## 2026-07-08 — feat: admin com paginação/detalhe de usuário + fix de vazamento na exclusão de conta
 
 - Bug real corrigido: `users/{uid}/fcmTokens` (token de push) nunca era apagado nem na autoexclusão (`accountDeletionService.ts`) nem na exclusão pelo admin (`functions-admin/src/index.ts`) — ficava órfão no Firestore pra sempre. Corrigido nos dois fluxos; alinhei também a lista de subcoleções (`comments`) entre os dois arquivos.

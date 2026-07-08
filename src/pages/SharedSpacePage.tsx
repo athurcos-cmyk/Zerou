@@ -221,18 +221,22 @@ export function SharedSpacePage() {
         /* 2) Space exists but waiting for partner — invite card */
         <div className="form-stack">
           {workspaceId && user ? (
-            <CoupleInviteSection
-              workspaceId={workspaceId}
-              workspaceName={shared.workspace?.name ?? ''}
-              userId={user.uid}
-              activeInvite={shared.invites[0]}
-              confirm={confirm}
-              onMessage={setMessage}
-            />
-          ) : null}
-          <button className="button button--ghost button--block" type="button" onClick={handleLeaveOrRemove}>
-            Cancelar espaço compartilhado
-          </button>
+            <>
+              <CoupleInviteSection
+                workspaceId={workspaceId}
+                workspaceName={shared.workspace?.name ?? ''}
+                userId={user.uid}
+                activeInvite={shared.invites[0]}
+                confirm={confirm}
+                onMessage={setMessage}
+              />
+              <button className="button button--ghost button--block" type="button" onClick={handleLeaveOrRemove}>
+                Cancelar espaço compartilhado
+              </button>
+            </>
+          ) : (
+            <p className="text-secondary">Preparando seu espaço...</p>
+          )}
         </div>
       ) : (
         /* 3) Partnered — cofrinho + despesas + gerenciar */

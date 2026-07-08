@@ -1035,6 +1035,12 @@ service cloud.firestore {
             && existsAfter(memberDoc(workspaceId, resource.data.partnerUserId))
             && getAfter(memberDoc(workspaceId, resource.data.partnerUserId)).data.status == 'removed'
           )
+          || (
+            // Mode-only change (updateCoupleMode) — membership unchanged, any active member can do it.
+            request.resource.data.activeMemberCount == resource.data.activeMemberCount
+            && request.resource.data.partnerUserId == resource.data.partnerUserId
+            && isActiveMember(workspaceId)
+          )
         );
     }
 
