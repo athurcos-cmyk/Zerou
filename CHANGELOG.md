@@ -7,7 +7,8 @@ Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/his
 - Domínio comprado no registro.br e adicionado no Vercel (apex `A` + `www` CNAME).
 - Código atualizado pra `https://granativa.com.br`: canonical e `og:image` em `index.html`, todas as URLs de `public/sitemap.xml` e `public/robots.txt`, links de notificação push nas Cloud Functions (`functions/src/automation.ts`, `push.ts`, `index.ts`, `.env`).
 - `src/components/Seo.tsx` já era dinâmico (`window.location.origin`) — não precisou mudar.
-- Pendente (fora do código): configurar a zona DNS no registro.br (domínio recém-registrado fica bloqueado pra edição por algumas horas), autorizar `granativa.com.br` no Firebase Auth, e deploy de `functions` pra `APP_BASE_URL` valer em produção.
+- `functions` já deployado com o `APP_BASE_URL` novo — links de push (fatura fechada, conta a vencer, lembrete diário) já usam o domínio novo em produção.
+- Pendente (fora do código): configurar a zona DNS no registro.br (domínio recém-registrado fica bloqueado pra edição por algumas horas) e autorizar `granativa.com.br` no Firebase Auth.
 
 Detalhes em [`docs/history/2026-07.md`](docs/history/2026-07.md).
 

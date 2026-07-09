@@ -9,11 +9,10 @@ Itens acionáveis. Fechou? Mova para "Concluído" ou remova. Detalhe histórico 
 - [ ] Dar a mesma voz de copy às páginas legais/ajuda, se fizer sentido.
 
 ### Técnico
-- [ ] Deploy de `functions-admin` (`npx firebase deploy --only functions --project zerou-26757`) pra ativar a nova função `adminForceLogout` em produção — código pronto, deploy pendente de confirmação explícita do dono.
 - [ ] Code splitting — bundle inicial > 500 kB (warning no build).
 - [ ] App Check, backups do Firestore, alertas de custo Firebase/Vercel.
 - [ ] Corrigir Java local (erro 3221226505) para `npm run test:rules`.
-- [ ] Domínio `granativa.com.br` comprado e código já aponta pra ele (canonical/OG/sitemap/robots.txt/links de push das Functions) — falta: (1) configurar a zona DNS no registro.br (bloqueado por algumas horas em domínio recém-registrado, ver `SESSAO.md`), (2) autorizar o domínio em Firebase Auth → Authorized domains, (3) deploy de `functions` pra `APP_BASE_URL` valer em produção.
+- [ ] Domínio `granativa.com.br` comprado, código aponta pra ele e `functions` já deployado com o `APP_BASE_URL` novo (2026-07-08) — falta só o lado de fora do código: (1) configurar a zona DNS no registro.br (bloqueado por algumas horas em domínio recém-registrado, ver `SESSAO.md`), (2) autorizar o domínio em Firebase Auth → Authorized domains.
 - [ ] Emails oficiais de suporte/privacidade.
 
 ### Automação server-side (futuro — exige worker/Functions)
@@ -24,6 +23,7 @@ Itens acionáveis. Fechou? Mova para "Concluído" ou remova. Detalhe histórico 
 - [ ] Billing real (Stripe) — só com decisão explícita de produto (hoje 100% gratuito).
 
 ## Concluído (recente)
+- [x] Deploy de `functions` (billing + admin) com o `APP_BASE_URL` novo (`granativa.com.br`) — 9 functions do codebase `billing` atualizadas (`closeInvoicesDue`, `generateRecurrences`, `sendDueReminders`, `sendDailyLogReminder`, Stripe scaffold). `adminForceLogout` já estava deployada (nada a atualizar nela nesta rodada).
 - [x] Testado aceitar convite do espaço do casal com uma segunda conta real (ponta a ponta, sem reload) + 3º bug corrigido em `firestore.rules` (trocar o modo do espaço dava "Missing or insufficient permissions" — `validCoupleWorkspaceUpdate` só previa as transições de aceitar/sair, não mudança de modo isolada) + race condition no botão "Cancelar espaço compartilhado" corrigida.
 - [x] Reestruturação da UI do espaço do casal (`src/pages/shared/`) — fluxo de convite com um estado por vez, formulário de despesa em BottomSheet, seleção de modo deduplicada — e 2 bugs corrigidos em `firestore.rules` (assimetria de entitlement de billing, `displayName` faltando nas regras de membro).
 - [x] Reestruturação da tela de Análise (`SearchPage.tsx`) — consistência visual com o design system, empty states com ilustração, navegação por mês nova, busca em `BottomSheet` sob demanda.
