@@ -2,6 +2,15 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-09 — fix: exclusão de conta no admin retornava "internal"
+
+- Digitar `EXCLUIR` e confirmar na tela de admin sempre falhava com erro genérico "internal", mesmo com a frase certa.
+- Causa: a Cloud Function `adminDeleteUser` (`functions-admin/`) estava sem a permissão pública de invocação (`roles/run.invoker` para `allUsers`) no Cloud Run — a requisição era bloqueada pela infraestrutura antes de chegar no código, então o SDK do Firebase nunca via o erro de verdade. Provavelmente perdida no redeploy que resolveu o conflito de codebases em 2026-07-07.
+- Fix aplicado direto via API do Cloud Run (`setIamPolicy`), igualando à policy do `adminForceLogout`. Um redeploy comum (`firebase deploy`) **não** reaplica essa permissão em functions já existentes — só na criação.
+- Bônus: `DeleteConfirmModal` (`AdminPage.tsx`) passou a usar `.trim()` na comparação com `EXCLUIR`, igual à autoexclusão em `LoginMethodsPage.tsx` — protege contra espaço acidental deixando o botão travado sem aviso.
+
+Detalhes em [`docs/history/2026-07.md`](docs/history/2026-07.md).
+
 ## 2026-07-08 — feat: domínio próprio granativa.com.br
 
 - Domínio comprado no registro.br e adicionado no Vercel (apex `A` + `www` CNAME).

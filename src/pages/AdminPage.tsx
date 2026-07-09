@@ -339,7 +339,7 @@ function DeleteConfirmModal({ user, onConfirm, onCancel }: DeleteConfirmProps) {
   }, []);
 
   async function handleConfirm() {
-    if (input !== expected) return;
+    if (input.trim() !== expected) return;
     setBusy(true);
     setError(null);
     try {
@@ -371,7 +371,7 @@ function DeleteConfirmModal({ user, onConfirm, onCancel }: DeleteConfirmProps) {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && input === expected && !busy && void handleConfirm()}
+          onKeyDown={(e) => e.key === 'Enter' && input.trim() === expected && !busy && void handleConfirm()}
           placeholder={expected}
           disabled={busy}
         />
@@ -389,7 +389,7 @@ function DeleteConfirmModal({ user, onConfirm, onCancel }: DeleteConfirmProps) {
             type="button"
             className="button admin-modal__delete-btn"
             onClick={() => void handleConfirm()}
-            disabled={input !== expected || busy}
+            disabled={input.trim() !== expected || busy}
           >
             {busy ? <Loader2 size={15} className="admin-spin" /> : <Trash2 size={15} />}
             Deletar conta
