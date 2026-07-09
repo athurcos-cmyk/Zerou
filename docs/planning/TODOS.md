@@ -12,7 +12,6 @@ Itens acionáveis. Fechou? Mova para "Concluído" ou remova. Detalhe histórico 
 - [ ] Code splitting — bundle inicial > 500 kB (warning no build).
 - [ ] App Check, backups do Firestore, alertas de custo Firebase/Vercel.
 - [ ] Corrigir Java local (erro 3221226505) para `npm run test:rules`.
-- [ ] Domínio `granativa.com.br`: DNS configurado no registro.br e código/`functions` já apontam pra ele (2026-07-08) — só falta **autorizar `granativa.com.br` (e `www.granativa.com.br`) em Firebase Console → Authentication → Settings → Authorized domains** assim que o DNS propagar e o Vercel emitir o certificado HTTPS (login com Google/e-mail quebra no domínio novo até isso ser feito).
 - [ ] Emails oficiais de suporte/privacidade.
 
 ### Automação server-side (futuro — exige worker/Functions)
@@ -23,6 +22,7 @@ Itens acionáveis. Fechou? Mova para "Concluído" ou remova. Detalhe histórico 
 - [ ] Billing real (Stripe) — só com decisão explícita de produto (hoje 100% gratuito).
 
 ## Concluído (recente)
+- [x] Domínio `granativa.com.br` no ar de ponta a ponta: HTTPS válido, landing carregando, login com Google testado e confirmado funcionando em produção pelo próprio dono.
 - [x] Zona DNS de `granativa.com.br` configurada no registro.br (registro `A` na raiz + `CNAME` em `www`, valores exatos gerados pelo Vercel) — "Zona DNS atualizada com sucesso!" confirmado no painel. Precisou esperar o domínio sair do estado "em transição" (bloqueio temporário do registro.br pra domínio recém-registrado).
 - [x] Deploy de `functions` (billing + admin) com o `APP_BASE_URL` novo (`granativa.com.br`) — 9 functions do codebase `billing` atualizadas (`closeInvoicesDue`, `generateRecurrences`, `sendDueReminders`, `sendDailyLogReminder`, Stripe scaffold). `adminForceLogout` já estava deployada (nada a atualizar nela nesta rodada).
 - [x] Testado aceitar convite do espaço do casal com uma segunda conta real (ponta a ponta, sem reload) + 3º bug corrigido em `firestore.rules` (trocar o modo do espaço dava "Missing or insufficient permissions" — `validCoupleWorkspaceUpdate` só previa as transições de aceitar/sair, não mudança de modo isolada) + race condition no botão "Cancelar espaço compartilhado" corrigida.

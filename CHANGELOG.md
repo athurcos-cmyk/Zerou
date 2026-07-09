@@ -8,8 +8,8 @@ Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/his
 - Código atualizado pra `https://granativa.com.br`: canonical e `og:image` em `index.html`, todas as URLs de `public/sitemap.xml` e `public/robots.txt`, links de notificação push nas Cloud Functions (`functions/src/automation.ts`, `push.ts`, `index.ts`, `.env`).
 - `src/components/Seo.tsx` já era dinâmico (`window.location.origin`) — não precisou mudar.
 - `functions` já deployado com o `APP_BASE_URL` novo — links de push (fatura fechada, conta a vencer, lembrete diário) já usam o domínio novo em produção.
-- Zona DNS configurada no registro.br (registro `A` na raiz + `CNAME` em `www`) — só falta propagar e o Vercel emitir o certificado sozinho.
-- Pendente (fora do código): autorizar `granativa.com.br` no Firebase Auth assim que o domínio for confirmado no Vercel.
+- Zona DNS configurada no registro.br (registro `A` na raiz + `CNAME` em `www`).
+- **Migração completa e confirmada**: HTTPS válido, landing carregando, login com Google testado em produção no domínio novo pelo dono.
 
 Detalhes em [`docs/history/2026-07.md`](docs/history/2026-07.md).
 
