@@ -21,7 +21,7 @@ export function AccountsPage() {
   const finance = useFinanceContext();
   const [name, setName] = useState('');
   const [type, setType] = useState<AccountType>('checking');
-  const [openingBalance, setOpeningBalance] = useState('0,00');
+  const [openingBalance, setOpeningBalance] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const { confirm, dialog: confirmDialog } = useConfirm();
@@ -50,7 +50,7 @@ export function AccountsPage() {
     }).catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar a conta agora.')));
     setName('');
     setType('checking');
-    setOpeningBalance('0,00');
+    setOpeningBalance('');
     setFormOpen(false);
   }
 
@@ -190,7 +190,7 @@ export function AccountsPage() {
             />
             <label className="field">
               <span>Saldo inicial</span>
-              <input className="input" inputMode="decimal" value={openingBalance} onChange={(event) => setOpeningBalance(event.target.value)} />
+              <input className="input" inputMode="decimal" value={openingBalance} onChange={(event) => setOpeningBalance(event.target.value)} placeholder="0,00" />
             </label>
             <button className="button button--primary" type="submit">
               Criar conta

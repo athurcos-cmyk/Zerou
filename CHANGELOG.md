@@ -2,6 +2,10 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-09 — fix: campo "Saldo inicial" pré-preenchido com "0,00" ao criar conta
+
+- Em Contas → Criar conta, o campo "Saldo inicial" vinha com o valor real `"0,00"`, exigindo apagar antes de digitar. Os demais campos de dinheiro do app (Metas, Contas a pagar, Recorrências, Faturas, Cofrinho e despesas do casal, Nova transação) já usavam `"0,00"` só como placeholder, some ao focar. `AccountsPage.tsx` era o único fora do padrão — alinhado.
+
 ## 2026-07-09 — fix: exclusão de conta no admin retornava "internal"
 
 - Digitar `EXCLUIR` e confirmar na tela de admin sempre falhava com erro genérico "internal", mesmo com a frase certa.
