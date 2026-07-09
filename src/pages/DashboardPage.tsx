@@ -6,7 +6,7 @@ import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContex
 
 import { calculateDashboardSummary } from '../finance/financeCalculations';
 import { readCachedDashboardSummary, saveCachedDashboardSummary } from '../finance/dashboardSummaryCache';
-import { toDateInputValue } from '../finance/financeDates';
+import { formatFriendlyDate } from '../finance/financeDates';
 import { transactionTypeLabels } from '../finance/financeLabels';
 import { formatMoney } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
@@ -63,7 +63,6 @@ export function DashboardPage() {
     : formatMoney(dashboard.committedCents);
   const syncStatus = finance.pendingWrites || cardsData.pendingWrites ? 'pending' : 'synced';
   const currentMonth = new Date().toISOString().slice(0, 7);
-  const categoryNames = new Map(finance.categories.map((category) => [category.id, category.name]));
   const categoryMap = new Map(finance.categories.map((c) => [c.id, c]));
   const spendingByCategory = finance.transactions
     .filter(
@@ -75,8 +74,8 @@ export function DashboardPage() {
         !transaction.tags?.includes('cofrinho')
     )
     .reduce((totals, transaction) => {
-      const categoryName = transaction.categoryId ? categoryNames.get(transaction.categoryId) ?? 'Sem categoria' : 'Sem categoria';
-      totals.set(categoryName, (totals.get(categoryName) ?? 0) + transaction.amountCents);
+      const categoryId = transaction.categoryId ?? 'uncategorized';
+      totals.set(categoryId, (totals.get(categoryId) ?? 0) + transaction.amountCents);
       return totals;
     }, new Map<string, number>());
   const spendingRows = [...spendingByCategory.entries()]
@@ -173,17 +172,23 @@ export function DashboardPage() {
         </div>
         {spendingRows.length > 0 ? (
           <div className="spending-bars">
-            {spendingRows.map(([category, amount]) => (
-              <div className="spending-row" key={category}>
-                <div className="spending-row-label">
-                  <strong>{category}</strong>
-                  <span>{formatMoney(amount)}</span>
+            {spendingRows.map(([categoryId, amount]) => {
+              const category = categoryMap.get(categoryId);
+              return (
+                <div className="spending-row" key={categoryId}>
+                  <div className="spending-row-label">
+                    <span className="spending-row-name">
+                      <CategoryMark category={category} />
+                      <strong>{category?.name ?? 'Sem categoria'}</strong>
+                    </span>
+                    <span>{formatMoney(amount)}</span>
+                  </div>
+                  <div className="spending-bar-track" aria-hidden="true">
+                    <span style={{ width: `${Math.max(8, Math.round((amount / maxSpendingCents) * 100))}%` }} />
+                  </div>
                 </div>
-                <div className="spending-bar-track" aria-hidden="true">
-                  <span style={{ width: `${Math.max(8, Math.round((amount / maxSpendingCents) * 100))}%` }} />
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <EmptyState
@@ -214,7 +219,7 @@ export function DashboardPage() {
                     <strong>{commitment.description}</strong>
                     <span className="text-secondary">
                       {commitment.kind === 'bill' ? 'Conta a pagar' : commitment.kind === 'invoice' ? 'Fatura' : 'Recorrência'} ·{' '}
-                      {toDateInputValue(commitment.dueAt)}
+                      {formatFriendlyDate(commitment.dueAt)}
                     </span>
                   </div>
                   <strong className="amount--expense">{formatMoney(commitment.amountCents)}</strong>
@@ -222,7 +227,12 @@ export function DashboardPage() {
               ))}
             </div>
           ) : (
-            <p className="text-secondary">Nenhum compromisso pendente no período.</p>
+            <EmptyState
+              illustration="bills"
+              compact
+              title="Nenhum compromisso pendente"
+              description="Contas a pagar, faturas e recorrências futuras aparecem aqui."
+            />
           )}
         </article>
 
@@ -254,7 +264,7 @@ export function DashboardPage() {
                     <div className="list-row-body">
                       <strong>{transaction.description}</strong>
                       <span className="text-secondary">
-                        {transactionTypeLabels[transaction.type]} · {toDateInputValue(transaction.date)}
+                        {transactionTypeLabels[transaction.type]} · {formatFriendlyDate(transaction.date)}
                       </span>
                     </div>
                     <strong className={amountClass}>

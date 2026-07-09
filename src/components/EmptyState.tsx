@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { ACCENT_FOREGROUND } from '../theme/palette';
 
-type Illustration = 'transactions' | 'cards' | 'wallet' | 'shared' | 'goals';
+type Illustration = 'transactions' | 'cards' | 'wallet' | 'shared' | 'goals' | 'bills';
 
 interface EmptyStateProps {
   illustration?: Illustration;
@@ -66,6 +66,16 @@ function EmptyArt({ name }: { name: Illustration }) {
             <circle cx="60" cy="46" r="13" fill="var(--action-primary-soft)" />
             <circle cx="60" cy="46" r="5" fill="var(--action-primary)" />
             <path d="M60 24v-8M60 76v-6" stroke="var(--border-default)" strokeWidth="2" strokeLinecap="round" />
+          </>
+        )}
+        {name === 'bills' && (
+          <>
+            <rect x="28" y="26" width="64" height="52" rx="9" fill="var(--bg-surface)" stroke="var(--border-default)" strokeWidth="2" />
+            <path d="M28 35a9 9 0 0 1 9-9h46a9 9 0 0 1 9 9v7H28z" fill="var(--action-primary)" />
+            <rect x="40" y="18" width="4" height="12" rx="2" fill="var(--border-default)" />
+            <rect x="76" y="18" width="4" height="12" rx="2" fill="var(--border-default)" />
+            <circle cx="60" cy="60" r="12" fill="var(--action-primary-soft)" />
+            <path d="M55 60l3.5 3.5L66 56" stroke="var(--action-primary)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
           </>
         )}
       </svg>

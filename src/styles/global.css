@@ -904,6 +904,13 @@ html[data-reduce-motion='true'] *::after {
   gap: 1rem;
 }
 
+.spending-row-name {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
 .spending-bar-track {
   overflow: hidden;
   border-radius: 999px;
@@ -984,8 +991,9 @@ html[data-reduce-motion='true'] *::after {
   text-align: right;
 }
 
-/* category icon tile in list rows */
-.category-mark {
+/* category icon tile in list rows — specificity must match/beat ".list-row span"
+   (display:block, used to stack text rows) since this is also a span inside .list-row. */
+span.category-mark {
   width: 2.25rem;
   height: 2.25rem;
   border-radius: 0.65rem;

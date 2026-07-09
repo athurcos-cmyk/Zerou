@@ -67,6 +67,9 @@ React 19 (TS strict), Vite, Firebase Web SDK (Auth + Firestore + Storage), Verce
 - Cores só em `src/styles/themes.css` (+ `src/theme/palette.ts`). Literais quebram o teste `noHardcodedColors` (exceção: `src/landing/`).
 - Componentes-base de UX: `BottomSheet`, `SelectField`, `CategoryField`, `ConfirmDialog`, `EmptyState`.
 - Não expor erro técnico ao usuário; landing sempre clara.
+- **Data exibida pro usuário: sempre `formatFriendlyDate`, nunca `toDateInputValue`** (2026-07-09): `toDateInputValue` (`financeDates.ts`) é `yyyy-MM-dd`, feito só pra preencher `<input type="date">` — usá-la como texto de tela mostra data crua tipo "2026-07-08" pro usuário. `formatFriendlyDate` (mesmo arquivo) retorna "Hoje"/"Ontem"/`d MMM`/`d MMM yyyy` com `locale: ptBR` do date-fns (sem o locale, nomes de mês saem em inglês). Já corrigido na Dashboard; **ainda pendente** em `TransactionsPage`, `BillsPage`, `InvoicePage`, `CardDetailPage`, `CardsPage`, `RecurringPage`, `SearchPage` (têm um `spawn_task` sinalizando).
+- **`.category-mark` precisa do seletor `span.category-mark`, não só `.category-mark`** (2026-07-09): é um `<span>` dentro de `.list-row`, e a regra genérica `.list-row strong, .list-row span { display: block; }` (empilha texto nas linhas de lista) tem especificidade maior e derrubava o `display: grid` que centraliza o ícone — sintoma: ícone encostado no canto superior-esquerdo do tile colorido, só visível renderizado (não aparece lendo o componente isolado). Se qualquer outro tile/ícone for colocado direto dentro de `.list-row` no futuro, mesmo cuidado de especificidade se aplica.
+- `EmptyState` tem 6 ilustrações: `transactions`, `cards`, `wallet`, `shared`, `goals`, `bills` (2026-07-09, calendário+check — "nenhum compromisso pendente").
 
 ## Cartões e faturas — comportamentos-chave
 

@@ -37,7 +37,7 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
 | `SelectField` | Campo que abre sheet com lista de opções + ícones. Substitui `<select>`. |
 | `CategoryField` | Sheet de categorias com ícone+cor, criar/editar/excluir. |
 | `ConfirmDialog` (`useConfirm`) | Confirmação destrutiva em sheet — nunca `window.confirm`. |
-| `EmptyState` | Estado vazio com ilustração SVG própria. |
+| `EmptyState` | Estado vazio com ilustração SVG própria. 6 variantes: `transactions`, `cards`, `wallet`, `shared`, `goals`, `bills`. Sempre usar uma ilustração existente ou criar uma nova nesse padrão — nunca cair pra texto seco sem ilustração num card que tem vizinho ilustrado (inconsistência perceptível lado a lado). |
 | `categoryIcons` / `palette` | 36 ícones + paleta de cores de categoria/meta. |
 | `.metric-card` / `.metric-icon` / `.metric-strip` (`global.css`) | Cartão de métrica/KPI compacto (usado em `SearchPage.tsx`). `.metric-card--accent` para o destaque principal (mesmo tratamento gradiente do `.dash-hero`). Valor de **texto longo** (não dinheiro/porcentagem) precisa do modificador `.metric-card-value--compact` — a tipografia padrão do card é grande demais e corta nomes como "Alimentação". |
 

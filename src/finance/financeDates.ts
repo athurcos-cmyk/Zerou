@@ -1,4 +1,5 @@
-import { format } from 'date-fns';
+import { format, isToday, isYesterday } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import type { Timestamp } from 'firebase/firestore';
 
 export type DateLike = Date | Timestamp | { toDate: () => Date };
@@ -9,6 +10,18 @@ export function toDate(value: DateLike) {
 
 export function toDateInputValue(value: DateLike) {
   return format(toDate(value), 'yyyy-MM-dd');
+}
+
+/** Data amigável pro usuário ("Hoje", "Ontem", "8 jul", "8 jul 2025") — nunca usar
+ * `toDateInputValue` (formato `yyyy-MM-dd` pra `<input type="date">`) como texto de tela. */
+export function formatFriendlyDate(value: DateLike) {
+  const date = toDate(value);
+
+  if (isToday(date)) return 'Hoje';
+  if (isYesterday(date)) return 'Ontem';
+
+  const sameYear = date.getFullYear() === new Date().getFullYear();
+  return format(date, sameYear ? 'd MMM' : 'd MMM yyyy', { locale: ptBR });
 }
 
 export function monthKeyFromDate(value: Date) {

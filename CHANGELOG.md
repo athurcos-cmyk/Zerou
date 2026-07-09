@@ -2,6 +2,13 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-09 — feat: revisão de design da Dashboard
+
+- **Ícone de categoria descentralizado** (`.category-mark`): conflito de especificidade CSS com `.list-row span` (regra genérica que empilha texto nas linhas de lista) derrubava o `display: grid` que centraliza o ícone — o SVG ficava encostado no canto superior-esquerdo do quadrado colorido. Fix: seletor `span.category-mark` (mesma especificidade, vence por ordem no arquivo).
+- **Datas amigáveis em português**: `toDateInputValue` (formato `yyyy-MM-dd`, pensado só pra `<input type="date">`) estava sendo exibido cru como texto pro usuário ("2026-07-08"). Novo helper `formatFriendlyDate` (`financeDates.ts`) — "Hoje", "Ontem", "8 jul" ou "8 jul 2025" (locale pt-BR do date-fns) — aplicado em "Últimos movimentos" e "Próximos compromissos" da Dashboard. O mesmo problema existe em outras telas (Extrato, Contas a pagar, Faturas, Cartões, Recorrências, Busca) — ainda não corrigido lá.
+- **"Próximos compromissos" vazio** ganhou ilustração própria (calendário + check), consistente com o resto do app — antes era só texto seco enquanto o card ao lado (transações) já usava `EmptyState` ilustrado.
+- **"Resumo de gastos"** agora mostra o tile colorido da categoria (`CategoryMark`) ao lado do nome, criando o mesmo fio visual da lista de transações — agrupamento trocado de nome pra ID de categoria pra viabilizar.
+
 ## 2026-07-09 — fix: campo "Saldo inicial" pré-preenchido com "0,00" ao criar conta
 
 - Em Contas → Criar conta, o campo "Saldo inicial" vinha com o valor real `"0,00"`, exigindo apagar antes de digitar. Os demais campos de dinheiro do app (Metas, Contas a pagar, Recorrências, Faturas, Cofrinho e despesas do casal, Nova transação) já usavam `"0,00"` só como placeholder, some ao focar. `AccountsPage.tsx` era o único fora do padrão — alinhado.
