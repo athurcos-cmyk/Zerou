@@ -2,6 +2,15 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-09 — fix: criar categoria nova falhava silenciosamente + auditoria de regras
+
+- Ao lançar uma despesa/receita e criar categoria nova no picker, o app também salvava a transação incompleta (form da categoria, dentro de um `BottomSheet`/portal, ainda é "filho" do form da transação na árvore React — sem `event.stopPropagation()`, o submit se propagava pros dois). Corrigido em `CategoryField.tsx`.
+- Causa mais séria: `validCategoryCreate` (`firestore.rules`) nunca foi atualizada quando o campo `createdBy` foi adicionado no cliente — toda categoria personalizada era rejeitada pelo servidor **silenciosamente há ~3 semanas**. Corrigida e deployada.
+- Ao corrigir a regra, quebrei sem querer o seeding das categorias padrão (que nunca envia `createdBy`) — pego e corrigido na mesma sessão antes de virar um problema novo. Regra final trata os dois casos (categoria padrão sem `createdBy` vs. personalizada com `createdBy` obrigatório).
+- **Auditoria completa**: todo write do app (`financeService`, `cardService`, `sharedService`, `workspaceService`, sync de tema, tokens de push) comparado campo a campo contra as regras do Firestore — nenhum outro desalinhamento encontrado. Teste novo em `tests/firestore.rules.test.ts` cobrindo os dois ramos da regra de categoria.
+
+Detalhes em [`docs/history/2026-07.md`](docs/history/2026-07.md).
+
 ## 2026-07-09 — feat: revisão de design da Dashboard
 
 - **Ícone de categoria descentralizado** (`.category-mark`): conflito de especificidade CSS com `.list-row span` (regra genérica que empilha texto nas linhas de lista) derrubava o `display: grid` que centraliza o ícone — o SVG ficava encostado no canto superior-esquerdo do quadrado colorido. Fix: seletor `span.category-mark` (mesma especificidade, vence por ordem no arquivo).

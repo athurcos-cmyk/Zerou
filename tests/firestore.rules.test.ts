@@ -109,10 +109,9 @@ function accountPayload(workspaceId: string, accountId: string, uid: string, ove
   };
 }
 
-function categoryPayload(workspaceId: string, categoryId: string, overrides: Record<string, unknown> = {}) {
+function categoryPayload(workspaceId: string, categoryId: string, uid: string, overrides: Record<string, unknown> = {}) {
   const now = serverTimestamp();
-
-  return {
+  const payload: Record<string, unknown> = {
     id: categoryId,
     workspaceId,
     name: 'Categoria teste',
@@ -121,10 +120,20 @@ function categoryPayload(workspaceId: string, categoryId: string, overrides: Rec
     color: '#EE5524',
     isDefault: false,
     isActive: true,
+    createdBy: uid,
     createdAt: now,
     updatedAt: now,
     ...overrides
   };
+
+  // O SDK do Firestore rejeita valores `undefined` explícitos no setDoc — usar
+  // `createdBy: undefined` nos overrides pra simular payload de categoria padrão
+  // (sem createdBy) precisa remover a chave de verdade, não só zerar o valor.
+  if (payload.createdBy === undefined) {
+    delete payload.createdBy;
+  }
+
+  return payload;
 }
 
 function goalPayload(workspaceId: string, goalId: string, uid: string, overrides: Record<string, unknown> = {}) {
@@ -696,8 +705,34 @@ describe('firestore security rules', () => {
     const aliceDb = testEnv.authenticatedContext('alice').firestore();
     const categoryReference = doc(aliceDb, 'workspaces/workspaceA/categories/categoryA');
 
-    await assertSucceeds(setDoc(categoryReference, categoryPayload('workspaceA', 'categoryA')));
+    await assertSucceeds(setDoc(categoryReference, categoryPayload('workspaceA', 'categoryA', 'alice')));
     await assertSucceeds(updateDoc(categoryReference, { color: '#37A24A', updatedAt: serverTimestamp() }));
+  });
+
+  it('allows seeding a default category without createdBy, but not a custom category', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    // Default categories (ensureDefaultCategories/buildDefaultCategory) never set createdBy.
+    await assertSucceeds(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/categories/categoryDefault'),
+        categoryPayload('workspaceA', 'categoryDefault', 'alice', { isDefault: true, createdBy: undefined })
+      )
+    );
+    // A non-default (user-created) category without createdBy must be rejected.
+    await assertFails(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/categories/categoryNoCreator'),
+        categoryPayload('workspaceA', 'categoryNoCreator', 'alice', { isDefault: false, createdBy: undefined })
+      )
+    );
+    // A default category that also claims a createdBy must be rejected.
+    await assertFails(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/categories/categoryDefaultWithCreator'),
+        categoryPayload('workspaceA', 'categoryDefaultWithCreator', 'alice', { isDefault: true })
+      )
+    );
   });
 
   it('blocks a user from writing financial accounts in another workspace', async () => {

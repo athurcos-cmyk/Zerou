@@ -335,6 +335,7 @@ service cloud.firestore {
           'color',
           'isDefault',
           'isActive',
+          'createdBy',
           'createdAt',
           'updatedAt'
         ])
@@ -347,6 +348,10 @@ service cloud.firestore {
         && validOptionalString('color', 40)
         && request.resource.data.isDefault is bool
         && request.resource.data.isActive is bool
+        && (
+          (request.resource.data.isDefault == true && !request.resource.data.keys().hasAny(['createdBy']))
+          || (request.resource.data.isDefault == false && request.resource.data.createdBy == request.auth.uid)
+        )
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time;
     }

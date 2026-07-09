@@ -72,7 +72,12 @@ export function CategoryField({
   }
 
   async function handleSubmit(event: FormEvent) {
+    // O sheet é renderizado via portal (BottomSheet/createPortal), mas continua
+    // filho do <form> externo (transação/conta/recorrência) na árvore React —
+    // sem stopPropagation, o submit daqui também dispara o onSubmit de fora e
+    // salva o registro pai incompleto junto com a categoria.
     event.preventDefault();
+    event.stopPropagation();
     if (!name.trim()) return;
     setBusy(true);
     try {
