@@ -7,7 +7,7 @@ import { SelectField } from '../components/SelectField';
 import { BottomSheet } from '../components/BottomSheet';
 import { EmptyState } from '../components/EmptyState';
 import { FormMessage } from '../components/FormMessage';
-import { fromDateInputValue, todayInputValue, toDateInputValue } from '../finance/financeDates';
+import { formatFriendlyDate, fromDateInputValue, todayInputValue } from '../finance/financeDates';
 import { billStatusLabels } from '../finance/financeLabels';
 import { createBill, createCategory, deleteCategory, payBill, updateBillStatus, updateCategory } from '../finance/financeService';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
@@ -162,7 +162,7 @@ export function BillsPage() {
                   <div>
                     <strong>{bill.description}</strong>
                     <span className="text-secondary">
-                      {billStatusLabels[bill.status]} · {toDateInputValue(bill.dueDate)}
+                      {billStatusLabels[bill.status]} · {formatFriendlyDate(bill.dueDate)}
                     </span>
                   </div>
                   <div className="list-row-end">

@@ -2,6 +2,11 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-09 — fix: datas cruas ("2026-07-08") em Extrato, Contas a pagar, Faturas, Cartões, Recorrências e Busca
+
+- Extensão do fix de data amigável aplicado antes só na Dashboard: `toDateInputValue` (formato de `<input type="date">`) trocado por `formatFriendlyDate` ("Hoje", "Ontem", "8 jul") em `TransactionsPage`, `BillsPage`, `InvoicePage`, `CardDetailPage`, `CardsPage`, `RecurringPage` e `SearchPage`. Sessão spawnada separadamente (chip de sugestão) e revisada/mesclada aqui.
+- 3 riscos anotados em `CLAUDE.md` (seção temporária, remover ao resolver): Java local quebrado bloqueando `npm run test:rules`, `fireWrite` sem log nem em dev, e um `spread` frágil em `accountDeletionService.ts` que pode repetir a mesma classe de bug da regra de categoria se o tipo `WorkspaceRef` ganhar um campo novo.
+
 ## 2026-07-09 — fix: criar categoria nova falhava silenciosamente + auditoria de regras
 
 - Ao lançar uma despesa/receita e criar categoria nova no picker, o app também salvava a transação incompleta (form da categoria, dentro de um `BottomSheet`/portal, ainda é "filho" do form da transação na árvore React — sem `event.stopPropagation()`, o submit se propagava pros dois). Corrigido em `CategoryField.tsx`.

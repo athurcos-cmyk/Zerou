@@ -7,7 +7,7 @@ import { SelectField } from '../components/SelectField';
 import { BottomSheet } from '../components/BottomSheet';
 import { EmptyState } from '../components/EmptyState';
 import { FormMessage } from '../components/FormMessage';
-import { fromDateInputValue, todayInputValue, toDateInputValue } from '../finance/financeDates';
+import { formatFriendlyDate, fromDateInputValue, todayInputValue } from '../finance/financeDates';
 import { recurringFrequencyLabels } from '../finance/financeLabels';
 import { createCategory, createRecurringRule, deleteCategory, recordRecurringPayment, updateCategory } from '../finance/financeService';
 import { recurringFrequencies, type CreateRecurringRuleInput } from '../finance/financeSchemas';
@@ -146,7 +146,7 @@ export function RecurringPage() {
                   <div>
                     <strong>{rule.description}</strong>
                     <span className="text-secondary">
-                      {recurringFrequencyLabels[rule.frequency]} · {toDateInputValue(rule.nextOccurrenceAt)}
+                      {recurringFrequencyLabels[rule.frequency]} · {formatFriendlyDate(rule.nextOccurrenceAt)}
                     </span>
                   </div>
                   <div className="list-row-end">

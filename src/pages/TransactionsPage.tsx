@@ -5,7 +5,7 @@ import { useFinanceContext } from '../finance/FinanceDataContext';
 import { EmptyState } from '../components/EmptyState';
 import { CategoryMark } from '../components/categoryIcons';
 import { defaultCategoryColors } from '../theme/palette';
-import { toDateInputValue } from '../finance/financeDates';
+import { formatFriendlyDate } from '../finance/financeDates';
 import { transactionTypeLabels } from '../finance/financeLabels';
 import { softDeleteTransaction } from '../finance/financeService';
 import { formatMoney } from '../finance/money';
@@ -57,7 +57,7 @@ export function TransactionsPage() {
                   <div className="list-row-body">
                     <strong>{transaction.description}</strong>
                     <span className="text-secondary">
-                      {transactionTypeLabels[transaction.type]} · {toDateInputValue(transaction.date)}
+                      {transactionTypeLabels[transaction.type]} · {formatFriendlyDate(transaction.date)}
                     </span>
                   </div>
                   <div className="list-row-end">

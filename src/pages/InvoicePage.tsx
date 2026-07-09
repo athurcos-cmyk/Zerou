@@ -13,7 +13,7 @@ import {
   recordInvoicePayment
 } from '../cards/cardService';
 
-import { fromDateInputValue, todayInputValue, toDateInputValue } from '../finance/financeDates';
+import { formatFriendlyDate, fromDateInputValue, todayInputValue } from '../finance/financeDates';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 
 import type { InvoiceLedgerEntryType } from '../types/contracts';
@@ -190,7 +190,7 @@ export function InvoicePage() {
                   {formatMoney(invoice.outstandingBalanceCents)}
                 </span>
                 <p className="text-secondary" style={{ marginTop: '0.35rem', fontSize: '0.86rem' }}>
-                  Vence {toDateInputValue(invoice.dueDate)}
+                  Vence {formatFriendlyDate(invoice.dueDate)}
                   {isOpen ? ' · fatura ainda aberta' : ''}
                 </p>
               </div>
@@ -226,7 +226,7 @@ export function InvoicePage() {
                   <div className="list-row" key={entry.id}>
                     <div>
                       <strong>{txnDescriptions.get(entry.sourceTransactionId ?? '') ?? ledgerTypeLabels[entry.type as InvoiceLedgerEntryType]}</strong>
-                      <span className="text-secondary">{toDateInputValue(entry.effectiveAt)}</span>
+                      <span className="text-secondary">{formatFriendlyDate(entry.effectiveAt)}</span>
                     </div>
                     <strong className="amount--expense">{formatMoney(entry.amountCents)}</strong>
                   </div>
@@ -246,7 +246,7 @@ export function InvoicePage() {
                   <div className="list-row" key={entry.id}>
                     <div>
                       <strong>{ledgerTypeLabels[entry.type as InvoiceLedgerEntryType]}</strong>
-                      <span className="text-secondary">{toDateInputValue(entry.effectiveAt)}</span>
+                      <span className="text-secondary">{formatFriendlyDate(entry.effectiveAt)}</span>
                     </div>
                     <strong className="amount--income">− {formatMoney(entry.amountCents)}</strong>
                   </div>

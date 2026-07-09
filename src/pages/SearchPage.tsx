@@ -8,7 +8,7 @@ import {
 import { BottomSheet } from '../components/BottomSheet';
 import { EmptyState } from '../components/EmptyState';
 import { useFinanceContext } from '../finance/FinanceDataContext';
-import { toDateInputValue } from '../finance/financeDates';
+import { formatFriendlyDate } from '../finance/financeDates';
 import { billStatusLabels, transactionTypeLabels } from '../finance/financeLabels';
 import { formatMoney } from '../finance/money';
 import { categoryColors, defaultCategoryColor, defaultCategoryColors } from '../theme/palette';
@@ -204,11 +204,11 @@ export function SearchPage() {
           .toLocaleLowerCase('pt-BR')
           .includes(normalizedQuery)
       )
-      .map((t) => ({ id: t.id, kind: 'Transação', title: t.description, detail: `${transactionTypeLabels[t.type]} · ${toDateInputValue(t.date)}`, amountCents: t.amountCents }));
+      .map((t) => ({ id: t.id, kind: 'Transação', title: t.description, detail: `${transactionTypeLabels[t.type]} · ${formatFriendlyDate(t.date)}`, amountCents: t.amountCents }));
 
     const bills = finance.bills
       .filter((b) => b.description.toLocaleLowerCase('pt-BR').includes(normalizedQuery))
-      .map((b) => ({ id: b.id, kind: 'Conta a pagar', title: b.description, detail: `${billStatusLabels[b.status]} · ${toDateInputValue(b.dueDate)}`, amountCents: b.amountCents }));
+      .map((b) => ({ id: b.id, kind: 'Conta a pagar', title: b.description, detail: `${billStatusLabels[b.status]} · ${formatFriendlyDate(b.dueDate)}`, amountCents: b.amountCents }));
 
     const accounts = finance.accounts
       .filter((a) => a.name.toLocaleLowerCase('pt-BR').includes(normalizedQuery))

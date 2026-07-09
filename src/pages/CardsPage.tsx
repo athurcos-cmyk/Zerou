@@ -9,7 +9,7 @@ import { FormMessage } from '../components/FormMessage';
 import { cardBrandOptions, type CreateCreditCardInput } from '../cards/cardSchemas';
 import { createCreditCard } from '../cards/cardService';
 
-import { toDateInputValue } from '../finance/financeDates';
+import { formatFriendlyDate } from '../finance/financeDates';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
@@ -106,7 +106,7 @@ export function CardsPage() {
                         {openInvoice && openInvoice.outstandingBalanceCents > 0 && (
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: '0.3rem', fontSize: '0.82rem' }}>
                             <span className="text-secondary">
-                              Fatura {openInvoice.referenceMonth} · vence {toDateInputValue(openInvoice.dueDate)}
+                              Fatura {openInvoice.referenceMonth} · vence {formatFriendlyDate(openInvoice.dueDate)}
                             </span>
                             <strong className="amount--expense">{formatMoney(openInvoice.outstandingBalanceCents)}</strong>
                           </div>

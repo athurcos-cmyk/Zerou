@@ -9,7 +9,7 @@ import { FormMessage } from '../components/FormMessage';
 import { invoiceStatusLabels } from '../cards/cardLabels';
 import { deleteCard, recordInvoicePayment } from '../cards/cardService';
 
-import { toDateInputValue } from '../finance/financeDates';
+import { formatFriendlyDate } from '../finance/financeDates';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
@@ -144,7 +144,7 @@ export function CardDetailPage() {
                     </span>
                   </strong>
                   <span className="text-secondary">
-                    {openInvoice.referenceMonth} · {openInvoice.status === 'open' ? 'em aberto' : 'fechada'} · vence {toDateInputValue(openInvoice.dueDate)}
+                    {openInvoice.referenceMonth} · {openInvoice.status === 'open' ? 'em aberto' : 'fechada'} · vence {formatFriendlyDate(openInvoice.dueDate)}
                   </span>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
@@ -185,7 +185,7 @@ export function CardDetailPage() {
                   <div>
                     <strong>Fatura {invoice.referenceMonth}</strong>
                     <span className="text-secondary">
-                      {invoiceStatusLabels[invoice.status]} · vence {toDateInputValue(invoice.dueDate)}
+                      {invoiceStatusLabels[invoice.status]} · vence {formatFriendlyDate(invoice.dueDate)}
                     </span>
                   </div>
                   <div className="list-row-end">

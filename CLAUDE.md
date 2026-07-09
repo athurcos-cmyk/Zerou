@@ -6,6 +6,14 @@
 2. Use `docs/BUSCA_RAPIDA.md` para decidir qual contexto abrir.
 3. Não abra arquivos grandes por padrão. Use `rg`/Grep primeiro em `docs/history/` e nos docs de referência.
 
+## ⚠️ Pendências urgentes anotadas em 2026-07-09 (remover esta seção ao resolver)
+
+Achados durante a auditoria de regras do Firestore desta sessão — não são bugs confirmados em produção, mas riscos concretos que valem correção:
+
+1. **Java local quebrado bloqueia `npm run test:rules`** (erro `3221226505`, já listado em `docs/planning/TODOS.md`). É a ferramenta que teria pego automaticamente o bug do `createdBy` faltando em `validCategoryCreate` (ficou sem detecção ~3 semanas em produção). Prioridade subiu depois do incidente de hoje — vale resolver antes da próxima mudança em `firestore.rules`.
+2. **`fireWrite` (`src/firebase/fireWrite.ts`) silencia erro de escrita até em dev**, de propósito (não expor erro técnico ao usuário). Mas isso também escondeu o bug de categoria do próprio dono/agente durante testes manuais — só apareceu ao recarregar a página e notar que o dado sumiu. Considerar `if (import.meta.env.DEV) console.error(...)` dentro do `.catch()` só em desenvolvimento, sem tocar no comportamento de produção — daria sinal imediato no console em vez de exigir reload manual pra notar.
+3. **`accountDeletionService.ts` (`leavePartnerWorkspace`) espalha `...workspaceRefData` inteiro num `batch.update`** antes de sobrescrever `status`/`updatedAt`. Funciona hoje porque os valores lidos são idênticos aos já salvos (Firestore só considera "alterado" o que difere de verdade), mas é frágil: se o tipo `WorkspaceRef` ganhar um campo novo amanhã sem a regra `validCoupleWorkspaceRefUpdate` prever esse campo no `diff().affectedKeys().hasOnly([...])`, a saída do parceiro do espaço compartilhado quebra do mesmo jeito que a criação de categoria quebrou hoje. Mais seguro seria escrever só `{ status: 'removed', updatedAt }` explicitamente, sem spread.
+
 ## Mapa de contexto
 
 | Tema | Arquivo |
