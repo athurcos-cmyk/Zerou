@@ -1115,6 +1115,72 @@ span.category-mark {
   gap: 0.75rem;
 }
 
+/* Marca de serviço (assinaturas e contas fixas). Mesmo desenho do `.bank-mark`. */
+.service-mark {
+  display: inline-grid;
+  flex: 0 0 auto;
+  width: 2.15rem;
+  height: 2.15rem;
+  place-items: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.7rem;
+  background: var(--bg-surface);
+  color: var(--action-primary);
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+/* Chip sempre claro: logos como Apple TV, Notion, Steam, Uber e HBO Max são pretos e
+   sumiriam sobre a superfície escura dos 4 temas dark. É como o sistema operacional
+   mostra ícone de app — a cor da marca fica legível em qualquer tema. */
+.service-mark--has-logo {
+  background: var(--brand-chip-bg);
+  border-color: var(--border-subtle);
+}
+
+.service-mark__logo {
+  display: block;
+  width: 1.35rem;
+  height: 1.35rem;
+  object-fit: contain;
+}
+
+.service-mark__text {
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.service-picker {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.service-suggestion-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.service-suggestion {
+  display: inline-flex;
+  min-height: 2.35rem;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--bg-surface-subtle);
+  color: var(--text-primary);
+  padding: 0.35rem 0.7rem 0.35rem 0.4rem;
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.service-suggestion:hover {
+  border-color: var(--action-primary);
+  background: var(--action-primary-soft);
+}
+
 .bank-picker {
   display: grid;
   gap: 0.55rem;

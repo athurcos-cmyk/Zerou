@@ -5,12 +5,14 @@ Itens acionáveis. Fechou? Mova para "Concluído" ou remova. Detalhe histórico 
 ## Abertas
 
 ### Produto / UX
+- [ ] **Logos das marcas fora do simple-icons** (Prime Video, Disney+, Wellhub/Gympass, Smart Fit, Xbox, Nintendo, Microsoft 365, Adobe, Canva, ChatGPT, Google One, Kindle, Globoplay, Rappi, Claro/Vivo/TIM/Oi/Sky): hoje mostram tile de iniciais no catálogo de serviços. Rever caso a caso se vale buscar o SVG oficial de cada uma — a maioria só tem wordmark (ilegível em tile de 36px) e todas estão fora do simple-icons porque o pacote remove logo a pedido do dono, então cada uma adicionada é um risco de marca registrada assumido conscientemente (app público, domínio próprio). Catálogo: `src/finance/subscriptionServices.ts` (`logoPath` ausente = tile).
 - [ ] QA manual real no celular (cadastro, login, onboarding, conta, transação, conta a pagar, cartão, fatura, espaço do casal, cofrinho — incluindo o resgate novo).
 - [ ] Dar a mesma voz de copy às páginas legais/ajuda, se fizer sentido.
 
 ### Técnico
 - [ ] Code splitting — bundle inicial > 500 kB (warning no build).
 - [ ] App Check, backups do Firestore, alertas de custo Firebase/Vercel.
+- [ ] **Procedência dos logos de banco divergente** (achado em 2026-07-11): `scripts/generate-bank-logos.mjs` diz gerar 7 SVGs do `simple-icons`, mas 26 dos 29 arquivos em disco (inclusive nubank/picpay/mercado-pago/neon, que o script lista) vieram de outra fonte e foram commitados sem atualizar o script. Ver aviso em `public/bank-logos/SOURCES.md`. Decidir com o dono: adotar simple-icons como fonte canônica (rodar o script, aceitar novo visual) ou documentar a origem real dos 26. Contraste: `public/service-logos/` é gerado de verdade e confere.
 - [ ] Emails oficiais de suporte/privacidade.
 - [ ] Contas a pagar (`Bill.status`) nunca viram `'overdue'` automaticamente — ficam "Pendente" pra sempre mesmo com vencimento no passado. Não afeta o cálculo do Comprometido (já conta certo), só falta indicação visual/status pro usuário perceber o atraso.
 

@@ -2,6 +2,15 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-11 — feat: logos e autocomplete de assinaturas nas Recorrências e Compromissos
+
+- **Catálogo de ~60 serviços** (`src/finance/subscriptionServices.ts`): assinaturas (Netflix, Spotify, Prime Video, Disney+, Max, Wellhub, Xbox…) e contas fixas (energia, água, aluguel, internet…). Digitar no campo Descrição sugere a marca, preenche o nome canônico e sugere a categoria (sem sobrescrever uma escolhida à mão). A lista de recorrências e de compromissos passou a mostrar a marca ao lado do nome.
+- **26 logos SVG** gerados do `simple-icons` (mesma fonte CC0 dos bancos), via `npm run generate:service-logos`, com `SOURCES.md` automático. Chip de fundo sempre claro (`--brand-chip-bg`) pra logos pretos (Apple TV, Notion, Uber) não sumirem nos 4 temas escuros.
+- **Marcas fora do simple-icons mostram tile de iniciais**, igual aos bancos sem logo. Prime Video, Disney+, Wellhub, Xbox, Microsoft 365, Adobe, Canva, ChatGPT e Globoplay **não existem** no pacote (que remove logo a pedido do dono) e não têm versão quadrada de fonte confiável — busquei no Wikimedia Commons e só há wordmarks marcados como `trademarked`, ilegíveis num tile de 36px. Decisão do dono: tentar o oficial, cair no simple-icons quando não der.
+- **Reconhecimento por palavra inteira**, não substring: "Time do coração" não vira TIM, "Oitava parcela" não vira Oi — logo errado ao lado de dinheiro é pior que logo nenhum. Coberto por teste.
+- Achado no caminho e anotado como pendência: o `SOURCES.md` dos **bancos** estava errado (dizia gerar 26 SVGs do simple-icons que na verdade vieram de outra fonte). Corrigido o texto; a origem real fica pra decidir com o dono.
+- 213 testes de unidade, typecheck, lint (1 problema a menos que a linha de base), build e `noHardcodedColors` limpos.
+
 ## 2026-07-11 — fix: as 3 pendências técnicas + um bug de offline achado no caminho
 
 - **Excluir uma transação offline não fazia nada.** `snapshot.data()` devolve `null` para um `serverTimestamp()` ainda pendente, então `deletedAt` chegava nulo no cache local: a transação continuava no Extrato e a compra continuava somando na fatura até o servidor responder. Num app offline-first, a UI desfazia a ação do usuário. Toda leitura de snapshot passa agora por `readSnapshotDoc` (`serverTimestamps: 'estimate'`).

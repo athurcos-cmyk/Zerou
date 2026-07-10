@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from 'react';
-import { CalendarClock, ChevronDown } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useFinanceContext } from '../finance/FinanceDataContext';
 import { CategoryField } from '../components/CategoryField';
+import { ServiceMark } from '../components/ServiceMark';
+import { findSubscriptionService, searchSubscriptionServices, type SubscriptionService } from '../finance/subscriptionServices';
 import { SelectField } from '../components/SelectField';
 import { BottomSheet } from '../components/BottomSheet';
 import { EmptyState } from '../components/EmptyState';
@@ -30,6 +32,16 @@ export function BillsPage() {
   const [payAccountId, setPayAccountId] = useState('');
   const [payAmount, setPayAmount] = useState('');
   const [formOpen, setFormOpen] = useState(false);
+
+  const serviceSuggestions = searchSubscriptionServices(description);
+
+  // Preenche o nome canônico e sugere a categoria, sem sobrescrever uma escolhida à mão.
+  function selectService(service: SubscriptionService) {
+    setDescription(service.name);
+    if (!categoryId && service.suggestedCategoryId) {
+      setCategoryId(service.suggestedCategoryId);
+    }
+  }
 
   function handleOpenPay(bill: Bill) {
     setPayingBill(bill);
@@ -111,8 +123,26 @@ export function BillsPage() {
           <FormMessage>{message}</FormMessage>
           <label className="field">
             <span>Descrição</span>
-            <input className="input" value={description} onChange={(event) => setDescription(event.target.value)} />
+            <input
+              className="input"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="Energia, Aluguel, Internet"
+            />
           </label>
+          {serviceSuggestions.length > 0 && (
+            <div className="service-picker" aria-label="Sugestões de contas e assinaturas">
+              <span className="field-label">{description.trim() ? 'Encontramos estas opções' : 'Sugestões rápidas'}</span>
+              <div className="service-suggestion-grid">
+                {serviceSuggestions.map((service) => (
+                  <button className="service-suggestion" type="button" key={service.id} onClick={() => selectService(service)}>
+                    <ServiceMark service={service} />
+                    <span>{service.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <label className="field">
             <span>Valor</span>
             <input className="input" inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0,00" />
@@ -158,8 +188,9 @@ export function BillsPage() {
           {finance.bills.length > 0 ? (
             <div className="item-list">
               {finance.bills.map((bill) => (
-                <div className="list-row" key={bill.id}>
-                  <div>
+                <div className="list-row list-row--with-icon" key={bill.id}>
+                  <ServiceMark service={findSubscriptionService(bill.description)} />
+                  <div className="list-row-body">
                     <strong>{bill.description}</strong>
                     <span className="text-secondary">
                       {billStatusLabels[bill.status]} · {formatFriendlyDate(bill.dueDate)}

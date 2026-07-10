@@ -16,6 +16,7 @@
     "test:rules": "node scripts/with-java.mjs firebase emulators:exec --only firestore,storage \"vitest run tests/firestore.rules.test.ts tests/storage.rules.test.ts --config vite.config.ts\"",
     "test:e2e": "playwright test",
     "generate:bank-logos": "node scripts/generate-bank-logos.mjs",
+    "generate:service-logos": "node scripts/generate-service-logos.mjs",
     "functions:build": "npm --prefix functions run build",
     "emulators": "node scripts/with-java.mjs firebase emulators:start --only auth,firestore,storage,functions,hosting"
   },

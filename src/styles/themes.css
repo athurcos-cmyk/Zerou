@@ -1,5 +1,6 @@
 :root,
 [data-theme='paper'] {
+  --brand-chip-bg: #FFFFFF;
   /* Sol — areia quente + tangerina */
   --bg-page: #FAF8F5;
   --bg-surface: #FFFFFF;
@@ -65,6 +66,7 @@
 }
 
 [data-theme='sakura'] {
+  --brand-chip-bg: #FFFFFF;
   --bg-page: #FBF7F8;
   --bg-surface: #FFFFFF;
   --bg-surface-subtle: #F8EEF1;
@@ -100,6 +102,7 @@
 }
 
 [data-theme='obsidian'] {
+  --brand-chip-bg: #F1F2F5;
   --bg-page: #111318;
   --bg-surface: #1A1D24;
   --bg-surface-subtle: #20242D;
@@ -135,6 +138,7 @@
 }
 
 [data-theme='midnight'] {
+  --brand-chip-bg: #F1F2F5;
   --bg-page: #101225;
   --bg-surface: #181B35;
   --bg-surface-subtle: #202443;
@@ -170,6 +174,7 @@
 }
 
 [data-theme='aurora'] {
+  --brand-chip-bg: #F1F2F5;
   --bg-page: #0F1919;
   --bg-surface: #172525;
   --bg-surface-subtle: #1E3030;
@@ -205,6 +210,7 @@
 }
 
 [data-theme='rose-gold'] {
+  --brand-chip-bg: #F1F2F5;
   --bg-page: #1A1517;
   --bg-surface: #251D21;
   --bg-surface-subtle: #30262A;
