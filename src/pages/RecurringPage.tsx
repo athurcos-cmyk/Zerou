@@ -9,7 +9,14 @@ import { EmptyState } from '../components/EmptyState';
 import { FormMessage } from '../components/FormMessage';
 import { formatFriendlyDate, fromDateInputValue, todayInputValue } from '../finance/financeDates';
 import { recurringFrequencyLabels } from '../finance/financeLabels';
-import { createCategory, createRecurringRule, deleteCategory, recordRecurringPayment, updateCategory } from '../finance/financeService';
+import {
+  createCategory,
+  createRecurringRule,
+  deleteCategory,
+  nextOccurrenceDate,
+  recordRecurringPayment,
+  updateCategory
+} from '../finance/financeService';
 import { recurringFrequencies, type CreateRecurringRuleInput } from '../finance/financeSchemas';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import type { RecurringRule } from '../types/contracts';
@@ -191,7 +198,11 @@ export function RecurringPage() {
               ))}
             </div>
             <p className="text-muted" style={{ fontSize: '0.8rem', margin: '0.4rem 0 0' }}>
-              A próxima ocorrência avança para {payingRule ? new Date(payingRule.nextOccurrenceAt.toDate().getTime()).toLocaleDateString('pt-BR') : '–'} + 1 período.
+              {payingRule
+                ? `A próxima ocorrência avança para ${formatFriendlyDate(
+                    nextOccurrenceDate(payingRule.nextOccurrenceAt.toDate(), payingRule.frequency, payingRule.anchorDay)
+                  )}.`
+                : null}
             </p>
           </div>
           <div className="sheet-actions">

@@ -140,6 +140,19 @@ export function EditTransactionPage() {
     );
   }
 
+  if (transaction?.type === 'card_purchase') {
+    return (
+      <section className="page-content page-content--narrow">
+        <p className="eyebrow">Editar transação</p>
+        <h1 className="page-title">Compras no cartão ainda não podem ser editadas.</h1>
+        <p className="text-secondary">Para corrigir, exclua a compra no Extrato e lance de novo.</p>
+        <Link className="button button--secondary" to="/app/transactions">
+          Voltar
+        </Link>
+      </section>
+    );
+  }
+
   return (
     <div className="entry-screen">
       <header className={`amount-hero ${moodClass}`}>

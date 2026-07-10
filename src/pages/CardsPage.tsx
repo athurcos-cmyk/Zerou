@@ -8,6 +8,7 @@ import { SelectField } from '../components/SelectField';
 import { FormMessage } from '../components/FormMessage';
 import { cardBrandOptions, type CreateCreditCardInput } from '../cards/cardSchemas';
 import { createCreditCard } from '../cards/cardService';
+import { pickCurrentInvoice } from '../cards/cardDates';
 
 import { formatFriendlyDate } from '../finance/financeDates';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
@@ -73,7 +74,7 @@ export function CardsPage() {
                 const activeInvoices = cardsData.invoices.filter(
                   (invoice) => invoice.cardId === card.id && (invoice.status === 'open' || invoice.status === 'closed')
                 );
-                const openInvoice = activeInvoices.find((inv) => inv.status === 'open') ?? activeInvoices[0] ?? null;
+                const openInvoice = pickCurrentInvoice(activeInvoices);
                 const usedCents = activeInvoices.reduce((total, invoice) => total + invoice.outstandingBalanceCents, 0);
                 const availableCents = Math.max(0, card.limitCents - usedCents);
                 const usedPercent = card.limitCents > 0 ? Math.min(100, Math.round((usedCents / card.limitCents) * 100)) : 0;

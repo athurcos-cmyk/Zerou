@@ -340,45 +340,51 @@ export async function recordInvoiceFee(workspaceId: string, userId: string, inpu
 export async function anticipateInstallments(workspaceId: string, userId: string, input: AnticipateInstallmentsInput) {
   const parsed = anticipateInstallmentsSchema.parse(input);
   const batch = writeBatch(getFirebaseDb());
-  const totalCents = parsed.credits.reduce((sum, c) => sum + c.amountCents, 0);
   const seed = createId('anticipation');
 
+  // Um lançamento de débito por parcela antecipada (não um único débito somado) —
+  // cada um carrega o `sourceTransactionId` da compra original correspondente. Sem
+  // isso, excluir a compra original depois de antecipada deixava um débito "fantasma"
+  // na fatura atual: o filtro de ledger órfão (useCardsData.ts) só sabe remover
+  // lançamentos com `sourceTransactionId` apontando pra uma transação excluída, e um
+  // débito somado sem esse vínculo nunca seria limpo.
   parsed.credits.forEach((credit, index) => {
-    const idempotencyKey = `${seed}_credit_${credit.invoiceId}_${index}`;
-    const entryId = idempotentEntryId(idempotencyKey);
+    const creditKey = `${seed}_credit_${credit.invoiceId}_${index}`;
+    const creditEntryId = idempotentEntryId(creditKey);
     batch.set(
-      ledgerDocRef(workspaceId, parsed.cardId, credit.invoiceId, entryId),
+      ledgerDocRef(workspaceId, parsed.cardId, credit.invoiceId, creditEntryId),
       ledgerPayload({
-        id: entryId,
+        id: creditEntryId,
         workspaceId,
         cardId: parsed.cardId,
         invoiceId: credit.invoiceId,
         type: 'installment_anticipation_credit',
         amountCents: credit.amountCents,
         effectiveAt: parsed.effectiveAt,
-        idempotencyKey,
+        idempotencyKey: creditKey,
+        createdBy: userId,
+        sourceTransactionId: credit.sourceTransactionId
+      })
+    );
+
+    const debitKey = `${seed}_debit_${index}`;
+    const debitEntryId = idempotentEntryId(debitKey);
+    batch.set(
+      ledgerDocRef(workspaceId, parsed.cardId, parsed.currentInvoiceId, debitEntryId),
+      ledgerPayload({
+        id: debitEntryId,
+        workspaceId,
+        cardId: parsed.cardId,
+        invoiceId: parsed.currentInvoiceId,
+        type: 'installment_anticipation',
+        amountCents: credit.amountCents,
+        effectiveAt: parsed.effectiveAt,
+        idempotencyKey: debitKey,
         createdBy: userId,
         sourceTransactionId: credit.sourceTransactionId
       })
     );
   });
-
-  const debitKey = `${seed}_debit`;
-  const debitEntryId = idempotentEntryId(debitKey);
-  batch.set(
-    ledgerDocRef(workspaceId, parsed.cardId, parsed.currentInvoiceId, debitEntryId),
-    ledgerPayload({
-      id: debitEntryId,
-      workspaceId,
-      cardId: parsed.cardId,
-      invoiceId: parsed.currentInvoiceId,
-      type: 'installment_anticipation',
-      amountCents: totalCents,
-      effectiveAt: parsed.effectiveAt,
-      idempotencyKey: debitKey,
-      createdBy: userId
-    })
-  );
 
   fireWrite(batch.commit());
 }

@@ -696,7 +696,10 @@ html[data-reduce-motion='true'] *::after {
 }
 
 .dash-balance .display-number {
-  font-size: clamp(2rem, 4.8vw, 3rem);
+  /* Teto reduzido de 3rem pra 2.35rem: com o valor negativo ("-R$ 1.400,00"), o
+     texto em nowrap ultrapassava a coluna do card no desktop (grid de 3 colunas
+     divide o espaço com Disponível/Comprometido) e vazava por cima do card vizinho. */
+  font-size: clamp(2rem, 4.8vw, 2.35rem);
 }
 
 .dash-secondary {
@@ -831,6 +834,10 @@ html[data-reduce-motion='true'] *::after {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   line-height: 1;
+  /* Sem isso, um valor negativo pode quebrar linha logo depois do "-" (a UAX#14
+     trata hífen seguido de letra como ponto de quebra válido) — o sinal de menos
+     fica sozinho numa linha, parece um traço solto em vez de "valor negativo". */
+  white-space: nowrap;
 }
 
 .metric-icon {

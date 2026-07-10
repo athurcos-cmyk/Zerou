@@ -26,7 +26,7 @@ const initialState: CardsState = {
   error: null
 };
 
-export function useCardsData(workspaceId?: string) {
+export function useCardsData(workspaceId?: string, deletedTransactionIds?: ReadonlySet<string>) {
   const [state, setState] = useState<CardsState>(initialState);
 
   // Refs: effects read current data without triggering re-subscription on data-only changes.
@@ -131,34 +131,41 @@ export function useCardsData(workspaceId?: string) {
     };
   }, [invoiceIds, workspaceId]);
 
-  const calculatedInvoices = useMemo(
-    () =>
-      state.invoices.map((invoice) => {
-        const entries = state.ledgerEntries
-          .filter((entry) => entry.cardId === invoice.cardId && entry.invoiceId === invoice.id)
-          .map((entry) => ({
-            id: entry.id,
-            type: entry.type,
-            amountCents: entry.amountCents,
-            effectiveAt: toDate(entry.effectiveAt),
-            idempotencyKey: entry.idempotencyKey
-          }));
-        const calculation = calculateInvoice(entries, invoice.status === 'closed' ? 'closed' : 'open');
+  const calculatedInvoices = useMemo(() => {
+    // Ledger entries de uma compra no cartão excluída no Extrato (softDeleteTransaction
+    // marca deletedAt na transação, mas as regras do Firestore não permitem que um
+    // membro comum apague/edite o ledger da fatura) ficam órfãs para sempre — filtradas
+    // aqui em vez de removidas, para não depender de regra nova.
+    const liveLedgerEntries = deletedTransactionIds?.size
+      ? state.ledgerEntries.filter((entry) => !entry.sourceTransactionId || !deletedTransactionIds.has(entry.sourceTransactionId))
+      : state.ledgerEntries;
 
-        return {
-          ...invoice,
-          purchasesTotalCents: calculation.purchasesTotalCents,
-          paymentsTotalCents: calculation.paymentsTotalCents,
-          creditsTotalCents: calculation.creditsTotalCents,
-          feesTotalCents: calculation.feesTotalCents,
-          outstandingBalanceCents: calculation.outstandingBalanceCents,
-          overpaidCreditCents: calculation.overpaidCreditCents,
-          status: invoice.status === 'open' || invoice.status === 'closed' ? calculation.status : invoice.status,
-          ledgerEntries: state.ledgerEntries.filter((entry) => entry.cardId === invoice.cardId && entry.invoiceId === invoice.id)
-        };
-      }),
-    [state.invoices, state.ledgerEntries]
-  );
+    return state.invoices.map((invoice) => {
+      const invoiceLedgerEntries = liveLedgerEntries.filter(
+        (entry) => entry.cardId === invoice.cardId && entry.invoiceId === invoice.id
+      );
+      const entries = invoiceLedgerEntries.map((entry) => ({
+        id: entry.id,
+        type: entry.type,
+        amountCents: entry.amountCents,
+        effectiveAt: toDate(entry.effectiveAt),
+        idempotencyKey: entry.idempotencyKey
+      }));
+      const calculation = calculateInvoice(entries, invoice.status === 'closed' ? 'closed' : 'open');
+
+      return {
+        ...invoice,
+        purchasesTotalCents: calculation.purchasesTotalCents,
+        paymentsTotalCents: calculation.paymentsTotalCents,
+        creditsTotalCents: calculation.creditsTotalCents,
+        feesTotalCents: calculation.feesTotalCents,
+        outstandingBalanceCents: calculation.outstandingBalanceCents,
+        overpaidCreditCents: calculation.overpaidCreditCents,
+        status: invoice.status === 'open' || invoice.status === 'closed' ? calculation.status : invoice.status,
+        ledgerEntries: invoiceLedgerEntries
+      };
+    });
+  }, [state.invoices, state.ledgerEntries, deletedTransactionIds]);
 
   const pendingWrites = useMemo(
     () => [...state.cards, ...state.invoices, ...state.ledgerEntries].some((item) => item.localSyncStatus === 'pending'),

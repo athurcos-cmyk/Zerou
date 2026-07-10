@@ -31,8 +31,16 @@ export function DashboardPage() {
     transactions: finance.transactions,
     bills: finance.bills,
     recurringRules: finance.recurringRules,
-    invoices: cardsData.invoices
+    invoices: cardsData.invoices,
+    payday: profile?.payday,
+    committedWindowDays: profile?.committedWindowDays
   });
+  const committedCaption =
+    dashboard.committedCutoffSource === 'income'
+      ? `Considerando sua receita de ${formatFriendlyDate(dashboard.committedCutoff)}`
+      : dashboard.committedCutoffSource === 'payday'
+      ? `Considerando seu recebimento em ${formatFriendlyDate(dashboard.committedCutoff)}`
+      : `Considerando os próximos ${profile?.committedWindowDays ?? 30} dias`;
   // Mostra o último saldo conhecido (cache local) enquanto os listeners do
   // Firestore ainda não entregaram o primeiro snapshot — evita o "—" piscando
   // por 1-2s a cada reload, sem alterar a lógica de correção do loading em si.
@@ -114,7 +122,7 @@ export function DashboardPage() {
           <article className="surface surface-pad dash-metric dash-metric--committed">
             <p className="eyebrow">Comprometido</p>
             <strong className="display-number">{committedDisplay}</strong>
-            <span className="text-secondary">Contas e fatura.</span>
+            <span className="text-secondary">{isCommittedLoading ? 'Contas e fatura.' : committedCaption}</span>
           </article>
         </div>
       </div>

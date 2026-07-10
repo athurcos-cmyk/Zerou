@@ -8,6 +8,7 @@ import { useConfirm } from '../components/ConfirmDialog';
 import { FormMessage } from '../components/FormMessage';
 import { invoiceStatusLabels } from '../cards/cardLabels';
 import { deleteCard, recordInvoicePayment } from '../cards/cardService';
+import { pickCurrentInvoice } from '../cards/cardDates';
 
 import { formatFriendlyDate } from '../finance/financeDates';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
@@ -81,7 +82,7 @@ export function CardDetailPage() {
   const activeInvoices = card
     ? cardsData.invoices.filter((invoice) => invoice.cardId === card.id && (invoice.status === 'open' || invoice.status === 'closed'))
     : [];
-  const openInvoice = activeInvoices.find((inv) => inv.status === 'open') ?? activeInvoices[0] ?? null;
+  const openInvoice = pickCurrentInvoice(activeInvoices);
   const usedCents = activeInvoices.reduce((total, invoice) => total + invoice.outstandingBalanceCents, 0);
   const availableCents = card ? Math.max(0, card.limitCents - usedCents) : 0;
   const usedPercent = card && card.limitCents > 0 ? Math.min(100, Math.round((usedCents / card.limitCents) * 100)) : 0;

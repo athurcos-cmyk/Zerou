@@ -1,4 +1,4 @@
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsData } from '../cards/useCardsData';
 import { useFinanceData } from './useFinanceData';
@@ -12,7 +12,13 @@ export function FinanceDataProvider({ children }: { children: ReactNode }) {
   const { user, profile } = useAuth();
   const workspaceId = profile?.defaultWorkspaceId;
   const finance = useFinanceData(workspaceId, user?.uid);
-  const cards = useCardsData(workspaceId);
+  // Transações excluídas no Extrato (soft delete) precisam propagar pro cálculo da
+  // fatura: uma compra no cartão excluída deve parar de contar no saldo/lista da fatura.
+  const deletedTransactionIds = useMemo(
+    () => new Set(finance.transactions.filter((t) => t.deletedAt).map((t) => t.id)),
+    [finance.transactions]
+  );
+  const cards = useCardsData(workspaceId, deletedTransactionIds);
   const goals = useGoalsData(workspaceId);
 
   return (

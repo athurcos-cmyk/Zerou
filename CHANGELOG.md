@@ -2,6 +2,15 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-09 — fix: cartão/fatura não excluía direito, Comprometido contava fatura cedo demais, antecipação de parcelas nunca funcionou + feature de payday
+
+- **4 bugs reais de cartão/fatura corrigidos**: excluir compra no cartão não saía da fatura; "fatura atual" mostrava a fatura errada quando havia parcelamento; cartão que fecha tarde/vence mês seguinte calculava vencimento antes até da própria compra; e o mais sério — **antecipação de parcelas nunca funcionou em produção** (regra do Firestore nunca aceitou o tipo de lançamento de crédito, silenciosamente rejeitada desde que a feature existe).
+- **Comprometido/Disponível revisados a fundo**: o critério de quando uma fatura conta como "comprometida" mudou de "mês do ciclo da compra" pra "data de vencimento real" (mesmo cutoff de contas a pagar/recorrências), por decisão do dono, depois de investigar um caso concreto onde uma fatura que só vencia mês seguinte já derrubava o "Disponível" hoje.
+- **Nova pergunta de onboarding "quando você recebe?"** (dia fixo / Xº dia útil / fim do mês / renda variável — plantão, freela, autônomo) alimenta esse cutoff automaticamente, com janela de dias configurável em Configurações → Recebimento. Dashboard agora explica de onde vem o número do Comprometido.
+- Nomenclatura desktop/mobile unificada (Extrato→Transações, Casal→Compartilhado) e confirmação adicionada antes de excluir qualquer transação.
+- Todas as mudanças de `firestore.rules` desta sessão foram revisadas só manualmente (Java local quebrado bloqueia `npm run test:rules`, ver `CLAUDE.md`), deployadas com autorização explícita do dono e verificadas ao vivo em produção.
+- 147 testes passando (vários novos), typecheck limpo. Detalhes completos em [`docs/history/2026-07.md`](docs/history/2026-07.md).
+
 ## 2026-07-09 — fix: datas cruas ("2026-07-08") em Extrato, Contas a pagar, Faturas, Cartões, Recorrências e Busca
 
 - Extensão do fix de data amigável aplicado antes só na Dashboard: `toDateInputValue` (formato de `<input type="date">`) trocado por `formatFriendlyDate` ("Hoje", "Ontem", "8 jul") em `TransactionsPage`, `BillsPage`, `InvoicePage`, `CardDetailPage`, `CardsPage`, `RecurringPage` e `SearchPage`. Sessão spawnada separadamente (chip de sugestão) e revisada/mesclada aqui.

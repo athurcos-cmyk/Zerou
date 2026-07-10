@@ -11,8 +11,9 @@ Itens acionáveis. Fechou? Mova para "Concluído" ou remova. Detalhe histórico 
 ### Técnico
 - [ ] Code splitting — bundle inicial > 500 kB (warning no build).
 - [ ] App Check, backups do Firestore, alertas de custo Firebase/Vercel.
-- [ ] Corrigir Java local (erro 3221226505) para `npm run test:rules`.
+- [ ] Corrigir Java local (erro 3221226505) para `npm run test:rules` — prioridade alta, já causou 2 bugs reais em produção sem detecção (categoria em 2026-06, antecipação de parcelas desde a criação da feature) por não poder rodar o teste de regras do emulador.
 - [ ] Emails oficiais de suporte/privacidade.
+- [ ] Contas a pagar (`Bill.status`) nunca viram `'overdue'` automaticamente — ficam "Pendente" pra sempre mesmo com vencimento no passado. Não afeta o cálculo do Comprometido (já conta certo), só falta indicação visual/status pro usuário perceber o atraso.
 
 ### Automação server-side (futuro — exige worker/Functions)
 - [ ] Fechar fatura automaticamente, gerar recorrências e lembretes sem depender do app aberto. Decidir entre Cloud Run (perto do Firestore) e Railway. Hoje só roda quando o usuário abre o app.
@@ -22,6 +23,7 @@ Itens acionáveis. Fechou? Mova para "Concluído" ou remova. Detalhe histórico 
 - [ ] Billing real (Stripe) — só com decisão explícita de produto (hoje 100% gratuito).
 
 ## Concluído (recente)
+- [x] QA completa de cartões/faturas/Comprometido (pedido do dono): 4 bugs reais corrigidos — exclusão de compra no cartão não saía da fatura, "fatura atual" errada com parcelamento, cartão fecha-tarde/vence-mês-seguinte com vencimento errado, e antecipação de parcelas nunca funcionando em produção (regra do Firestore faltando desde a criação da feature). Comprometido/Disponível revisados a fundo e nova pergunta de onboarding "quando você recebe?" (payday + renda variável + janela configurável). Ver `CHANGELOG.md`/`docs/history/2026-07.md`.
 - [x] Domínio `granativa.com.br` no ar de ponta a ponta: HTTPS válido, landing carregando, login com Google testado e confirmado funcionando em produção pelo próprio dono.
 - [x] Zona DNS de `granativa.com.br` configurada no registro.br (registro `A` na raiz + `CNAME` em `www`, valores exatos gerados pelo Vercel) — "Zona DNS atualizada com sucesso!" confirmado no painel. Precisou esperar o domínio sair do estado "em transição" (bloqueio temporário do registro.br pra domínio recém-registrado).
 - [x] Deploy de `functions` (billing + admin) com o `APP_BASE_URL` novo (`granativa.com.br`) — 9 functions do codebase `billing` atualizadas (`closeInvoicesDue`, `generateRecurrences`, `sendDueReminders`, `sendDailyLogReminder`, Stripe scaffold). `adminForceLogout` já estava deployada (nada a atualizar nela nesta rodada).

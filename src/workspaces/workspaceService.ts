@@ -1,7 +1,8 @@
 import type { User } from 'firebase/auth';
-import { doc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { deleteField, doc, serverTimestamp, updateDoc, writeBatch } from 'firebase/firestore';
 import { getFirebaseDb } from '../firebase/config';
 import type { AppearancePreferences } from '../theme/theme.types';
+import type { PaydayRule } from '../types/contracts';
 
 const FOUNDATION_WRITE_TIMEOUT_MS = 700;
 
@@ -12,6 +13,8 @@ interface EnsurePersonalFoundationInput {
   appearance: AppearancePreferences;
   goal?: string;
   challenge?: string;
+  payday?: PaydayRule;
+  committedWindowDays?: number;
 }
 
 interface EnsurePersonalFoundationResponse {
@@ -39,7 +42,9 @@ export async function ensurePersonalFoundation({
   termsVersion,
   appearance,
   goal,
-  challenge
+  challenge,
+  payday,
+  committedWindowDays
 }: EnsurePersonalFoundationInput): Promise<EnsurePersonalFoundationResponse> {
   const db = getFirebaseDb();
   const displayName = sanitizeDisplayName(name);
@@ -65,6 +70,8 @@ export async function ensurePersonalFoundation({
       defaultWorkspaceId: workspaceId,
       ...(goal ? { onboardingGoal: goal } : {}),
       ...(challenge ? { onboardingChallenge: challenge } : {}),
+      ...(payday ? { payday } : {}),
+      ...(typeof committedWindowDays === 'number' ? { committedWindowDays } : {}),
       ...appearance,
       createdAt: now,
       updatedAt: now
@@ -111,4 +118,18 @@ export async function ensurePersonalFoundation({
 
   void commit.catch(() => undefined);
   return { workspaceId, created: true };
+}
+
+export function updatePaydaySettings(
+  uid: string,
+  settings: { payday: PaydayRule | null; committedWindowDays: number | null }
+) {
+  const db = getFirebaseDb();
+  const userRef = doc(db, 'users', uid);
+
+  void updateDoc(userRef, {
+    payday: settings.payday ?? deleteField(),
+    committedWindowDays: settings.committedWindowDays ?? deleteField(),
+    updatedAt: serverTimestamp()
+  }).catch(() => undefined);
 }

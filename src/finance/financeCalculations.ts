@@ -1,6 +1,7 @@
 import { addDays, compareAsc, isAfter, isBefore, isEqual } from 'date-fns';
 import { toDate } from './financeDates';
-import type { Account, Bill, Invoice, RecurringRule, Transaction } from '../types/contracts';
+import { defaultCommittedWindowDays, nextPaydayFrom } from './payday';
+import type { Account, Bill, Invoice, PaydayRule, RecurringRule, Transaction } from '../types/contracts';
 
 export interface AccountBalance extends Account {
   balanceCents: number;
@@ -14,6 +15,10 @@ export interface UpcomingCommitment {
   dueAt: Date;
 }
 
+// De onde veio a data-limite usada pra decidir o que conta como "Comprometido" —
+// exibido no Dashboard pra explicar o número em vez de só mostrar um valor sem contexto.
+export type CommittedCutoffSource = 'income' | 'payday' | 'window';
+
 export interface DashboardSummary {
   totalBalanceCents: number;
   committedCents: number;
@@ -21,6 +26,8 @@ export interface DashboardSummary {
   upcomingCommitments: UpcomingCommitment[];
   recentTransactions: Transaction[];
   nextIncomeAt: Date | null;
+  committedCutoff: Date;
+  committedCutoffSource: CommittedCutoffSource;
 }
 
 function isActiveTransaction(transaction: Transaction) {
@@ -142,16 +149,20 @@ export function buildUpcomingCommitments(
 
   // Regra de fatura no comprometido:
   // - 'closed': sempre (já fechou, o pagamento é iminente)
-  // - 'open' do mês atual ou anterior: sim (dívida do ciclo corrente)
-  // - 'open' de meses futuros: não (parcelas futuras — vira comprometido no mês delas)
-  const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  // - 'open': só se o VENCIMENTO REAL cair dentro do mesmo cutoff usado pra contas a
+  //   pagar/recorrências (antes do próximo salário, ou 30 dias). Antes usava
+  //   "referenceMonth <= mês atual" (mês do CICLO da compra, não da cobrança) — em
+  //   cartões que fecham tarde e vencem no mês seguinte (padrão comum: fecha dia 25,
+  //   vence dia 5), isso contava a fatura inteira como comprometida um mês antes do
+  //   vencimento de verdade, mesmo já com `resolveInvoiceCycle` calculando a data de
+  //   vencimento certa. Decisão do dono do produto: vencimento real é o critério.
   const invoiceCommitments = invoices
     .filter(
       (invoice) =>
         invoice.status !== 'paid' &&
         invoice.status !== 'overpaid' &&
         invoice.outstandingBalanceCents > 0 &&
-        (invoice.status === 'closed' || invoice.referenceMonth <= currentYearMonth)
+        (invoice.status === 'closed' || isOnOrBefore(toDate(invoice.dueDate), cutoff))
     )
     .map(
       (invoice) =>
@@ -175,11 +186,21 @@ export function calculateDashboardSummary(input: {
   bills: Bill[];
   recurringRules: RecurringRule[];
   invoices?: Invoice[];
+  payday?: PaydayRule;
+  committedWindowDays?: number;
   now?: Date;
 }): DashboardSummary {
   const now = input.now ?? new Date();
   const nextIncomeAt = findNextIncomeDate(input.transactions, now);
-  const cutoff = nextIncomeAt ?? addDays(now, 30);
+  // Sem receita futura lançada na mão, usa a data de recebimento estimada do perfil
+  // (pergunta do onboarding) antes de cair na janela configurável (padrão 30 dias) —
+  // evita que uma fatura que só vence depois do próximo salário pareça "comprometida"
+  // hoje. "Renda variável" é uma escolha explícita sem data resolvível — cai na janela
+  // igual quem nunca respondeu a pergunta.
+  const resolvablePayday = input.payday && input.payday.type !== 'variable_income' ? input.payday : undefined;
+  const windowDays = input.committedWindowDays ?? defaultCommittedWindowDays;
+  const committedCutoffSource: CommittedCutoffSource = nextIncomeAt ? 'income' : resolvablePayday ? 'payday' : 'window';
+  const cutoff = nextIncomeAt ?? (resolvablePayday ? nextPaydayFrom(resolvablePayday, now) : addDays(now, windowDays));
   const totalBalanceCents = calculateTotalBalance(input.accounts, input.transactions);
   const commitments = buildUpcomingCommitments(input.bills, input.recurringRules, cutoff, input.invoices ?? [], now);
   const committedCents = commitments.reduce((total, commitment) => total + commitment.amountCents, 0);
@@ -195,6 +216,8 @@ export function calculateDashboardSummary(input: {
     freeToSpendCents: totalBalanceCents - committedCents,
     upcomingCommitments: commitments.slice(0, 3),
     recentTransactions,
-    nextIncomeAt
+    nextIncomeAt,
+    committedCutoff: cutoff,
+    committedCutoffSource
   };
 }

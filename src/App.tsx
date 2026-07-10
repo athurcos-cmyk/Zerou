@@ -23,6 +23,7 @@ import { JoinInvitePage } from './pages/JoinInvitePage';
 import { LoginMethodsPage } from './settings/LoginMethodsPage';
 import { LoginPage } from './pages/LoginPage';
 import { NewTransactionPage } from './pages/NewTransactionPage';
+import { PaydaySettingsPage } from './settings/PaydaySettingsPage';
 import { OnboardingPage } from './onboarding/OnboardingPage';
 import { ContactPage, FeaturesPage, HelpPage, SecurityPage } from './pages/PublicPages';
 import { PrivacyPolicyPage, TermsPage } from './pages/LegalPages';
@@ -91,6 +92,7 @@ export function App() {
                 <Route path="shared" element={<SharedSpacePage />} />
                 <Route path="settings/appearance" element={<AppearanceSettingsPage />} />
                 <Route path="settings/billing" element={<Navigate to="/app/settings/appearance" replace />} />
+                <Route path="settings/payday" element={<PaydaySettingsPage />} />
                 <Route path="settings/security/login-methods" element={<LoginMethodsPage />} />
               </Route>
             </Route>

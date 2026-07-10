@@ -362,27 +362,32 @@ describe('buildUpcomingCommitments', () => {
     expect(commitments.map((c) => c.id)).toEqual(['inv-closed-past']);
   });
 
-  it('includes an open invoice for the current or a past month', () => {
+  it('includes an open invoice whose due date falls on or before the cutoff', () => {
     const commitments = buildUpcomingCommitments(
       [],
       [],
       cutoff,
       [
-        invoice({ id: 'inv-open-current', status: 'open', referenceMonth: '2026-06', outstandingBalanceCents: 5000 }),
-        invoice({ id: 'inv-open-past', status: 'open', referenceMonth: '2026-05', outstandingBalanceCents: 3000 })
+        invoice({ id: 'inv-open-soon', status: 'open', dueDate: Timestamp.fromDate(new Date('2026-07-10T12:00:00')), outstandingBalanceCents: 5000 }),
+        invoice({ id: 'inv-open-past-due', status: 'open', dueDate: Timestamp.fromDate(new Date('2026-06-05T12:00:00')), outstandingBalanceCents: 3000 })
       ],
       now
     );
 
-    expect(commitments.map((c) => c.id).sort()).toEqual(['inv-open-current', 'inv-open-past']);
+    expect(commitments.map((c) => c.id).sort()).toEqual(['inv-open-past-due', 'inv-open-soon']);
   });
 
-  it('excludes an open invoice from a future month (future installments)', () => {
+  // Regressão: o critério já foi "referenceMonth <= mês atual" (mês do CICLO da
+  // compra). Isso contava uma fatura inteira como comprometida assim que a compra
+  // entrava no ciclo — mesmo em cartões que fecham tarde e vencem só no mês
+  // seguinte (fecha dia 25, vence dia 5), onde a cobrança de verdade só chega bem
+  // depois. Critério agora é a data de vencimento real, igual bills/recorrências.
+  it('excludes an open invoice whose real due date falls after the cutoff (future installment or "fecha tarde, vence mês que vem")', () => {
     const commitments = buildUpcomingCommitments(
       [],
       [],
       cutoff,
-      [invoice({ id: 'inv-open-future', status: 'open', referenceMonth: '2026-07', outstandingBalanceCents: 5000 })],
+      [invoice({ id: 'inv-open-future', status: 'open', referenceMonth: '2026-06', dueDate: Timestamp.fromDate(new Date('2026-08-05T12:00:00')), outstandingBalanceCents: 5000 })],
       now
     );
 
@@ -465,6 +470,99 @@ describe('calculateDashboardSummary', () => {
 
     expect(summary.committedCents).toBe(45000);
     expect(summary.freeToSpendCents).toBe(455000);
+  });
+
+  // Cenário real do dono: cartão fecha dia 25, vence dia 5 do mês seguinte. Uma
+  // compra hoje (14 jun) fica no ciclo de junho (referenceMonth), mas só é cobrada
+  // dia 5 de agosto — bem além do cutoff padrão de 30 dias (14 jul, sem salário
+  // futuro lançado). "Disponível" não pode cair o valor inteiro da compra no mesmo
+  // dia que ela foi feita, quase 2 meses antes do vencimento de verdade.
+  it('keeps an open invoice due next month (closes-late/dues-next-month card) out of committed until it nears the due date', () => {
+    const now = new Date('2026-06-14T12:00:00');
+    const summary = calculateDashboardSummary({
+      accounts: [account('checking', 500000)],
+      transactions: [],
+      bills: [],
+      recurringRules: [],
+      invoices: [
+        invoice({
+          status: 'open',
+          referenceMonth: '2026-06',
+          dueDate: Timestamp.fromDate(new Date('2026-08-05T12:00:00')),
+          outstandingBalanceCents: 140000
+        })
+      ],
+      now
+    });
+
+    expect(summary.committedCents).toBe(0);
+    expect(summary.freeToSpendCents).toBe(500000);
+  });
+
+  // Renda variável (plantão, freela, autônomo): sem `payday`, uma janela de dias
+  // configurável substitui o chute fixo de 30 dias — a mesma fatura do teste acima
+  // (vence 5 ago) passa a contar se a pessoa alargar a janela o suficiente.
+  it('uses a custom committedWindowDays instead of the 30-day default when there is no payday', () => {
+    const now = new Date('2026-06-14T12:00:00');
+    const invoices = [
+      invoice({
+        status: 'open',
+        referenceMonth: '2026-06',
+        dueDate: Timestamp.fromDate(new Date('2026-08-05T12:00:00')),
+        outstandingBalanceCents: 140000
+      })
+    ];
+
+    const withDefaultWindow = calculateDashboardSummary({
+      accounts: [account('checking', 500000)],
+      transactions: [],
+      bills: [],
+      recurringRules: [],
+      invoices,
+      now
+    });
+    expect(withDefaultWindow.committedCents).toBe(0);
+    expect(withDefaultWindow.committedCutoffSource).toBe('window');
+
+    const withWiderWindow = calculateDashboardSummary({
+      accounts: [account('checking', 500000)],
+      transactions: [],
+      bills: [],
+      recurringRules: [],
+      invoices,
+      committedWindowDays: 60,
+      now
+    });
+    expect(withWiderWindow.committedCents).toBe(140000);
+    expect(withWiderWindow.committedCutoffSource).toBe('window');
+  });
+
+  it('reports which source decided the committed cutoff: income, payday or the fallback window', () => {
+    const now = new Date('2026-07-09T12:00:00');
+    const base = {
+      accounts: [account('checking', 500000)],
+      bills: [],
+      recurringRules: [],
+      invoices: [],
+      now
+    };
+
+    expect(calculateDashboardSummary({ ...base, transactions: [] }).committedCutoffSource).toBe('window');
+    expect(
+      calculateDashboardSummary({ ...base, transactions: [], payday: { type: 'fixed_day', day: 25 } }).committedCutoffSource
+    ).toBe('payday');
+    expect(
+      calculateDashboardSummary({
+        ...base,
+        transactions: [transaction({ type: 'income', date: Timestamp.fromDate(new Date('2026-07-25T12:00:00')) })],
+        payday: { type: 'fixed_day', day: 5 }
+      }).committedCutoffSource
+    ).toBe('income');
+    // "Renda variável" é uma escolha explícita (plantão, freela, autônomo), mas não
+    // resolve pra uma data — cai na janela igual quem nunca respondeu a pergunta.
+    expect(
+      calculateDashboardSummary({ ...base, transactions: [], payday: { type: 'variable_income' } }).committedCutoffSource
+    ).toBe('window');
   });
 
   it('defaults committed invoices to zero when the invoices list is omitted', () => {

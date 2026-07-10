@@ -7,7 +7,7 @@ import {
 } from '@firebase/rules-unit-testing';
 import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { Timestamp, deleteDoc, doc, getDoc, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
+import { Timestamp, deleteDoc, deleteField, doc, getDoc, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 
 let testEnv: RulesTestEnvironment;
 type TestFirestore = ReturnType<RulesTestContext['firestore']>;
@@ -606,6 +606,32 @@ describe('firestore security rules', () => {
     await assertSucceeds(getDoc(doc(charlieDb, 'workspaces/personal_charlie')));
   });
 
+  it('allows creating the foundation with a payday answered during onboarding, and rejects a malformed one', async () => {
+    const dianaDb = testEnv.authenticatedContext('diana').firestore();
+
+    await assertSucceeds(
+      createFoundationBatch(dianaDb, 'diana', { user: { payday: { type: 'fixed_day', day: 5 } } }).commit()
+    );
+
+    const erinDb = testEnv.authenticatedContext('erin').firestore();
+    await assertFails(
+      createFoundationBatch(erinDb, 'erin', { user: { payday: { type: 'fixed_day', day: 40 } } }).commit()
+    );
+  });
+
+  it('allows creating the foundation with a committed window (renda variável, no payday), and rejects an out-of-range value', async () => {
+    const fabioDb = testEnv.authenticatedContext('fabio').firestore();
+
+    await assertSucceeds(
+      createFoundationBatch(fabioDb, 'fabio', { user: { committedWindowDays: 15 } }).commit()
+    );
+
+    const gabiDb = testEnv.authenticatedContext('gabi').firestore();
+    await assertFails(
+      createFoundationBatch(gabiDb, 'gabi', { user: { committedWindowDays: 120 } }).commit()
+    );
+  });
+
   it('allows a signed-in user to delete their own personal foundation atomically', async () => {
     const charlieDb = testEnv.authenticatedContext('charlie').firestore();
     const modularDb = charlieDb as unknown as Parameters<typeof writeBatch>[0];
@@ -670,6 +696,102 @@ describe('firestore security rules', () => {
     );
 
     await assertFails(updateDoc(doc(aliceDb, 'users/alice'), { defaultWorkspaceId: 'workspaceB' }));
+  });
+
+  it('allows a user to set, change and clear their own payday preference', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        payday: { type: 'fixed_day', day: 5 },
+        updatedAt: serverTimestamp()
+      })
+    );
+    await assertSucceeds(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        payday: { type: 'business_day', day: 5 },
+        updatedAt: serverTimestamp()
+      })
+    );
+    await assertSucceeds(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        payday: { type: 'end_of_month' },
+        updatedAt: serverTimestamp()
+      })
+    );
+    await assertSucceeds(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        payday: { type: 'variable_income' },
+        updatedAt: serverTimestamp()
+      })
+    );
+    await assertSucceeds(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        payday: deleteField(),
+        updatedAt: serverTimestamp()
+      })
+    );
+  });
+
+  it('rejects a malformed payday and payday updates bundled with unrelated fields', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertFails(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        payday: { type: 'fixed_day', day: 32 },
+        updatedAt: serverTimestamp()
+      })
+    );
+    await assertFails(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        payday: { type: 'yearly', day: 5 },
+        updatedAt: serverTimestamp()
+      })
+    );
+    await assertFails(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        payday: { type: 'fixed_day', day: 5 },
+        name: 'Forged name',
+        updatedAt: serverTimestamp()
+      })
+    );
+    await assertFails(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        payday: { type: 'variable_income', day: 5 },
+        updatedAt: serverTimestamp()
+      })
+    );
+  });
+
+  it('allows a user to set a committed window (renda variável) alongside or instead of payday, and rejects an out-of-range value', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        payday: deleteField(),
+        committedWindowDays: 15,
+        updatedAt: serverTimestamp()
+      })
+    );
+    await assertSucceeds(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        payday: { type: 'fixed_day', day: 5 },
+        committedWindowDays: 30,
+        updatedAt: serverTimestamp()
+      })
+    );
+    await assertFails(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        committedWindowDays: 91,
+        updatedAt: serverTimestamp()
+      })
+    );
+    await assertFails(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        committedWindowDays: 0,
+        updatedAt: serverTimestamp()
+      })
+    );
   });
 
   it('blocks client writes to owner and role protected fields', async () => {
@@ -899,6 +1021,34 @@ describe('firestore security rules', () => {
     );
 
     await assertFails(updateDoc(ledgerDocument, { amountCents: 1 }));
+  });
+
+  // Regressão: o tipo TS `InvoiceLedgerEntryType` (src/types/contracts.ts) já incluía
+  // 'installment_anticipation_credit' desde a criação da feature de antecipação de
+  // parcelas, mas `validInvoiceLedgerEntryType` nunca foi atualizada com esse valor —
+  // mesmo padrão do bug de `createdBy` faltando em `validCategoryCreate` (2026-07-09):
+  // campo/valor novo no cliente sem atualizar a regra correspondente no mesmo commit.
+  // Resultado: TODA antecipação de parcela era rejeitada silenciosamente em produção
+  // (fire-and-forget engole o erro) desde que a feature existe.
+  it('allows creating an installment_anticipation_credit ledger entry (anticipating a future installment)', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(setDoc(doc(aliceDb, 'workspaces/workspaceA/cards/cardA'), cardPayload('workspaceA', 'cardA', 'alice')));
+    await assertSucceeds(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/cards/cardA/invoices/cardA_2026-08'),
+        invoicePayload('workspaceA', 'cardA', 'cardA_2026-08')
+      )
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/cards/cardA/invoices/cardA_2026-08/ledger/anticipationCreditA'),
+        ledgerPayload('workspaceA', 'cardA', 'cardA_2026-08', 'anticipationCreditA', 'alice', {
+          type: 'installment_anticipation_credit',
+          sourceTransactionId: 'txnOriginalInstallmentPurchase'
+        })
+      )
+    );
   });
 
   it('validates goal documents and goal contributions', async () => {

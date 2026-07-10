@@ -3,6 +3,7 @@ import { requestAndRegisterPushToken } from '../pwa/notifications';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   BarChart2,
+  Banknote,
   CalendarClock,
   Home,
   LogOut,
@@ -93,6 +94,9 @@ export function AppShell() {
             <Users size={19} aria-hidden="true" /> Compartilhado
           </NavLink>
           <p className="eyebrow" style={{ margin: '0.75rem 0 0.15rem 0.6rem' }}>Conta</p>
+          <NavLink className={getNavClass} to="/app/settings/payday">
+            <Banknote size={19} aria-hidden="true" /> Recebimento
+          </NavLink>
           <NavLink className={getNavClass} to="/app/settings/appearance">
             <Palette size={19} aria-hidden="true" /> Aparência
           </NavLink>
@@ -139,7 +143,7 @@ export function AppShell() {
                 <WalletCards size={19} aria-hidden="true" /> Contas
               </NavLink>
               <NavLink className={getNavClass} to="/app/shared" onClick={() => setMobileMenuOpen(false)}>
-                <Users size={19} aria-hidden="true" /> Casal
+                <Users size={19} aria-hidden="true" /> Compartilhado
               </NavLink>
               <NavLink className={getNavClass} to="/app/bills" onClick={() => setMobileMenuOpen(false)}>
                 <CalendarClock size={19} aria-hidden="true" /> Compromissos
@@ -154,6 +158,9 @@ export function AppShell() {
                 <BarChart2 size={19} aria-hidden="true" /> Análise
               </NavLink>
               <p className="eyebrow" style={{ gridColumn: '1 / -1', margin: '0.5rem 0 0' }}>Conta</p>
+              <NavLink className={getNavClass} to="/app/settings/payday" onClick={() => setMobileMenuOpen(false)}>
+                <Banknote size={19} aria-hidden="true" /> Recebimento
+              </NavLink>
               <NavLink className={getNavClass} to="/app/settings/appearance" onClick={() => setMobileMenuOpen(false)}>
                 <Palette size={19} aria-hidden="true" /> Aparência
               </NavLink>
@@ -176,7 +183,7 @@ export function AppShell() {
         </NavLink>
         <NavLink className={getNavClass} to="/app/transactions" aria-label="Transações">
           <ReceiptText size={20} aria-hidden="true" />
-          <span>Extrato</span>
+          <span>Transações</span>
         </NavLink>
         <NavLink className="mobile-fab" to="/app/transactions/new" aria-label="Adicionar transação">
           <Plus size={26} aria-hidden="true" />

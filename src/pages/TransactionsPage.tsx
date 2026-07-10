@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useFinanceContext } from '../finance/FinanceDataContext';
 import { EmptyState } from '../components/EmptyState';
 import { CategoryMark } from '../components/categoryIcons';
+import { useConfirm } from '../components/ConfirmDialog';
 import { defaultCategoryColors } from '../theme/palette';
 import { formatFriendlyDate } from '../finance/financeDates';
 import { transactionTypeLabels } from '../finance/financeLabels';
@@ -15,15 +16,29 @@ export function TransactionsPage() {
   const { user, profile } = useAuth();
   const workspaceId = profile?.defaultWorkspaceId;
   const finance = useFinanceContext();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const visibleTransactions = finance.transactions.filter((transaction) => !transaction.deletedAt);
   const categoryMap = new Map(finance.categories.map((c) => [c.id, c]));
 
-  async function handleDelete(transactionId: string) {
+  async function handleDelete(transactionId: string, isCardPurchase: boolean) {
     if (!workspaceId || !user) {
       return;
     }
 
-    await softDeleteTransaction(workspaceId, user.uid, transactionId);
+    const ok = await confirm({
+      title: 'Excluir transação?',
+      message: isCardPurchase
+        ? 'A compra some do extrato e o valor sai da fatura do cartão.'
+        : 'Essa ação não pode ser desfeita.',
+      confirmLabel: 'Excluir',
+      danger: true
+    });
+
+    if (!ok) {
+      return;
+    }
+
+    softDeleteTransaction(workspaceId, user.uid, transactionId);
   }
 
   return (
@@ -65,14 +80,16 @@ export function TransactionsPage() {
                       {isIncome ? '+' : isExpense ? '−' : ''}{formatMoney(transaction.amountCents)}
                     </strong>
                     <SyncStatusBadge status={transaction.localSyncStatus} />
-                    <Link className="button button--subtle button--compact" to={`/app/transactions/${transaction.id}/edit`}>
-                      Editar
-                    </Link>
+                    {transaction.type !== 'card_purchase' ? (
+                      <Link className="button button--subtle button--compact" to={`/app/transactions/${transaction.id}/edit`}>
+                        Editar
+                      </Link>
+                    ) : null}
                     <button
                       className="icon-button"
                       type="button"
                       aria-label="Excluir transação"
-                      onClick={() => void handleDelete(transaction.id)}
+                      onClick={() => void handleDelete(transaction.id, transaction.type === 'card_purchase')}
                     >
                       <Trash2 size={17} aria-hidden="true" />
                     </button>
@@ -94,6 +111,7 @@ export function TransactionsPage() {
           />
         )}
       </article>
+      {confirmDialog}
     </section>
   );
 }

@@ -40,6 +40,17 @@ export type InvoiceLedgerEntryType =
   | 'installment_anticipation'
   | 'installment_anticipation_credit';
 
+// Quando a pessoa recebe (salário/renda) — usado pra saber até quando "Comprometido"
+// deve olhar sem precisar que ela lance uma receita futura manualmente.
+// `variable_income` é uma escolha explícita (plantão, freela, autônomo — sem data
+// fixa), não a ausência de resposta: guardar como valor real (não como `payday`
+// ausente) pra UI de configurações lembrar a escolha depois de recarregar.
+export type PaydayRule =
+  | { type: 'fixed_day'; day: number }
+  | { type: 'business_day'; day: number }
+  | { type: 'end_of_month' }
+  | { type: 'variable_income' };
+
 export interface UserProfile extends AppearancePreferences {
   id: string;
   name: string;
@@ -52,6 +63,12 @@ export interface UserProfile extends AppearancePreferences {
   themeId: ThemeId;
   onboardingGoal?: string;
   onboardingChallenge?: string;
+  payday?: PaydayRule;
+  // Sem `payday` (renda variável — plantão, freela, autônomo — ou pessoa que pulou a
+  // pergunta), quantos dias pra frente contam como "Comprometido" no resumo. Padrão 30
+  // quando ausente; editável em Configurações por qualquer pessoa, não só quem tem
+  // renda variável.
+  committedWindowDays?: number;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
