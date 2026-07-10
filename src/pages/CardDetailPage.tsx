@@ -39,10 +39,17 @@ export function CardDetailPage() {
 
   async function handleDeleteCard() {
     if (!workspaceId || !cardId) return;
+    // Excluir um cartão que ainda tem saldo em aberto faz essa dívida sumir do
+    // "Comprometido" e devolver limite — o "Disponível" sobe sem ninguém ter pago nada.
+    // A pessoa precisa saber disso ANTES, com o valor na frente.
+    const outstandingCents = activeInvoices.reduce((total, invoice) => total + invoice.outstandingBalanceCents, 0);
     const ok = await confirm({
       title: 'Excluir cartão?',
-      message: 'O cartão será removido da sua lista. As faturas e transações já registradas continuam no histórico.',
-      confirmLabel: 'Excluir',
+      message:
+        outstandingCents > 0
+          ? `Este cartão ainda tem ${formatMoney(outstandingCents)} em faturas a pagar. Ao excluir, esse valor deixa de contar no seu "Comprometido" e as faturas sumem do app — as compras continuam no Extrato. Se a dívida existe de verdade, pague ou registre antes.`
+          : 'O cartão sai da sua lista e as faturas dele deixam de aparecer no app. As compras já lançadas continuam no Extrato.',
+      confirmLabel: outstandingCents > 0 ? 'Excluir mesmo assim' : 'Excluir',
       danger: true
     });
     if (!ok) return;
@@ -120,7 +127,10 @@ export function CardDetailPage() {
                 <span className="text-secondary" style={{ marginLeft: '0.5rem', fontSize: '0.86rem' }}>de {formatMoney(card.limitCents)}</span>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <p className="eyebrow" style={{ marginBottom: '0.25rem' }}>Fatura em aberto</p>
+                {/* `usedCents` soma TODAS as faturas em aberto/fechadas (inclusive parcelas
+                    de meses futuros), não só a fatura atual — chamar isso de "fatura em
+                    aberto" fazia o número não bater com a fatura logo abaixo. */}
+                <p className="eyebrow" style={{ marginBottom: '0.25rem' }}>Limite usado</p>
                 <span className="card-limit-available amount--expense">{formatMoney(usedCents)}</span>
               </div>
             </div>

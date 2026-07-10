@@ -316,7 +316,6 @@ describe('findNextIncomeDate', () => {
 
 describe('buildUpcomingCommitments', () => {
   const cutoff = new Date('2026-07-14T12:00:00');
-  const now = new Date('2026-06-14T12:00:00');
 
   it('includes pending and overdue bills, excludes paid/cancelled', () => {
     const commitments = buildUpcomingCommitments(
@@ -361,8 +360,7 @@ describe('buildUpcomingCommitments', () => {
       [],
       [],
       cutoff,
-      [invoice({ id: 'inv-closed-past', status: 'closed', referenceMonth: '2026-01', outstandingBalanceCents: 5000 })],
-      now
+      [invoice({ id: 'inv-closed-past', status: 'closed', referenceMonth: '2026-01', outstandingBalanceCents: 5000 })]
     );
 
     expect(commitments.map((c) => c.id)).toEqual(['inv-closed-past']);
@@ -376,8 +374,7 @@ describe('buildUpcomingCommitments', () => {
       [
         invoice({ id: 'inv-open-soon', status: 'open', dueDate: Timestamp.fromDate(new Date('2026-07-10T12:00:00')), outstandingBalanceCents: 5000 }),
         invoice({ id: 'inv-open-past-due', status: 'open', dueDate: Timestamp.fromDate(new Date('2026-06-05T12:00:00')), outstandingBalanceCents: 3000 })
-      ],
-      now
+      ]
     );
 
     expect(commitments.map((c) => c.id).sort()).toEqual(['inv-open-past-due', 'inv-open-soon']);
@@ -393,8 +390,7 @@ describe('buildUpcomingCommitments', () => {
       [],
       [],
       cutoff,
-      [invoice({ id: 'inv-open-future', status: 'open', referenceMonth: '2026-06', dueDate: Timestamp.fromDate(new Date('2026-08-05T12:00:00')), outstandingBalanceCents: 5000 })],
-      now
+      [invoice({ id: 'inv-open-future', status: 'open', referenceMonth: '2026-06', dueDate: Timestamp.fromDate(new Date('2026-08-05T12:00:00')), outstandingBalanceCents: 5000 })]
     );
 
     expect(commitments).toHaveLength(0);
@@ -409,8 +405,7 @@ describe('buildUpcomingCommitments', () => {
         invoice({ id: 'inv-paid', status: 'paid', referenceMonth: '2026-06', outstandingBalanceCents: 0 }),
         invoice({ id: 'inv-overpaid', status: 'overpaid', referenceMonth: '2026-06', outstandingBalanceCents: 0 }),
         invoice({ id: 'inv-zero', status: 'closed', referenceMonth: '2026-06', outstandingBalanceCents: 0 })
-      ],
-      now
+      ]
     );
 
     expect(commitments).toHaveLength(0);
@@ -421,8 +416,7 @@ describe('buildUpcomingCommitments', () => {
       [bill({ id: 'b-1', dueDate: Timestamp.fromDate(new Date('2026-06-25T12:00:00')) })],
       [recurring({ id: 'r-1', nextOccurrenceAt: Timestamp.fromDate(new Date('2026-06-16T12:00:00')) })],
       cutoff,
-      [invoice({ id: 'inv-1', status: 'closed', referenceMonth: '2026-06', dueDate: Timestamp.fromDate(new Date('2026-06-20T12:00:00')), outstandingBalanceCents: 1000 })],
-      now
+      [invoice({ id: 'inv-1', status: 'closed', referenceMonth: '2026-06', dueDate: Timestamp.fromDate(new Date('2026-06-20T12:00:00')), outstandingBalanceCents: 1000 })]
     );
 
     expect(commitments.map((c) => c.id)).toEqual(['r-1', 'inv-1', 'b-1']);

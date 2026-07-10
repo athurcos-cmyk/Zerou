@@ -128,8 +128,7 @@ export function buildUpcomingCommitments(
   bills: Bill[],
   recurringRules: RecurringRule[],
   cutoff: Date | null,
-  invoices: Invoice[] = [],
-  now: Date = new Date()
+  invoices: Invoice[] = []
 ): UpcomingCommitment[] {
   const withinCutoff = (dueAt: Date) => cutoff === null || isOnOrBefore(dueAt, cutoff);
 
@@ -196,6 +195,54 @@ export function buildUpcomingCommitments(
   );
 }
 
+export interface CommittedCutoff {
+  /** `null` no modo conservador: não existe data-limite, tudo que se deve conta. */
+  cutoff: Date | null;
+  source: CommittedCutoffSource;
+  nextIncomeAt: Date | null;
+}
+
+/**
+ * Até quando o "Comprometido" enxerga. É o coração do "Disponível", e a tela de
+ * Configurações usa esta mesma função pra mostrar a data real que está em vigor —
+ * sem isso, a explicação lá e o número do Dashboard poderiam divergir em silêncio.
+ */
+export function resolveCommittedCutoff(input: {
+  transactions: Transaction[];
+  payday?: PaydayRule;
+  committedWindowDays?: number;
+  availableMode?: AvailableMode;
+  now?: Date;
+}): CommittedCutoff {
+  const now = input.now ?? new Date();
+  const nextIncomeAt = findNextIncomeDate(input.transactions, now);
+  const availableMode = input.availableMode ?? defaultAvailableMode;
+
+  // Modo conservador: sem data de corte. Não prevê recebimento nenhum — tudo que a
+  // pessoa já deve entra no Comprometido.
+  if (availableMode === 'conservative') {
+    return { cutoff: null, source: 'all', nextIncomeAt };
+  }
+
+  // Sem receita futura lançada na mão, usa a data de recebimento estimada do perfil
+  // (pergunta do onboarding) antes de cair na janela configurável (padrão 30 dias) —
+  // evita que uma fatura que só vence depois do próximo salário pareça "comprometida"
+  // hoje. "Renda variável" é uma escolha explícita sem data resolvível — cai na janela
+  // igual quem nunca respondeu a pergunta.
+  const resolvablePayday = input.payday && input.payday.type !== 'variable_income' ? input.payday : undefined;
+  const windowDays = input.committedWindowDays ?? defaultCommittedWindowDays;
+  const source: CommittedCutoffSource = nextIncomeAt ? 'income' : resolvablePayday ? 'payday' : 'window';
+  // `endOfDay`: o corte é um DIA, não um instante. As três origens produzem horas
+  // diferentes (receita lançada e vencimentos ficam ao meio-dia; `nextPaydayFrom`
+  // devolve meia-noite; a janela de N dias herda a hora atual) — sem normalizar, uma
+  // conta que vence no próprio dia do salário entrava ou não no Comprometido dependendo
+  // da origem do corte, e a janela de 30 dias mudava de resultado conforme a hora em
+  // que o app era aberto.
+  const rawCutoff = nextIncomeAt ?? (resolvablePayday ? nextPaydayFrom(resolvablePayday, now) : addDays(now, windowDays));
+
+  return { cutoff: endOfDay(rawCutoff), source, nextIncomeAt };
+}
+
 export function calculateDashboardSummary(input: {
   accounts: Account[];
   transactions: Transaction[];
@@ -208,35 +255,15 @@ export function calculateDashboardSummary(input: {
   now?: Date;
 }): DashboardSummary {
   const now = input.now ?? new Date();
-  const nextIncomeAt = findNextIncomeDate(input.transactions, now);
-  const availableMode = input.availableMode ?? defaultAvailableMode;
-  // Modo conservador: sem data de corte. Não prevê recebimento nenhum — tudo que a
-  // pessoa já deve entra no Comprometido.
-  const isConservative = availableMode === 'conservative';
-  // Sem receita futura lançada na mão, usa a data de recebimento estimada do perfil
-  // (pergunta do onboarding) antes de cair na janela configurável (padrão 30 dias) —
-  // evita que uma fatura que só vence depois do próximo salário pareça "comprometida"
-  // hoje. "Renda variável" é uma escolha explícita sem data resolvível — cai na janela
-  // igual quem nunca respondeu a pergunta.
-  const resolvablePayday = input.payday && input.payday.type !== 'variable_income' ? input.payday : undefined;
-  const windowDays = input.committedWindowDays ?? defaultCommittedWindowDays;
-  const committedCutoffSource: CommittedCutoffSource = isConservative
-    ? 'all'
-    : nextIncomeAt
-    ? 'income'
-    : resolvablePayday
-    ? 'payday'
-    : 'window';
-  // `endOfDay`: o corte é um DIA, não um instante. As três origens produzem horas
-  // diferentes (receita lançada e vencimentos ficam ao meio-dia; `nextPaydayFrom`
-  // devolve meia-noite; a janela de N dias herda a hora atual) — sem normalizar, uma
-  // conta que vence no próprio dia do salário entrava ou não no Comprometido dependendo
-  // da origem do corte, e a janela de 30 dias mudava de resultado conforme a hora em
-  // que o app era aberto.
-  const rawCutoff = nextIncomeAt ?? (resolvablePayday ? nextPaydayFrom(resolvablePayday, now) : addDays(now, windowDays));
-  const cutoff = isConservative ? null : endOfDay(rawCutoff);
+  const { cutoff, source: committedCutoffSource, nextIncomeAt } = resolveCommittedCutoff({
+    transactions: input.transactions,
+    payday: input.payday,
+    committedWindowDays: input.committedWindowDays,
+    availableMode: input.availableMode,
+    now
+  });
   const totalBalanceCents = calculateTotalBalance(input.accounts, input.transactions);
-  const commitments = buildUpcomingCommitments(input.bills, input.recurringRules, cutoff, input.invoices ?? [], now);
+  const commitments = buildUpcomingCommitments(input.bills, input.recurringRules, cutoff, input.invoices ?? []);
   const committedCents = commitments.reduce((total, commitment) => total + commitment.amountCents, 0);
   const recentTransactions = input.transactions
     .filter(isActiveTransaction)

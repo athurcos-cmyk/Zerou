@@ -332,6 +332,10 @@ function cardPaymentTransactionPayload(
   };
 }
 
+// Espelha o payload real de `createCoupleWorkspace` (src/shared/sharedService.ts).
+// `coupleMode` faltava aqui. A regra lê `request.resource.data.coupleMode`, e ler um
+// campo AUSENTE é *evaluation error* nas rules (não `false`) — o batch inteiro era
+// negado. O teste nunca rodou (Java quebrado), então ninguém percebeu.
 function coupleWorkspacePayload(workspaceId: string, uid: string, overrides: Record<string, unknown> = {}) {
   const now = serverTimestamp();
 
@@ -342,6 +346,7 @@ function coupleWorkspacePayload(workspaceId: string, uid: string, overrides: Rec
     ownerUserId: uid,
     partnerUserId: '',
     activeMemberCount: 1,
+    coupleMode: 'savings_only',
     status: 'active',
     currency: 'BRL',
     locale: 'pt-BR',
@@ -352,6 +357,7 @@ function coupleWorkspacePayload(workspaceId: string, uid: string, overrides: Rec
   };
 }
 
+// `displayName` também faz parte do payload real (sharedService.ts) desde 2026-06-17.
 function coupleMemberPayload(
   workspaceId: string,
   uid: string,
@@ -365,6 +371,7 @@ function coupleMemberPayload(
     workspaceId,
     role,
     status: 'active',
+    displayName: uid,
     joinedAt: now,
     createdAt: now,
     updatedAt: now,
@@ -396,7 +403,10 @@ function invitePayload(inviteId: string, workspaceId: string, uid: string, overr
     codeHash: 'a'.repeat(64),
     codeHint: '92',
     createdBy: uid,
-    expiresAt: Timestamp.fromDate(new Date('2026-06-16T12:00:00')),
+    // A regra exige `expiresAt > request.time`. Uma data literal aqui é uma bomba-relógio:
+    // era `2026-06-16` e o teste passou a falhar sozinho quando essa data ficou no passado.
+    // 48h é a mesma validade que `createCoupleInvite` usa em produção.
+    expiresAt: Timestamp.fromDate(new Date(Date.now() + 48 * 60 * 60 * 1000)),
     status: 'active',
     createdAt: now,
     updatedAt: now,
@@ -491,7 +501,7 @@ function privacyRequestPayload(requestId: string, uid: string, overrides: Record
   };
 }
 
-function createCoupleWorkspaceBatch(db: TestFirestore, workspaceId = 'coupleA', uid = 'alice') {
+function createCoupleWorkspaceBatch(db: TestFirestore, workspaceId = 'couple_a', uid = 'alice') {
   const modularDb = db as unknown as Parameters<typeof writeBatch>[0];
   const batch = writeBatch(modularDb);
   batch.set(doc(modularDb, 'workspaces', workspaceId), coupleWorkspacePayload(workspaceId, uid));
@@ -538,18 +548,10 @@ describe('firestore security rules', () => {
         fontScale: 'md',
         reduceMotion: false
       });
-      await setDoc(doc(adminDb, 'users/charlie'), {
-        id: 'charlie',
-        name: 'Charlie',
-        email: 'charlie@zerou.test',
-        locale: 'pt-BR',
-        timezone: 'America/Sao_Paulo',
-        themeMode: 'system',
-        themeId: 'paper',
-        density: 'comfortable',
-        fontScale: 'md',
-        reduceMotion: false
-      });
+      // `users/charlie` NÃO é semeado de propósito: charlie é o usuário "novo" que
+      // exercita a criação da fundação (`validUserFoundationCreate`). Com o doc já
+      // existindo, `batch.set` virava um UPDATE, a regra de create nunca era avaliada,
+      // e os testes de "rejeita fundação inválida" passavam pelo motivo errado.
       await setDoc(doc(adminDb, 'billingAccounts/billing_alice'), billingAccountPayload('alice', true));
       await setDoc(doc(adminDb, 'billingAccounts/billing_bob'), billingAccountPayload('bob', false));
       await setDoc(doc(adminDb, 'workspaces/workspaceA'), {
@@ -1123,13 +1125,13 @@ describe('firestore security rules', () => {
     const aliceDb = testEnv.authenticatedContext('alice').firestore();
 
     await assertSucceeds(createCoupleWorkspaceBatch(aliceDb).commit());
-    await assertSucceeds(getDoc(doc(aliceDb, 'workspaces/coupleA')));
+    await assertSucceeds(getDoc(doc(aliceDb, 'workspaces/couple_a')));
   });
 
   it('allows couple workspace creation during the free launch mode', async () => {
     const bobDb = testEnv.authenticatedContext('bob').firestore();
 
-    await assertSucceeds(createCoupleWorkspaceBatch(bobDb, 'coupleBob', 'bob').commit());
+    await assertSucceeds(createCoupleWorkspaceBatch(bobDb, 'couple_bob', 'bob').commit());
   });
 
   it('allows a user to create only their own privacy request', async () => {
@@ -1156,10 +1158,10 @@ describe('firestore security rules', () => {
     const inviteId = 'invite_' + 'a'.repeat(32);
 
     await assertSucceeds(createCoupleWorkspaceBatch(aliceDb).commit());
-    await assertSucceeds(setDoc(doc(aliceDb, 'coupleInvites', inviteId), invitePayload(inviteId, 'coupleA', 'alice')));
+    await assertSucceeds(setDoc(doc(aliceDb, 'coupleInvites', inviteId), invitePayload(inviteId, 'couple_a', 'alice')));
 
     const batch = writeBatch(modularBobDb);
-    batch.update(doc(modularBobDb, 'workspaces/coupleA'), {
+    batch.update(doc(modularBobDb, 'workspaces/couple_a'), {
       partnerUserId: 'bob',
       activeMemberCount: 2,
       updatedAt: serverTimestamp()
@@ -1170,8 +1172,8 @@ describe('firestore security rules', () => {
       usedAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
-    batch.set(doc(modularBobDb, 'workspaces/coupleA/members/bob'), coupleMemberPayload('coupleA', 'bob', 'partner', { acceptedInviteId: inviteId }));
-    batch.set(doc(modularBobDb, 'users/bob/workspaceRefs/coupleA'), workspaceRefPayload('coupleA', 'partner'));
+    batch.set(doc(modularBobDb, 'workspaces/couple_a/members/bob'), coupleMemberPayload('couple_a', 'bob', 'partner', { acceptedInviteId: inviteId }));
+    batch.set(doc(modularBobDb, 'users/bob/workspaceRefs/couple_a'), workspaceRefPayload('couple_a', 'partner'));
 
     await assertSucceeds(batch.commit());
     await assertFails(
@@ -1190,26 +1192,26 @@ describe('firestore security rules', () => {
 
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const adminDb = context.firestore();
-      await setDoc(doc(adminDb, 'workspaces/coupleA'), {
-        ...coupleWorkspacePayload('coupleA', 'alice'),
+      await setDoc(doc(adminDb, 'workspaces/couple_a'), {
+        ...coupleWorkspacePayload('couple_a', 'alice'),
         createdAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         updatedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00'))
       });
-      await setDoc(doc(adminDb, 'workspaces/coupleA/members/alice'), {
-        ...coupleMemberPayload('coupleA', 'alice', 'owner'),
+      await setDoc(doc(adminDb, 'workspaces/couple_a/members/alice'), {
+        ...coupleMemberPayload('couple_a', 'alice', 'owner'),
         createdAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         updatedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         joinedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00'))
       });
       await setDoc(doc(adminDb, 'coupleInvites/invite_expired'), {
-        ...invitePayload('invite_expired', 'coupleA', 'alice', {
+        ...invitePayload('invite_expired', 'couple_a', 'alice', {
           expiresAt: Timestamp.fromDate(new Date('2026-06-13T12:00:00'))
         }),
         createdAt: Timestamp.fromDate(new Date('2026-06-12T12:00:00')),
         updatedAt: Timestamp.fromDate(new Date('2026-06-12T12:00:00'))
       });
       await setDoc(doc(adminDb, 'coupleInvites/invite_revoked'), {
-        ...invitePayload('invite_revoked', 'coupleA', 'alice', { status: 'revoked' }),
+        ...invitePayload('invite_revoked', 'couple_a', 'alice', { status: 'revoked' }),
         createdAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         updatedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00'))
       });
@@ -1217,7 +1219,7 @@ describe('firestore security rules', () => {
 
     for (const inviteId of ['invite_expired', 'invite_revoked']) {
       const batch = writeBatch(modularBobDb);
-      batch.update(doc(modularBobDb, 'workspaces/coupleA'), {
+      batch.update(doc(modularBobDb, 'workspaces/couple_a'), {
         partnerUserId: 'bob',
         activeMemberCount: 2,
         updatedAt: serverTimestamp()
@@ -1228,8 +1230,8 @@ describe('firestore security rules', () => {
         usedAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
-      batch.set(doc(modularBobDb, 'workspaces/coupleA/members/bob'), coupleMemberPayload('coupleA', 'bob', 'partner', { acceptedInviteId: inviteId }));
-      batch.set(doc(modularBobDb, 'users/bob/workspaceRefs/coupleA'), workspaceRefPayload('coupleA', 'partner'));
+      batch.set(doc(modularBobDb, 'workspaces/couple_a/members/bob'), coupleMemberPayload('couple_a', 'bob', 'partner', { acceptedInviteId: inviteId }));
+      batch.set(doc(modularBobDb, 'users/bob/workspaceRefs/couple_a'), workspaceRefPayload('couple_a', 'partner'));
 
       await assertFails(batch.commit());
     }
@@ -1242,32 +1244,32 @@ describe('firestore security rules', () => {
 
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const adminDb = context.firestore();
-      await setDoc(doc(adminDb, 'workspaces/coupleA'), {
-        ...coupleWorkspacePayload('coupleA', 'alice', { partnerUserId: 'bob', activeMemberCount: 2 }),
+      await setDoc(doc(adminDb, 'workspaces/couple_a'), {
+        ...coupleWorkspacePayload('couple_a', 'alice', { partnerUserId: 'bob', activeMemberCount: 2 }),
         createdAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         updatedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00'))
       });
-      await setDoc(doc(adminDb, 'workspaces/coupleA/members/alice'), {
-        ...coupleMemberPayload('coupleA', 'alice', 'owner'),
+      await setDoc(doc(adminDb, 'workspaces/couple_a/members/alice'), {
+        ...coupleMemberPayload('couple_a', 'alice', 'owner'),
         createdAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         updatedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         joinedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00'))
       });
-      await setDoc(doc(adminDb, 'workspaces/coupleA/members/bob'), {
-        ...coupleMemberPayload('coupleA', 'bob', 'partner', { acceptedInviteId: 'invite_old' }),
+      await setDoc(doc(adminDb, 'workspaces/couple_a/members/bob'), {
+        ...coupleMemberPayload('couple_a', 'bob', 'partner', { acceptedInviteId: 'invite_old' }),
         createdAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         updatedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         joinedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00'))
       });
       await setDoc(doc(adminDb, 'coupleInvites', inviteId), {
-        ...invitePayload(inviteId, 'coupleA', 'alice'),
+        ...invitePayload(inviteId, 'couple_a', 'alice'),
         createdAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         updatedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00'))
       });
     });
 
     const batch = writeBatch(modularCharlieDb);
-    batch.update(doc(modularCharlieDb, 'workspaces/coupleA'), {
+    batch.update(doc(modularCharlieDb, 'workspaces/couple_a'), {
       partnerUserId: 'charlie',
       activeMemberCount: 2,
       updatedAt: serverTimestamp()
@@ -1278,8 +1280,8 @@ describe('firestore security rules', () => {
       usedAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
-    batch.set(doc(modularCharlieDb, 'workspaces/coupleA/members/charlie'), coupleMemberPayload('coupleA', 'charlie', 'partner', { acceptedInviteId: inviteId }));
-    batch.set(doc(modularCharlieDb, 'users/charlie/workspaceRefs/coupleA'), workspaceRefPayload('coupleA', 'partner'));
+    batch.set(doc(modularCharlieDb, 'workspaces/couple_a/members/charlie'), coupleMemberPayload('couple_a', 'charlie', 'partner', { acceptedInviteId: inviteId }));
+    batch.set(doc(modularCharlieDb, 'users/charlie/workspaceRefs/couple_a'), workspaceRefPayload('couple_a', 'partner'));
 
     await assertFails(batch.commit());
   });
@@ -1289,19 +1291,19 @@ describe('firestore security rules', () => {
 
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const adminDb = context.firestore();
-      await setDoc(doc(adminDb, 'workspaces/coupleA'), {
-        ...coupleWorkspacePayload('coupleA', 'alice', { partnerUserId: 'bob', activeMemberCount: 2 }),
+      await setDoc(doc(adminDb, 'workspaces/couple_a'), {
+        ...coupleWorkspacePayload('couple_a', 'alice', { partnerUserId: 'bob', activeMemberCount: 2 }),
         createdAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         updatedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00'))
       });
-      await setDoc(doc(adminDb, 'workspaces/coupleA/members/alice'), {
-        ...coupleMemberPayload('coupleA', 'alice', 'owner'),
+      await setDoc(doc(adminDb, 'workspaces/couple_a/members/alice'), {
+        ...coupleMemberPayload('couple_a', 'alice', 'owner'),
         createdAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         updatedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         joinedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00'))
       });
-      await setDoc(doc(adminDb, 'workspaces/coupleA/members/bob'), {
-        ...coupleMemberPayload('coupleA', 'bob', 'partner', { acceptedInviteId: 'invite_old' }),
+      await setDoc(doc(adminDb, 'workspaces/couple_a/members/bob'), {
+        ...coupleMemberPayload('couple_a', 'bob', 'partner', { acceptedInviteId: 'invite_old' }),
         createdAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         updatedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         joinedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00'))
@@ -1318,7 +1320,7 @@ describe('firestore security rules', () => {
       });
     });
 
-    await assertSucceeds(getDoc(doc(bobDb, 'workspaces/coupleA')));
+    await assertSucceeds(getDoc(doc(bobDb, 'workspaces/couple_a')));
     await assertFails(getDoc(doc(bobDb, 'workspaces/workspaceA/accounts/accountPrivate')));
     await assertFails(getDoc(doc(bobDb, 'workspaces/workspaceA/cards/cardPrivate')));
   });
@@ -1328,19 +1330,19 @@ describe('firestore security rules', () => {
 
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const adminDb = context.firestore();
-      await setDoc(doc(adminDb, 'workspaces/coupleA'), {
-        ...coupleWorkspacePayload('coupleA', 'alice', { partnerUserId: 'bob', activeMemberCount: 2 }),
+      await setDoc(doc(adminDb, 'workspaces/couple_a'), {
+        ...coupleWorkspacePayload('couple_a', 'alice', { partnerUserId: 'bob', activeMemberCount: 2 }),
         createdAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         updatedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00'))
       });
-      await setDoc(doc(adminDb, 'workspaces/coupleA/members/alice'), {
-        ...coupleMemberPayload('coupleA', 'alice', 'owner'),
+      await setDoc(doc(adminDb, 'workspaces/couple_a/members/alice'), {
+        ...coupleMemberPayload('couple_a', 'alice', 'owner'),
         createdAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         updatedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         joinedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00'))
       });
-      await setDoc(doc(adminDb, 'workspaces/coupleA/members/bob'), {
-        ...coupleMemberPayload('coupleA', 'bob', 'partner', { acceptedInviteId: 'invite_old' }),
+      await setDoc(doc(adminDb, 'workspaces/couple_a/members/bob'), {
+        ...coupleMemberPayload('couple_a', 'bob', 'partner', { acceptedInviteId: 'invite_old' }),
         createdAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         updatedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         joinedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00'))
@@ -1348,12 +1350,12 @@ describe('firestore security rules', () => {
     });
 
     await assertSucceeds(
-      setDoc(doc(aliceDb, 'workspaces/coupleA/sharedExpenseClaims/claimA'), sharedClaimPayload('coupleA', 'claimA', 'alice'))
+      setDoc(doc(aliceDb, 'workspaces/couple_a/sharedExpenseClaims/claimA'), sharedClaimPayload('couple_a', 'claimA', 'alice'))
     );
     await assertFails(
       setDoc(
-        doc(aliceDb, 'workspaces/coupleA/sharedExpenseClaims/claimLeak'),
-        sharedClaimPayload('coupleA', 'claimLeak', 'alice', { sourcePersonalTransactionId: 'txn_private' })
+        doc(aliceDb, 'workspaces/couple_a/sharedExpenseClaims/claimLeak'),
+        sharedClaimPayload('couple_a', 'claimLeak', 'alice', { sourcePersonalTransactionId: 'txn_private' })
       )
     );
   });
@@ -1363,19 +1365,19 @@ describe('firestore security rules', () => {
 
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const adminDb = context.firestore();
-      await setDoc(doc(adminDb, 'workspaces/coupleA'), {
-        ...coupleWorkspacePayload('coupleA', 'alice', { partnerUserId: 'bob', activeMemberCount: 2 }),
+      await setDoc(doc(adminDb, 'workspaces/couple_a'), {
+        ...coupleWorkspacePayload('couple_a', 'alice', { partnerUserId: 'bob', activeMemberCount: 2 }),
         createdAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         updatedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00'))
       });
-      await setDoc(doc(adminDb, 'workspaces/coupleA/members/alice'), {
-        ...coupleMemberPayload('coupleA', 'alice', 'owner'),
+      await setDoc(doc(adminDb, 'workspaces/couple_a/members/alice'), {
+        ...coupleMemberPayload('couple_a', 'alice', 'owner'),
         createdAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         updatedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         joinedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00'))
       });
-      await setDoc(doc(adminDb, 'workspaces/coupleA/members/bob'), {
-        ...coupleMemberPayload('coupleA', 'bob', 'partner', { acceptedInviteId: 'invite_old' }),
+      await setDoc(doc(adminDb, 'workspaces/couple_a/members/bob'), {
+        ...coupleMemberPayload('couple_a', 'bob', 'partner', { acceptedInviteId: 'invite_old' }),
         createdAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         updatedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         joinedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00'))
@@ -1383,10 +1385,10 @@ describe('firestore security rules', () => {
     });
 
     await assertSucceeds(
-      setDoc(doc(aliceDb, 'workspaces/coupleA/settlements/settlementA'), settlementPayload('coupleA', 'settlementA', 'alice'))
+      setDoc(doc(aliceDb, 'workspaces/couple_a/settlements/settlementA'), settlementPayload('couple_a', 'settlementA', 'alice'))
     );
     await assertSucceeds(
-      updateDoc(doc(aliceDb, 'workspaces/coupleA/settlements/settlementA'), {
+      updateDoc(doc(aliceDb, 'workspaces/couple_a/settlements/settlementA'), {
         status: 'partially_paid',
         paidAmountCents: 2500,
         version: 2,
@@ -1394,7 +1396,7 @@ describe('firestore security rules', () => {
       })
     );
     await assertSucceeds(
-      updateDoc(doc(aliceDb, 'workspaces/coupleA/settlements/settlementA'), {
+      updateDoc(doc(aliceDb, 'workspaces/couple_a/settlements/settlementA'), {
         status: 'settled',
         paidAmountCents: 5000,
         version: 3,
@@ -1408,19 +1410,19 @@ describe('firestore security rules', () => {
 
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const adminDb = context.firestore();
-      await setDoc(doc(adminDb, 'workspaces/coupleA'), {
-        ...coupleWorkspacePayload('coupleA', 'alice', { partnerUserId: 'bob', activeMemberCount: 2 }),
+      await setDoc(doc(adminDb, 'workspaces/couple_a'), {
+        ...coupleWorkspacePayload('couple_a', 'alice', { partnerUserId: 'bob', activeMemberCount: 2 }),
         createdAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         updatedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00'))
       });
-      await setDoc(doc(adminDb, 'workspaces/coupleA/members/bob'), {
-        ...coupleMemberPayload('coupleA', 'bob', 'partner', { acceptedInviteId: 'invite_old' }),
+      await setDoc(doc(adminDb, 'workspaces/couple_a/members/bob'), {
+        ...coupleMemberPayload('couple_a', 'bob', 'partner', { acceptedInviteId: 'invite_old' }),
         createdAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         updatedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
         joinedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00'))
       });
     });
 
-    await assertFails(updateDoc(doc(bobDb, 'workspaces/coupleA/members/bob'), { role: 'owner', updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(doc(bobDb, 'workspaces/couple_a/members/bob'), { role: 'owner', updatedAt: serverTimestamp() }));
   });
 });

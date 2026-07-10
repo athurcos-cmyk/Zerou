@@ -18,7 +18,7 @@ import {
   updateCategory
 } from '../finance/financeService';
 import { recurringFrequencies, type CreateRecurringRuleInput } from '../finance/financeSchemas';
-import { formatMoney, parseMoneyToCents } from '../finance/money';
+import { centsToInputValue, formatMoney, parseMoneyToCents } from '../finance/money';
 import type { RecurringRule } from '../types/contracts';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
@@ -42,7 +42,10 @@ export function RecurringPage() {
   function handleOpenPay(rule: RecurringRule) {
     setPayingRule(rule);
     setPayAccountId(rule.accountId ?? '');
-    setPayAmount(rule.amountCents ? formatMoney(rule.amountCents) : '');
+    // `centsToInputValue` ("39,90"), não `formatMoney` ("R$ 39,90"): todos os outros
+    // campos de dinheiro do app recebem o número puro. Com o "R$" dentro do input, editar
+    // o valor no celular vira uma briga com o cursor.
+    setPayAmount(rule.amountCents ? centsToInputValue(rule.amountCents) : '');
   }
 
   function handleConfirmPay() {

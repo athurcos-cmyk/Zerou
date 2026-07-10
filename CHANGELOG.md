@@ -2,6 +2,17 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-10 — fix: `npm run test:rules` desbloqueado (e 5 testes que ele revelou quebrados) + clareza na tela de Recebimento
+
+- **`npm run test:rules` voltou a rodar**, depois de meses bloqueado. O Java desta máquina tinha dois JDK 25 **sem a pasta `bin/`** e um stub órfão da Oracle primeiro no PATH do sistema, morrendo com `0xC0000409`. Como `firebase-tools` chama `spawn("java")` cru e ignora `JAVA_HOME`, e corrigir o PATH do sistema exige admin, o script passou a usar `scripts/with-java.mjs`: acha um JDK que de fato executa e o coloca na frente do PATH só daquele comando.
+- **Ao rodar, a suíte acusou 5 falhas — todas nos testes, não nas regras.** O seed criava `users/charlie` antes do teste que deveria *criar* a fundação (virava update); os testes de casal usavam id `coupleA`, mas a regra exige `^couple_`; o payload de teste não tinha `coupleMode` nem `displayName` (ler campo ausente numa rule é *evaluation error*, não `false`); e o convite tinha `expiresAt` fixo em `2026-06-16`, uma data que já passou. 43/43 passando agora, e um teste de mutação confirmou que a suíte realmente pega uma regra sabotada.
+- **Excluir cartão com fatura em aberto** agora avisa, com o valor na frente, que a dívida vai parar de contar no "Comprometido" e as faturas somem do app (as compras continuam no Extrato). O texto anterior prometia que "as faturas continuam no histórico" — não continuam.
+- **Tela de Recebimento reescrita**: clicar num modo não dava retorno nenhum (o "Salvo." ficava no rodapé, fora da tela) — agora há um selo "Salvo" que aparece e some. A tela também mostra **a data-limite real em vigor** ("Hoje o corte é 5 ago — seu próximo recebimento"), usando a mesma função do Dashboard, e explica em português o que a data de recebimento faz e o que é o período de dias.
+- No modo Conservador, a seção de recebimento fica recuada com um aviso: nada ali muda o resumo.
+- **Rótulo errado no cartão**: "Fatura em aberto" mostrava a soma de *todas* as faturas (o limite usado), não a fatura atual. Virou "Limite usado".
+- Campo de valor da recorrência vinha preenchido com `"R$ 39,90"` em vez de `"39,90"`, fora do padrão dos outros campos de dinheiro.
+- 178 testes de unidade + 43 de regras passando, typecheck e build limpos, lint com 2 problemas a menos que a linha de base.
+
 ## 2026-07-09 — fix: 7 bugs de cartão/parcela/Comprometido + a pessoa escolhe como o "Disponível" é calculado
 
 - **Cartão excluído continuava listado em Cartões e ainda comprometia saldo e limite** — `deleteCard` é soft-delete e nada filtrava `isActive`. Corrigido na raiz (`useCardsData`), verificado ao vivo: o Comprometido volta sozinho ao excluir o cartão.

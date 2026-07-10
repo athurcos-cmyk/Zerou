@@ -30,5 +30,13 @@ export default tseslint.config(
       ecmaVersion: 2022,
       globals: globals.node
     }
+  },
+  {
+    // Scripts de ferramenta rodam no Node, não no browser (`process`, `console`).
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      globals: globals.node
+    }
   }
 );

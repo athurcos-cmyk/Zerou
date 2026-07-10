@@ -3866,6 +3866,42 @@ span.category-mark {
   border-color: transparent;
 }
 
+/* Configurações › Recebimento */
+.settings-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+.saved-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.settings-hint {
+  margin: 0.9rem 0 0;
+  padding: 0.7rem 0.85rem;
+  border-radius: 0.7rem;
+  background: var(--bg-surface-subtle);
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+/* Os controles continuam clicáveis (a escolha fica salva), mas o modo conservador não
+   usa nenhum deles — o recuo visual evita que a pessoa mexa achando que muda o resumo. */
+.settings-grid--inactive {
+  opacity: 0.62;
+}
+
 /* Mini tutorial do "Disponível" (AvailableModeSheet) */
 .available-mode-steps {
   display: grid;

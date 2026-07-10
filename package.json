@@ -13,11 +13,11 @@
     "test": "vitest run src",
     "test:functions": "npm --prefix functions test",
     "test:watch": "vitest",
-    "test:rules": "firebase emulators:exec --only firestore,storage \"vitest run tests/firestore.rules.test.ts tests/storage.rules.test.ts --config vite.config.ts\"",
+    "test:rules": "node scripts/with-java.mjs firebase emulators:exec --only firestore,storage \"vitest run tests/firestore.rules.test.ts tests/storage.rules.test.ts --config vite.config.ts\"",
     "test:e2e": "playwright test",
     "generate:bank-logos": "node scripts/generate-bank-logos.mjs",
     "functions:build": "npm --prefix functions run build",
-    "emulators": "firebase emulators:start --only auth,firestore,storage,functions,hosting"
+    "emulators": "node scripts/with-java.mjs firebase emulators:start --only auth,firestore,storage,functions,hosting"
   },
   "engines": {
     "node": ">=22.0.0"

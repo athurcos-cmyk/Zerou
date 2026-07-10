@@ -1,8 +1,11 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import { CalendarClock, CalendarRange, CheckCircle2, HelpCircle, Shuffle, Wallet } from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { CalendarClock, CalendarRange, Check, CheckCircle2, HelpCircle, Shuffle, Wallet } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { AvailableModeSheet } from '../finance/AvailableModeSheet';
 import { availableModeLabels, availableModeSummaries, defaultAvailableMode } from '../finance/availableMode';
+import { useFinanceContext } from '../finance/FinanceDataContext';
+import { resolveCommittedCutoff } from '../finance/financeCalculations';
+import { formatFriendlyDate } from '../finance/financeDates';
 import {
   committedWindowDaysMax,
   committedWindowDaysMin,
@@ -24,6 +27,9 @@ const paydayOptions: { id: PaydayChoice; label: string; hint: string; icon: Reac
 
 export function PaydaySettingsPage() {
   const { user, profile } = useAuth();
+  const finance = useFinanceContext();
+  const savedTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(savedTimer.current), []);
   const [paydayType, setPaydayType] = useState<PaydayChoice | ''>(profile?.payday?.type ?? '');
   const [paydayDay, setPaydayDay] = useState(
     profile?.payday && (profile.payday.type === 'fixed_day' || profile.payday.type === 'business_day')
@@ -71,7 +77,7 @@ export function PaydaySettingsPage() {
     );
 
     updatePaydaySettings(user.uid, { payday, committedWindowDays });
-    setSaved(true);
+    flashSaved();
   }
 
   function selectType(nextType: PaydayChoice) {
@@ -103,11 +109,38 @@ export function PaydaySettingsPage() {
   // nada disso entra no cálculo — mostrar os controles como se entrassem seria mentira.
   const paydayAffectsSummary = availableMode === 'until_payday';
 
+  // Mesma função que o Dashboard usa. Mostrar aqui a data-limite REAL responde de dentro
+  // do produto a pergunta "o que essa data faz, afinal?" — antes a pessoa escolhia um dia
+  // do mês sem nunca ver a consequência.
+  const committed = resolveCommittedCutoff({
+    transactions: finance.transactions,
+    payday: profile?.payday,
+    committedWindowDays: profile?.committedWindowDays,
+    availableMode
+  });
+  const cutoffExplanation =
+    committed.cutoff === null
+      ? null
+      : committed.source === 'income'
+      ? `Hoje o corte é ${formatFriendlyDate(committed.cutoff)}, porque você lançou uma receita futura nessa data.`
+      : committed.source === 'payday'
+      ? `Hoje o corte é ${formatFriendlyDate(committed.cutoff)} — seu próximo recebimento pela regra acima.`
+      : `Hoje o corte é ${formatFriendlyDate(committed.cutoff)}, o fim da janela de ${profile?.committedWindowDays ?? defaultCommittedWindowDays} dias.`;
+
   function chooseAvailableMode(mode: AvailableMode) {
     if (!user) return;
     updateAvailableMode(user.uid, mode);
     setTutorialOpen(false);
+    flashSaved();
+  }
+
+  // Feedback visível e efêmero. Antes existia só um "Salvo." no rodapé da página, fora da
+  // tela — clicar num modo parecia não fazer nada, e clicar no modo JÁ ativo então não
+  // dava sinal nenhum de que o app tinha entendido.
+  function flashSaved() {
     setSaved(true);
+    window.clearTimeout(savedTimer.current);
+    savedTimer.current = window.setTimeout(() => setSaved(false), 2200);
   }
 
   return (
@@ -126,9 +159,16 @@ export function PaydaySettingsPage() {
               Atualmente: <strong>{availableModeLabels[availableMode]}</strong>
             </p>
           </div>
-          <button className="button button--subtle button--compact" type="button" onClick={() => setTutorialOpen(true)}>
-            <HelpCircle size={16} aria-hidden="true" /> Ver explicação
-          </button>
+          <div className="settings-heading-actions">
+            {saved && (
+              <span className="saved-badge" role="status">
+                <Check size={14} aria-hidden="true" /> Salvo
+              </span>
+            )}
+            <button className="button button--subtle button--compact" type="button" onClick={() => setTutorialOpen(true)}>
+              <HelpCircle size={16} aria-hidden="true" /> Ver explicação
+            </button>
+          </div>
         </div>
 
         <div className="choice-list" style={{ marginTop: '0.9rem' }}>
@@ -149,19 +189,25 @@ export function PaydaySettingsPage() {
             </button>
           ))}
         </div>
+
+        {cutoffExplanation && <p className="settings-hint">{cutoffExplanation}</p>}
       </section>
 
       {!paydayAffectsSummary && (
-        <p className="text-muted" style={{ fontSize: '0.84rem' }}>
-          No modo <strong>{availableModeLabels.conservative}</strong>, as opções abaixo não mudam o seu resumo — tudo que
-          você deve já conta como Comprometido, sem esperar data nenhuma. Elas continuam salvas caso você volte pro modo
+        <div className="notice">
+          No modo <strong>{availableModeLabels.conservative}</strong>, nada abaixo muda o seu resumo: tudo que você deve já
+          conta como Comprometido, sem esperar data nenhuma. As opções continuam salvas caso você volte pro modo
           "{availableModeLabels.until_payday}".
-        </p>
+        </div>
       )}
 
-      <div className="settings-grid">
+      <div className={`settings-grid${paydayAffectsSummary ? '' : ' settings-grid--inactive'}`}>
         <section className="surface surface-pad" aria-labelledby="payday-title">
           <h2 id="payday-title">Data de recebimento</h2>
+          <p className="text-secondary">
+            O app usa isso pra <strong>estimar quando o próximo dinheiro entra</strong> e parar de contar como
+            "Comprometido" o que só vence depois disso. Nenhum valor é criado: é só uma data.
+          </p>
           <div className="choice-list">
             {paydayOptions.map((option) => (
               <button
@@ -205,14 +251,14 @@ export function PaydaySettingsPage() {
         </section>
 
         <section className="surface surface-pad" aria-labelledby="window-title">
-          <h2 id="window-title">Janela do "Comprometido"</h2>
+          <h2 id="window-title">Quando não dá pra saber a data</h2>
           <p className="text-secondary">
-            {hasFixedPayday
-              ? 'Só usada se algum dia faltar a data de recebimento acima (ex.: enquanto uma fatura não tem vencimento calculado ainda).'
-              : 'Sem data fixa, contamos como "Comprometido" tudo que vence dentro dessa janela — ajuste pro que fizer sentido pro seu ritmo de recebimento.'}
+            Se você marcou <strong>Renda variável</strong> (ou não escolheu data nenhuma), o app não tem como estimar seu
+            próximo recebimento. Nesse caso ele olha só um <strong>período fixo à frente</strong>: tudo que vence dentro
+            desse período conta como Comprometido; o que vence depois, ainda não.
           </p>
           <label className="field">
-            <span>Considerar comprometido o que vence nos próximos quantos dias?</span>
+            <span>Olhar quantos dias à frente?</span>
             <input
               className="input"
               type="number"
@@ -222,11 +268,19 @@ export function PaydaySettingsPage() {
               value={windowDaysInput}
               onChange={(event) => changeWindowDays(event.target.value)}
             />
+            <span className="field-hint">
+              Entre {committedWindowDaysMin} e {committedWindowDaysMax} dias. Se você recebe a cada 30 dias, 30 é um bom
+              número. Quem recebe por semana costuma preferir 7.
+            </span>
           </label>
+          {hasFixedPayday && (
+            <p className="settings-hint">
+              Como você informou uma data de recebimento acima, este período <strong>não está em uso</strong> hoje — ele é
+              a reserva pra quando não houver data.
+            </p>
+          )}
         </section>
       </div>
-
-      {saved && <p className="text-secondary">Salvo.</p>}
 
       <AvailableModeSheet
         open={tutorialOpen}

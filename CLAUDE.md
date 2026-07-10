@@ -6,13 +6,15 @@
 2. Use `docs/BUSCA_RAPIDA.md` para decidir qual contexto abrir.
 3. Não abra arquivos grandes por padrão. Use `rg`/Grep primeiro em `docs/history/` e nos docs de referência.
 
-## ⚠️ Pendências urgentes anotadas em 2026-07-09 (remover esta seção ao resolver)
+## ✅ `npm run test:rules` voltou a funcionar (2026-07-10)
 
-Achados durante a auditoria de regras do Firestore desta sessão — não são bugs confirmados em produção, mas riscos concretos que valem correção:
+Rode-o **sempre** que mexer em `firestore.rules`. Ele é a única defesa automática contra o padrão de bug mais caro deste projeto (ver a REGRA PRINCIPAL sobre enums/campos novos, mais abaixo) — 3 incidentes reais até hoje.
 
-1. **Java local quebrado bloqueia `npm run test:rules`** (erro `3221226505` / `0xC0000409`, reconfirmado em 2026-07-09; já listado em `docs/planning/TODOS.md`) — é a ferramenta que pegaria automaticamente o padrão de bug descrito na seção "⚠️ REGRA PRINCIPAL: todo valor novo de enum num payload do Firestore precisa atualizar a regra no MESMO commit" (mais abaixo neste arquivo; **3 incidentes reais já** — o terceiro, `availableMode`, em 2026-07-09, pego antes de sair só porque a resposta HTTP do Firestore foi inspecionada no navegador). Resolver antes da próxima mudança em `firestore.rules`, pra não depender de teste manual + verificação em produção de novo.
-2. ~~**`fireWrite` silencia erro de escrita até em dev**~~ — **RESOLVIDO em 2026-07-09**: `fireWrite` (`src/firebase/fireWrite.ts`) faz `console.error` quando `import.meta.env.DEV`, citando `firestore.rules` na mensagem. Produção continua silenciosa. `updatePaydaySettings`/`updateAvailableMode` passaram a usar `fireWrite` em vez de `.catch(() => undefined)` solto.
-3. **`accountDeletionService.ts` (`leavePartnerWorkspace`) espalha `...workspaceRefData` inteiro num `batch.update`** antes de sobrescrever `status`/`updatedAt`. Funciona hoje porque os valores lidos são idênticos aos já salvos (Firestore só considera "alterado" o que difere de verdade), mas é frágil: se o tipo `WorkspaceRef` ganhar um campo novo amanhã sem a regra `validCoupleWorkspaceRefUpdate` prever esse campo no `diff().affectedKeys().hasOnly([...])`, a saída do parceiro do espaço compartilhado quebra do mesmo jeito que a criação de categoria quebrou hoje. Mais seguro seria escrever só `{ status: 'removed', updatedAt }` explicitamente, sem spread.
+O Java desta máquina estava quebrado: dois JDK 25 sem a pasta `bin/` e um stub órfão da Oracle (`Common Files\Oracle\Java\javapath`) primeiro no PATH do sistema, morrendo com `0xC0000409` (3221226505). Sem admin não dá pra corrigir o PATH do sistema, então `npm run test:rules` e `npm run emulators` passam por `scripts/with-java.mjs`: ele testa `java -version` nos candidatos e coloca o primeiro que funciona na frente do PATH só daquele comando. Um JDK Temurin 21 foi extraído em `%USERPROFILE%\tools\jdk` — se sumir, o wrapper diz como reinstalar. `firebase-tools` chama `spawn("java")` cru e **ignora `JAVA_HOME`**, por isso não adianta só apontar a variável.
+
+## ⚠️ Pendência remanescente
+
+**`accountDeletionService.ts` (`leavePartnerWorkspace`) espalha `...workspaceRefData` inteiro num `batch.update`** antes de sobrescrever `status`/`updatedAt`. Funciona hoje porque os valores lidos são idênticos aos já salvos (Firestore só considera "alterado" o que difere de verdade), mas é frágil: se o tipo `WorkspaceRef` ganhar um campo novo amanhã sem a regra `validCoupleWorkspaceRefUpdate` prever esse campo no `diff().affectedKeys().hasOnly([...])`, a saída do parceiro do espaço compartilhado quebra do mesmo jeito que a criação de categoria já quebrou. Mais seguro seria escrever só `{ status: 'removed', updatedAt }` explicitamente, sem spread.
 
 ## Mapa de contexto
 
@@ -84,7 +86,7 @@ Já aconteceu **duas vezes** neste projeto — cada uma quebrando uma feature in
 
 1. Abrir `firestore.rules` e conferir se a função `valid*Create`/`valid*Update` correspondente já aceita esse campo/valor — em `hasOnly([...])` (chaves) e em `in [...]` (valores de enum).
 2. Conferir se o payload de teste em `tests/firestore.rules.test.ts` (`ledgerPayload`, `categoryPayload`, etc.) reflete o payload real do cliente, não uma versão simplificada — senão o teste passa mesmo com a regra desatualizada, igual aconteceu nos dois incidentes acima.
-3. Rodar `npm run test:rules` antes de considerar a mudança pronta (hoje bloqueado por Java local quebrado nesta máquina — ver `docs/planning/TODOS.md` — então, até corrigir isso, fazer uma conferência manual linha a linha da regra + deploy + verificação ao vivo em produção, com autorização explícita do dono antes do deploy).
+3. Rodar `npm run test:rules` antes de considerar a mudança pronta. **Voltou a funcionar em 2026-07-10** (via `scripts/with-java.mjs`) — não há mais desculpa pra pular. Deploy da regra só com autorização explícita do dono.
 
 Isso vale tanto pra campo novo (`createdBy`) quanto pra valor novo dentro de um enum já existente (`installment_anticipation_credit`) — os dois incidentes reais foram um de cada tipo.
 
