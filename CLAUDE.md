@@ -10,7 +10,7 @@
 
 Achados durante a auditoria de regras do Firestore desta sessão — não são bugs confirmados em produção, mas riscos concretos que valem correção:
 
-1. **Java local quebrado bloqueia `npm run test:rules`** (erro `3221226505`, já listado em `docs/planning/TODOS.md`). É a ferramenta que teria pego automaticamente o bug do `createdBy` faltando em `validCategoryCreate` (ficou sem detecção ~3 semanas em produção). **Isso já se repetiu duas vezes na mesma sessão**: (a) a mudança de regra pra `payday` foi escrita e revisada só manualmente, deployada com autorização explícita do dono ("o problema de Java é no meu PC mesmo") e confirmada funcionando ao vivo depois; (b) uma auditoria da mesma sessão achou que `validInvoiceLedgerEntryType` nunca aceitou `'installment_anticipation_credit'` — a feature de antecipar parcelas estava **completamente quebrada em produção desde que foi criada**, e só foi descoberta testando manualmente ao vivo (o teste do emulador teria pego isso na hora). Ainda vale resolver o Java antes da próxima mudança em `firestore.rules`, pra não depender de teste manual + verificação em produção de novo — e vale rodar `test:rules` (ou uma varredura manual dos `in [...]` da regra contra os tipos TS) assim que possível, caso ainda exista algum enum desalinhado não descoberto.
+1. **Java local quebrado bloqueia `npm run test:rules`** (erro `3221226505`, já listado em `docs/planning/TODOS.md`) — é a ferramenta que pegaria automaticamente o padrão de bug descrito na seção "⚠️ REGRA PRINCIPAL: todo valor novo de enum num payload do Firestore precisa atualizar a regra no MESMO commit" (mais abaixo neste arquivo; 2 incidentes reais já, o segundo achado numa auditoria desta mesma sessão). Resolver antes da próxima mudança em `firestore.rules`, pra não depender de teste manual + verificação em produção de novo.
 2. **`fireWrite` (`src/firebase/fireWrite.ts`) silencia erro de escrita até em dev**, de propósito (não expor erro técnico ao usuário). Mas isso também escondeu o bug de categoria do próprio dono/agente durante testes manuais — só apareceu ao recarregar a página e notar que o dado sumiu. Considerar `if (import.meta.env.DEV) console.error(...)` dentro do `.catch()` só em desenvolvimento, sem tocar no comportamento de produção — daria sinal imediato no console em vez de exigir reload manual pra notar.
 3. **`accountDeletionService.ts` (`leavePartnerWorkspace`) espalha `...workspaceRefData` inteiro num `batch.update`** antes de sobrescrever `status`/`updatedAt`. Funciona hoje porque os valores lidos são idênticos aos já salvos (Firestore só considera "alterado" o que difere de verdade), mas é frágil: se o tipo `WorkspaceRef` ganhar um campo novo amanhã sem a regra `validCoupleWorkspaceRefUpdate` prever esse campo no `diff().affectedKeys().hasOnly([...])`, a saída do parceiro do espaço compartilhado quebra do mesmo jeito que a criação de categoria quebrou hoje. Mais seguro seria escrever só `{ status: 'removed', updatedAt }` explicitamente, sem spread.
 
@@ -68,6 +68,25 @@ if (!ok) return;
 setEstadoOtimista(...);               // atualiza UI imediatamente
 minhaEscrita(dados).catch(...);      // write é fire-and-forget
 ```
+
+---
+
+## ⚠️ REGRA PRINCIPAL: todo valor novo de enum num payload do Firestore precisa atualizar a regra no MESMO commit
+
+Já aconteceu **duas vezes** neste projeto — cada uma quebrando uma feature inteira, silenciosamente, por semanas:
+
+1. **`createCategory` ganhou o campo `createdBy`** (17/06) mas `validCategoryCreate` (`firestore.rules`) nunca foi atualizada — toda criação de categoria personalizada foi rejeitada pelo servidor silenciosamente por **~3 semanas**. Só apareceu quando o próprio dono recarregou a página e notou que a categoria tinha sumido.
+2. **`InvoiceLedgerEntryType` (TypeScript) ganhou `'installment_anticipation_credit'`** desde a criação da feature "antecipar parcelas", mas `validInvoiceLedgerEntryType` (`firestore.rules`) nunca incluiu esse valor na lista `in [...]` — a feature inteira estava **rejeitada pelo servidor desde que foi criada**, e ninguém percebeu porque o padrão fire-and-forget do app suprime o erro de propósito. Só foi descoberta meses depois, testando manualmente ao vivo em produção (2026-07-09).
+
+**Por que isso acontece**: o TypeScript nunca reclama — o tipo/schema do cliente aceita o valor novo numa boa. A regra do Firestore é um arquivo **separado**, escrito numa linguagem diferente, que ninguém lembra de abrir de novo depois. E como o app é offline-first (`fireWrite` engole o erro de propósito, por design — não expor erro técnico ao usuário), a rejeição do servidor é **completamente invisível**: a UI mostra sucesso, o dado entra no cache local, e só some quando a página recarrega e busca o estado real do servidor.
+
+**Regra**: sempre que um campo ou valor de enum novo for adicionado a um payload que o cliente grava no Firestore (`setDoc`/`updateDoc`/`batch.set`/`batch.update` em `financeService.ts`, `cardService.ts`, `sharedService.ts`, `workspaceService.ts`, etc.), **no mesmo commit**:
+
+1. Abrir `firestore.rules` e conferir se a função `valid*Create`/`valid*Update` correspondente já aceita esse campo/valor — em `hasOnly([...])` (chaves) e em `in [...]` (valores de enum).
+2. Conferir se o payload de teste em `tests/firestore.rules.test.ts` (`ledgerPayload`, `categoryPayload`, etc.) reflete o payload real do cliente, não uma versão simplificada — senão o teste passa mesmo com a regra desatualizada, igual aconteceu nos dois incidentes acima.
+3. Rodar `npm run test:rules` antes de considerar a mudança pronta (hoje bloqueado por Java local quebrado nesta máquina — ver `docs/planning/TODOS.md` — então, até corrigir isso, fazer uma conferência manual linha a linha da regra + deploy + verificação ao vivo em produção, com autorização explícita do dono antes do deploy).
+
+Isso vale tanto pra campo novo (`createdBy`) quanto pra valor novo dentro de um enum já existente (`installment_anticipation_credit`) — os dois incidentes reais foram um de cada tipo.
 
 ---
 
