@@ -11,7 +11,9 @@ Itens acionáveis. Fechou? Mova para "Concluído" ou remova. Detalhe histórico 
 ### Técnico
 - [ ] Code splitting — bundle inicial > 500 kB (warning no build).
 - [ ] App Check, backups do Firestore, alertas de custo Firebase/Vercel.
-- [ ] Corrigir Java local (erro 3221226505) para `npm run test:rules` — prioridade alta, já causou 2 bugs reais em produção sem detecção (categoria em 2026-06, antecipação de parcelas desde a criação da feature) por não poder rodar o teste de regras do emulador.
+- [ ] Corrigir Java local (erro 3221226505) para `npm run test:rules` — prioridade alta, já causou **3** incidentes do mesmo padrão (categoria em 2026-06; antecipação de parcelas, quebrada desde a criação da feature; `availableMode` em 2026-07-09, este pego antes de sair) por não poder rodar o teste de regras do emulador.
+- [ ] `useFinanceData` ainda expõe um `dashboard` calculado sem faturas, payday nem `availableMode`. Nenhuma tela consome (a `DashboardPage` calcula o seu). É trabalho desperdiçado a cada mudança de transação e uma armadilha pra quem usar por engano — remover.
+- [ ] `subscribeTransactions` tem `limit(300)`: se uma compra de cartão excluída sair dessa janela, ela some de `deletedTransactionIds` e os lançamentos dela **voltam** a contar na fatura (o filtro de ledger órfão em `useCardsData` depende da transação estar carregada). Só afeta contas com muito histórico.
 - [ ] Emails oficiais de suporte/privacidade.
 - [ ] Contas a pagar (`Bill.status`) nunca viram `'overdue'` automaticamente — ficam "Pendente" pra sempre mesmo com vencimento no passado. Não afeta o cálculo do Comprometido (já conta certo), só falta indicação visual/status pro usuário perceber o atraso.
 

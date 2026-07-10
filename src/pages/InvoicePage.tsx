@@ -6,6 +6,7 @@ import { BottomSheet } from '../components/BottomSheet';
 import { SelectField } from '../components/SelectField';
 import { FormMessage } from '../components/FormMessage';
 import { invoiceStatusLabels, ledgerTypeLabels } from '../cards/cardLabels';
+import { selectAnticipatableInstallments } from '../cards/anticipation';
 import {
   anticipateInstallments,
   recordInvoiceCredit,
@@ -46,32 +47,12 @@ export function InvoicePage() {
       .map((t) => [t.id, t.description])
   );
 
-  const anticipatable = cardsData.invoices
-    .filter(
-      (inv) =>
-        inv.cardId === cardId &&
-        inv.id !== invoiceId &&
-        inv.status !== 'paid' &&
-        inv.status !== 'overpaid'
-    )
-    .flatMap((inv) => {
-      const anticipatedIds = new Set(
-        inv.ledgerEntries
-          .filter((e) => e.type === 'installment_anticipation_credit' && e.sourceTransactionId)
-          .map((e) => e.sourceTransactionId!)
-      );
-      return inv.ledgerEntries
-        .filter((e) => e.type === 'purchase' && e.sourceTransactionId && !anticipatedIds.has(e.sourceTransactionId))
-        .map((e) => ({
-          entryId: e.id,
-          invoiceId: inv.id,
-          referenceMonth: inv.referenceMonth,
-          amountCents: e.amountCents,
-          sourceTransactionId: e.sourceTransactionId!,
-          description: txnDescriptions.get(e.sourceTransactionId!) ?? 'Compra parcelada'
-        }));
-    })
-    .sort((a, b) => a.referenceMonth.localeCompare(b.referenceMonth));
+  const anticipatable = invoice
+    ? selectAnticipatableInstallments(cardsData.invoices, invoice).map((item) => ({
+        ...item,
+        description: txnDescriptions.get(item.sourceTransactionId) ?? 'Compra parcelada'
+      }))
+    : [];
 
   function handleOpenPaySheet() {
     setPayAmount('');
@@ -255,7 +236,10 @@ export function InvoicePage() {
             </article>
           )}
 
-          {/* Ações avançadas */}
+          {/* Ações avançadas — antecipar só faz sentido na fatura que ainda acumula
+              compras. Numa fatura fechada ou paga, o débito da antecipação entraria
+              num ciclo que já terminou. */}
+          {isOpen && (
           <details className="advanced-panel">
             <summary>Antecipar parcelas de faturas futuras</summary>
             <div className="form-stack" style={{ marginTop: '0.75rem' }}>
@@ -304,6 +288,7 @@ export function InvoicePage() {
               )}
             </div>
           </details>
+          )}
 
           <details className="advanced-panel">
             <summary>Estornos, créditos e tarifas</summary>

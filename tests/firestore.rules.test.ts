@@ -794,6 +794,52 @@ describe('firestore security rules', () => {
     );
   });
 
+  // O payload aqui é exatamente o de `updateAvailableMode` (workspaceService.ts):
+  // `{ availableMode, updatedAt }`. Se um campo entrar nesse write sem entrar em
+  // `onlyAvailableModeChanged`, o servidor rejeita em silêncio (fire-and-forget) e o
+  // usuário só descobre ao recarregar — foi assim com `createdBy`/categoria e com
+  // `installment_anticipation_credit`. Este teste é a rede de segurança.
+  it('allows a user to choose how their "Disponível" is calculated, and rejects anything else', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        availableMode: 'conservative',
+        updatedAt: serverTimestamp()
+      })
+    );
+    await assertSucceeds(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        availableMode: 'until_payday',
+        updatedAt: serverTimestamp()
+      })
+    );
+
+    // Valor fora do enum.
+    await assertFails(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        availableMode: 'aggressive',
+        updatedAt: serverTimestamp()
+      })
+    );
+    // Modo válido, mas contrabandeando um campo protegido junto.
+    await assertFails(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        availableMode: 'conservative',
+        name: 'Forged name',
+        updatedAt: serverTimestamp()
+      })
+    );
+    // Ninguém escolhe pelos outros.
+    const bobDb = testEnv.authenticatedContext('bob').firestore();
+    await assertFails(
+      updateDoc(doc(bobDb, 'users/alice'), {
+        availableMode: 'conservative',
+        updatedAt: serverTimestamp()
+      })
+    );
+  });
+
   it('blocks client writes to owner and role protected fields', async () => {
     const aliceDb = testEnv.authenticatedContext('alice').firestore();
 

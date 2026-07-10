@@ -77,6 +77,14 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['payday', 'committedWindowDays', 'updatedAt']);
     }
 
+    function onlyAvailableModeChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['availableMode', 'updatedAt']);
+    }
+
+    function validAvailableMode(value) {
+      return value in ['conservative', 'until_payday'];
+    }
+
     function validPayday(value) {
       return value.type is string
         && (
@@ -119,6 +127,7 @@ service cloud.firestore {
           'onboardingChallenge',
           'payday',
           'committedWindowDays',
+          'availableMode',
           'createdAt',
           'updatedAt'
         ])
@@ -157,6 +166,7 @@ service cloud.firestore {
         && (!request.resource.data.keys().hasAny(['onboardingChallenge']) || request.resource.data.onboardingChallenge is string)
         && (!request.resource.data.keys().hasAny(['payday']) || validPayday(request.resource.data.payday))
         && (!request.resource.data.keys().hasAny(['committedWindowDays']) || validCommittedWindowDays(request.resource.data.committedWindowDays))
+        && (!request.resource.data.keys().hasAny(['availableMode']) || validAvailableMode(request.resource.data.availableMode))
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time
         && validThemeFields()
@@ -1409,6 +1419,7 @@ service cloud.firestore {
           && (!request.resource.data.keys().hasAny(['payday']) || validPayday(request.resource.data.payday))
           && (!request.resource.data.keys().hasAny(['committedWindowDays']) || validCommittedWindowDays(request.resource.data.committedWindowDays))
         )
+        || (onlyAvailableModeChanged() && validAvailableMode(request.resource.data.availableMode))
       );
       allow delete: if canDeleteUserAccountData(uid);
 

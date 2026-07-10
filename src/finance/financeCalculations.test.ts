@@ -301,10 +301,16 @@ describe('findNextIncomeDate', () => {
     expect(next).toBeNull();
   });
 
-  it('counts an income scheduled for exactly "now" as upcoming', () => {
+  // Antes esta função contava uma receita datada de HOJE como "próximo recebimento".
+  // Isso tinha dois problemas: a receita de hoje já está somada no saldo (o saldo não
+  // filtra por data), então usá-la como corte encolhia o Comprometido pra "só o que
+  // vence hoje"; e, como a comparação era contra o instante `now`, a mesma receita
+  // (gravada ao meio-dia) contava de manhã e não contava à tarde. O corte agora é o
+  // fim do dia de hoje: só receita de amanhã em diante é "próxima".
+  it('does not treat an income dated today as the next income', () => {
     const next = findNextIncomeDate([transaction({ type: 'income', date: Timestamp.fromDate(now) })], now);
 
-    expect(next?.getTime()).toBe(now.getTime());
+    expect(next).toBeNull();
   });
 });
 
@@ -595,5 +601,156 @@ describe('calculateDashboardSummary', () => {
     expect(summary.recentTransactions).toHaveLength(5);
     expect(summary.recentTransactions[0].id).toBe('tx-5');
     expect(summary.recentTransactions[4].id).toBe('tx-1');
+  });
+
+  // Regressão: `nextPaydayFrom` devolve meia-noite, mas contas e faturas são gravadas
+  // ao meio-dia (`fromDateInputValue`). Comparando instantes, uma conta que vence no
+  // PRÓPRIO dia do salário ficava depois do corte e sumia do Comprometido — o usuário
+  // via "Disponível" alto justamente no dia em que precisava pagar a conta.
+  it('counts a bill that falls exactly on payday as committed', () => {
+    const summary = calculateDashboardSummary({
+      accounts: [account('checking', 100000)],
+      transactions: [],
+      bills: [bill({ amountCents: 5000, dueDate: Timestamp.fromDate(new Date('2026-07-20T12:00:00')) })],
+      recurringRules: [],
+      payday: { type: 'fixed_day', day: 20 },
+      now: new Date('2026-07-09T15:00:00')
+    });
+
+    expect(summary.committedCents).toBe(5000);
+    expect(summary.committedCutoffSource).toBe('payday');
+  });
+
+  // Regressão: o corte é um DIA, não um instante. Com `addDays(now, 30)` cru, abrir o
+  // app às 8h e às 20h dava Comprometidos diferentes para uma conta que vence no
+  // 30º dia.
+  it('keeps the 30-day window stable regardless of the hour the app is opened', () => {
+    const dueOnLastWindowDay = Timestamp.fromDate(new Date('2026-08-08T12:00:00'));
+
+    const morning = calculateDashboardSummary({
+      accounts: [account('checking', 100000)],
+      transactions: [],
+      bills: [bill({ amountCents: 5000, dueDate: dueOnLastWindowDay })],
+      recurringRules: [],
+      now: new Date('2026-07-09T08:00:00')
+    });
+    const evening = calculateDashboardSummary({
+      accounts: [account('checking', 100000)],
+      transactions: [],
+      bills: [bill({ amountCents: 5000, dueDate: dueOnLastWindowDay })],
+      recurringRules: [],
+      now: new Date('2026-07-09T20:00:00')
+    });
+
+    expect(morning.committedCents).toBe(5000);
+    expect(evening.committedCents).toBe(morning.committedCents);
+  });
+});
+
+// O modo é uma escolha explícita da pessoa (mini tutorial no Dashboard). As duas
+// leituras são legítimas: `until_payday` assume que o próximo recebimento acontece;
+// `conservative` nunca assume nada e conta toda dívida já assumida.
+describe('calculateDashboardSummary — availableMode', () => {
+  const now = new Date('2026-07-09T12:00:00');
+  // R$ 1.000 na conta, fatura aberta de R$ 50 que só vence depois do próximo salário.
+  const baseInput = {
+    accounts: [account('checking', 100000)],
+    transactions: [],
+    bills: [],
+    recurringRules: [],
+    invoices: [
+      invoice({
+        status: 'open',
+        outstandingBalanceCents: 5000,
+        referenceMonth: '2026-08',
+        dueDate: Timestamp.fromDate(new Date('2026-08-10T12:00:00'))
+      })
+    ],
+    payday: { type: 'fixed_day' as const, day: 5 },
+    now
+  };
+
+  it('until_payday: a fatura que vence depois do recebimento não compromete nada', () => {
+    const summary = calculateDashboardSummary({ ...baseInput, availableMode: 'until_payday' });
+
+    expect(summary.committedCents).toBe(0);
+    expect(summary.freeToSpendCents).toBe(100000);
+    expect(summary.committedCutoffSource).toBe('payday');
+    expect(summary.committedCutoff).not.toBeNull();
+  });
+
+  it('conservative: a mesma fatura compromete desde já, sem data de corte', () => {
+    const summary = calculateDashboardSummary({ ...baseInput, availableMode: 'conservative' });
+
+    expect(summary.committedCents).toBe(5000);
+    expect(summary.freeToSpendCents).toBe(95000);
+    expect(summary.committedCutoffSource).toBe('all');
+    expect(summary.committedCutoff).toBeNull();
+  });
+
+  it('defaults to until_payday when the profile never answered the tutorial', () => {
+    const summary = calculateDashboardSummary(baseInput);
+
+    expect(summary.committedCents).toBe(0);
+    expect(summary.committedCutoffSource).toBe('payday');
+  });
+
+  // No conservador, parcelas de meses futuros são dívida já assumida — entram.
+  it('conservative: counts future installment invoices as committed', () => {
+    const summary = calculateDashboardSummary({
+      ...baseInput,
+      availableMode: 'conservative',
+      invoices: [
+        invoice({ id: 'i-08', referenceMonth: '2026-08', outstandingBalanceCents: 10000, dueDate: Timestamp.fromDate(new Date('2026-08-20T12:00:00')) }),
+        invoice({ id: 'i-12', referenceMonth: '2026-12', outstandingBalanceCents: 10000, dueDate: Timestamp.fromDate(new Date('2026-12-20T12:00:00')) })
+      ]
+    });
+
+    expect(summary.committedCents).toBe(20000);
+  });
+
+  it('conservative: still ignores paid invoices and settled balances', () => {
+    const summary = calculateDashboardSummary({
+      ...baseInput,
+      availableMode: 'conservative',
+      invoices: [
+        invoice({ id: 'i-paid', status: 'paid', outstandingBalanceCents: 0 }),
+        invoice({ id: 'i-zero', status: 'open', outstandingBalanceCents: 0 })
+      ]
+    });
+
+    expect(summary.committedCents).toBe(0);
+  });
+
+  it('conservative: counts a bill due far beyond any window', () => {
+    const summary = calculateDashboardSummary({
+      ...baseInput,
+      availableMode: 'conservative',
+      invoices: [],
+      bills: [bill({ amountCents: 7000, dueDate: Timestamp.fromDate(new Date('2027-03-01T12:00:00')) })]
+    });
+
+    expect(summary.committedCents).toBe(7000);
+  });
+});
+
+describe('findNextIncomeDate — receita de hoje não é "próximo recebimento"', () => {
+  // Regressão: comparar com o instante `now` fazia uma receita datada de hoje (gravada
+  // ao meio-dia) contar como futura de manhã e não contar à tarde, mudando o corte do
+  // Comprometido conforme a hora. Receita de hoje já entrou no saldo.
+  it('ignores an income dated today, whatever the hour', () => {
+    const todayIncome = [transaction({ type: 'income', date: Timestamp.fromDate(new Date('2026-06-14T12:00:00')) })];
+
+    expect(findNextIncomeDate(todayIncome, new Date('2026-06-14T08:00:00'))).toBeNull();
+    expect(findNextIncomeDate(todayIncome, new Date('2026-06-14T20:00:00'))).toBeNull();
+  });
+
+  it('still finds an income dated tomorrow', () => {
+    const next = findNextIncomeDate(
+      [transaction({ type: 'income', date: Timestamp.fromDate(new Date('2026-06-15T12:00:00')) })],
+      new Date('2026-06-14T08:00:00')
+    );
+
+    expect(next?.toISOString().slice(0, 10)).toBe('2026-06-15');
   });
 });

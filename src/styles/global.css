@@ -714,6 +714,29 @@ html[data-reduce-motion='true'] *::after {
   align-content: center;
 }
 
+/* Legenda do "Comprometido": também é o gatilho pra reabrir a explicação do cálculo.
+   Herda a aparência de `.text-secondary` — é texto que por acaso é clicável, não um
+   botão desenhado como botão. */
+.dash-metric-explain {
+  border: none;
+  background: none;
+  padding: 0;
+  text-align: left;
+  font-size: 0.84rem;
+  line-height: 1.35;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 0.2em;
+  text-decoration-color: var(--border-default);
+}
+
+.dash-metric-explain:hover {
+  color: var(--text-primary);
+  text-decoration-color: var(--action-primary);
+}
+
 .dash-metric .display-number {
   font-size: clamp(1.3rem, 2.8vw, 1.75rem);
 }
@@ -3841,6 +3864,111 @@ span.category-mark {
 
 .choice-card-radio--on {
   border-color: transparent;
+}
+
+/* Mini tutorial do "Disponível" (AvailableModeSheet) */
+.available-mode-steps {
+  display: grid;
+  gap: 0.9rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.available-mode-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.available-mode-steps li div {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.available-mode-steps li span.text-secondary {
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.available-mode-step-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  border-radius: 0.7rem;
+  color: var(--action-primary);
+  background: var(--action-primary-soft);
+}
+
+.available-mode-example {
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.9rem;
+  padding: 0.85rem 1rem;
+  background: var(--bg-surface-subtle);
+}
+
+.available-mode-example p {
+  margin: 0;
+}
+
+.available-mode-example p.text-secondary {
+  margin-top: 0.35rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+/* O card de escolha empilha 4 linhas de texto; o padrão é uma linha só, centralizada. */
+.choice-list .choice-card:has(.available-mode-preview) {
+  align-items: flex-start;
+}
+
+.choice-card-label:has(.available-mode-preview) {
+  display: grid;
+  gap: 0.3rem;
+  font-weight: 500;
+}
+
+.choice-card-label:has(.available-mode-preview) > strong {
+  font-weight: 700;
+}
+
+.choice-card-label .text-secondary {
+  font-size: 0.85rem;
+  line-height: 1.4;
+  font-weight: 400;
+}
+
+.available-mode-preview {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  font-weight: 400;
+}
+
+.available-mode-caption {
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.available-mode-footnote {
+  font-size: 0.8rem;
+  line-height: 1.4;
+  margin: 0;
+}
+
+/* O tutorial é a primeira coisa que um usuário novo vê e não cabe numa tela de 375×812:
+   sem grudar a ação no rodapé do sheet, o botão "Usar ..." fica abaixo da dobra e a
+   pessoa não vê que precisa escolher. Só o CTA gruda; o conteúdo acima rola normal. */
+.available-mode-actions {
+  position: sticky;
+  bottom: 0;
+  margin: 0 -1px -0.25rem;
+  padding-top: 0.75rem;
+  padding-bottom: 0.25rem;
+  background: linear-gradient(to top, var(--bg-surface) 78%, transparent);
 }
 
 .onboard-finish-hint {

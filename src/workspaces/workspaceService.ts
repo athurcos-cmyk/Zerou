@@ -1,8 +1,9 @@
 import type { User } from 'firebase/auth';
 import { deleteField, doc, serverTimestamp, updateDoc, writeBatch } from 'firebase/firestore';
 import { getFirebaseDb } from '../firebase/config';
+import { fireWrite } from '../firebase/fireWrite';
 import type { AppearancePreferences } from '../theme/theme.types';
-import type { PaydayRule } from '../types/contracts';
+import type { AvailableMode, PaydayRule } from '../types/contracts';
 
 const FOUNDATION_WRITE_TIMEOUT_MS = 700;
 
@@ -127,9 +128,27 @@ export function updatePaydaySettings(
   const db = getFirebaseDb();
   const userRef = doc(db, 'users', uid);
 
-  void updateDoc(userRef, {
+  fireWrite(updateDoc(userRef, {
     payday: settings.payday ?? deleteField(),
     committedWindowDays: settings.committedWindowDays ?? deleteField(),
     updatedAt: serverTimestamp()
-  }).catch(() => undefined);
+  }));
+}
+
+/**
+ * Grava a escolha de como calcular o "Disponível". Escrever o campo (mesmo com o valor
+ * default) é o que marca "já passou pelo mini tutorial" — é por isso que dispensar o
+ * tutorial também chama esta função, senão ele reabriria em todo boot.
+ *
+ * A regra `onlyAvailableModeChanged` em `firestore.rules` aceita este update; se um
+ * campo novo entrar neste payload, ela precisa ser atualizada no MESMO commit.
+ */
+export function updateAvailableMode(uid: string, availableMode: AvailableMode) {
+  const db = getFirebaseDb();
+  const userRef = doc(db, 'users', uid);
+
+  fireWrite(updateDoc(userRef, {
+    availableMode,
+    updatedAt: serverTimestamp()
+  }));
 }

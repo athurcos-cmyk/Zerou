@@ -118,4 +118,32 @@ describe('useCardsData', () => {
     expect(invoice1After?.purchasesTotalCents).toBe(0);
     expect(invoice2After?.creditsTotalCents).toBe(0);
   });
+
+  // Regressão: `deleteCard` é soft-delete (isActive: false) e `subscribeCards` não
+  // filtra — o cartão continuava listado em /app/cards depois de excluído, e as faturas
+  // dele seguiam entrando no "Comprometido" do Dashboard e no cálculo de limite.
+  it('drops soft-deleted cards and their invoices', () => {
+    cardMocks.subscribeCards.mockImplementation((_workspaceId, onNext) => {
+      onNext([
+        { id: 'card-1', workspaceId: 'ws-1', name: 'Ativo', isActive: true, localSyncStatus: 'synced' },
+        { id: 'card-morto', workspaceId: 'ws-1', name: 'Excluído', isActive: false, localSyncStatus: 'synced' }
+      ]);
+      return vi.fn();
+    });
+    cardMocks.subscribeInvoices.mockImplementation((_workspaceId, cardId, onNext) => {
+      onNext([
+        { id: `invoice-${cardId}`, cardId, workspaceId: 'ws-1', referenceMonth: '2026-07', status: 'closed', localSyncStatus: 'synced' }
+      ]);
+      return vi.fn();
+    });
+    cardMocks.subscribeInvoiceLedger.mockImplementation((_workspaceId, cardId, invoiceId, onNext) => {
+      onNext([ledgerEntry({ id: `entry-${cardId}`, cardId, invoiceId, amountCents: 30000 })]);
+      return vi.fn();
+    });
+
+    const { result } = renderHook(() => useCardsData('ws-1', new Set<string>()));
+
+    expect(result.current.cards.map((card) => card.id)).toEqual(['card-1']);
+    expect(result.current.invoices.map((invoice) => invoice.cardId)).toEqual(['card-1']);
+  });
 });

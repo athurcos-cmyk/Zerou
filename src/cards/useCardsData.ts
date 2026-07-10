@@ -29,15 +29,21 @@ const initialState: CardsState = {
 export function useCardsData(workspaceId?: string, deletedTransactionIds?: ReadonlySet<string>) {
   const [state, setState] = useState<CardsState>(initialState);
 
+  // `deleteCard` é soft-delete (isActive: false) — o listener continua trazendo o doc.
+  // Filtrar aqui, e não em cada tela, garante que um cartão excluído suma da lista E
+  // pare de comprometer saldo/limite: as faturas dele nunca chegam ao Dashboard porque
+  // o effect abaixo só assina faturas dos cartões ativos.
+  const activeCards = useMemo(() => state.cards.filter((card) => card.isActive !== false), [state.cards]);
+
   // Refs: effects read current data without triggering re-subscription on data-only changes.
-  const cardsRef = useRef(state.cards);
-  cardsRef.current = state.cards;
+  const cardsRef = useRef(activeCards);
+  cardsRef.current = activeCards;
   const invoicesRef = useRef(state.invoices);
   invoicesRef.current = state.invoices;
 
   const cardIds = useMemo(
-    () => state.cards.map((c) => c.id).sort().join(','),
-    [state.cards]
+    () => activeCards.map((c) => c.id).sort().join(','),
+    [activeCards]
   );
   const invoiceIds = useMemo(
     () => state.invoices.map((inv) => inv.id).sort().join(','),
@@ -140,7 +146,12 @@ export function useCardsData(workspaceId?: string, deletedTransactionIds?: Reado
       ? state.ledgerEntries.filter((entry) => !entry.sourceTransactionId || !deletedTransactionIds.has(entry.sourceTransactionId))
       : state.ledgerEntries;
 
-    return state.invoices.map((invoice) => {
+    // Faturas de um cartão que acabou de ser excluído continuam em `state.invoices`
+    // (o effect desassina o listener, mas não limpa o que já chegou) — sem este filtro
+    // elas seguiriam contando no "Comprometido" do Dashboard.
+    const activeCardIds = new Set(activeCards.map((card) => card.id));
+
+    return state.invoices.filter((invoice) => activeCardIds.has(invoice.cardId)).map((invoice) => {
       const invoiceLedgerEntries = liveLedgerEntries.filter(
         (entry) => entry.cardId === invoice.cardId && entry.invoiceId === invoice.id
       );
@@ -165,7 +176,7 @@ export function useCardsData(workspaceId?: string, deletedTransactionIds?: Reado
         ledgerEntries: invoiceLedgerEntries
       };
     });
-  }, [state.invoices, state.ledgerEntries, deletedTransactionIds]);
+  }, [state.invoices, state.ledgerEntries, deletedTransactionIds, activeCards]);
 
   const pendingWrites = useMemo(
     () => [...state.cards, ...state.invoices, ...state.ledgerEntries].some((item) => item.localSyncStatus === 'pending'),
@@ -174,6 +185,7 @@ export function useCardsData(workspaceId?: string, deletedTransactionIds?: Reado
 
   return {
     ...state,
+    cards: activeCards,
     invoices: calculatedInvoices,
     pendingWrites
   };

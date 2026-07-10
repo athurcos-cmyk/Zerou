@@ -152,7 +152,10 @@ export function SearchPage() {
     const totals = new Map<string, { name: string; amountCents: number; color: string }>();
     for (const t of finance.transactions) {
       if (!isExpenseInMonth(t, selectedMonth)) continue;
-      const catId = t.categoryId ?? '__none__';
+      // `||`, não `??`: compra no cartão sem categoria grava `categoryId: ''`
+      // (`createCardPurchase`), e string vazia passa pelo `??` — o donut ganhava duas
+      // fatias "Sem categoria".
+      const catId = t.categoryId || '__none__';
       const catName = t.categoryId ? (categoryNames.get(t.categoryId) ?? 'Sem categoria') : 'Sem categoria';
       const cat = t.categoryId ? categoryMap.get(t.categoryId) : null;
       const color = cat ? resolveCategoryColor(cat) : defaultCategoryColor;

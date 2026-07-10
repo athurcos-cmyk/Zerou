@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pickCurrentInvoice, resolveInvoiceCycle } from './cardDates';
+import { pickCurrentInvoice, resolveInstallmentCycle, resolveInvoiceCycle } from './cardDates';
 
 describe('resolveInvoiceCycle', () => {
   it('keeps the due date in the same month as closing when dueDay is after closingDay', () => {
@@ -29,6 +29,46 @@ describe('resolveInvoiceCycle', () => {
 
     expect(cycle.referenceMonth).toBe('2026-08');
     expect(cycle.dueDate.toISOString().slice(0, 10)).toBe('2026-09-05');
+  });
+});
+
+describe('resolveInstallmentCycle', () => {
+  function monthsFor(purchase: Date, closingDay: number, dueDay: number, count: number) {
+    return Array.from({ length: count }, (_, index) =>
+      resolveInstallmentCycle(purchase, closingDay, dueDay, index).referenceMonth
+    );
+  }
+
+  it('spreads installments over consecutive invoices in the common case', () => {
+    expect(monthsFor(new Date(2026, 6, 5, 12), 10, 20, 4)).toEqual(['2026-07', '2026-08', '2026-09', '2026-10']);
+  });
+
+  // Regressão: as parcelas eram calculadas com addMonths(purchaseDate, index), que
+  // clampa 31/jan em 28/fev. Num cartão que fecha dia 28 (o máximo permitido pela UI),
+  // o dia clampado deixa de ser "> closingDay": a 2ª parcela caía na MESMA fatura de
+  // fevereiro que a 1ª, e março ficava sem parcela nenhuma. O cliente pagava duas
+  // parcelas juntas num mês e nenhuma no seguinte.
+  it('does not collide two installments in one invoice when February clamps the purchase day', () => {
+    expect(monthsFor(new Date(2026, 0, 31, 12), 28, 10, 4)).toEqual(['2026-02', '2026-03', '2026-04', '2026-05']);
+  });
+
+  it('keeps consecutive invoices for a purchase on the 30th of a 31-day month', () => {
+    expect(monthsFor(new Date(2026, 0, 30, 12), 28, 10, 3)).toEqual(['2026-02', '2026-03', '2026-04']);
+  });
+
+  it('rolls the first invoice forward when the purchase happens after closing', () => {
+    expect(monthsFor(new Date(2026, 6, 26, 12), 25, 5, 3)).toEqual(['2026-08', '2026-09', '2026-10']);
+  });
+
+  it('advances the due date with each installment on a card that closes late and is due next month', () => {
+    const third = resolveInstallmentCycle(new Date(2026, 6, 9, 12), 25, 5, 2);
+
+    expect(third.referenceMonth).toBe('2026-09');
+    expect(third.dueDate.toISOString().slice(0, 10)).toBe('2026-10-05');
+  });
+
+  it('crosses the year boundary without losing a month', () => {
+    expect(monthsFor(new Date(2026, 10, 15, 12), 20, 28, 4)).toEqual(['2026-11', '2026-12', '2027-01', '2027-02']);
   });
 });
 

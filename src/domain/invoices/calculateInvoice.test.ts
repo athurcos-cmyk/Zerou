@@ -157,4 +157,80 @@ describe('invoice ledger calculations', () => {
     expect(retry.entries).toHaveLength(1);
     expect(calculateInvoice(retry.entries).purchasesTotalCents).toBe(10000);
   });
+
+  // Invariante central da antecipação (estilo Nubank): o dinheiro só MUDA DE FATURA.
+  // A soma dos saldos em aberto — que é exatamente o limite consumido do cartão — não
+  // pode mudar ao antecipar. Se mudar, ou o cliente foi cobrado duas vezes, ou ganhou
+  // limite do nada.
+  describe('antecipação de parcelas move dívida entre faturas sem criar nem sumir dinheiro', () => {
+    // Compra de R$ 300 em 3x: R$ 100 em julho, agosto e setembro.
+    const july = [purchase(10000, 'buy_1')];
+    const august = [purchase(10000, 'buy_2')];
+    const september = [purchase(10000, 'buy_3')];
+
+    function totalOutstanding(...invoices: ReturnType<typeof calculateInvoice>[]) {
+      return invoices.reduce((total, invoice) => total + invoice.outstandingBalanceCents, 0);
+    }
+
+    it('keeps the total outstanding unchanged when anticipating a far-future installment', () => {
+      const before = totalOutstanding(
+        calculateInvoice(july),
+        calculateInvoice(august),
+        calculateInvoice(september)
+      );
+
+      // Antecipa a parcela de SETEMBRO (fatura de meses depois) para a fatura de julho.
+      const julyAfter = calculateInvoice([...july, ledgerEntry('installment_anticipation', 10000, 'ant_debit_sep')]);
+      const septemberAfter = calculateInvoice([
+        ...september,
+        ledgerEntry('installment_anticipation_credit', 10000, 'ant_credit_sep')
+      ]);
+
+      expect(before).toBe(30000);
+      expect(julyAfter.outstandingBalanceCents).toBe(20000);
+      expect(septemberAfter.outstandingBalanceCents).toBe(0);
+      expect(totalOutstanding(julyAfter, calculateInvoice(august), septemberAfter)).toBe(before);
+    });
+
+    it('keeps the total outstanding unchanged when anticipating every remaining installment', () => {
+      const julyAfter = calculateInvoice([
+        ...july,
+        ledgerEntry('installment_anticipation', 10000, 'ant_debit_aug'),
+        ledgerEntry('installment_anticipation', 10000, 'ant_debit_sep')
+      ]);
+      const augustAfter = calculateInvoice([
+        ...august,
+        ledgerEntry('installment_anticipation_credit', 10000, 'ant_credit_aug')
+      ]);
+      const septemberAfter = calculateInvoice([
+        ...september,
+        ledgerEntry('installment_anticipation_credit', 10000, 'ant_credit_sep')
+      ]);
+
+      expect(julyAfter.outstandingBalanceCents).toBe(30000);
+      expect(augustAfter.outstandingBalanceCents).toBe(0);
+      expect(septemberAfter.outstandingBalanceCents).toBe(0);
+      expect(totalOutstanding(julyAfter, augustAfter, septemberAfter)).toBe(30000);
+    });
+
+    it('leaves a future invoice fully settled — never overpaid — after its installment is anticipated', () => {
+      const septemberAfter = calculateInvoice([
+        ...september,
+        ledgerEntry('installment_anticipation_credit', 10000, 'ant_credit_sep')
+      ]);
+
+      expect(septemberAfter.overpaidCreditCents).toBe(0);
+      expect(septemberAfter.status).toBe('open');
+    });
+
+    it('does not double-apply an anticipation replayed with the same idempotencyKey', () => {
+      const replayed = calculateInvoice([
+        ...july,
+        ledgerEntry('installment_anticipation', 10000, 'ant_debit_sep'),
+        ledgerEntry('installment_anticipation', 10000, 'ant_debit_sep')
+      ]);
+
+      expect(replayed.outstandingBalanceCents).toBe(20000);
+    });
+  });
 });

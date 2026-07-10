@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { CalendarClock, CalendarRange, CheckCircle2, Shuffle, Wallet } from 'lucide-react';
+import { CalendarClock, CalendarRange, CheckCircle2, HelpCircle, Shuffle, Wallet } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { AvailableModeSheet } from '../finance/AvailableModeSheet';
+import { availableModeLabels, availableModeSummaries, defaultAvailableMode } from '../finance/availableMode';
 import {
   committedWindowDaysMax,
   committedWindowDaysMin,
@@ -8,8 +10,8 @@ import {
   paydayBusinessDayMax,
   paydayFixedDayMax
 } from '../finance/payday';
-import type { PaydayRule } from '../types/contracts';
-import { updatePaydaySettings } from '../workspaces/workspaceService';
+import type { AvailableMode, PaydayRule } from '../types/contracts';
+import { updateAvailableMode, updatePaydaySettings } from '../workspaces/workspaceService';
 
 type PaydayChoice = PaydayRule['type'] | 'variable_income';
 
@@ -30,6 +32,7 @@ export function PaydaySettingsPage() {
   );
   const [windowDaysInput, setWindowDaysInput] = useState(String(profile?.committedWindowDays ?? defaultCommittedWindowDays));
   const [saved, setSaved] = useState(false);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
   // Hidrata do perfil só até a primeira escolha manual na sessão — mesmo padrão do
   // `hasLocalOverride` em appearance.store.ts. Sem isso, um snapshot do Firestore em
   // trânsito (ou ainda não carregado no primeiro render) sobrescreve a escolha que a
@@ -95,15 +98,66 @@ export function PaydaySettingsPage() {
 
   const hasFixedPayday = paydayType === 'fixed_day' || paydayType === 'business_day' || paydayType === 'end_of_month';
   const hasAnyPaydayChoice = paydayType !== '';
+  const availableMode = profile?.availableMode ?? defaultAvailableMode;
+  // Só o modo `until_payday` usa data de recebimento / janela de dias. No conservador,
+  // nada disso entra no cálculo — mostrar os controles como se entrassem seria mentira.
+  const paydayAffectsSummary = availableMode === 'until_payday';
+
+  function chooseAvailableMode(mode: AvailableMode) {
+    if (!user) return;
+    updateAvailableMode(user.uid, mode);
+    setTutorialOpen(false);
+    setSaved(true);
+  }
 
   return (
     <section className="page-content">
       <p className="eyebrow">Configurações</p>
-      <h1 className="page-title">Quando você recebe</h1>
+      <h1 className="page-title">Recebimento e Disponível</h1>
       <p className="page-description">
-        Usamos isso pra saber até quando uma fatura ou conta a pagar pode esperar antes de contar como "Comprometido"
-        no seu resumo — sem você precisar lançar seu salário na mão toda vez.
+        Escolha como o seu "Disponível" é calculado e, se ele depender do seu recebimento, quando o dinheiro entra.
       </p>
+
+      <section className="surface surface-pad" aria-labelledby="available-mode-title">
+        <div className="section-heading">
+          <div>
+            <h2 id="available-mode-title">Como calcular o "Disponível"</h2>
+            <p className="text-secondary" style={{ margin: '0.25rem 0 0' }}>
+              Atualmente: <strong>{availableModeLabels[availableMode]}</strong>
+            </p>
+          </div>
+          <button className="button button--subtle button--compact" type="button" onClick={() => setTutorialOpen(true)}>
+            <HelpCircle size={16} aria-hidden="true" /> Ver explicação
+          </button>
+        </div>
+
+        <div className="choice-list" style={{ marginTop: '0.9rem' }}>
+          {(Object.keys(availableModeLabels) as AvailableMode[]).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              className={`choice-card${availableMode === mode ? ' choice-card--selected' : ''}`}
+              aria-pressed={availableMode === mode}
+              onClick={() => chooseAvailableMode(mode)}
+            >
+              <span className="choice-card-label">
+                {availableModeLabels[mode]} · {availableModeSummaries[mode]}
+              </span>
+              <span className={`choice-card-radio${availableMode === mode ? ' choice-card-radio--on' : ''}`} aria-hidden="true">
+                {availableMode === mode && <CheckCircle2 size={20} />}
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {!paydayAffectsSummary && (
+        <p className="text-muted" style={{ fontSize: '0.84rem' }}>
+          No modo <strong>{availableModeLabels.conservative}</strong>, as opções abaixo não mudam o seu resumo — tudo que
+          você deve já conta como Comprometido, sem esperar data nenhuma. Elas continuam salvas caso você volte pro modo
+          "{availableModeLabels.until_payday}".
+        </p>
+      )}
 
       <div className="settings-grid">
         <section className="surface surface-pad" aria-labelledby="payday-title">
@@ -173,6 +227,13 @@ export function PaydaySettingsPage() {
       </div>
 
       {saved && <p className="text-secondary">Salvo.</p>}
+
+      <AvailableModeSheet
+        open={tutorialOpen}
+        currentMode={profile?.availableMode}
+        onChoose={chooseAvailableMode}
+        onClose={() => setTutorialOpen(false)}
+      />
     </section>
   );
 }

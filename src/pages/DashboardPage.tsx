@@ -1,10 +1,14 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CalendarClock, CreditCard, Plus, Target, Wallet } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
+import { AvailableModeSheet } from '../finance/AvailableModeSheet';
+import { updateAvailableMode } from '../workspaces/workspaceService';
+import type { AvailableMode } from '../types/contracts';
 
 import { calculateDashboardSummary } from '../finance/financeCalculations';
+import { defaultAvailableMode } from '../finance/availableMode';
 import { readCachedDashboardSummary, saveCachedDashboardSummary } from '../finance/dashboardSummaryCache';
 import { formatFriendlyDate } from '../finance/financeDates';
 import { transactionTypeLabels } from '../finance/financeLabels';
@@ -26,6 +30,12 @@ export function DashboardPage() {
   // contas/transações — sem isso, mostrariam um "Disponível" inflado por um instante
   // antes das faturas sincronizarem.
   const isCommittedLoading = finance.loading || cardsData.loading;
+  // Perfil sem `availableMode` = ainda não passou pelo mini tutorial. Ele abre sozinho
+  // (uma vez), e qualquer escolha — inclusive manter o padrão — grava o campo, que é o
+  // que impede de reabrir no próximo boot.
+  const hasChosenAvailableMode = Boolean(profile?.availableMode);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [tutorialDismissed, setTutorialDismissed] = useState(false);
   const dashboard = calculateDashboardSummary({
     accounts: finance.accounts,
     transactions: finance.transactions,
@@ -33,14 +43,33 @@ export function DashboardPage() {
     recurringRules: finance.recurringRules,
     invoices: cardsData.invoices,
     payday: profile?.payday,
-    committedWindowDays: profile?.committedWindowDays
+    committedWindowDays: profile?.committedWindowDays,
+    availableMode: profile?.availableMode
   });
   const committedCaption =
-    dashboard.committedCutoffSource === 'income'
-      ? `Considerando sua receita de ${formatFriendlyDate(dashboard.committedCutoff)}`
+    dashboard.committedCutoffSource === 'all'
+      ? 'Considerando tudo que você já deve'
+      : dashboard.committedCutoffSource === 'income'
+      ? `Considerando sua receita de ${formatFriendlyDate(dashboard.committedCutoff!)}`
       : dashboard.committedCutoffSource === 'payday'
-      ? `Considerando seu recebimento em ${formatFriendlyDate(dashboard.committedCutoff)}`
+      ? `Considerando seu recebimento em ${formatFriendlyDate(dashboard.committedCutoff!)}`
       : `Considerando os próximos ${profile?.committedWindowDays ?? 30} dias`;
+
+  // Só depois que o perfil carregou (senão o sheet pisca antes de sabermos a escolha).
+  const shouldAutoOpenTutorial = Boolean(profile) && !hasChosenAvailableMode && !tutorialDismissed;
+
+  function handleChooseAvailableMode(mode: AvailableMode) {
+    if (user) updateAvailableMode(user.uid, mode);
+    setTutorialDismissed(true);
+    setTutorialOpen(false);
+  }
+
+  function handleCloseTutorial() {
+    // Fechar sem escolher assume o padrão e grava — senão o tutorial reabre pra sempre.
+    if (user && !hasChosenAvailableMode) updateAvailableMode(user.uid, defaultAvailableMode);
+    setTutorialDismissed(true);
+    setTutorialOpen(false);
+  }
   // Mostra o último saldo conhecido (cache local) enquanto os listeners do
   // Firestore ainda não entregaram o primeiro snapshot — evita o "—" piscando
   // por 1-2s a cada reload, sem alterar a lógica de correção do loading em si.
@@ -82,7 +111,11 @@ export function DashboardPage() {
         !transaction.tags?.includes('cofrinho')
     )
     .reduce((totals, transaction) => {
-      const categoryId = transaction.categoryId ?? 'uncategorized';
+      // `||`, não `??`: compra no cartão sem categoria grava `categoryId: ''`
+      // (`createCardPurchase`), e string vazia passa pelo `??`. Com `??`, os sem-categoria
+      // caíam em dois baldes ('' e 'uncategorized') e o resumo mostrava duas linhas
+      // "Sem categoria".
+      const categoryId = transaction.categoryId || 'uncategorized';
       totals.set(categoryId, (totals.get(categoryId) ?? 0) + transaction.amountCents);
       return totals;
     }, new Map<string, number>());
@@ -122,10 +155,24 @@ export function DashboardPage() {
           <article className="surface surface-pad dash-metric dash-metric--committed">
             <p className="eyebrow">Comprometido</p>
             <strong className="display-number">{committedDisplay}</strong>
-            <span className="text-secondary">{isCommittedLoading ? 'Contas e fatura.' : committedCaption}</span>
+            <button
+              type="button"
+              className="dash-metric-explain"
+              onClick={() => setTutorialOpen(true)}
+              aria-label="Entender como o Disponível e o Comprometido são calculados"
+            >
+              {isCommittedLoading ? 'Contas e fatura.' : committedCaption}
+            </button>
           </article>
         </div>
       </div>
+
+      <AvailableModeSheet
+        open={tutorialOpen || shouldAutoOpenTutorial}
+        currentMode={profile?.availableMode}
+        onChoose={handleChooseAvailableMode}
+        onClose={handleCloseTutorial}
+      />
 
       <div className="quick-actions">
         <Link className="button button--primary" to="/app/transactions/new">

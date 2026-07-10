@@ -1,7 +1,8 @@
-import { addDays, compareAsc, isAfter, isBefore, isEqual } from 'date-fns';
+import { addDays, compareAsc, endOfDay, isAfter, isBefore, isEqual } from 'date-fns';
 import { toDate } from './financeDates';
+import { defaultAvailableMode } from './availableMode';
 import { defaultCommittedWindowDays, nextPaydayFrom } from './payday';
-import type { Account, Bill, Invoice, PaydayRule, RecurringRule, Transaction } from '../types/contracts';
+import type { Account, AvailableMode, Bill, Invoice, PaydayRule, RecurringRule, Transaction } from '../types/contracts';
 
 export interface AccountBalance extends Account {
   balanceCents: number;
@@ -17,7 +18,8 @@ export interface UpcomingCommitment {
 
 // De onde veio a data-limite usada pra decidir o que conta como "Comprometido" —
 // exibido no Dashboard pra explicar o número em vez de só mostrar um valor sem contexto.
-export type CommittedCutoffSource = 'income' | 'payday' | 'window';
+// `all`: modo conservador, não há data-limite (tudo que se deve conta).
+export type CommittedCutoffSource = 'income' | 'payday' | 'window' | 'all';
 
 export interface DashboardSummary {
   totalBalanceCents: number;
@@ -26,7 +28,8 @@ export interface DashboardSummary {
   upcomingCommitments: UpcomingCommitment[];
   recentTransactions: Transaction[];
   nextIncomeAt: Date | null;
-  committedCutoff: Date;
+  /** `null` no modo conservador: não existe data de corte, tudo que se deve conta. */
+  committedCutoff: Date | null;
   committedCutoffSource: CommittedCutoffSource;
 }
 
@@ -103,22 +106,33 @@ export function calculateTotalBalance(accounts: Account[], transactions: Transac
 }
 
 export function findNextIncomeDate(transactions: Transaction[], now = new Date()) {
+  // Estritamente DEPOIS de hoje: uma receita lançada com a data de hoje já entrou no
+  // saldo, então não é o "próximo recebimento". Comparar contra o instante `now` fazia
+  // a mesma receita de hoje contar de manhã (12:00 > 08:00) e não contar à tarde,
+  // mudando o Comprometido conforme a hora em que o app era aberto.
+  const todayEnd = endOfDay(now);
   const futureIncomeDates = transactions
     .filter((transaction) => isActiveTransaction(transaction) && transaction.type === 'income')
     .map((transaction) => toDate(transaction.date))
-    .filter((date) => isAfter(date, now) || isEqual(date, now))
+    .filter((date) => isAfter(date, todayEnd))
     .sort(compareAsc);
 
   return futureIncomeDates[0] ?? null;
 }
 
+/**
+ * `cutoff = null` (modo conservador): não há data-limite — tudo que a pessoa já deve
+ * conta como comprometido, inclusive parcelas de faturas de meses futuros.
+ */
 export function buildUpcomingCommitments(
   bills: Bill[],
   recurringRules: RecurringRule[],
-  cutoff: Date,
+  cutoff: Date | null,
   invoices: Invoice[] = [],
   now: Date = new Date()
 ): UpcomingCommitment[] {
+  const withinCutoff = (dueAt: Date) => cutoff === null || isOnOrBefore(dueAt, cutoff);
+
   const billCommitments = bills
     .filter((bill) => bill.status === 'pending' || bill.status === 'overdue')
     .map(
@@ -131,7 +145,7 @@ export function buildUpcomingCommitments(
           dueAt: toDate(bill.dueDate)
         }) satisfies UpcomingCommitment
     )
-    .filter((commitment) => isOnOrBefore(commitment.dueAt, cutoff));
+    .filter((commitment) => withinCutoff(commitment.dueAt));
 
   const recurringCommitments = recurringRules
     .filter((rule) => rule.isActive && typeof rule.amountCents === 'number')
@@ -145,7 +159,7 @@ export function buildUpcomingCommitments(
           dueAt: toDate(rule.nextOccurrenceAt)
         }) satisfies UpcomingCommitment
     )
-    .filter((commitment) => isOnOrBefore(commitment.dueAt, cutoff));
+    .filter((commitment) => withinCutoff(commitment.dueAt));
 
   // Regra de fatura no comprometido:
   // - 'closed': sempre (já fechou, o pagamento é iminente)
@@ -156,13 +170,15 @@ export function buildUpcomingCommitments(
   //   vence dia 5), isso contava a fatura inteira como comprometida um mês antes do
   //   vencimento de verdade, mesmo já com `resolveInvoiceCycle` calculando a data de
   //   vencimento certa. Decisão do dono do produto: vencimento real é o critério.
+  // No modo conservador (`cutoff === null`) toda fatura em aberto conta, inclusive as
+  // de parcelas que só vencem daqui a meses — é dívida já assumida.
   const invoiceCommitments = invoices
     .filter(
       (invoice) =>
         invoice.status !== 'paid' &&
         invoice.status !== 'overpaid' &&
         invoice.outstandingBalanceCents > 0 &&
-        (invoice.status === 'closed' || isOnOrBefore(toDate(invoice.dueDate), cutoff))
+        (invoice.status === 'closed' || withinCutoff(toDate(invoice.dueDate)))
     )
     .map(
       (invoice) =>
@@ -188,10 +204,15 @@ export function calculateDashboardSummary(input: {
   invoices?: Invoice[];
   payday?: PaydayRule;
   committedWindowDays?: number;
+  availableMode?: AvailableMode;
   now?: Date;
 }): DashboardSummary {
   const now = input.now ?? new Date();
   const nextIncomeAt = findNextIncomeDate(input.transactions, now);
+  const availableMode = input.availableMode ?? defaultAvailableMode;
+  // Modo conservador: sem data de corte. Não prevê recebimento nenhum — tudo que a
+  // pessoa já deve entra no Comprometido.
+  const isConservative = availableMode === 'conservative';
   // Sem receita futura lançada na mão, usa a data de recebimento estimada do perfil
   // (pergunta do onboarding) antes de cair na janela configurável (padrão 30 dias) —
   // evita que uma fatura que só vence depois do próximo salário pareça "comprometida"
@@ -199,8 +220,21 @@ export function calculateDashboardSummary(input: {
   // igual quem nunca respondeu a pergunta.
   const resolvablePayday = input.payday && input.payday.type !== 'variable_income' ? input.payday : undefined;
   const windowDays = input.committedWindowDays ?? defaultCommittedWindowDays;
-  const committedCutoffSource: CommittedCutoffSource = nextIncomeAt ? 'income' : resolvablePayday ? 'payday' : 'window';
-  const cutoff = nextIncomeAt ?? (resolvablePayday ? nextPaydayFrom(resolvablePayday, now) : addDays(now, windowDays));
+  const committedCutoffSource: CommittedCutoffSource = isConservative
+    ? 'all'
+    : nextIncomeAt
+    ? 'income'
+    : resolvablePayday
+    ? 'payday'
+    : 'window';
+  // `endOfDay`: o corte é um DIA, não um instante. As três origens produzem horas
+  // diferentes (receita lançada e vencimentos ficam ao meio-dia; `nextPaydayFrom`
+  // devolve meia-noite; a janela de N dias herda a hora atual) — sem normalizar, uma
+  // conta que vence no próprio dia do salário entrava ou não no Comprometido dependendo
+  // da origem do corte, e a janela de 30 dias mudava de resultado conforme a hora em
+  // que o app era aberto.
+  const rawCutoff = nextIncomeAt ?? (resolvablePayday ? nextPaydayFrom(resolvablePayday, now) : addDays(now, windowDays));
+  const cutoff = isConservative ? null : endOfDay(rawCutoff);
   const totalBalanceCents = calculateTotalBalance(input.accounts, input.transactions);
   const commitments = buildUpcomingCommitments(input.bills, input.recurringRules, cutoff, input.invoices ?? [], now);
   const committedCents = commitments.reduce((total, commitment) => total + commitment.amountCents, 0);

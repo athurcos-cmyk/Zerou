@@ -51,6 +51,18 @@ export type PaydayRule =
   | { type: 'end_of_month' }
   | { type: 'variable_income' };
 
+// Como o "Disponível" do resumo é calculado. Escolha explícita da pessoa (mini tutorial
+// no primeiro Dashboard, trocável em Configurações), porque as duas leituras são
+// legítimas e dependem da vida de cada um:
+//
+// - `conservative`: Comprometido = tudo que você já deve (contas pendentes, próxima
+//   ocorrência de cada recorrência, e todo saldo em aberto de fatura, inclusive parcelas
+//   de meses futuros). Nunca conta com dinheiro que ainda não entrou.
+// - `until_payday`: Comprometido = só o que vence antes do seu próximo recebimento
+//   (receita futura lançada → data do onboarding → janela de N dias). Otimista: assume
+//   que a próxima entrada acontece.
+export type AvailableMode = 'conservative' | 'until_payday';
+
 export interface UserProfile extends AppearancePreferences {
   id: string;
   name: string;
@@ -69,6 +81,11 @@ export interface UserProfile extends AppearancePreferences {
   // quando ausente; editável em Configurações por qualquer pessoa, não só quem tem
   // renda variável.
   committedWindowDays?: number;
+  // Ausente = a pessoa ainda não passou pelo mini tutorial do Dashboard. Nesse caso o
+  // cálculo usa `defaultAvailableMode` ('until_payday', o comportamento histórico) e o
+  // tutorial abre sozinho. Depois de escolher (ou dispensar), o campo existe e o
+  // tutorial só reaparece se ela pedir em Configurações.
+  availableMode?: AvailableMode;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }

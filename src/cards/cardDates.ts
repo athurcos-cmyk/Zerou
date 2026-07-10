@@ -5,9 +5,33 @@ function clampDay(date: Date, day: number) {
   return setDate(date, Math.min(day, lastDay));
 }
 
-export function resolveInvoiceCycle(purchaseDate: Date, closingDay: number, dueDay: number) {
+/**
+ * Ciclo (fatura + vencimento) da parcela `installmentIndex` de uma compra.
+ *
+ * O mês da parcela é contado a partir do mês da PRIMEIRA fatura, ancorado no dia 1 —
+ * nunca somando meses à data da compra. Somar à data da compra clampa em fevereiro
+ * (31/jan + 1 mês = 28/fev) e, num cartão que fecha dia 28, o dia clampado deixa de
+ * ser "depois do fechamento": a 2ª parcela caía na MESMA fatura da 1ª e março ficava
+ * sem parcela nenhuma. Parcelas sempre ocupam faturas consecutivas.
+ */
+export function resolveInstallmentCycle(
+  purchaseDate: Date,
+  closingDay: number,
+  dueDay: number,
+  installmentIndex = 0
+) {
   const purchaseDay = purchaseDate.getDate();
-  const referenceDate = purchaseDay > closingDay ? addMonths(purchaseDate, 1) : purchaseDate;
+  // Compra depois do fechamento entra na fatura do mês seguinte.
+  const firstMonthOffset = purchaseDay > closingDay ? 1 : 0;
+  const referenceDate = new Date(
+    purchaseDate.getFullYear(),
+    purchaseDate.getMonth() + firstMonthOffset + installmentIndex,
+    1,
+    purchaseDate.getHours(),
+    purchaseDate.getMinutes(),
+    purchaseDate.getSeconds(),
+    purchaseDate.getMilliseconds()
+  );
   const referenceMonth = format(referenceDate, 'yyyy-MM');
   // Padrão comum de cartão brasileiro: fecha tarde no mês (ex. dia 25), vence cedo no
   // mês seguinte (ex. dia 5) — dueDay < closingDay indica que o vencimento cai no mês
@@ -20,6 +44,10 @@ export function resolveInvoiceCycle(purchaseDate: Date, closingDay: number, dueD
     referenceMonth,
     dueDate
   };
+}
+
+export function resolveInvoiceCycle(purchaseDate: Date, closingDay: number, dueDay: number) {
+  return resolveInstallmentCycle(purchaseDate, closingDay, dueDay, 0);
 }
 
 export function invoiceIdFor(cardId: string, referenceMonth: string) {

@@ -15,7 +15,6 @@ import {
   type QueryDocumentSnapshot,
   type Unsubscribe
 } from 'firebase/firestore';
-import { addMonths } from 'date-fns';
 import { getFirebaseDb } from '../firebase/config';
 import { fireWrite } from '../firebase/fireWrite';
 import { monthKeyFromDate } from '../finance/financeDates';
@@ -35,7 +34,7 @@ import {
   type RecordInvoiceFeeInput,
   type RecordInvoicePaymentInput
 } from './cardSchemas';
-import { invoiceIdFor, resolveInvoiceCycle } from './cardDates';
+import { invoiceIdFor, resolveInstallmentCycle } from './cardDates';
 import type { CreditCard, Invoice, InvoiceLedgerEntry, InvoiceLedgerEntryType, SyncStatus } from '../types/contracts';
 
 export type LocalCardSynced<T> = T & {
@@ -196,8 +195,7 @@ export async function createCardPurchase(workspaceId: string, userId: string, in
   >();
 
   amounts.forEach((amountCents, index) => {
-    const installmentDate = addMonths(parsed.purchaseDate, index);
-    const cycle = resolveInvoiceCycle(installmentDate, card.closingDay, card.dueDay);
+    const cycle = resolveInstallmentCycle(parsed.purchaseDate, card.closingDay, card.dueDay, index);
     const invoiceId = invoiceIdFor(card.id, cycle.referenceMonth);
     const idempotencyKey = `${transactionId}_purchase_${index + 1}`;
     const entryId = idempotentEntryId(idempotencyKey);
@@ -226,7 +224,7 @@ export async function createCardPurchase(workspaceId: string, userId: string, in
     );
   });
 
-  const firstCycle = resolveInvoiceCycle(parsed.purchaseDate, card.closingDay, card.dueDay);
+  const firstCycle = resolveInstallmentCycle(parsed.purchaseDate, card.closingDay, card.dueDay, 0);
   const firstInvoiceId = invoiceIdFor(card.id, firstCycle.referenceMonth);
   const monthKey = monthKeyFromDate(parsed.purchaseDate);
 

@@ -2,6 +2,18 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-09 — fix: 7 bugs de cartão/parcela/Comprometido + a pessoa escolhe como o "Disponível" é calculado
+
+- **Cartão excluído continuava listado em Cartões e ainda comprometia saldo e limite** — `deleteCard` é soft-delete e nada filtrava `isActive`. Corrigido na raiz (`useCardsData`), verificado ao vivo: o Comprometido volta sozinho ao excluir o cartão.
+- **Parcelamento colidia num mês e pulava outro**: compra 4x em 31/jan num cartão que fecha dia 28 gerava duas parcelas em fevereiro e nenhuma em março (`addMonths` clampando fevereiro). Novo `resolveInstallmentCycle` garante faturas consecutivas.
+- **Antecipação de parcelas**: oferecia faturas *passadas* como se fossem futuras (antecipá-las jogaria a dívida pra frente), e antecipar uma parcela escondia as irmãs da mesma compra. Lógica extraída pra `src/cards/anticipation.ts` com 10 testes. Antecipação de parcela de meses depois testada ao vivo — limite consumido não muda.
+- **Comprometido**: conta que vence no próprio dia do salário sumia do cálculo, e o número mudava conforme a hora do dia em que o app abria. O corte agora é sempre fim do dia.
+- **Push "Fatura fechada: R$ 0,00"**: `outstandingBalanceCents` nunca é gravado no Firestore (o total vem do ledger, no cliente) e a Cloud Function lia o campo cru. Agora calcula do ledger — **exige `firebase deploy --only functions`**.
+- **Novo: escolha do modo de "Disponível"** (`conservative` × `until_payday`), com mini tutorial que abre no primeiro Dashboard, trocável e revisitável em Configurações. Nasce do ponto levantado pelo dono: o app não pode simplesmente *deduzir* que um salário futuro vai cair. O default mantém o comportamento atual.
+- **"Sem categoria" aparecia duas vezes** no Resumo de gastos e no donut da Análise: o agrupamento usava `?? 'uncategorized'`, e compra no cartão sem categoria grava `categoryId: ''` — string vazia passa pelo `??`. Trocado por `||`.
+- **`fireWrite` agora loga `permission-denied` no console em desenvolvimento** — o silêncio de propósito já escondeu dois bugs graves por semanas, e escondeu um terceiro nesta sessão (pego olhando a resposta HTTP do Firestore).
+- Regras do Firestore e Cloud Functions **deployadas e verificadas ao vivo** com autorização do dono. 178 testes passando, typecheck e build limpos. Detalhes em [`docs/history/2026-07.md`](docs/history/2026-07.md).
+
 ## 2026-07-09 — fix: cartão/fatura não excluía direito, Comprometido contava fatura cedo demais, antecipação de parcelas nunca funcionou + feature de payday
 
 - **4 bugs reais de cartão/fatura corrigidos**: excluir compra no cartão não saía da fatura; "fatura atual" mostrava a fatura errada quando havia parcelamento; cartão que fecha tarde/vence mês seguinte calculava vencimento antes até da própria compra; e o mais sério — **antecipação de parcelas nunca funcionou em produção** (regra do Firestore nunca aceitou o tipo de lançamento de crédito, silenciosamente rejeitada desde que a feature existe).
