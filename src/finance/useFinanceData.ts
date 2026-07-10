@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { buildDefaultCategory, defaultCategories } from './defaultCategories';
-import { calculateAccountBalances, calculateDashboardSummary } from './financeCalculations';
+import { calculateAccountBalances } from './financeCalculations';
 import {
   ensureDefaultCategories,
   subscribeAccounts,
@@ -201,17 +201,6 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
     [activeAccounts, state.transactions]
   );
 
-  const dashboard = useMemo(
-    () =>
-      calculateDashboardSummary({
-        accounts: activeAccounts,
-        transactions: state.transactions,
-        bills: state.bills,
-        recurringRules: state.recurringRules
-      }),
-    [activeAccounts, state.bills, state.recurringRules, state.transactions]
-  );
-
   const pendingWrites = useMemo(
     () =>
       [...state.accounts, ...state.categories, ...state.transactions, ...state.bills, ...state.recurringRules].some(
@@ -225,7 +214,6 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
     accounts: activeAccounts,
     categories: categoriesWithDefaults,
     accountBalances,
-    dashboard,
     pendingWrites
   };
 }

@@ -22,6 +22,7 @@ import { addHours } from 'date-fns';
 import { getBillingEntitlementsForUser } from '../billing/billingService';
 import { getFirebaseDb } from '../firebase/config';
 import { fireWrite } from '../firebase/fireWrite';
+import { readSnapshotDoc } from '../firebase/snapshotData';
 import { getPersonalWorkspaceId } from '../workspaces/workspaceService';
 import {
   createSettlementSchema,
@@ -64,7 +65,7 @@ function createId(prefix: string) {
 }
 
 function withLocalSync<T extends object>(snapshot: QueryDocumentSnapshot<DocumentData>) {
-  const data = { id: snapshot.id, ...snapshot.data() } as unknown as T;
+  const data = readSnapshotDoc<T>(snapshot);
   const localSyncStatus: SyncStatus = snapshot.metadata.hasPendingWrites ? 'pending' : 'synced';
   return { ...data, localSyncStatus } as LocalSharedSynced<T>;
 }

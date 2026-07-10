@@ -927,6 +927,33 @@ describe('firestore security rules', () => {
     );
   });
 
+  // Esta rejeição é o que torna seguro o id determinístico das recorrências
+  // (`recurringOccurrenceTransactionId`): a Cloud Function `generateRecurrences` e o botão
+  // "Registrar" gravam no MESMO documento para a mesma ocorrência, e a segunda escrita —
+  // um payload de create, com `version: 1` e `createdAt` novo — bate na regra de update e
+  // é negada. Sem isso, a despesa sairia em dobro.
+  it('rejects re-creating an existing transaction with the same id (recurrence idempotency)', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    const occurrenceId = 'rec_abc_2026-07-09';
+
+    await assertSucceeds(
+      setDoc(doc(aliceDb, 'workspaces/workspaceA/accounts/accountA'), accountPayload('workspaceA', 'accountA', 'alice'))
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(aliceDb, `workspaces/workspaceA/transactions/${occurrenceId}`),
+        transactionPayload('workspaceA', occurrenceId, 'alice', 'accountA', { isRecurring: true, recurringId: 'rec_abc' })
+      )
+    );
+
+    await assertFails(
+      setDoc(
+        doc(aliceDb, `workspaces/workspaceA/transactions/${occurrenceId}`),
+        transactionPayload('workspaceA', occurrenceId, 'alice', 'accountA', { isRecurring: true, recurringId: 'rec_abc' })
+      )
+    );
+  });
+
   it('blocks protected financial transaction fields from being forged', async () => {
     const aliceDb = testEnv.authenticatedContext('alice').firestore();
 

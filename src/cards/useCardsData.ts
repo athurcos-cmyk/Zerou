@@ -3,6 +3,7 @@ import { calculateInvoice } from '../domain/invoices/calculateInvoice';
 import { subscribeWithTransientRetry } from '../firebase/firestoreRetry';
 import { toDate } from '../finance/financeDates';
 import {
+  fetchDeletedTransactionIds,
   subscribeCards,
   subscribeInvoiceLedger,
   subscribeInvoices,
@@ -18,6 +19,16 @@ interface CardsState {
   error: string | null;
 }
 
+/**
+ * O que o hook sabe sobre as transações a partir da janela de `subscribeTransactions`
+ * (as 300 mais recentes). `knownIds` é o que essa janela cobre; tudo fora dela precisa ser
+ * consultado antes de o ledger poder ser filtrado com segurança.
+ */
+export interface TransactionDeletionIndex {
+  knownIds: ReadonlySet<string>;
+  deletedIds: ReadonlySet<string>;
+}
+
 const initialState: CardsState = {
   cards: [],
   invoices: [],
@@ -26,8 +37,13 @@ const initialState: CardsState = {
   error: null
 };
 
-export function useCardsData(workspaceId?: string, deletedTransactionIds?: ReadonlySet<string>) {
+const emptyIds: ReadonlySet<string> = new Set();
+
+export function useCardsData(workspaceId?: string, transactionIndex?: TransactionDeletionIndex) {
   const [state, setState] = useState<CardsState>(initialState);
+  // Excluídas descobertas fora da janela de 300 (ver `fetchDeletedTransactionIds`).
+  const [remoteDeletedIds, setRemoteDeletedIds] = useState<ReadonlySet<string>>(emptyIds);
+  const resolvedIds = useRef(new Set<string>());
 
   // `deleteCard` é soft-delete (isActive: false) — o listener continua trazendo o doc.
   // Filtrar aqui, e não em cada tela, garante que um cartão excluído suma da lista E
@@ -137,12 +153,63 @@ export function useCardsData(workspaceId?: string, deletedTransactionIds?: Reado
     };
   }, [invoiceIds, workspaceId]);
 
+  // Transações citadas pelo ledger que a janela de `subscribeTransactions` não cobre.
+  // Normalmente vazio; só aparece em conta com muito histórico, e é exatamente aí que o
+  // filtro de lançamento órfão silenciosamente falhava.
+  const unresolvedIdsKey = useMemo(() => {
+    if (!transactionIndex) return '';
+
+    const referenced = new Set<string>();
+    state.ledgerEntries.forEach((entry) => {
+      if (entry.sourceTransactionId && !transactionIndex.knownIds.has(entry.sourceTransactionId)) {
+        referenced.add(entry.sourceTransactionId);
+      }
+    });
+
+    return [...referenced].sort().join(',');
+  }, [state.ledgerEntries, transactionIndex]);
+
+  useEffect(() => {
+    resolvedIds.current = new Set();
+    setRemoteDeletedIds(emptyIds);
+  }, [workspaceId]);
+
+  useEffect(() => {
+    if (!workspaceId || !unresolvedIdsKey) return undefined;
+
+    const pending = unresolvedIdsKey.split(',').filter((id) => !resolvedIds.current.has(id));
+    if (pending.length === 0) return undefined;
+
+    let cancelled = false;
+    fetchDeletedTransactionIds(workspaceId, pending)
+      .then((deleted) => {
+        if (cancelled) return;
+        // Marca como resolvido mesmo quando nada foi excluído: senão o effect refaz a
+        // leitura a cada snapshot de ledger.
+        pending.forEach((id) => resolvedIds.current.add(id));
+        if (deleted.length > 0) {
+          setRemoteDeletedIds((current) => new Set([...current, ...deleted]));
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId, unresolvedIdsKey]);
+
+  const deletedTransactionIds = useMemo(() => {
+    const fromWindow = transactionIndex?.deletedIds ?? emptyIds;
+    if (remoteDeletedIds.size === 0) return fromWindow;
+    return new Set([...fromWindow, ...remoteDeletedIds]);
+  }, [transactionIndex, remoteDeletedIds]);
+
   const calculatedInvoices = useMemo(() => {
     // Ledger entries de uma compra no cartão excluída no Extrato (softDeleteTransaction
     // marca deletedAt na transação, mas as regras do Firestore não permitem que um
     // membro comum apague/edite o ledger da fatura) ficam órfãs para sempre — filtradas
     // aqui em vez de removidas, para não depender de regra nova.
-    const liveLedgerEntries = deletedTransactionIds?.size
+    const liveLedgerEntries = deletedTransactionIds.size
       ? state.ledgerEntries.filter((entry) => !entry.sourceTransactionId || !deletedTransactionIds.has(entry.sourceTransactionId))
       : state.ledgerEntries;
 

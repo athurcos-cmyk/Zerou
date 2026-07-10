@@ -8,7 +8,7 @@ import { useConfirm } from '../components/ConfirmDialog';
 import { EmptyState } from '../components/EmptyState';
 import { findBankInstitution, searchBankInstitutions, type BankInstitution } from '../finance/bankInstitutions';
 import { accountTypeLabels } from '../finance/financeLabels';
-import { createAccount, deleteAccount } from '../finance/financeService';
+import { accountHasLiveTransactions, createAccount, deleteAccount } from '../finance/financeService';
 import { accountTypes } from '../finance/financeSchemas';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
@@ -24,6 +24,9 @@ export function AccountsPage() {
   const [openingBalance, setOpeningBalance] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  // Enquanto a conferência de lançamentos roda, o botão da conta fica travado — a leitura
+  // vai ao servidor e demora o suficiente pra dar dois cliques.
+  const [deleteProbeAccountId, setDeleteProbeAccountId] = useState<string | null>(null);
   const { confirm, dialog: confirmDialog } = useConfirm();
   const suggestions = searchBankInstitutions(name, name.trim() ? 6 : 8);
   const syncStatusByAccountId = new Map(finance.accounts.map((account) => [account.id, account.localSyncStatus]));
@@ -59,15 +62,33 @@ export function AccountsPage() {
       return;
     }
 
-    const hasTransactions = finance.transactions.some(
-      (transaction) => !transaction.deletedAt && (transaction.accountId === accountId || transaction.destinationAccountId === accountId)
-    );
     const hasBills = finance.bills.some((bill) => bill.accountId === accountId && bill.status !== 'cancelled');
     const hasRecurringRules = finance.recurringRules.some((rule) => rule.accountId === accountId && rule.isActive);
 
-    if (hasTransactions || hasBills || hasRecurringRules) {
+    if (hasBills || hasRecurringRules) {
       setMessage(
-        `Não dá para excluir "${accountName}" ainda. Ela está ligada a lançamentos, contas a pagar ou recorrências. Remova ou altere esses vínculos primeiro.`
+        `Não dá para excluir "${accountName}" ainda. Ela está ligada a contas a pagar ou recorrências. Remova ou altere esses vínculos primeiro.`
+      );
+      return;
+    }
+
+    // Pergunta ao servidor em vez de olhar `finance.transactions`: aquela lista é a janela
+    // das 300 transações mais recentes do workspace, e uma conta antiga passava por vazia.
+    // `deleteAccount` é irreversível, então na dúvida (erro de rede) não deixamos seguir.
+    setDeleteProbeAccountId(accountId);
+    let hasTransactions: boolean;
+    try {
+      hasTransactions = await accountHasLiveTransactions(workspaceId, accountId);
+    } catch (error) {
+      setMessage(getUserFacingErrorMessage(error, 'Não foi possível conferir os lançamentos desta conta agora. Tente de novo.'));
+      return;
+    } finally {
+      setDeleteProbeAccountId(null);
+    }
+
+    if (hasTransactions) {
+      setMessage(
+        `Não dá para excluir "${accountName}" ainda. Ela está ligada a lançamentos. Remova ou altere esses vínculos primeiro.`
       );
       return;
     }
@@ -125,6 +146,7 @@ export function AccountsPage() {
                     className="icon-button"
                     type="button"
                     aria-label={`Excluir ${account.name}`}
+                    disabled={deleteProbeAccountId !== null}
                     onClick={() => void handleDeleteAccount(account.id, account.name)}
                   >
                     <Trash2 size={17} aria-hidden="true" />

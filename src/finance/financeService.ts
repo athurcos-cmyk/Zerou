@@ -13,13 +13,16 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
+  where,
   writeBatch,
   type DocumentData,
   type QueryDocumentSnapshot,
+  type QuerySnapshot,
   type Unsubscribe
 } from 'firebase/firestore';
 import { getFirebaseDb } from '../firebase/config';
 import { fireWrite } from '../firebase/fireWrite';
+import { readSnapshotData, readSnapshotDoc } from '../firebase/snapshotData';
 import { buildDefaultCategory, defaultCategories } from './defaultCategories';
 import { monthKeyFromDate } from './financeDates';
 import {
@@ -58,7 +61,7 @@ function omitUndefined<T extends Record<string, unknown>>(value: T) {
 }
 
 function withLocalSync<T extends object>(snapshot: QueryDocumentSnapshot<DocumentData>) {
-  const data = { id: snapshot.id, ...snapshot.data() } as unknown as T;
+  const data = readSnapshotDoc<T>(snapshot);
   const syncStatus = (data as { syncStatus?: SyncStatus }).syncStatus;
   const localSyncStatus: SyncStatus = snapshot.metadata.hasPendingWrites ? 'pending' : syncStatus ?? 'synced';
   return { ...data, localSyncStatus } as LocalSynced<T>;
@@ -105,6 +108,35 @@ export async function createAccount(workspaceId: string, userId: string, input: 
   });
 
   return id;
+}
+
+/** Quantas transações da conta são inspecionadas no servidor antes de decidir. Ver `accountHasLiveTransactions`. */
+const ACCOUNT_LINK_PROBE_LIMIT = 20;
+
+/**
+ * Existe alguma transação **não excluída** ligada a esta conta? Pergunta ao servidor.
+ *
+ * `deleteAccount` apaga o documento de vez, então a UI precisa impedir a exclusão de uma
+ * conta com histórico — senão as transações dela ficam órfãs no Extrato enquanto somem do
+ * saldo. A checagem antiga usava `finance.transactions`, que é a janela das 300 transações
+ * mais recentes do workspace inteiro: uma conta antiga, cujos lançamentos já saíram dessa
+ * janela, parecia vazia e podia ser apagada.
+ *
+ * Lê no máximo `ACCOUNT_LINK_PROBE_LIMIT` documentos por lado (origem e destino). Escapar
+ * exigiria a conta ter 20+ transações excluídas antes de qualquer viva na ordem do índice —
+ * e o custo é pago uma vez, num clique deliberado de exclusão.
+ */
+export async function accountHasLiveTransactions(workspaceId: string, accountId: string) {
+  const transactions = collectionRef(workspaceId, 'transactions');
+  const [asSource, asDestination] = await Promise.all([
+    getDocs(query(transactions, where('accountId', '==', accountId), limit(ACCOUNT_LINK_PROBE_LIMIT))),
+    getDocs(query(transactions, where('destinationAccountId', '==', accountId), limit(ACCOUNT_LINK_PROBE_LIMIT)))
+  ]);
+
+  const hasLiveDoc = (snapshot: QuerySnapshot<DocumentData>) =>
+    snapshot.docs.some((document) => !readSnapshotData(document)?.deletedAt);
+
+  return hasLiveDoc(asSource) || hasLiveDoc(asDestination);
 }
 
 export async function deleteAccount(workspaceId: string, accountId: string) {
@@ -524,6 +556,37 @@ export function payBill(
 }
 
 // ─── recordRecurringPayment ───────────────────────────────────────────────────
+
+/**
+ * Id determinístico da transação de UMA ocorrência de uma recorrência.
+ *
+ * Duas coisas registram a mesma ocorrência: a Cloud Function `generateRecurrences` (roda
+ * às 6h) e o botão "Registrar" da tela de Recorrências. Sem uma chave em comum, as duas
+ * criavam transações diferentes e a despesa saía em dobro. Com o id derivado de
+ * `(regra, data da ocorrência)`, a segunda escrita cai no mesmo documento — e a regra do
+ * Firestore a rejeita (`version` não incrementa num payload de create), então o batch
+ * inteiro é desfeito e nada é duplicado.
+ *
+ * A data é lida em **UTC**, não no fuso local: o app roda em BRT e a Cloud Function em UTC,
+ * e `getDate()` daria dias diferentes para o mesmo instante. A chave não precisa ser
+ * legível, precisa ser idêntica dos dois lados.
+ *
+ * Mantido em sincronia com `recurringOccurrenceTransactionId` em `functions/src/automation.ts`.
+ */
+export function recurringOccurrenceTransactionId(ruleId: string, occurrenceAt: Date) {
+  return `${ruleId}_${occurrenceAt.toISOString().slice(0, 10)}`;
+}
+
+/**
+ * Uma ocorrência só pode ser registrada quando já venceu. Se `nextOccurrenceAt` está no
+ * futuro, ou a automação já registrou a ocorrência anterior, ou ela ainda não chegou —
+ * nos dois casos, "Registrar" criaria uma despesa que não existe.
+ */
+export function isRecurrenceDue(nextOccurrenceAt: Date, now: Date = new Date()) {
+  const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  return nextOccurrenceAt.getTime() <= endOfToday.getTime();
+}
+
 // Cria transação de despesa e avança nextOccurrenceAt para a próxima data.
 export function recordRecurringPayment(
   workspaceId: string,
@@ -534,14 +597,15 @@ export function recordRecurringPayment(
   const amount = opts.amountCents ?? rule.amountCents;
   if (!amount) return;
   const acctId = opts.accountId || rule.accountId;
-  const nextDate = nextOccurrenceDate(rule.nextOccurrenceAt.toDate(), rule.frequency, rule.anchorDay);
+  const occurrenceAt = rule.nextOccurrenceAt.toDate();
+  const nextDate = nextOccurrenceDate(occurrenceAt, rule.frequency, rule.anchorDay);
   const batch = writeBatch(getFirebaseDb());
   batch.update(documentRef(workspaceId, 'recurring', rule.id), {
     nextOccurrenceAt: Timestamp.fromDate(nextDate),
     updatedAt: serverTimestamp()
   });
   if (acctId) {
-    const id = createId('txn');
+    const id = recurringOccurrenceTransactionId(rule.id, occurrenceAt);
     const now = new Date();
     batch.set(documentRef(workspaceId, 'transactions', id), omitUndefined({
       id, workspaceId, createdBy: userId, updatedBy: userId,

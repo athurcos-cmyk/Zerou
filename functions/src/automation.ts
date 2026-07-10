@@ -44,6 +44,15 @@ function nextOccurrenceDate(current: Date, frequency: 'weekly' | 'monthly' | 'ye
   );
 }
 
+// Mantido em sincronia com `recurringOccurrenceTransactionId` em src/finance/financeService.ts.
+// Id determinístico por (regra, ocorrência): faz o "Registrar" do app e esta função
+// gravarem no MESMO documento, em vez de criarem duas despesas para a mesma ocorrência.
+// A data sai em UTC (`toISOString`) porque o app roda em BRT e esta função em UTC — ler o
+// dia no fuso local daria chaves diferentes para o mesmo instante.
+function recurringOccurrenceTransactionId(ruleId: string, occurrenceAt: Date): string {
+  return `${ruleId}_${occurrenceAt.toISOString().slice(0, 10)}`;
+}
+
 function formatBRL(amountCents: number): string {
   return (amountCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
@@ -154,6 +163,7 @@ export const generateRecurrences = onSchedule(
     const nowDate = nowInBRT();
     const monthKey = currentYearMonth();
     let generated = 0;
+    let skipped = 0;
 
     const rulesSnap = await db
       .collectionGroup('recurring')
@@ -177,8 +187,24 @@ export const generateRecurrences = onSchedule(
       // Sem valor ou conta definida não há como criar a transação
       if (!rule.amountCents || !rule.accountId) continue;
 
-      const txnId = db.collection('x').doc().id;
-      const nextDate = nextOccurrenceDate(rule.nextOccurrenceAt.toDate(), rule.frequency, rule.anchorDay);
+      const occurrenceAt = rule.nextOccurrenceAt.toDate();
+      const txnId = recurringOccurrenceTransactionId(ruleDoc.id, occurrenceAt);
+      const nextDate = nextOccurrenceDate(occurrenceAt, rule.frequency, rule.anchorDay);
+      const txnRef = db.doc(`workspaces/${rule.workspaceId}/transactions/${txnId}`);
+
+      // A pessoa pode ter clicado "Registrar" nesta mesma ocorrência antes das 6h. O id
+      // determinístico faz as duas escritas caírem no mesmo documento: aqui só avançamos a
+      // data (e não mandamos push), em vez de gravar a despesa de novo por cima.
+      const alreadyRecorded = (await txnRef.get()).exists;
+
+      if (alreadyRecorded) {
+        await ruleDoc.ref.update({
+          nextOccurrenceAt: Timestamp.fromDate(nextDate),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        skipped++;
+        continue;
+      }
 
       const txnPayload: Record<string, unknown> = {
         id: txnId,
@@ -207,7 +233,7 @@ export const generateRecurrences = onSchedule(
       }
 
       const batch = db.batch();
-      batch.set(db.doc(`workspaces/${rule.workspaceId}/transactions/${txnId}`), txnPayload);
+      batch.set(txnRef, txnPayload);
       batch.update(ruleDoc.ref, {
         nextOccurrenceAt: Timestamp.fromDate(nextDate),
         updatedAt: FieldValue.serverTimestamp(),
@@ -222,7 +248,7 @@ export const generateRecurrences = onSchedule(
       ).catch(() => {});
     }
 
-    logger.info('generate_recurrences_finished', { generated });
+    logger.info('generate_recurrences_finished', { generated, skipped });
   }
 );
 

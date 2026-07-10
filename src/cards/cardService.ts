@@ -17,6 +17,7 @@ import {
 } from 'firebase/firestore';
 import { getFirebaseDb } from '../firebase/config';
 import { fireWrite } from '../firebase/fireWrite';
+import { readSnapshotData, readSnapshotDoc } from '../firebase/snapshotData';
 import { monthKeyFromDate } from '../finance/financeDates';
 import {
   anticipateInstallmentsSchema,
@@ -47,7 +48,7 @@ function createId(prefix: string) {
 }
 
 function withLocalSync<T extends object>(snapshot: QueryDocumentSnapshot<DocumentData>) {
-  const data = { id: snapshot.id, ...snapshot.data() } as unknown as T;
+  const data = readSnapshotDoc<T>(snapshot);
   const localSyncStatus: SyncStatus = snapshot.metadata.hasPendingWrites ? 'pending' : 'synced';
   return { ...data, localSyncStatus } as LocalCardSynced<T>;
 }
@@ -424,6 +425,39 @@ export async function reconcileInvoice(workspaceId: string, input: ReconcileInvo
     status: parsed.status,
     updatedAt: serverTimestamp()
   }));
+}
+
+/**
+ * Descobre quais das transações informadas estão excluídas (soft delete), lendo cada
+ * documento direto.
+ *
+ * Existe porque `subscribeTransactions` traz só as 300 mais recentes. Uma compra no
+ * cartão excluída que saia dessa janela desaparece do conjunto de "excluídas" que o
+ * `useCardsData` usa pra filtrar o ledger — e o valor dela **volta** a somar na fatura,
+ * que pode até sair de "paga". As faturas carregadas cobrem 24 ciclos, então uma compra
+ * parcelada de 2 anos atrás continua relevante muito depois de sair da janela.
+ *
+ * Só é chamada para os ids que a janela não cobre (normalmente nenhum), e o Firestore
+ * cacheia o resultado. Em caso de erro ou documento ausente, devolve "não excluída": o
+ * lado seguro é manter o lançamento, porque some-lo apagaria uma dívida real da fatura.
+ */
+export async function fetchDeletedTransactionIds(
+  workspaceId: string,
+  transactionIds: readonly string[]
+): Promise<string[]> {
+  const results = await Promise.all(
+    transactionIds.map(async (transactionId) => {
+      try {
+        const snapshot = await getDoc(transactionRef(workspaceId, transactionId));
+        const isDeleted = snapshot.exists() && Boolean(readSnapshotData(snapshot)?.deletedAt);
+        return isDeleted ? transactionId : null;
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  return results.filter((transactionId): transactionId is string => transactionId !== null);
 }
 
 export function subscribeCards(

@@ -11,10 +11,6 @@ Itens acionáveis. Fechou? Mova para "Concluído" ou remova. Detalhe histórico 
 ### Técnico
 - [ ] Code splitting — bundle inicial > 500 kB (warning no build).
 - [ ] App Check, backups do Firestore, alertas de custo Firebase/Vercel.
-- [ ] `useFinanceData` ainda expõe um `dashboard` calculado sem faturas, payday nem `availableMode`. Nenhuma tela consome (a `DashboardPage` calcula o seu). É trabalho desperdiçado a cada mudança de transação e uma armadilha pra quem usar por engano — remover.
-- [ ] `subscribeTransactions` tem `limit(300)`: se uma compra de cartão excluída sair dessa janela, ela some de `deletedTransactionIds` e os lançamentos dela **voltam** a contar na fatura (o filtro de ledger órfão em `useCardsData` depende da transação estar carregada). O mesmo limite afeta a trava de exclusão de conta em `AccountsPage` (`hasTransactions`), que pode liberar a exclusão de uma conta com histórico antigo. Só afeta contas com muito uso.
-- [ ] Recorrência pode gerar despesa em dobro: `generateRecurrences` (Cloud Function, 6h) cria a transação e avança `nextOccurrenceAt`; se a pessoa também clicar "Registrar" na tela, sai outra transação. Nada impede.
-- [ ] `deleteAccount` apaga a conta de vez, mas as transações dela continuam no Extrato e no "Resumo de gastos" (só somem do saldo, porque `calculateAccountBalances` filtra por conta existente). Hoje a exclusão é bloqueada quando há vínculos, então é uma porta estreita — mas se a trava do `limit(300)` acima falhar, o dado fica inconsistente.
 - [ ] Emails oficiais de suporte/privacidade.
 - [ ] Contas a pagar (`Bill.status`) nunca viram `'overdue'` automaticamente — ficam "Pendente" pra sempre mesmo com vencimento no passado. Não afeta o cálculo do Comprometido (já conta certo), só falta indicação visual/status pro usuário perceber o atraso.
 
@@ -26,6 +22,7 @@ Itens acionáveis. Fechou? Mova para "Concluído" ou remova. Detalhe histórico 
 - [ ] Billing real (Stripe) — só com decisão explícita de produto (hoje 100% gratuito).
 
 ## Concluído (recente)
+- [x] **As 3 pendências técnicas abertas na auditoria de 2026-07-10** (2026-07-11): `dashboard` morto removido do `useFinanceData`; o filtro de lançamento órfão deixou de depender da janela de 300 transações (e a trava de exclusão de conta passou a perguntar ao servidor); recorrência não gera mais despesa em dobro (id determinístico por ocorrência, compartilhado entre a Cloud Function e o botão "Registrar", com a rejeição provada no emulador). No caminho apareceu um bug maior: `snapshot.data()` devolve `null` pra `serverTimestamp()` pendente, então **excluir qualquer transação offline não fazia nada** até o servidor responder. Ver `docs/history/2026-07.md`.
 - [x] QA completa de cartões/faturas/Comprometido (pedido do dono): 4 bugs reais corrigidos — exclusão de compra no cartão não saía da fatura, "fatura atual" errada com parcelamento, cartão fecha-tarde/vence-mês-seguinte com vencimento errado, e antecipação de parcelas nunca funcionando em produção (regra do Firestore faltando desde a criação da feature). Comprometido/Disponível revisados a fundo e nova pergunta de onboarding "quando você recebe?" (payday + renda variável + janela configurável). Ver `CHANGELOG.md`/`docs/history/2026-07.md`.
 - [x] Domínio `granativa.com.br` no ar de ponta a ponta: HTTPS válido, landing carregando, login com Google testado e confirmado funcionando em produção pelo próprio dono.
 - [x] Zona DNS de `granativa.com.br` configurada no registro.br (registro `A` na raiz + `CNAME` em `www`, valores exatos gerados pelo Vercel) — "Zona DNS atualizada com sucesso!" confirmado no painel. Precisou esperar o domínio sair do estado "em transição" (bloqueio temporário do registro.br pra domínio recém-registrado).

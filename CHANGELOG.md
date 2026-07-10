@@ -2,6 +2,16 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-11 — fix: as 3 pendências técnicas + um bug de offline achado no caminho
+
+- **Excluir uma transação offline não fazia nada.** `snapshot.data()` devolve `null` para um `serverTimestamp()` ainda pendente, então `deletedAt` chegava nulo no cache local: a transação continuava no Extrato e a compra continuava somando na fatura até o servidor responder. Num app offline-first, a UI desfazia a ação do usuário. Toda leitura de snapshot passa agora por `readSnapshotDoc` (`serverTimestamps: 'estimate'`).
+- **Compra de cartão excluída voltava a contar na fatura.** O filtro de lançamento órfão usava a janela das 300 transações mais recentes; uma compra antiga que saísse dela sumia do conjunto de "excluídas" e o valor **voltava** — a fatura podia até deixar de estar paga. Agora o `useCardsData` consulta o servidor pelos ids que a janela não cobre (normalmente nenhum) e, na dúvida, mantém o lançamento: sumir com ele apagaria dívida real.
+- **Trava de exclusão de conta era furada** pelo mesmo motivo: uma conta antiga parecia vazia e podia ser apagada, deixando as transações órfãs. Passou a perguntar ao servidor.
+- **Recorrência gerava despesa em dobro**: a Cloud Function das 6h e o botão "Registrar" criavam transações independentes para a mesma ocorrência. Agora as duas usam um id derivado de `(regra, data da ocorrência)` — a segunda escrita cai no mesmo documento e é rejeitada pela regra do Firestore, o que está provado por teste no emulador. O botão "Registrar" também sumiu das recorrências que ainda não venceram (mostram "Em dia"); clicar ali lançava despesa inexistente e ainda pulava um período.
+- **Código morto removido**: `useFinanceData` recalculava um `dashboard` sem faturas, payday nem `availableMode` que nenhuma tela consumia.
+- `generateRecurrences` deployada com autorização do dono, então a idempotência vale dos dois lados.
+- 193 testes de unidade + 44 de regras, typecheck, lint e builds (app e functions) limpos. Detalhes em [`docs/history/2026-07.md`](docs/history/2026-07.md).
+
 ## 2026-07-10 — fix: `npm run test:rules` desbloqueado (e 5 testes que ele revelou quebrados) + clareza na tela de Recebimento
 
 - **`npm run test:rules` voltou a rodar**, depois de meses bloqueado. O Java desta máquina tinha dois JDK 25 **sem a pasta `bin/`** e um stub órfão da Oracle primeiro no PATH do sistema, morrendo com `0xC0000409`. Como `firebase-tools` chama `spawn("java")` cru e ignora `JAVA_HOME`, e corrigir o PATH do sistema exige admin, o script passou a usar `scripts/with-java.mjs`: acha um JDK que de fato executa e o coloca na frente do PATH só daquele comando.

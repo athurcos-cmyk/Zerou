@@ -1,14 +1,20 @@
-import { renderHook } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { useCardsData } from './useCardsData';
+import { useCardsData, type TransactionDeletionIndex } from './useCardsData';
 
 const cardMocks = vi.hoisted(() => ({
   subscribeCards: vi.fn(),
   subscribeInvoices: vi.fn(),
-  subscribeInvoiceLedger: vi.fn()
+  subscribeInvoiceLedger: vi.fn(),
+  fetchDeletedTransactionIds: vi.fn()
 }));
 
 vi.mock('./cardService', () => cardMocks);
+
+/** A janela de `subscribeTransactions` conhece `knownIds`; `deletedIds` é o subset excluído. */
+function index(deletedIds: string[] = [], knownIds: string[] = ['txn-1', 'txn-2']): TransactionDeletionIndex {
+  return { knownIds: new Set(knownIds), deletedIds: new Set(deletedIds) };
+}
 
 function ledgerEntry(overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -29,6 +35,8 @@ function ledgerEntry(overrides: Partial<Record<string, unknown>> = {}) {
 
 describe('useCardsData', () => {
   beforeEach(() => {
+    cardMocks.fetchDeletedTransactionIds.mockReset();
+    cardMocks.fetchDeletedTransactionIds.mockResolvedValue([]);
     cardMocks.subscribeCards.mockImplementation((_workspaceId, onNext) => {
       onNext([{ id: 'card-1', workspaceId: 'ws-1', name: 'Cartão', isActive: true, localSyncStatus: 'synced' }]);
       return vi.fn();
@@ -61,15 +69,15 @@ describe('useCardsData', () => {
     });
 
     const { result, rerender } = renderHook(
-      ({ deletedTransactionIds }: { deletedTransactionIds: Set<string> }) => useCardsData('ws-1', deletedTransactionIds),
-      { initialProps: { deletedTransactionIds: new Set<string>() } }
+      ({ transactionIndex }: { transactionIndex: TransactionDeletionIndex }) => useCardsData('ws-1', transactionIndex),
+      { initialProps: { transactionIndex: index() } }
     );
 
     const beforeInvoice = result.current.invoices.find((inv) => inv.id === 'invoice-1');
     expect(beforeInvoice?.purchasesTotalCents).toBe(5000);
     expect(beforeInvoice?.ledgerEntries.map((e) => e.id)).toEqual(['entry-1', 'entry-2']);
 
-    rerender({ deletedTransactionIds: new Set(['txn-1']) });
+    rerender({ transactionIndex: index(['txn-1']) });
 
     const afterInvoice = result.current.invoices.find((inv) => inv.id === 'invoice-1');
     expect(afterInvoice?.purchasesTotalCents).toBe(0);
@@ -104,14 +112,14 @@ describe('useCardsData', () => {
     });
 
     const { result, rerender } = renderHook(
-      ({ deletedTransactionIds }: { deletedTransactionIds: Set<string> }) => useCardsData('ws-1', deletedTransactionIds),
-      { initialProps: { deletedTransactionIds: new Set<string>() } }
+      ({ transactionIndex }: { transactionIndex: TransactionDeletionIndex }) => useCardsData('ws-1', transactionIndex),
+      { initialProps: { transactionIndex: index() } }
     );
 
     const invoice1Before = result.current.invoices.find((inv) => inv.id === 'invoice-1');
     expect(invoice1Before?.purchasesTotalCents).toBe(5000);
 
-    rerender({ deletedTransactionIds: new Set(['txn-1']) });
+    rerender({ transactionIndex: index(['txn-1']) });
 
     const invoice1After = result.current.invoices.find((inv) => inv.id === 'invoice-1');
     const invoice2After = result.current.invoices.find((inv) => inv.id === 'invoice-2');
@@ -141,9 +149,75 @@ describe('useCardsData', () => {
       return vi.fn();
     });
 
-    const { result } = renderHook(() => useCardsData('ws-1', new Set<string>()));
+    const { result } = renderHook(() => useCardsData('ws-1', index()));
 
     expect(result.current.cards.map((card) => card.id)).toEqual(['card-1']);
     expect(result.current.invoices.map((invoice) => invoice.cardId)).toEqual(['card-1']);
+  });
+
+  describe('compra excluída fora da janela de `subscribeTransactions` (limit 300)', () => {
+    beforeEach(() => {
+      cardMocks.subscribeInvoiceLedger.mockImplementation((_workspaceId, _cardId, _invoiceId, onNext) => {
+        // A compra que gerou este lançamento é antiga: saiu das 300 transações mais
+        // recentes, então `knownIds` não a contém.
+        onNext([ledgerEntry({ id: 'entry-antiga', sourceTransactionId: 'txn-antiga', amountCents: 5000 })]);
+        return vi.fn();
+      });
+    });
+
+    // Regressão: `deletedIds` só enxerga a janela de 300 transações. Uma compra no cartão
+    // excluída que saia dessa janela sumia do conjunto, e o valor dela VOLTAVA a somar na
+    // fatura — que podia até deixar de estar paga. As faturas cobrem 24 ciclos, então uma
+    // parcela de 2 anos atrás continua relevante muito depois de a compra sair da janela.
+    it('busca o estado da transação no servidor e remove o lançamento se ela foi excluída', async () => {
+      cardMocks.fetchDeletedTransactionIds.mockResolvedValue(['txn-antiga']);
+
+      const { result } = renderHook(() => useCardsData('ws-1', index([], ['txn-recente'])));
+
+      expect(result.current.invoices[0]?.purchasesTotalCents).toBe(5000);
+
+      await waitFor(() => expect(result.current.invoices[0]?.purchasesTotalCents).toBe(0));
+      expect(cardMocks.fetchDeletedTransactionIds).toHaveBeenCalledWith('ws-1', ['txn-antiga']);
+    });
+
+    // O lado seguro: se a consulta não confirma a exclusão, o lançamento fica. Sumir com
+    // ele apagaria uma dívida real da fatura.
+    it('mantém o lançamento quando a transação fora da janela não está excluída', async () => {
+      cardMocks.fetchDeletedTransactionIds.mockResolvedValue([]);
+
+      const { result } = renderHook(() => useCardsData('ws-1', index([], ['txn-recente'])));
+
+      await waitFor(() => expect(cardMocks.fetchDeletedTransactionIds).toHaveBeenCalled());
+      expect(result.current.invoices[0]?.purchasesTotalCents).toBe(5000);
+    });
+
+    it('mantém o lançamento quando a consulta falha (offline sem cache)', async () => {
+      cardMocks.fetchDeletedTransactionIds.mockRejectedValue(new Error('offline'));
+
+      const { result } = renderHook(() => useCardsData('ws-1', index([], ['txn-recente'])));
+
+      await waitFor(() => expect(cardMocks.fetchDeletedTransactionIds).toHaveBeenCalled());
+      expect(result.current.invoices[0]?.purchasesTotalCents).toBe(5000);
+    });
+
+    it('não reconsulta a mesma transação a cada snapshot de ledger', async () => {
+      cardMocks.fetchDeletedTransactionIds.mockResolvedValue([]);
+
+      const { rerender } = renderHook(
+        ({ transactionIndex }: { transactionIndex: TransactionDeletionIndex }) => useCardsData('ws-1', transactionIndex),
+        { initialProps: { transactionIndex: index([], ['txn-recente']) } }
+      );
+
+      await waitFor(() => expect(cardMocks.fetchDeletedTransactionIds).toHaveBeenCalledTimes(1));
+      rerender({ transactionIndex: index([], ['txn-recente']) });
+      await waitFor(() => expect(cardMocks.fetchDeletedTransactionIds).toHaveBeenCalledTimes(1));
+    });
+
+    it('não consulta nada quando a janela já cobre a transação', async () => {
+      const { result } = renderHook(() => useCardsData('ws-1', index([], ['txn-antiga'])));
+
+      await waitFor(() => expect(result.current.invoices[0]?.purchasesTotalCents).toBe(5000));
+      expect(cardMocks.fetchDeletedTransactionIds).not.toHaveBeenCalled();
+    });
   });
 });

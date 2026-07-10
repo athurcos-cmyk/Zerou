@@ -13,6 +13,7 @@ import {
   createCategory,
   createRecurringRule,
   deleteCategory,
+  isRecurrenceDue,
   nextOccurrenceDate,
   recordRecurringPayment,
   updateCategory
@@ -151,23 +152,38 @@ export function RecurringPage() {
           <p className="eyebrow">Ativas</p>
           {finance.recurringRules.length > 0 ? (
             <div className="item-list">
-              {finance.recurringRules.map((rule) => (
-                <div className="list-row" key={rule.id}>
-                  <div>
-                    <strong>{rule.description}</strong>
-                    <span className="text-secondary">
-                      {recurringFrequencyLabels[rule.frequency]} · {formatFriendlyDate(rule.nextOccurrenceAt)}
-                    </span>
+              {finance.recurringRules.map((rule) => {
+                // "Registrar" só faz sentido numa ocorrência vencida. Se a próxima está no
+                // futuro, ou a automação das 6h já lançou a anterior, ou ela ainda não
+                // chegou — clicar ali lançaria uma despesa que não aconteceu e ainda pularia
+                // um período da recorrência.
+                const due = isRecurrenceDue(rule.nextOccurrenceAt.toDate());
+
+                return (
+                  <div className="list-row" key={rule.id}>
+                    <div>
+                      <strong>{rule.description}</strong>
+                      <span className="text-secondary">
+                        {recurringFrequencyLabels[rule.frequency]} ·{' '}
+                        {due ? `vence ${formatFriendlyDate(rule.nextOccurrenceAt)}` : `próxima em ${formatFriendlyDate(rule.nextOccurrenceAt)}`}
+                      </span>
+                    </div>
+                    <div className="list-row-end">
+                      <strong>{formatMoney(rule.amountCents ?? 0)}</strong>
+                      <SyncStatusBadge status={rule.localSyncStatus} />
+                      {due ? (
+                        <button className="button button--subtle button--compact" type="button" onClick={() => handleOpenPay(rule)}>
+                          Registrar
+                        </button>
+                      ) : (
+                        <span className="text-muted" style={{ fontSize: '0.78rem' }}>
+                          Em dia
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="list-row-end">
-                    <strong>{formatMoney(rule.amountCents ?? 0)}</strong>
-                    <SyncStatusBadge status={rule.localSyncStatus} />
-                    <button className="button button--subtle button--compact" type="button" onClick={() => handleOpenPay(rule)}>
-                      Registrar
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <EmptyState
