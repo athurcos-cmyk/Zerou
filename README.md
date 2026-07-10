@@ -45,7 +45,7 @@ npm run test:functions
 npm run emulators
 ```
 
-Para `npm run test:rules`, Java precisa estar instalado e disponivel no PATH.
+`npm run test:rules` e `npm run emulators` precisam de um JDK 11+. Eles passam por `scripts/with-java.mjs`, que procura um Java que realmente execute (`JAVA_HOME`, PATH, `~/tools/jdk/*`, instalacoes comuns) e o coloca na frente do PATH so daquele comando. Se nao achar nenhum, a mensagem de erro diz como instalar sem admin.
 
 ## Firebase
 

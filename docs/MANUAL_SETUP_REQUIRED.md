@@ -16,7 +16,7 @@ Estas acoes dependem do dono do projeto e nao foram simuladas no repositorio.
 
 ## Emuladores
 
-- Instalar Java no PATH para rodar `npm run test:rules` e `npm run emulators`.
+- Instalar um JDK 11+ para rodar `npm run test:rules` e `npm run emulators`. Nao precisa estar no PATH: `scripts/with-java.mjs` procura em `JAVA_HOME`, no PATH, em `~/tools/jdk/*` e nas instalacoes comuns, e usa o primeiro que realmente executa.
 - Instalar Firebase CLI globalmente ou usar o `firebase-tools` local instalado pelo projeto.
 
 ## Deploy
@@ -33,5 +33,4 @@ Estas acoes dependem do dono do projeto e nao foram simuladas no repositorio.
 - Revisar `docs/PRODUCTION_CHECKLIST.md`.
 - Revisar `docs/legal/` com profissional habilitado antes de escala publica ampla.
 - Confirmar emails oficiais de suporte e privacidade.
-- Corrigir Java local para rodar `npm run test:rules`.
 - Configurar App Check, backups, alertas e dominio final.

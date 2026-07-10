@@ -61,7 +61,7 @@ npm run test:rules
 npm run generate:bank-logos
 ```
 
-Observacao: `npm run test:rules` depende de Java. No computador atual, Java esta quebrando com codigo `3221226505`.
+Observacao: `npm run test:rules` e `npm run emulators` precisam de um JDK 11+, mas nao exigem que ele esteja no PATH: `scripts/with-java.mjs` acha um Java que realmente execute e o injeta no PATH so daquele comando. (O Java desta maquina estava quebrado com o codigo `3221226505`; ver `CLAUDE.md`.)
 
 ## Variaveis de ambiente
 
@@ -236,7 +236,6 @@ documentacao-v12.2/PRODUCT-COPY-CANONICAL.md
 
 ## Pendencias atuais
 
-- Corrigir Java/PATH local para `npm run test:rules`.
 - Fazer QA manual real no celular: cadastro, login, onboarding, conta financeira, receita, despesa, bill, cartao, fatura parcial, espaco do casal.
 - Configurar dominio final e atualizar canonical/sitemap.
 - Configurar App Check.
@@ -297,5 +296,4 @@ Motivo: Java local quebrado neste computador.
 4. Revisar fluxo de criar/editar/excluir conta financeira com estados vazios melhores.
 5. Adicionar SVGs oficiais faltantes de bancos.
 6. Fazer code splitting do app.
-7. Corrigir Java e rodar `npm run test:rules`.
-8. Revisar checklist de producao antes de divulgacao publica ampla.
+7. Revisar checklist de producao antes de divulgacao publica ampla.
