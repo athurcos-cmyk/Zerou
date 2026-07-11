@@ -6,7 +6,7 @@ import { BottomSheet } from '../components/BottomSheet';
 import { SelectField } from '../components/SelectField';
 import { FormMessage } from '../components/FormMessage';
 import { invoiceStatusLabels, ledgerTypeLabels } from '../cards/cardLabels';
-import { selectAnticipatableInstallments } from '../cards/anticipation';
+import { groupAnticipatablePurchases } from '../cards/anticipation';
 import {
   anticipateInstallments,
   recordInvoiceCredit,
@@ -38,7 +38,8 @@ export function InvoicePage() {
   const [creditType, setCreditType] = useState<'refund_credit' | 'chargeback_credit' | 'manual_credit'>('refund_credit');
   const [feeAmount, setFeeAmount] = useState('');
   const [feeType, setFeeType] = useState<'interest' | 'fine' | 'iof' | 'fee' | 'manual_debit'>('fee');
-  const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
+  // Quantas das ÚLTIMAS parcelas antecipar, por compra (sourceTransactionId → N).
+  const [anticipateCounts, setAnticipateCounts] = useState<Record<string, number>>({});
   const [message, setMessage] = useState<string | null>(null);
 
   const txnDescriptions = new Map(
@@ -47,12 +48,17 @@ export function InvoicePage() {
       .map((t) => [t.id, t.description])
   );
 
-  const anticipatable = invoice
-    ? selectAnticipatableInstallments(cardsData.invoices, invoice).map((item) => ({
-        ...item,
-        description: txnDescriptions.get(item.sourceTransactionId) ?? 'Compra parcelada'
+  const anticipatableGroups = invoice
+    ? groupAnticipatablePurchases(cardsData.invoices, invoice).map((group) => ({
+        ...group,
+        description: txnDescriptions.get(group.sourceTransactionId) ?? 'Compra parcelada'
       }))
     : [];
+
+  const anticipateTotalCents = anticipatableGroups.reduce((total, group) => {
+    const count = anticipateCounts[group.sourceTransactionId] ?? 0;
+    return total + group.installments.slice(0, count).reduce((sum, inst) => sum + inst.amountCents, 0);
+  }, 0);
 
   function handleOpenPaySheet() {
     setPayAmount('');
@@ -78,12 +84,16 @@ export function InvoicePage() {
   }
 
   function handleAnticipation() {
-    if (!workspaceId || !user || !cardId || !invoiceId || selectedEntryIds.size === 0) return;
-    const credits = anticipatable
-      .filter((fi) => selectedEntryIds.has(fi.entryId))
-      .map((fi) => ({ invoiceId: fi.invoiceId, amountCents: fi.amountCents, sourceTransactionId: fi.sourceTransactionId }));
+    if (!workspaceId || !user || !cardId || !invoiceId) return;
+    // Por compra, as N ÚLTIMAS parcelas (o grupo já vem ordenado da última pra primeira).
+    const credits = anticipatableGroups.flatMap((group) => {
+      const count = anticipateCounts[group.sourceTransactionId] ?? 0;
+      return group.installments
+        .slice(0, count)
+        .map((inst) => ({ invoiceId: inst.invoiceId, amountCents: inst.amountCents, sourceTransactionId: inst.sourceTransactionId }));
+    });
     if (credits.length === 0) return;
-    setSelectedEntryIds(new Set());
+    setAnticipateCounts({});
     setMessage(null);
     anticipateInstallments(workspaceId, user.uid, {
       cardId,
@@ -255,39 +265,79 @@ export function InvoicePage() {
             <div className="form-stack" style={{ marginTop: '0.75rem' }}>
               <div className="anticipation-explain">
                 <strong>O que é antecipar?</strong>
-                Traz parcelas de faturas futuras para esta fatura. O valor é cobrado aqui e a fatura futura recebe um crédito — sem juros extras.
+                Traz as <strong>últimas</strong> parcelas de uma compra para esta fatura — pagando adiantado da última pra trás, como no cartão. O valor entra aqui e sai das faturas futuras; o total devido não muda.
               </div>
-              {anticipatable.length === 0 ? (
+              {anticipatableGroups.length === 0 ? (
                 <p className="text-secondary" style={{ fontSize: '0.86rem' }}>Nenhuma parcela futura disponível.</p>
               ) : (
                 <>
-                  <div className="item-list">
-                    {anticipatable.map((fi) => (
-                      <label key={fi.entryId} className="list-row" style={{ cursor: 'pointer', gap: '0.75rem', alignItems: 'center' }}>
-                        <input
-                          type="checkbox"
-                          checked={selectedEntryIds.has(fi.entryId)}
-                          onChange={(e) => {
-                            setSelectedEntryIds((prev) => {
-                              const next = new Set(prev);
-                              if (e.target.checked) next.add(fi.entryId);
-                              else next.delete(fi.entryId);
-                              return next;
-                            });
-                          }}
-                        />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <strong style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fi.description}</strong>
-                          <span className="text-secondary">Fatura {fi.referenceMonth}</span>
+                  {anticipatableGroups.map((group) => {
+                    const available = group.installments.length;
+                    const count = anticipateCounts[group.sourceTransactionId] ?? 0;
+                    const selected = group.installments.slice(0, count);
+                    const groupTotal = selected.reduce((s, inst) => s + inst.amountCents, 0);
+                    // A "próxima a antecipar" é a última ainda não marcada.
+                    const nextToAnticipate = group.installments[count];
+                    const parcelaLabel = (n?: number) =>
+                      n && group.installmentTotal ? `parcela ${n}/${group.installmentTotal}` : null;
+
+                    return (
+                      <div key={group.sourceTransactionId} className="anticipation-group">
+                        <div className="anticipation-group-head">
+                          <strong className="anticipation-group-name">{group.description}</strong>
+                          <span className="text-secondary" style={{ fontSize: '0.82rem' }}>
+                            {available} {available === 1 ? 'parcela futura' : 'parcelas futuras'}
+                          </span>
                         </div>
-                        <strong className="amount--expense">{formatMoney(fi.amountCents)}</strong>
-                      </label>
-                    ))}
-                  </div>
-                  {selectedEntryIds.size > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-subtle)' }}>
+                        <div className="anticipation-stepper">
+                          <button
+                            className="anticipation-step-btn"
+                            type="button"
+                            aria-label="Antecipar menos"
+                            disabled={count === 0}
+                            onClick={() =>
+                              setAnticipateCounts((prev) => ({
+                                ...prev,
+                                [group.sourceTransactionId]: Math.max(0, (prev[group.sourceTransactionId] ?? 0) - 1)
+                              }))
+                            }
+                          >
+                            −
+                          </button>
+                          <span className="anticipation-step-value">
+                            {count === 0
+                              ? 'Nenhuma'
+                              : `${count} ${count === 1 ? 'última' : 'últimas'}`}
+                          </span>
+                          <button
+                            className="anticipation-step-btn"
+                            type="button"
+                            aria-label="Antecipar mais"
+                            disabled={count >= available}
+                            onClick={() =>
+                              setAnticipateCounts((prev) => ({
+                                ...prev,
+                                [group.sourceTransactionId]: Math.min(available, (prev[group.sourceTransactionId] ?? 0) + 1)
+                              }))
+                            }
+                          >
+                            +
+                          </button>
+                        </div>
+                        <span className="text-muted anticipation-group-hint">
+                          {count === 0
+                            ? nextToAnticipate
+                              ? `Próxima a antecipar: ${parcelaLabel(nextToAnticipate.installmentNumber) ?? `fatura ${nextToAnticipate.referenceMonth}`}`
+                              : ''
+                            : `${parcelaLabel(selected[selected.length - 1].installmentNumber) ?? `fatura ${selected[selected.length - 1].referenceMonth}`} até ${parcelaLabel(selected[0].installmentNumber) ?? `fatura ${selected[0].referenceMonth}`} · ${formatMoney(groupTotal)}`}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {anticipateTotalCents > 0 && (
+                    <div className="anticipation-confirm-row">
                       <span className="text-secondary" style={{ fontSize: '0.86rem' }}>
-                        Total: <strong>{formatMoney(anticipatable.filter((fi) => selectedEntryIds.has(fi.entryId)).reduce((s, fi) => s + fi.amountCents, 0))}</strong>
+                        Total: <strong>{formatMoney(anticipateTotalCents)}</strong>
                       </span>
                       <button className="button button--secondary" type="button" onClick={handleAnticipation}>
                         Confirmar antecipação

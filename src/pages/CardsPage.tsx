@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { ChevronDown, CreditCard } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext } from '../finance/FinanceDataContext';
 import { EmptyState } from '../components/EmptyState';
@@ -17,6 +17,7 @@ import { getUserFacingErrorMessage } from '../utils/userFacingError';
 
 export function CardsPage() {
   const { user, profile } = useAuth();
+  const navigate = useNavigate();
   const workspaceId = profile?.defaultWorkspaceId;
   const cardsData = useCardsContext();
   const [name, setName] = useState('');
@@ -37,6 +38,10 @@ export function CardsPage() {
       return;
     }
 
+    // Vai direto pra página do cartão recém-criado: é lá que a pessoa traz as compras que
+    // já existem (parcelas em andamento / compras futuras). A maioria já chega com parcelas
+    // no cartão, então esconder isso num segundo passo confundia. `createCreditCard` devolve
+    // o id na hora (o write é fire-and-forget), então dá pra navegar imediatamente.
     createCreditCard(workspaceId, user.uid, {
       name,
       lastFour,
@@ -45,7 +50,9 @@ export function CardsPage() {
       closingDay,
       dueDay,
       colorToken: 'chart-1'
-    }).catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar o cartão agora.')));
+    })
+      .then((id) => navigate(`/app/cards/${id}?novo=1`))
+      .catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar o cartão agora.')));
     setName('');
     setLastFour('');
     setBrand('Visa');

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { CalendarClock, CreditCard, Layers, Trash2 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
@@ -32,6 +32,11 @@ export function CardDetailPage() {
   const [payAmount, setPayAmount] = useState('');
   const [payAccountId, setPayAccountId] = useState('');
   const [ongoingSheetOpen, setOngoingSheetOpen] = useState(false);
+
+  // Destaque pra trazer compras existentes: logo após criar o cartão (`?novo=1`) ou
+  // enquanto ele ainda não tem nenhuma compra lançada.
+  const [searchParams] = useSearchParams();
+  const showOnboardingCallout = searchParams.get('novo') === '1' || invoices.length === 0;
 
   function handleOpenPaySheet() {
     setPayAmount('');
@@ -181,7 +186,21 @@ export function CardDetailPage() {
 
       <FormMessage>{message}</FormMessage>
 
-      {card ? (
+      {card && showOnboardingCallout ? (
+        // Logo depois de criar o cartão (ou enquanto ele não tem nenhuma compra): a maioria
+        // já chega com parcelas rolando, então destacamos a entrada em vez de esconder num botão.
+        <article className="surface surface-pad card-onboarding-callout">
+          <p className="eyebrow">Esse cartão já tinha compras?</p>
+          <h2>Traga o que já existe</h2>
+          <p className="text-secondary">
+            Parcelas que você já vinha pagando (ex.: algo em 12x, já na 7ª) ou uma compra futura que já fez e começa a ser
+            cobrada mais pra frente. Adicione quantas precisar — as parcelas já pagas não são recriadas.
+          </p>
+          <button className="button button--primary button--block" type="button" onClick={() => setOngoingSheetOpen(true)}>
+            <Layers size={17} aria-hidden="true" /> Adicionar parcelas em andamento
+          </button>
+        </article>
+      ) : card ? (
         <button className="button button--subtle button--block" type="button" onClick={() => setOngoingSheetOpen(true)}>
           <Layers size={17} aria-hidden="true" /> Lançar compra parcelada que já começou
         </button>

@@ -2,6 +2,12 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-11 — fix: antecipação só da última parcela pra trás + trazer compras existentes ao criar o cartão
+
+- **Antecipação de parcela reescrita pra funcionar como no cartão de verdade.** Antes o app deixava marcar qualquer parcela futura solta — inclusive uma do meio, deixando as de trás (parcelei em 5x, tô na 1ª, e dava pra antecipar a 3ª). Isso não existe: antecipação é sempre **da última parcela pra trás, contígua**. Agora o painel agrupa por compra e oferece um seletor "antecipar as últimas [N] parcelas" — pega da última pra trás, nunca uma do meio. Verificado ao vivo: antecipar as 3 últimas de um 10x moveu R$900 das faturas fev/mar/abr pra fatura atual, **limite usado inalterado** (antecipar move dívida entre faturas, não muda o total). O mecanismo em si (débito na fatura atual + crédito na futura) já estava certo; o bug era só a seleção.
+- **Trazer compras existentes ao cadastrar o cartão.** A maioria já chega com parcelas rolando. Agora, ao criar um cartão, o app vai direto pra página dele com um destaque: "Esse cartão já tinha compras? Traga o que já existe" — parcelas em andamento (ex.: 12x, já na 7ª) **e compras futuras que começam mais pra frente** (ex.: parcelas que só começam na fatura de outubro). Reaproveita o fluxo `registerOngoingInstallments`, com cópia mais clara pros dois casos. Verificado ao vivo (compra futura de 12x começando em outubro → 12 faturas de out/2026 a set/2027).
+- 218 testes de unidade, typecheck, build e lint (linha de base) limpos. Regra do Firestore não mudou (os campos de parcela já foram deployados).
+
 ## 2026-07-11 — fix: conservador não estoura mais com parcela + lançar compra parcelada em andamento
 
 - **Conservador com Disponível muito negativo — corrigido.** A causa era o modo contar **todas** as parcelas futuras de uma compra no cartão como se vencessem hoje. Reproduzido no caso do dono (R$5.000 de limite, R$3.000 em 10x, saldo baixo): antes dava Comprometido R$3.000 / Disponível −R$2.000. Agora o conservador olha a **janela de dias** (sem nunca assumir salário), então só a parcela que vence logo pesa — Comprometido R$300, Disponível R$700. Verificado ao vivo. Mini tutorial, tela de Recebimento e legenda do Dashboard reescritos pra refletir a diferença real entre os modos (conservador = janela fixa; "até o recebimento" = corte no salário).

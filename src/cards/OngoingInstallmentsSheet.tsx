@@ -110,7 +110,7 @@ export function OngoingInstallmentsSheet({ open, workspaceId, userId, cardId, on
 
           <div className="form-grid-2">
             <label className="field">
-              <span>Está na parcela</span>
+              <span>Próxima parcela</span>
               <input className="input" type="number" inputMode="numeric" min={1} max={totalNum || 72} value={current} onChange={(e) => setCurrent(e.target.value)} />
             </label>
             <label className="field">
@@ -118,11 +118,15 @@ export function OngoingInstallmentsSheet({ open, workspaceId, userId, cardId, on
               <input className="input" type="number" inputMode="numeric" min={2} max={72} value={total} onChange={(e) => setTotal(e.target.value)} />
             </label>
           </div>
+          <span className="field-hint" style={{ marginTop: '-0.4rem' }}>
+            Se já pagou algumas, coloque a próxima que ainda vai cair (ex.: 7 de 10). Se a compra é futura e ainda não
+            começou a ser cobrada, deixe 1.
+          </span>
 
           <label className="field">
-            <span>A próxima parcela cai em qual mês?</span>
+            <span>Essa próxima parcela cai em qual mês?</span>
             <input className="input" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
-            <span className="field-hint">O mês da fatura onde a próxima parcela aparece.</span>
+            <span className="field-hint">O mês da fatura onde ela aparece — pode ser um mês futuro (ex.: outubro).</span>
           </label>
 
           {preview ? (

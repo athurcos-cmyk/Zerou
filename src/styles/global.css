@@ -1703,6 +1703,92 @@ span.category-mark {
   font-size: 0.9rem;
 }
 
+/* Destaque pra trazer compras existentes ao entrar num cartão recém-criado. */
+.card-onboarding-callout {
+  display: grid;
+  gap: 0.4rem;
+  border: 1px solid var(--action-primary);
+  background: var(--action-primary-soft);
+}
+
+.card-onboarding-callout h2 {
+  margin: 0;
+}
+
+.card-onboarding-callout .button {
+  margin-top: 0.6rem;
+}
+
+/* Antecipação: um seletor por compra (antecipar as N últimas parcelas). */
+.anticipation-group {
+  display: grid;
+  gap: 0.5rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.75rem;
+  padding: 0.8rem 0.9rem;
+}
+
+.anticipation-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.anticipation-group-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.anticipation-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.anticipation-step-btn {
+  width: 2.1rem;
+  height: 2.1rem;
+  flex-shrink: 0;
+  border: 1px solid var(--border-default);
+  border-radius: 0.6rem;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.anticipation-step-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.anticipation-step-value {
+  flex: 1;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.anticipation-group-hint {
+  font-size: 0.8rem;
+  line-height: 1.4;
+  min-height: 1rem;
+}
+
+.anticipation-confirm-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
 /* Transaction type colors */
 .amount--income { color: var(--success); }
 .amount--expense { color: var(--danger); }
