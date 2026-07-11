@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pickCurrentInvoice, resolveInstallmentCycle, resolveInvoiceCycle } from './cardDates';
+import { invoiceDueDateForReferenceMonth, pickCurrentInvoice, resolveInstallmentCycle, resolveInvoiceCycle } from './cardDates';
 
 describe('resolveInvoiceCycle', () => {
   it('keeps the due date in the same month as closing when dueDay is after closingDay', () => {
@@ -69,6 +69,25 @@ describe('resolveInstallmentCycle', () => {
 
   it('crosses the year boundary without losing a month', () => {
     expect(monthsFor(new Date(2026, 10, 15, 12), 20, 28, 4)).toEqual(['2026-11', '2026-12', '2027-01', '2027-02']);
+  });
+});
+
+describe('invoiceDueDateForReferenceMonth', () => {
+  // Usado ao lançar uma compra parcelada já em andamento: a pessoa diz o mês da fatura,
+  // e daí sai o vencimento pela mesma regra de `resolveInvoiceCycle`.
+  it('vence no próprio mês de referência quando vence depois de fechar', () => {
+    // fecha dia 10, vence dia 20 → vencimento no próprio mês.
+    expect(invoiceDueDateForReferenceMonth('2026-09', 10, 20).toISOString().slice(0, 10)).toBe('2026-09-20');
+  });
+
+  it('rola pro mês seguinte quando o cartão vence antes de fechar', () => {
+    // fecha dia 25, vence dia 5 → a fatura de setembro vence em outubro.
+    expect(invoiceDueDateForReferenceMonth('2026-09', 25, 5).toISOString().slice(0, 10)).toBe('2026-10-05');
+  });
+
+  it('clampa o dia de vencimento em meses curtos', () => {
+    // vence dia 31, fatura de fevereiro → 28 (2026 não é bissexto).
+    expect(invoiceDueDateForReferenceMonth('2026-02', 10, 31).toISOString().slice(0, 10)).toBe('2026-02-28');
   });
 });
 

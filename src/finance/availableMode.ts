@@ -13,6 +13,6 @@ export const availableModeLabels: Record<AvailableMode, string> = {
 };
 
 export const availableModeSummaries: Record<AvailableMode, string> = {
-  conservative: 'Conta tudo que você já deve, inclusive parcelas de meses futuros. Nunca assume que o salário vai cair.',
-  until_payday: 'Conta só o que vence antes do seu próximo recebimento. O resto aparece quando chegar mais perto.'
+  conservative: 'Nunca conta com o salário chegando. Olha uma janela fixa de dias à frente — cada parcela de cartão entra só quando o vencimento dela chega perto, não todas de uma vez.',
+  until_payday: 'Conta com o seu próximo recebimento: só o que vence antes dele pesa. O resto aparece quando chegar mais perto.'
 };

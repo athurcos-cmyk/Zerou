@@ -3962,9 +3962,10 @@ span.category-mark {
   line-height: 1.45;
 }
 
-/* Os controles continuam clicáveis (a escolha fica salva), mas o modo conservador não
-   usa nenhum deles — o recuo visual evita que a pessoa mexa achando que muda o resumo. */
-.settings-grid--inactive {
+/* A seção continua clicável (a escolha fica salva), mas o modo conservador não usa a
+   DATA de recebimento — o recuo visual evita que a pessoa mexa achando que muda o resumo.
+   A janela de dias nunca é recuada: ela vale nos dois modos. */
+.settings-section--inactive {
   opacity: 0.62;
 }
 

@@ -31,19 +31,19 @@ const steps = [
   }
 ];
 
-// Exemplo fixo com números redondos: R$ 1.000 na conta e uma fatura aberta de R$ 50 que
-// só vence depois do próximo recebimento. É o caso que separa os dois modos.
+// Exemplo fixo: R$ 1.000 na conta e uma parcela de cartão de R$ 300 que vence em ~3
+// semanas, com o próximo salário caindo antes disso. É o caso que separa os dois modos.
 const exampleBalanceCents = 100000;
-const exampleInvoiceCents = 5000;
+const exampleInstallmentCents = 30000;
 
 const modeExample: Record<AvailableMode, { committedCents: number; caption: string }> = {
   conservative: {
-    committedCents: exampleInvoiceCents,
-    caption: 'A fatura conta desde já, mesmo vencendo só mês que vem.'
+    committedCents: exampleInstallmentCents,
+    caption: 'Não conta com o salário: guarda a parcela que vence logo.'
   },
   until_payday: {
     committedCents: 0,
-    caption: 'A fatura só entra quando o vencimento chegar perto do seu recebimento.'
+    caption: 'Você recebe antes de a parcela vencer, então ela não pesa agora.'
   }
 };
 
@@ -84,9 +84,9 @@ export function AvailableModeSheet({ open, currentMode, onChoose, onClose }: Ava
         <div className="available-mode-example">
           <p className="eyebrow">Um exemplo</p>
           <p className="text-secondary">
-            Você tem <strong>{formatMoney(exampleBalanceCents)}</strong> na conta e uma fatura aberta de{' '}
-            <strong>{formatMoney(exampleInvoiceCents)}</strong> que vence só depois do seu próximo recebimento.
-            Quanto o app deve dizer que está disponível?
+            Você tem <strong>{formatMoney(exampleBalanceCents)}</strong> na conta e uma parcela de cartão de{' '}
+            <strong>{formatMoney(exampleInstallmentCents)}</strong> que vence em umas 3 semanas — mas seu próximo salário
+            cai antes disso. Quanto o app deve dizer que está disponível?
           </p>
         </div>
 

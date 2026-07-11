@@ -51,6 +51,25 @@ export const recordInvoiceFeeSchema = z.object({
   description: z.string().trim().min(2).max(120)
 });
 
+// Compra parcelada que já estava rolando quando a pessoa começou a usar o app.
+// Ela informa o valor da parcela, em que parcela está (7 de 10) e em qual mês cai a
+// próxima — o app cria só as parcelas que faltam, nas faturas certas, rotuladas 7/10…10/10.
+export const registerOngoingInstallmentsSchema = z
+  .object({
+    cardId: z.string().trim().min(1),
+    description: z.string().trim().min(2).max(120),
+    installmentValueCents: moneyCentsSchema.refine((v) => v > 0, 'Informe o valor da parcela.'),
+    currentInstallment: z.number().int().min(1).max(72),
+    totalInstallments: z.number().int().min(2).max(72),
+    // Primeiro dia do mês em que a PRÓXIMA parcela é cobrada.
+    nextDueMonth: z.date(),
+    categoryId: z.string().trim().max(120).optional()
+  })
+  .refine((v) => v.currentInstallment <= v.totalInstallments, {
+    message: 'A parcela atual não pode ser maior que o total.',
+    path: ['currentInstallment']
+  });
+
 export const anticipateInstallmentsSchema = z.object({
   cardId: z.string().trim().min(1),
   currentInvoiceId: z.string().trim().min(1),
@@ -74,5 +93,6 @@ export type RecordInvoicePaymentInput = z.infer<typeof recordInvoicePaymentSchem
 export type RecordInvoiceCreditInput = z.infer<typeof recordInvoiceCreditSchema>;
 export type RecordInvoiceFeeInput = z.infer<typeof recordInvoiceFeeSchema>;
 export type AnticipateInstallmentsInput = z.infer<typeof anticipateInstallmentsSchema>;
+export type RegisterOngoingInstallmentsInput = z.infer<typeof registerOngoingInstallmentsSchema>;
 export type ReconcileInvoiceInput = z.infer<typeof reconcileInvoiceSchema>;
 export { signedMoneyCentsSchema };

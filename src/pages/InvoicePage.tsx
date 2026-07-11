@@ -203,15 +203,25 @@ export function InvoicePage() {
             <p className="eyebrow" style={{ marginBottom: '0.5rem' }}>Compras</p>
             {purchases.length > 0 ? (
               <div className="item-list">
-                {purchases.map((entry) => (
-                  <div className="list-row" key={entry.id}>
-                    <div>
-                      <strong>{txnDescriptions.get(entry.sourceTransactionId ?? '') ?? ledgerTypeLabels[entry.type as InvoiceLedgerEntryType]}</strong>
-                      <span className="text-secondary">{formatFriendlyDate(entry.effectiveAt)}</span>
+                {purchases.map((entry) => {
+                  const label = txnDescriptions.get(entry.sourceTransactionId ?? '') ?? ledgerTypeLabels[entry.type as InvoiceLedgerEntryType];
+                  const installment =
+                    entry.installmentNumber && entry.installmentTotal
+                      ? `parcela ${entry.installmentNumber}/${entry.installmentTotal}`
+                      : null;
+                  return (
+                    <div className="list-row" key={entry.id}>
+                      <div>
+                        <strong>{label}</strong>
+                        <span className="text-secondary">
+                          {installment ? `${installment} · ` : ''}
+                          {formatFriendlyDate(entry.effectiveAt)}
+                        </span>
+                      </div>
+                      <strong className="amount--expense">{formatMoney(entry.amountCents)}</strong>
                     </div>
-                    <strong className="amount--expense">{formatMoney(entry.amountCents)}</strong>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-secondary">Nenhuma compra nesta fatura ainda.</p>

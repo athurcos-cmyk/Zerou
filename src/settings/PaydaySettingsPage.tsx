@@ -105,9 +105,10 @@ export function PaydaySettingsPage() {
   const hasFixedPayday = paydayType === 'fixed_day' || paydayType === 'business_day' || paydayType === 'end_of_month';
   const hasAnyPaydayChoice = paydayType !== '';
   const availableMode = profile?.availableMode ?? defaultAvailableMode;
-  // Só o modo `until_payday` usa data de recebimento / janela de dias. No conservador,
-  // nada disso entra no cálculo — mostrar os controles como se entrassem seria mentira.
-  const paydayAffectsSummary = availableMode === 'until_payday';
+  // A DATA de recebimento só é usada no modo "até o recebimento" — o conservador nunca
+  // conta com o salário chegando. A JANELA de dias, por outro lado, é usada nos dois
+  // (sempre no conservador; como reserva no outro), então ela nunca fica inativa.
+  const paydayDateUsed = availableMode === 'until_payday';
 
   // Mesma função que o Dashboard usa. Mostrar aqui a data-limite REAL responde de dentro
   // do produto a pergunta "o que essa data faz, afinal?" — antes a pessoa escolhia um dia
@@ -118,14 +119,13 @@ export function PaydaySettingsPage() {
     committedWindowDays: profile?.committedWindowDays,
     availableMode
   });
-  const cutoffExplanation =
-    committed.cutoff === null
-      ? null
-      : committed.source === 'income'
-      ? `Hoje o corte é ${formatFriendlyDate(committed.cutoff)}, porque você lançou uma receita futura nessa data.`
-      : committed.source === 'payday'
-      ? `Hoje o corte é ${formatFriendlyDate(committed.cutoff)} — seu próximo recebimento pela regra acima.`
-      : `Hoje o corte é ${formatFriendlyDate(committed.cutoff)}, o fim da janela de ${profile?.committedWindowDays ?? defaultCommittedWindowDays} dias.`;
+  const cutoffExplanation = !committed.cutoff
+    ? null
+    : committed.source === 'income'
+    ? `Hoje o corte é ${formatFriendlyDate(committed.cutoff)}, porque você lançou uma receita futura nessa data.`
+    : committed.source === 'payday'
+    ? `Hoje o corte é ${formatFriendlyDate(committed.cutoff)} — seu próximo recebimento pela regra acima.`
+    : `Hoje o corte é ${formatFriendlyDate(committed.cutoff)}, o fim da janela de ${profile?.committedWindowDays ?? defaultCommittedWindowDays} dias. Tudo que vence até aí conta como Comprometido; o que vence depois, ainda não.`;
 
   function chooseAvailableMode(mode: AvailableMode) {
     if (!user) return;
@@ -193,16 +193,17 @@ export function PaydaySettingsPage() {
         {cutoffExplanation && <p className="settings-hint">{cutoffExplanation}</p>}
       </section>
 
-      {!paydayAffectsSummary && (
+      {!paydayDateUsed && (
         <div className="notice">
-          No modo <strong>{availableModeLabels.conservative}</strong>, nada abaixo muda o seu resumo: tudo que você deve já
-          conta como Comprometido, sem esperar data nenhuma. As opções continuam salvas caso você volte pro modo
+          No modo <strong>{availableModeLabels.conservative}</strong>, o app não conta com o salário chegando, então a
+          <strong> data de recebimento</strong> abaixo não é usada. O que vale é a <strong>janela de dias</strong> — tudo que
+          vence dentro dela conta como Comprometido. A data continua salva caso você volte pro modo
           "{availableModeLabels.until_payday}".
         </div>
       )}
 
-      <div className={`settings-grid${paydayAffectsSummary ? '' : ' settings-grid--inactive'}`}>
-        <section className="surface surface-pad" aria-labelledby="payday-title">
+      <div className="settings-grid">
+        <section className={`surface surface-pad${paydayDateUsed ? '' : ' settings-section--inactive'}`} aria-labelledby="payday-title">
           <h2 id="payday-title">Data de recebimento</h2>
           <p className="text-secondary">
             O app usa isso pra <strong>estimar quando o próximo dinheiro entra</strong> e parar de contar como
@@ -251,11 +252,11 @@ export function PaydaySettingsPage() {
         </section>
 
         <section className="surface surface-pad" aria-labelledby="window-title">
-          <h2 id="window-title">Quando não dá pra saber a data</h2>
+          <h2 id="window-title">Janela de dias</h2>
           <p className="text-secondary">
-            Se você marcou <strong>Renda variável</strong> (ou não escolheu data nenhuma), o app não tem como estimar seu
-            próximo recebimento. Nesse caso ele olha só um <strong>período fixo à frente</strong>: tudo que vence dentro
-            desse período conta como Comprometido; o que vence depois, ainda não.
+            O app olha um <strong>período fixo à frente</strong>: tudo que vence dentro dele conta como Comprometido; o que
+            vence depois, ainda não. É isso que impede uma compra parcelada de derrubar o Disponível de uma vez — só a
+            parcela que vence logo entra.
           </p>
           <label className="field">
             <span>Olhar quantos dias à frente?</span>
@@ -273,12 +274,13 @@ export function PaydaySettingsPage() {
               número. Quem recebe por semana costuma preferir 7.
             </span>
           </label>
-          {hasFixedPayday && (
-            <p className="settings-hint">
-              Como você informou uma data de recebimento acima, este período <strong>não está em uso</strong> hoje — ele é
-              a reserva pra quando não houver data.
-            </p>
-          )}
+          <p className="settings-hint">
+            {availableMode === 'conservative'
+              ? 'No modo Conservador esta janela é sempre o que vale.'
+              : hasFixedPayday
+              ? 'Como você informou uma data de recebimento acima, esta janela é só a reserva pra quando não houver data.'
+              : 'Sem uma data de recebimento definida, é esta janela que decide o seu Comprometido.'}
+          </p>
         </section>
       </div>
 

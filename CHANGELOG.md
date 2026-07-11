@@ -2,6 +2,13 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-11 — fix: conservador não estoura mais com parcela + lançar compra parcelada em andamento
+
+- **Conservador com Disponível muito negativo — corrigido.** A causa era o modo contar **todas** as parcelas futuras de uma compra no cartão como se vencessem hoje. Reproduzido no caso do dono (R$5.000 de limite, R$3.000 em 10x, saldo baixo): antes dava Comprometido R$3.000 / Disponível −R$2.000. Agora o conservador olha a **janela de dias** (sem nunca assumir salário), então só a parcela que vence logo pesa — Comprometido R$300, Disponível R$700. Verificado ao vivo. Mini tutorial, tela de Recebimento e legenda do Dashboard reescritos pra refletir a diferença real entre os modos (conservador = janela fixa; "até o recebimento" = corte no salário).
+- **Lançar compra parcelada que já começou** (`registerOngoingInstallments` + `OngoingInstallmentsSheet`, botão na página do cartão). Pro caso de migrar pro app uma compra que já vinha pagando: informa o valor da parcela, "está na parcela 7 de 10" e o mês da próxima; o app cria só as que faltam (7 a 10), nas faturas certas, sem recriar as pagas. Preview ao vivo antes de confirmar.
+- **Toda compra parcelada agora mostra "parcela X/N"** na fatura (novos campos `installmentNumber`/`installmentTotal` no ledger). Resolve a confusão das "10 faturas abertas que parecem 10 contas". Exige regra do Firestore nova (deployada).
+- QA ao vivo completo numa conta criada do zero (cadastro → onboarding → conta → cartão → compra 10x → conservador → compra em andamento), tudo persistindo após reload, console limpo. 221 testes de unidade + 45 de regras, typecheck, lint (linha de base) e build limpos.
+
 ## 2026-07-11 — feat: logos e autocomplete de assinaturas nas Recorrências e Compromissos
 
 - **Catálogo de ~60 serviços** (`src/finance/subscriptionServices.ts`): assinaturas (Netflix, Spotify, Prime Video, Disney+, Max, Wellhub, Xbox…) e contas fixas (energia, água, aluguel, internet…). Digitar no campo Descrição sugere a marca, preenche o nome canônico e sugere a categoria (sem sobrescrever uma escolhida à mão). A lista de recorrências e de compromissos passou a mostrar a marca ao lado do nome.

@@ -47,9 +47,7 @@ export function DashboardPage() {
     availableMode: profile?.availableMode
   });
   const committedCaption =
-    dashboard.committedCutoffSource === 'all'
-      ? 'Considerando tudo que você já deve'
-      : dashboard.committedCutoffSource === 'income'
+    dashboard.committedCutoffSource === 'income'
       ? `Considerando sua receita de ${formatFriendlyDate(dashboard.committedCutoff!)}`
       : dashboard.committedCutoffSource === 'payday'
       ? `Considerando seu recebimento em ${formatFriendlyDate(dashboard.committedCutoff!)}`

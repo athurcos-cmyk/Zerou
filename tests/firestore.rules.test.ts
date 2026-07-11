@@ -1038,6 +1038,37 @@ describe('firestore security rules', () => {
     await assertSucceeds(batch.commit());
   });
 
+  // Rótulo "7/10" na fatura, tanto pra compra nova quanto pra uma compra parcelada que já
+  // estava em andamento (`registerOngoingInstallments`). Os campos são opcionais e int 1..72.
+  it('allows a purchase ledger entry carrying installmentNumber/installmentTotal', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    await assertSucceeds(setDoc(doc(aliceDb, 'workspaces/workspaceA/cards/cardA'), cardPayload('workspaceA', 'cardA', 'alice')));
+    await assertSucceeds(
+      setDoc(doc(aliceDb, 'workspaces/workspaceA/cards/cardA/invoices/cardA_2026-06'), invoicePayload('workspaceA', 'cardA', 'cardA_2026-06'))
+    );
+
+    await assertSucceeds(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/cards/cardA/invoices/cardA_2026-06/ledger/ongoing7'),
+        ledgerPayload('workspaceA', 'cardA', 'cardA_2026-06', 'ongoing7', 'alice', { installmentNumber: 7, installmentTotal: 10 })
+      )
+    );
+
+    // Fora do intervalo (0 ou > 72) é rejeitado.
+    await assertFails(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/cards/cardA/invoices/cardA_2026-06/ledger/ongoingBad'),
+        ledgerPayload('workspaceA', 'cardA', 'cardA_2026-06', 'ongoingBad', 'alice', { installmentNumber: 0, installmentTotal: 10 })
+      )
+    );
+    await assertFails(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/cards/cardA/invoices/cardA_2026-06/ledger/ongoingBad2'),
+        ledgerPayload('workspaceA', 'cardA', 'cardA_2026-06', 'ongoingBad2', 'alice', { installmentNumber: 3, installmentTotal: 999 })
+      )
+    );
+  });
+
   it('requires an existing account when recording a card payment transaction', async () => {
     const aliceDb = testEnv.authenticatedContext('alice').firestore();
 

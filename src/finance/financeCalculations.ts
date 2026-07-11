@@ -18,8 +18,7 @@ export interface UpcomingCommitment {
 
 // De onde veio a data-limite usada pra decidir o que conta como "Comprometido" —
 // exibido no Dashboard pra explicar o número em vez de só mostrar um valor sem contexto.
-// `all`: modo conservador, não há data-limite (tudo que se deve conta).
-export type CommittedCutoffSource = 'income' | 'payday' | 'window' | 'all';
+export type CommittedCutoffSource = 'income' | 'payday' | 'window';
 
 export interface DashboardSummary {
   totalBalanceCents: number;
@@ -217,11 +216,15 @@ export function resolveCommittedCutoff(input: {
   const now = input.now ?? new Date();
   const nextIncomeAt = findNextIncomeDate(input.transactions, now);
   const availableMode = input.availableMode ?? defaultAvailableMode;
+  const windowDays = input.committedWindowDays ?? defaultCommittedWindowDays;
 
-  // Modo conservador: sem data de corte. Não prevê recebimento nenhum — tudo que a
-  // pessoa já deve entra no Comprometido.
+  // Modo conservador: nunca assume que o salário vai cair, então ignora receita futura
+  // lançada e a data de recebimento do perfil — usa só a janela fixa de N dias. Assim
+  // uma parcela de cartão só entra no Comprometido quando o vencimento dela chega perto,
+  // em vez de as 10 parcelas de uma compra caírem todas de uma vez (o que jogava o
+  // Disponível pra muito negativo, sem sentido, no caso de quem tem compra parcelada).
   if (availableMode === 'conservative') {
-    return { cutoff: null, source: 'all', nextIncomeAt };
+    return { cutoff: endOfDay(addDays(now, windowDays)), source: 'window', nextIncomeAt };
   }
 
   // Sem receita futura lançada na mão, usa a data de recebimento estimada do perfil
@@ -230,7 +233,6 @@ export function resolveCommittedCutoff(input: {
   // hoje. "Renda variável" é uma escolha explícita sem data resolvível — cai na janela
   // igual quem nunca respondeu a pergunta.
   const resolvablePayday = input.payday && input.payday.type !== 'variable_income' ? input.payday : undefined;
-  const windowDays = input.committedWindowDays ?? defaultCommittedWindowDays;
   const source: CommittedCutoffSource = nextIncomeAt ? 'income' : resolvablePayday ? 'payday' : 'window';
   // `endOfDay`: o corte é um DIA, não um instante. As três origens produzem horas
   // diferentes (receita lançada e vencimentos ficam ao meio-dia; `nextPaydayFrom`

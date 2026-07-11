@@ -641,90 +641,149 @@ describe('calculateDashboardSummary', () => {
   });
 });
 
-// O modo é uma escolha explícita da pessoa (mini tutorial no Dashboard). As duas
-// leituras são legítimas: `until_payday` assume que o próximo recebimento acontece;
-// `conservative` nunca assume nada e conta toda dívida já assumida.
+// O modo é uma escolha explícita da pessoa (mini tutorial no Dashboard). As duas leituras
+// são legítimas: `until_payday` conta com o próximo recebimento (só o que vence antes dele
+// pesa); `conservative` nunca conta com o salário e olha uma janela fixa de dias — cada
+// parcela de cartão entra só quando o vencimento chega perto, não todas de uma vez.
 describe('calculateDashboardSummary — availableMode', () => {
   const now = new Date('2026-07-09T12:00:00');
-  // R$ 1.000 na conta, fatura aberta de R$ 50 que só vence depois do próximo salário.
-  const baseInput = {
-    accounts: [account('checking', 100000)],
-    transactions: [],
-    bills: [],
-    recurringRules: [],
-    invoices: [
-      invoice({
-        status: 'open',
-        outstandingBalanceCents: 5000,
-        referenceMonth: '2026-08',
-        dueDate: Timestamp.fromDate(new Date('2026-08-10T12:00:00'))
-      })
-    ],
-    payday: { type: 'fixed_day' as const, day: 5 },
-    now
-  };
-
-  it('until_payday: a fatura que vence depois do recebimento não compromete nada', () => {
-    const summary = calculateDashboardSummary({ ...baseInput, availableMode: 'until_payday' });
-
-    expect(summary.committedCents).toBe(0);
-    expect(summary.freeToSpendCents).toBe(100000);
-    expect(summary.committedCutoffSource).toBe('payday');
-    expect(summary.committedCutoff).not.toBeNull();
-  });
-
-  it('conservative: a mesma fatura compromete desde já, sem data de corte', () => {
-    const summary = calculateDashboardSummary({ ...baseInput, availableMode: 'conservative' });
-
-    expect(summary.committedCents).toBe(5000);
-    expect(summary.freeToSpendCents).toBe(95000);
-    expect(summary.committedCutoffSource).toBe('all');
-    expect(summary.committedCutoff).toBeNull();
-  });
 
   it('defaults to until_payday when the profile never answered the tutorial', () => {
-    const summary = calculateDashboardSummary(baseInput);
+    const summary = calculateDashboardSummary({
+      accounts: [account('checking', 100000)],
+      transactions: [],
+      bills: [],
+      recurringRules: [],
+      payday: { type: 'fixed_day', day: 5 },
+      now
+    });
 
-    expect(summary.committedCents).toBe(0);
     expect(summary.committedCutoffSource).toBe('payday');
   });
 
-  // No conservador, parcelas de meses futuros são dívida já assumida — entram.
-  it('conservative: counts future installment invoices as committed', () => {
-    const summary = calculateDashboardSummary({
-      ...baseInput,
-      availableMode: 'conservative',
-      invoices: [
-        invoice({ id: 'i-08', referenceMonth: '2026-08', outstandingBalanceCents: 10000, dueDate: Timestamp.fromDate(new Date('2026-08-20T12:00:00')) }),
-        invoice({ id: 'i-12', referenceMonth: '2026-12', outstandingBalanceCents: 10000, dueDate: Timestamp.fromDate(new Date('2026-12-20T12:00:00')) })
-      ]
+  // O caso concreto do dono: cartão com compra parcelada. No conservador, o Disponível
+  // ia pra muito negativo porque as 10 parcelas contavam de uma vez. Agora só a que vence
+  // dentro da janela pesa.
+  describe('parcelas de cartão não caem todas de uma vez no conservador', () => {
+    // Compra de R$ 3.000 em 10x: uma fatura aberta por mês, R$ 300 cada.
+    const installments = Array.from({ length: 10 }, (_, i) => {
+      const due = new Date(2026, 6 + i, 15, 12, 0, 0);
+      return invoice({
+        id: `card-1_${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, '0')}`,
+        referenceMonth: `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, '0')}`,
+        outstandingBalanceCents: 30000,
+        dueDate: Timestamp.fromDate(due)
+      });
     });
 
-    expect(summary.committedCents).toBe(20000);
+    it('conservative: só a parcela dentro da janela de dias conta', () => {
+      const summary = calculateDashboardSummary({
+        accounts: [account('checking', 100000)], // R$ 1.000
+        transactions: [],
+        bills: [],
+        recurringRules: [],
+        invoices: installments,
+        committedWindowDays: 30,
+        availableMode: 'conservative',
+        now
+      });
+
+      // Janela de 30 dias a partir de 09/jul → corte 08/ago. Só a parcela de 15/jul entra.
+      expect(summary.committedCents).toBe(30000);
+      expect(summary.freeToSpendCents).toBe(70000);
+      expect(summary.committedCutoffSource).toBe('window');
+      expect(summary.committedCutoff).not.toBeNull();
+    });
+
+    it('conservative: janela maior alcança mais parcelas, mas nunca todas de uma vez', () => {
+      const summary = calculateDashboardSummary({
+        accounts: [account('checking', 100000)],
+        transactions: [],
+        bills: [],
+        recurringRules: [],
+        invoices: installments,
+        committedWindowDays: 90, // ~3 meses → parcelas de jul, ago, set
+        availableMode: 'conservative',
+        now
+      });
+
+      expect(summary.committedCents).toBe(90000);
+    });
   });
 
-  it('conservative: still ignores paid invoices and settled balances', () => {
+  // O que separa os dois modos: o conservador ignora o payday e usa a janela; o
+  // "até o recebimento" encurta o corte pro dia do salário.
+  it('conservative ignora o payday e usa a janela; until_payday usa o payday', () => {
+    const base = {
+      accounts: [account('checking', 100000)],
+      transactions: [],
+      bills: [],
+      recurringRules: [],
+      // Parcela vence 29/jul: depois do salário (dia 12), dentro da janela de 30 dias.
+      invoices: [invoice({ outstandingBalanceCents: 30000, referenceMonth: '2026-07', dueDate: Timestamp.fromDate(new Date('2026-07-29T12:00:00')) })],
+      payday: { type: 'fixed_day' as const, day: 12 },
+      committedWindowDays: 30,
+      now
+    };
+
+    const untilPayday = calculateDashboardSummary({ ...base, availableMode: 'until_payday' });
+    // Recebe dia 12, antes de a parcela vencer (29) → não pesa agora.
+    expect(untilPayday.committedCents).toBe(0);
+    expect(untilPayday.committedCutoffSource).toBe('payday');
+
+    const conservative = calculateDashboardSummary({ ...base, availableMode: 'conservative' });
+    // Não conta com o salário: guarda a parcela que vence dentro da janela.
+    expect(conservative.committedCents).toBe(30000);
+    expect(conservative.committedCutoffSource).toBe('window');
+  });
+
+  it('conservative ignora receita futura lançada (não assume que ela chega)', () => {
     const summary = calculateDashboardSummary({
-      ...baseInput,
+      accounts: [account('checking', 100000)],
+      transactions: [transaction({ type: 'income', amountCents: 500000, date: Timestamp.fromDate(new Date('2026-07-20T12:00:00')) })],
+      bills: [bill({ amountCents: 8000, dueDate: Timestamp.fromDate(new Date('2026-07-25T12:00:00')) })],
+      recurringRules: [],
+      committedWindowDays: 30,
       availableMode: 'conservative',
+      now
+    });
+
+    // A conta de 25/jul entra pela janela, sem depender da receita de 20/jul.
+    expect(summary.committedCents).toBe(8000);
+    expect(summary.committedCutoffSource).toBe('window');
+  });
+
+  it('conservative: ignora fatura paga e saldo zerado', () => {
+    const summary = calculateDashboardSummary({
+      accounts: [account('checking', 100000)],
+      transactions: [],
+      bills: [],
+      recurringRules: [],
       invoices: [
-        invoice({ id: 'i-paid', status: 'paid', outstandingBalanceCents: 0 }),
-        invoice({ id: 'i-zero', status: 'open', outstandingBalanceCents: 0 })
-      ]
+        invoice({ id: 'i-paid', status: 'paid', outstandingBalanceCents: 0, dueDate: Timestamp.fromDate(new Date('2026-07-15T12:00:00')) }),
+        invoice({ id: 'i-zero', status: 'open', outstandingBalanceCents: 0, dueDate: Timestamp.fromDate(new Date('2026-07-15T12:00:00')) })
+      ],
+      committedWindowDays: 30,
+      availableMode: 'conservative',
+      now
     });
 
     expect(summary.committedCents).toBe(0);
   });
 
-  it('conservative: counts a bill due far beyond any window', () => {
+  it('conservative: uma fatura FECHADA conta mesmo fora da janela (débito iminente)', () => {
     const summary = calculateDashboardSummary({
-      ...baseInput,
+      accounts: [account('checking', 100000)],
+      transactions: [],
+      bills: [],
+      recurringRules: [],
+      invoices: [invoice({ status: 'closed', outstandingBalanceCents: 40000, dueDate: Timestamp.fromDate(new Date('2026-10-15T12:00:00')) })],
+      committedWindowDays: 30,
       availableMode: 'conservative',
-      invoices: [],
-      bills: [bill({ amountCents: 7000, dueDate: Timestamp.fromDate(new Date('2027-03-01T12:00:00')) })]
+      now
     });
 
-    expect(summary.committedCents).toBe(7000);
+    expect(summary.committedCents).toBe(40000);
   });
 });
 

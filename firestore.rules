@@ -911,7 +911,9 @@ service cloud.firestore {
           'sourceTransactionId',
           'idempotencyKey',
           'createdBy',
-          'createdAt'
+          'createdAt',
+          'installmentNumber',
+          'installmentTotal'
         ])
         && request.resource.data.id == entryId
         && request.resource.data.invoiceId == invoiceId
@@ -921,6 +923,14 @@ service cloud.firestore {
         && validMoneyCents(request.resource.data.amountCents)
         && request.resource.data.effectiveAt is timestamp
         && validOptionalString('sourceTransactionId', 140)
+        && (!request.resource.data.keys().hasAny(['installmentNumber'])
+            || (request.resource.data.installmentNumber is int
+                && request.resource.data.installmentNumber >= 1
+                && request.resource.data.installmentNumber <= 72))
+        && (!request.resource.data.keys().hasAny(['installmentTotal'])
+            || (request.resource.data.installmentTotal is int
+                && request.resource.data.installmentTotal >= 1
+                && request.resource.data.installmentTotal <= 72))
         && request.resource.data.idempotencyKey == entryId
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.createdAt == request.time;

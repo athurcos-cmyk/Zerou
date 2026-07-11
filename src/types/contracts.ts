@@ -297,6 +297,11 @@ export interface InvoiceLedgerEntry {
   sourceTransactionId?: string;
   idempotencyKey: string;
   createdBy: string;
+  // Preenchidos só em lançamento `purchase` de compra parcelada (`installmentTotal > 1`).
+  // Permitem exibir "3/10" na fatura, tanto para compras novas quanto para uma compra que
+  // já estava em andamento quando a pessoa começou a usar o app.
+  installmentNumber?: number;
+  installmentTotal?: number;
   createdAt?: Timestamp;
 }
 

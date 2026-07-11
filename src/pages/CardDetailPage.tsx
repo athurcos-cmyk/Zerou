@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { CalendarClock, CreditCard, Trash2 } from 'lucide-react';
+import { CalendarClock, CreditCard, Layers, Trash2 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { BottomSheet } from '../components/BottomSheet';
+import { OngoingInstallmentsSheet } from '../cards/OngoingInstallmentsSheet';
 import { useConfirm } from '../components/ConfirmDialog';
 import { FormMessage } from '../components/FormMessage';
 import { invoiceStatusLabels } from '../cards/cardLabels';
@@ -30,6 +31,7 @@ export function CardDetailPage() {
   const [paySheetOpen, setPaySheetOpen] = useState(false);
   const [payAmount, setPayAmount] = useState('');
   const [payAccountId, setPayAccountId] = useState('');
+  const [ongoingSheetOpen, setOngoingSheetOpen] = useState(false);
 
   function handleOpenPaySheet() {
     setPayAmount('');
@@ -179,6 +181,12 @@ export function CardDetailPage() {
 
       <FormMessage>{message}</FormMessage>
 
+      {card ? (
+        <button className="button button--subtle button--block" type="button" onClick={() => setOngoingSheetOpen(true)}>
+          <Layers size={17} aria-hidden="true" /> Lançar compra parcelada que já começou
+        </button>
+      ) : null}
+
       <article className="surface surface-pad">
         <div className="section-heading">
           <div>
@@ -278,6 +286,16 @@ export function CardDetailPage() {
           </div>
         </div>
       </BottomSheet>
+
+      {card ? (
+        <OngoingInstallmentsSheet
+          open={ongoingSheetOpen}
+          workspaceId={workspaceId}
+          userId={user?.uid}
+          cardId={card.id}
+          onClose={() => setOngoingSheetOpen(false)}
+        />
+      ) : null}
     </section>
   );
 }

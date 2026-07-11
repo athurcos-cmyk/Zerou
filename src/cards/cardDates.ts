@@ -6,6 +6,21 @@ function clampDay(date: Date, day: number) {
 }
 
 /**
+ * Data de vencimento da fatura de um `referenceMonth` ('yyyy-MM'), dado o cartão.
+ *
+ * Usado ao lançar uma compra parcelada JÁ EM ANDAMENTO, quando a pessoa diz em qual mês
+ * cai a próxima parcela — aí não temos data de compra pra `resolveInstallmentCycle`, só o
+ * mês da fatura. A regra do vencimento é a mesma: se o cartão vence antes de fechar
+ * (ex.: fecha 25, vence 5), o vencimento cai no mês seguinte ao de referência.
+ */
+export function invoiceDueDateForReferenceMonth(referenceMonth: string, closingDay: number, dueDay: number) {
+  const [year, month] = referenceMonth.split('-').map(Number);
+  const referenceDate = new Date(year, month - 1, 1, 12, 0, 0);
+  const dueMonthDate = dueDay < closingDay ? addMonths(referenceDate, 1) : referenceDate;
+  return clampDay(dueMonthDate, dueDay);
+}
+
+/**
  * Ciclo (fatura + vencimento) da parcela `installmentIndex` de uma compra.
  *
  * O mês da parcela é contado a partir do mês da PRIMEIRA fatura, ancorado no dia 1 —
