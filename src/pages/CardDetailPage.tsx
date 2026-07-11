@@ -167,7 +167,7 @@ export function CardDetailPage() {
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
                   <button className="button button--primary button--compact" type="button" onClick={handleOpenPaySheet}>
-                    Pagar agora
+                    {openInvoice.status === 'open' ? 'Antecipar' : 'Pagar agora'}
                   </button>
                   <Link className="button button--subtle button--compact" to={`/app/cards/${card.id}/invoices/${openInvoice.id}`}>
                     Detalhes
@@ -176,7 +176,7 @@ export function CardDetailPage() {
               </div>
               {openInvoice.status === 'open' && (
                 <p className="text-muted" style={{ fontSize: '0.8rem', margin: 0 }}>
-                  Pode pagar antes de fechar — o valor libera seu limite na hora.
+                  Antecipar a fatura é quitar este ciclo antes de fechar — o valor libera seu limite na hora.
                 </p>
               )}
             </div>

@@ -1,9 +1,12 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { BottomSheet } from '../components/BottomSheet';
 import { SelectField } from '../components/SelectField';
+import { useConfirm } from '../components/ConfirmDialog';
 import { FormMessage } from '../components/FormMessage';
 import { invoiceStatusLabels, ledgerTypeLabels } from '../cards/cardLabels';
 import { groupAnticipatablePurchases } from '../cards/anticipation';
@@ -20,6 +23,12 @@ import { formatMoney, parseMoneyToCents } from '../finance/money';
 import type { InvoiceLedgerEntryType } from '../types/contracts';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
 
+/** "fev", "fev e mar", "fev, mar e abr" */
+function formatList(items: string[]) {
+  if (items.length <= 1) return items[0] ?? '';
+  return `${items.slice(0, -1).join(', ')} e ${items[items.length - 1]}`;
+}
+
 export function InvoicePage() {
   const { cardId, invoiceId } = useParams();
   const { user, profile } = useAuth();
@@ -28,6 +37,7 @@ export function InvoicePage() {
   const finance = useFinanceContext();
   const card = cardsData.cards.find((item) => item.id === cardId);
   const invoice = cardsData.invoices.find((item) => item.cardId === cardId && item.id === invoiceId);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [paySheetOpen, setPaySheetOpen] = useState(false);
   const [payAmount, setPayAmount] = useState('');
@@ -83,16 +93,32 @@ export function InvoicePage() {
     }).catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível registrar o pagamento.')));
   }
 
-  function handleAnticipation() {
+  async function handleAnticipation() {
     if (!workspaceId || !user || !cardId || !invoiceId) return;
     // Por compra, as N ÚLTIMAS parcelas (o grupo já vem ordenado da última pra primeira).
-    const credits = anticipatableGroups.flatMap((group) => {
-      const count = anticipateCounts[group.sourceTransactionId] ?? 0;
-      return group.installments
-        .slice(0, count)
-        .map((inst) => ({ invoiceId: inst.invoiceId, amountCents: inst.amountCents, sourceTransactionId: inst.sourceTransactionId }));
+    const selected = anticipatableGroups.flatMap((group) =>
+      group.installments.slice(0, anticipateCounts[group.sourceTransactionId] ?? 0)
+    );
+    if (selected.length === 0) return;
+
+    // Explica o que se move (decisão #4 da spec) + avisa que é irreversível.
+    const leavingMonths = [...new Set(selected.map((inst) => inst.referenceMonth))]
+      .sort()
+      .map((rm) => format(new Date(Number(rm.slice(0, 4)), Number(rm.slice(5, 7)) - 1, 1), 'MMM/yyyy', { locale: ptBR }));
+    const monthsLabel = formatList(leavingMonths);
+    const ok = await confirm({
+      title: `Antecipar ${selected.length} ${selected.length === 1 ? 'parcela' : 'parcelas'}?`,
+      message: `${selected.length === 1 ? 'Ela sai' : 'Elas saem'} das faturas de ${monthsLabel} e ${selected.length === 1 ? 'passa' : 'passam'} a contar nesta fatura agora — total ${formatMoney(anticipateTotalCents)}. Seu limite não muda; só o mês em que cada parcela pesa. Isso não pode ser desfeito.`,
+      confirmLabel: 'Antecipar',
+      danger: false
     });
-    if (credits.length === 0) return;
+    if (!ok) return;
+
+    const credits = selected.map((inst) => ({
+      invoiceId: inst.invoiceId,
+      amountCents: inst.amountCents,
+      sourceTransactionId: inst.sourceTransactionId
+    }));
     setAnticipateCounts({});
     setMessage(null);
     anticipateInstallments(workspaceId, user.uid, {
@@ -202,9 +228,18 @@ export function InvoicePage() {
             </div>
 
             {!isPaid && (
-              <button className="button button--primary" type="button" onClick={handleOpenPaySheet}>
-                Pagar fatura
-              </button>
+              <>
+                <button className="button button--primary" type="button" onClick={handleOpenPaySheet}>
+                  {isOpen ? 'Antecipar fatura (pagar antes de fechar)' : 'Pagar fatura'}
+                </button>
+                {isOpen && (
+                  <p className="text-muted" style={{ fontSize: '0.8rem', margin: '0.4rem 0 0' }}>
+                    Antecipar a fatura é quitar este ciclo antes do fechamento — o valor sai da conta que você escolher e o
+                    limite é liberado na hora. Diferente de <strong>antecipar parcela</strong>, que traz uma parcela de um mês
+                    futuro pra cá.
+                  </p>
+                )}
+              </>
             )}
           </div>
 
@@ -339,7 +374,7 @@ export function InvoicePage() {
                       <span className="text-secondary" style={{ fontSize: '0.86rem' }}>
                         Total: <strong>{formatMoney(anticipateTotalCents)}</strong>
                       </span>
-                      <button className="button button--secondary" type="button" onClick={handleAnticipation}>
+                      <button className="button button--secondary" type="button" onClick={() => void handleAnticipation()}>
                         Confirmar antecipação
                       </button>
                     </div>
@@ -394,7 +429,7 @@ export function InvoicePage() {
       <BottomSheet
         open={paySheetOpen}
         onClose={() => setPaySheetOpen(false)}
-        title="Pagar fatura"
+        title={isOpen ? 'Antecipar fatura' : 'Pagar fatura'}
         subtitle={invoice ? `${invoice.referenceMonth} · ${formatMoney(invoice.outstandingBalanceCents)} em aberto` : undefined}
       >
         <div className="form-stack">
@@ -446,6 +481,7 @@ export function InvoicePage() {
           </div>
         </div>
       </BottomSheet>
+      {confirmDialog}
     </section>
   );
 }

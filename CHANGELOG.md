@@ -2,6 +2,13 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-11 — feat: antecipar fatura x antecipar parcela explícitos + aviso de que é irreversível
+
+- **Confirmação antes de antecipar parcelas.** Ao confirmar, um diálogo mostra de quais faturas futuras as parcelas saem e que passam a contar nesta fatura agora (ex.: "Ela sai das faturas de dez/2026 e passa a contar nesta fatura agora — total R$ 125,00. Seu limite não muda; só o mês em que cada parcela pesa. Isso não pode ser desfeito."). Fecha a decisão #4 da spec (explicitar o que se move, já que não há desconto pra "vender" a ação) e o aviso de irreversibilidade (mantida irreversível, como no Nubank).
+- **"Antecipar fatura" e "antecipar parcela" viraram conceitos distintos na UI.** Numa fatura ainda aberta, o botão de pagar vira **"Antecipar fatura (pagar antes de fechar)"** com um texto curto explicando a diferença pra antecipar parcela; o título do sheet e o botão do cartão acompanham ("Antecipar" quando aberta, "Pagar fatura/agora" quando fechada).
+- Conferência final contra `spec_antecipacao_fatura_parcela.md`: o comportamento bate. Nosso modelo de ledger (débito na fatura atual + crédito na futura) já entrega o `mes_referencia` × `mes_pago` da spec sem precisar dos dois campos de data, e os relatórios de mês futuro já saem líquidos de graça (o crédito zera a parcela na fatura de origem).
+- Verificado ao vivo (conta de teste): botões, texto e diálogo com o mês certo (dez/2026), stepper da última pra trás refletindo antecipação anterior (10x já sem 8/9/10 → próxima 7/10; óculos intacto → próxima 10/10), console limpo. 218 testes, typecheck, lint (linha de base) e build limpos. Sem mudança de regra/dados.
+
 ## 2026-07-11 — fix: antecipação só da última parcela pra trás + trazer compras existentes ao criar o cartão
 
 - **Antecipação de parcela reescrita pra funcionar como no cartão de verdade.** Antes o app deixava marcar qualquer parcela futura solta — inclusive uma do meio, deixando as de trás (parcelei em 5x, tô na 1ª, e dava pra antecipar a 3ª). Isso não existe: antecipação é sempre **da última parcela pra trás, contígua**. Agora o painel agrupa por compra e oferece um seletor "antecipar as últimas [N] parcelas" — pega da última pra trás, nunca uma do meio. Verificado ao vivo: antecipar as 3 últimas de um 10x moveu R$900 das faturas fev/mar/abr pra fatura atual, **limite usado inalterado** (antecipar move dívida entre faturas, não muda o total). O mecanismo em si (débito na fatura atual + crédito na futura) já estava certo; o bug era só a seleção.
