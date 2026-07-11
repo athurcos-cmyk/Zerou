@@ -2,6 +2,14 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-11 — feat: Análise em regime de caixa (por parcela) + compras parceladas em andamento
+
+- **A Análise deixou de jogar a compra parcelada inteira no mês da compra.** Uma compra de R$3.000 em 10x aparecia como R$3.000 num mês só (a tela somava a transação `card_purchase`, que guarda o valor cheio no mês da compra) e os outros 9 meses zerados. Agora o cartão entra pela **parcela que cai na fatura de cada mês** — R$300 em cada um dos 10 meses. Casa com o "Comprometido" do Dashboard (que já contava por fatura) e com o que "quanto gastei no mês" significa. Nova lógica isolada em `src/finance/spendingAnalysis.ts`, pura e testada (11 casos).
+- **Antecipar parcela agora reflete na Análise, de graça.** Como o gasto do mês reusa o `recognizedExpenseCents` do ledger (`purchases + fees − credits`, incluindo débito de antecipação na fatura atual e crédito na futura), antecipar uma parcela move o gasto do mês futuro pro atual também nos gráficos — antes a Análise nem olhava o ledger.
+- **Nova seção "Compras parceladas — Em andamento"** na Análise, dando visibilidade ao valor cheio que a visão por parcela dilui: "R$3.000 em 10x", quantas parcelas faltam e quanto resta. "Restante" é líquido de antecipação (parcela antecipada sai do que falta, como no cartão de verdade). Vale mesmo pra compra migrada em andamento (óculos 7/10 → mostra o total real R$1.250, não só o que falta).
+- **Busca enriquecida**: um resultado de compra no cartão mostra "10x de R$300" ao lado do valor cheio, ligando a compra às parcelas.
+- Verificado ao vivo (conta de teste): julho mostrando R$1.200 (as parcelas do mês, não as compras cheias), seção em andamento com Geladeira R$2.400/12, Compra 10x QA R$2.100 restante/7 (refletindo 3 já antecipadas) e Óculos R$500/4, console limpo. 229 testes, typecheck, lint (uma abaixo da linha de base) e build limpos. Sem mudança de regra/dados.
+
 ## 2026-07-11 — feat: antecipar fatura x antecipar parcela explícitos + aviso de que é irreversível
 
 - **Confirmação antes de antecipar parcelas.** Ao confirmar, um diálogo mostra de quais faturas futuras as parcelas saem e que passam a contar nesta fatura agora (ex.: "Ela sai das faturas de dez/2026 e passa a contar nesta fatura agora — total R$ 125,00. Seu limite não muda; só o mês em que cada parcela pesa. Isso não pode ser desfeito."). Fecha a decisão #4 da spec (explicitar o que se move, já que não há desconto pra "vender" a ação) e o aviso de irreversibilidade (mantida irreversível, como no Nubank).

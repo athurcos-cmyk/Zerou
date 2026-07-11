@@ -7,12 +7,18 @@ import {
 } from 'recharts';
 import { BottomSheet } from '../components/BottomSheet';
 import { EmptyState } from '../components/EmptyState';
-import { useFinanceContext } from '../finance/FinanceDataContext';
+import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { formatFriendlyDate } from '../finance/financeDates';
 import { billStatusLabels, transactionTypeLabels } from '../finance/financeLabels';
 import { formatMoney } from '../finance/money';
+import {
+  monthlyTotals,
+  ongoingInstallmentPurchases,
+  spendingByCategoryForMonth,
+  NO_CATEGORY,
+  type InvoiceForSpending
+} from '../finance/spendingAnalysis';
 import { categoryColors, defaultCategoryColor, defaultCategoryColors } from '../theme/palette';
-import type { Transaction } from '../types/contracts';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -65,12 +71,10 @@ function shiftMonth(key: string, delta: number) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function isExpenseInMonth(t: Transaction, month: string) {
-  if (t.deletedAt) return false;
-  if (t.type !== 'expense' && t.type !== 'card_purchase') return false;
-  if (t.cashMonth !== month && t.competenceMonth !== month) return false;
-  if (t.tags?.includes('meta') || t.tags?.includes('cofrinho')) return false;
-  return true;
+function sumPositive(totals: Map<string, number>) {
+  let sum = 0;
+  for (const cents of totals.values()) if (cents > 0) sum += cents;
+  return sum;
 }
 
 // ─── tooltips ─────────────────────────────────────────────────────────────────
@@ -122,6 +126,7 @@ function MetricCard({ label, value, sub, accent = false, icon, long = false }: {
 
 export function SearchPage() {
   const finance = useFinanceContext();
+  const cardsData = useCardsContext();
   const location = useLocation();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
@@ -130,9 +135,24 @@ export function SearchPage() {
 
   const currentMonth = new Date().toISOString().slice(0, 7);
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
-  const last6Months = getLastNMonths(6);
+  const last6Months = useMemo(() => getLastNMonths(6), []);
 
   const normalizedQuery = query.trim().toLocaleLowerCase('pt-BR');
+
+  // Faturas reduzidas ao que a Análise precisa (referenceMonth + ledger por parcela).
+  const invoicesForSpending = useMemo<InvoiceForSpending[]>(
+    () => cardsData.invoices.map((inv) => ({ referenceMonth: inv.referenceMonth, ledgerEntries: inv.ledgerEntries })),
+    [cardsData.invoices]
+  );
+  // Cartão entra na Análise pela parcela; a categoria/descrição de cada parcela vem da transação-mãe.
+  const txnCategoryById = useMemo(
+    () => new Map(finance.transactions.map((t) => [t.id, t.categoryId])),
+    [finance.transactions]
+  );
+  const txnDescriptionById = useMemo(
+    () => new Map(finance.transactions.map((t) => [t.id, t.description])),
+    [finance.transactions]
+  );
 
   // Arriving from the Dashboard's "Buscar" shortcut opens straight into search.
   useEffect(() => {
@@ -144,57 +164,79 @@ export function SearchPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const categoryMap = new Map(finance.categories.map((c) => [c.id, c]));
-  const categoryNames = new Map(finance.categories.map((c) => [c.id, c.name]));
+  const categoryMap = useMemo(() => new Map(finance.categories.map((c) => [c.id, c])), [finance.categories]);
+  const categoryNames = useMemo(() => new Map(finance.categories.map((c) => [c.id, c.name])), [finance.categories]);
 
-  // ── gastos do mês selecionado por categoria ───────────────────────────────
+  // ── gastos do mês selecionado por categoria (regime de caixa: por parcela) ──
   const spendingByCategory = useMemo(() => {
-    const totals = new Map<string, { name: string; amountCents: number; color: string }>();
-    for (const t of finance.transactions) {
-      if (!isExpenseInMonth(t, selectedMonth)) continue;
-      // `||`, não `??`: compra no cartão sem categoria grava `categoryId: ''`
-      // (`createCardPurchase`), e string vazia passa pelo `??` — o donut ganhava duas
-      // fatias "Sem categoria".
-      const catId = t.categoryId || '__none__';
-      const catName = t.categoryId ? (categoryNames.get(t.categoryId) ?? 'Sem categoria') : 'Sem categoria';
-      const cat = t.categoryId ? categoryMap.get(t.categoryId) : null;
-      const color = cat ? resolveCategoryColor(cat) : defaultCategoryColor;
-      const prev = totals.get(catId);
-      totals.set(catId, { name: catName, amountCents: (prev?.amountCents ?? 0) + t.amountCents, color });
-    }
-    return [...totals.values()].sort((a, b) => b.amountCents - a.amountCents);
-  }, [finance.transactions, finance.categories, selectedMonth]);
+    const totals = spendingByCategoryForMonth(
+      selectedMonth,
+      finance.transactions,
+      invoicesForSpending,
+      (id) => (id ? txnCategoryById.get(id) : undefined)
+    );
+    return [...totals.entries()]
+      .filter(([, amountCents]) => amountCents > 0) // mês só de estorno pode zerar/inverter uma categoria
+      .map(([catId, amountCents]) => {
+        const isNone = catId === NO_CATEGORY;
+        const cat = isNone ? null : categoryMap.get(catId);
+        return {
+          name: isNone ? 'Sem categoria' : (categoryNames.get(catId) ?? 'Sem categoria'),
+          amountCents,
+          color: cat ? resolveCategoryColor(cat) : defaultCategoryColor
+        };
+      })
+      .sort((a, b) => b.amountCents - a.amountCents);
+  }, [finance.transactions, invoicesForSpending, txnCategoryById, categoryMap, categoryNames, selectedMonth]);
 
   const totalSpent = spendingByCategory.reduce((s, c) => s + c.amountCents, 0);
 
   // ── histórico mensal (últimos 6 meses reais — não acompanha selectedMonth) ─
-  const monthlyData = useMemo(() => {
-    return last6Months.map((month) => {
-      let incomeCents = 0;
-      let expenseCents = 0;
-      for (const t of finance.transactions) {
-        if (t.deletedAt) continue;
-        const m = t.cashMonth ?? t.competenceMonth;
-        if (m !== month) continue;
-        if (t.tags?.includes('meta') || t.tags?.includes('cofrinho')) continue;
-        if (t.type === 'income') incomeCents += t.amountCents;
-        else if (t.type === 'expense' || t.type === 'card_purchase') expenseCents += t.amountCents;
-      }
-      return { month: monthLabel(month), incomeCents, expenseCents };
-    });
-  }, [finance.transactions, last6Months]);
+  const monthlyData = useMemo(
+    () =>
+      monthlyTotals(last6Months, finance.transactions, invoicesForSpending).map((m) => ({
+        month: monthLabel(m.month),
+        incomeCents: m.incomeCents,
+        expenseCents: m.expenseCents
+      })),
+    [finance.transactions, invoicesForSpending, last6Months]
+  );
 
   const hasMonthlyData = monthlyData.some((m) => m.incomeCents > 0 || m.expenseCents > 0);
 
   // ── variação vs. mês anterior ao selecionado ───────────────────────────────
   const prevMonth = shiftMonth(selectedMonth, -1);
   const prevExpense = useMemo(
-    () => finance.transactions.filter((t) => isExpenseInMonth(t, prevMonth)).reduce((s, t) => s + t.amountCents, 0),
-    [finance.transactions, prevMonth]
+    () =>
+      sumPositive(
+        spendingByCategoryForMonth(prevMonth, finance.transactions, invoicesForSpending, (id) =>
+          id ? txnCategoryById.get(id) : undefined
+        )
+      ),
+    [finance.transactions, invoicesForSpending, txnCategoryById, prevMonth]
   );
   const variation = prevExpense > 0
     ? Math.round(((totalSpent - prevExpense) / prevExpense) * 100)
     : null;
+
+  // ── compras parceladas ainda em andamento (visibilidade do valor cheio) ─────
+  const ongoing = useMemo(
+    () => ongoingInstallmentPurchases(currentMonth, invoicesForSpending, (id) => txnDescriptionById.get(id)),
+    [currentMonth, invoicesForSpending, txnDescriptionById]
+  );
+
+  // Parcelas por transação, pra mostrar "10x de R$300" nos resultados de busca.
+  const installmentInfoById = useMemo(() => {
+    const map = new Map<string, { total: number; valueCents: number }>();
+    for (const invoice of invoicesForSpending) {
+      for (const entry of invoice.ledgerEntries) {
+        if (entry.type === 'purchase' && entry.sourceTransactionId && (entry.installmentTotal ?? 0) > 1) {
+          map.set(entry.sourceTransactionId, { total: entry.installmentTotal!, valueCents: entry.amountCents });
+        }
+      }
+    }
+    return map;
+  }, [invoicesForSpending]);
 
   // ── busca por texto ────────────────────────────────────────────────────────
   const results = useMemo(() => {
@@ -207,7 +249,17 @@ export function SearchPage() {
           .toLocaleLowerCase('pt-BR')
           .includes(normalizedQuery)
       )
-      .map((t) => ({ id: t.id, kind: 'Transação', title: t.description, detail: `${transactionTypeLabels[t.type]} · ${formatFriendlyDate(t.date)}`, amountCents: t.amountCents }));
+      .map((t) => {
+        const installment = t.type === 'card_purchase' ? installmentInfoById.get(t.id) : undefined;
+        const suffix = installment ? ` · ${installment.total}x de ${formatMoney(installment.valueCents)}` : '';
+        return {
+          id: t.id,
+          kind: 'Transação',
+          title: t.description,
+          detail: `${transactionTypeLabels[t.type]} · ${formatFriendlyDate(t.date)}${suffix}`,
+          amountCents: t.amountCents
+        };
+      });
 
     const bills = finance.bills
       .filter((b) => b.description.toLocaleLowerCase('pt-BR').includes(normalizedQuery))
@@ -218,7 +270,7 @@ export function SearchPage() {
       .map((a) => ({ id: a.id, kind: 'Conta', title: a.name, detail: 'Conta financeira', amountCents: a.openingBalanceCents }));
 
     return [...transactions, ...bills, ...accounts].slice(0, 25);
-  }, [finance.accounts, finance.bills, finance.transactions, normalizedQuery]);
+  }, [finance.accounts, finance.bills, finance.transactions, installmentInfoById, normalizedQuery]);
 
   const selectedCat = selectedCatIndex !== null ? spendingByCategory[selectedCatIndex] : null;
   const topCat = spendingByCategory[0] ?? null;
@@ -417,6 +469,39 @@ export function SearchPage() {
           />
         )}
       </article>
+
+      {/* ── Compras parceladas em andamento ────────────────────────────────── */}
+      {ongoing.length > 0 && (
+        <article className="surface surface-pad" style={{ marginTop: '0.75rem' }}>
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Compras parceladas</p>
+              <h2>Em andamento</h2>
+            </div>
+          </div>
+          <p className="text-secondary" style={{ margin: '0.1rem 0 1rem', fontSize: '0.86rem' }}>
+            O valor cheio de cada compra. Na visão por categoria acima ele aparece diluído — só a parcela do mês pesa lá.
+          </p>
+          <div className="item-list">
+            {ongoing.map((purchase) => (
+              <div className="list-row" key={purchase.sourceTransactionId}>
+                <div>
+                  <strong>{purchase.description}</strong>
+                  <span className="text-secondary">
+                    {purchase.installmentTotal}x de {formatMoney(purchase.installmentValueCents)} · compra de {formatMoney(purchase.fullAmountCents)}
+                  </span>
+                </div>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <strong>{formatMoney(purchase.remainingCents)}</strong>
+                  <span className="text-secondary" style={{ display: 'block' }}>
+                    {purchase.remainingCount} {purchase.remainingCount === 1 ? 'parcela' : 'parcelas'} a vencer
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </article>
+      )}
 
       {/* ── Barras: histórico 6 meses ──────────────────────────────────────── */}
       <article className="surface surface-pad" style={{ marginTop: '0.75rem' }}>

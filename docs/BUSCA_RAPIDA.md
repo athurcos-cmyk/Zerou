@@ -32,7 +32,7 @@ Use este arquivo como mapa antes de abrir documentos grandes. Regra: leia o meno
 | Serviço financeiro | `src/finance/financeService.ts` |
 | Cartões / faturas | `src/cards/` |
 | Espaço do casal + cofrinho | `src/pages/SharedSpacePage.tsx` (orquestrador), `src/pages/shared/` (convite/modo/cofrinho/despesas), `src/shared/` (serviço/hooks) |
-| Análise / gráficos / busca | `src/pages/SearchPage.tsx` |
+| Análise / gráficos / busca | `src/pages/SearchPage.tsx` (UI); `src/finance/spendingAnalysis.ts` (gasto por mês/categoria em regime de caixa — cartão pela parcela da fatura, não pela transação) |
 | Metas (pessoais) | `src/pages/GoalsPage.tsx`, `src/finance/useGoalsData.ts` |
 | Tokens de cor / temas | `src/styles/themes.css` |
 | CSS global | `src/styles/global.css` |
