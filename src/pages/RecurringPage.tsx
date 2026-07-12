@@ -16,6 +16,7 @@ import { FormMessage } from '../components/FormMessage';
 import { formatFriendlyDate, fromDateInputValue, todayInputValue } from '../finance/financeDates';
 import { recurringFrequencyLabels } from '../finance/financeLabels';
 import {
+  canRegisterRecurrence,
   createCategory,
   createRecurringRule,
   deleteCategory,
@@ -188,11 +189,14 @@ export function RecurringPage() {
           {finance.recurringRules.length > 0 ? (
             <div className="item-list">
               {finance.recurringRules.map((rule) => {
-                // "Registrar" só faz sentido numa ocorrência vencida. Se a próxima está no
-                // futuro, ou a automação das 6h já lançou a anterior, ou ela ainda não
-                // chegou — clicar ali lançaria uma despesa que não aconteceu e ainda pularia
-                // um período da recorrência.
-                const due = isRecurrenceDue(rule.nextOccurrenceAt.toDate());
+                // "Registrar" aparece quando a ocorrência já venceu; "Pagar adiantado" quando
+                // ainda não venceu mas está dentro da janela de antecedência (pra quem paga a
+                // conta alguns dias antes). Fora disso fica "Em dia". Registrar adiantado é
+                // seguro: o id da transação é pela data de vencimento, então não duplica com a
+                // automação das 6h.
+                const dueDate = rule.nextOccurrenceAt.toDate();
+                const due = isRecurrenceDue(dueDate);
+                const canRegister = canRegisterRecurrence(dueDate);
 
                 return (
                   <div className="list-row list-row--with-icon" key={rule.id}>
@@ -210,6 +214,10 @@ export function RecurringPage() {
                       {due ? (
                         <button className="button button--subtle button--compact" type="button" onClick={() => handleOpenPay(rule)}>
                           Registrar
+                        </button>
+                      ) : canRegister ? (
+                        <button className="button button--subtle button--compact" type="button" onClick={() => handleOpenPay(rule)}>
+                          Pagar adiantado
                         </button>
                       ) : (
                         <span className="text-muted" style={{ fontSize: '0.78rem' }}>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isRecurrenceDue, recurringOccurrenceTransactionId } from './financeService';
+import { canRegisterRecurrence, isRecurrenceDue, recurringOccurrenceTransactionId } from './financeService';
 
 // A Cloud Function `generateRecurrences` (6h) e o botão "Registrar" da tela registram a
 // MESMA ocorrência. Antes, cada um criava uma transação com id aleatório e a despesa saía
@@ -64,5 +64,33 @@ describe('isRecurrenceDue', () => {
   it('is not due when the occurrence is tomorrow or later', () => {
     expect(isRecurrenceDue(new Date('2026-07-11T00:00:00'), now)).toBe(false);
     expect(isRecurrenceDue(new Date('2026-08-09T12:00:00'), now)).toBe(false);
+  });
+});
+
+// "Pagar adiantado": libera registrar a ocorrência alguns dias antes do vencimento
+// (conta do dia 10 paga no dia 7). Janela padrão de 7 dias.
+describe('canRegisterRecurrence', () => {
+  const now = new Date('2026-07-10T09:00:00');
+
+  it('permite quando já venceu', () => {
+    expect(canRegisterRecurrence(new Date('2026-07-09T12:00:00'), now)).toBe(true);
+  });
+
+  it('permite dentro da janela de antecedência (5 dias antes)', () => {
+    expect(canRegisterRecurrence(new Date('2026-07-15T12:00:00'), now)).toBe(true);
+  });
+
+  it('permite no limite exato da janela (7 dias antes)', () => {
+    expect(canRegisterRecurrence(new Date('2026-07-17T12:00:00'), now)).toBe(true);
+  });
+
+  it('não permite além da janela (8 dias ou mais)', () => {
+    expect(canRegisterRecurrence(new Date('2026-07-18T12:00:00'), now)).toBe(false);
+    expect(canRegisterRecurrence(new Date('2026-08-10T12:00:00'), now)).toBe(false);
+  });
+
+  it('respeita uma janela customizada', () => {
+    expect(canRegisterRecurrence(new Date('2026-07-13T12:00:00'), now, 2)).toBe(false);
+    expect(canRegisterRecurrence(new Date('2026-07-12T12:00:00'), now, 2)).toBe(true);
   });
 });

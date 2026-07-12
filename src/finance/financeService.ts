@@ -587,6 +587,27 @@ export function isRecurrenceDue(nextOccurrenceAt: Date, now: Date = new Date()) 
   return nextOccurrenceAt.getTime() <= endOfToday.getTime();
 }
 
+/** Dias de antecedência em que já dá pra pagar/registrar uma recorrência antes do vencimento. */
+export const RECURRENCE_EARLY_PAY_DAYS = 7;
+
+/**
+ * Se a ocorrência já pode ser registrada — vencida OU dentro da janela de antecedência
+ * (pra quem paga a conta alguns dias antes do vencimento, ex.: conta do dia 10 paga no dia 7).
+ * É seguro liberar adiantado: a transação da ocorrência é identificada pela DATA DE VENCIMENTO
+ * (`recurringOccurrenceTransactionId(rule, nextOccurrenceAt)`), não pela data do pagamento —
+ * então registrar hoje e a automação rodar no vencimento cai no mesmo id, sem duplicar.
+ */
+export function canRegisterRecurrence(
+  nextOccurrenceAt: Date,
+  now: Date = new Date(),
+  earlyDays = RECURRENCE_EARLY_PAY_DAYS
+) {
+  const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  const earliest = new Date(nextOccurrenceAt);
+  earliest.setDate(earliest.getDate() - earlyDays);
+  return earliest.getTime() <= endOfToday.getTime();
+}
+
 // Cria transação de despesa e avança nextOccurrenceAt para a próxima data.
 export function recordRecurringPayment(
   workspaceId: string,

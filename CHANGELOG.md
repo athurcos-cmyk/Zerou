@@ -2,6 +2,12 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-12 — feat: pagar recorrência adiantado (janela de dias antes do vencimento)
+
+- Dava pra registrar uma recorrência **só a partir do dia do vencimento** — quem paga a conta uns dias antes (conta do dia 10 paga no dia 7) ficava travado no "Em dia", sem ação. Agora, dentro de uma **janela de ~7 dias antes** do vencimento, aparece o botão **"Pagar adiantado"**; registrar ali lança o pagamento hoje e a recorrência avança pro próximo período normalmente.
+- **É seguro liberar adiantado**: a transação da ocorrência é identificada pela **data de vencimento** (`recurringOccurrenceTransactionId`), não pela data do pagamento — então registrar adiantado e a automação das 6h rodar no vencimento caem no mesmo id, sem duplicar. Nova função pura `canRegisterRecurrence` (+`RECURRENCE_EARLY_PAY_DAYS = 7`) em `financeService.ts`, testada (5 casos: vencida, dentro/no limite/fora da janela, janela customizada).
+- Verificado ao vivo: recorrência vencendo em 3 dias mostrou "Pagar adiantado", pagar avançou a próxima ocorrência pro mês seguinte e voltou pra "Em dia"; recorrência distante (mês seguinte) segue "Em dia". 247 testes, typecheck, lint (linha de base) e build limpos. Sem mudança de regra do Firestore.
+
 ## 2026-07-12 — feat: busca direta na tela de Transações
 
 - A tela de Transações (o extrato) ganhou uma **barra de busca sempre visível** no topo + **chips de filtro por tipo** (Tudo / Despesas / Receitas / Transferências). A busca por texto filtra a lista **ao vivo** por **nome, categoria, tag e estabelecimento** — os campos que a pessoa lembra. "Despesas" inclui compras no cartão. Empty state próprio quando o filtro/busca não acha nada ("Nenhum resultado"), distinto do "nenhuma transação ainda".
