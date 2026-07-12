@@ -177,7 +177,10 @@ export function InvoicePage() {
 
   const isPaid = invoice?.status === 'paid' || invoice?.status === 'overpaid';
   const isOpen = invoice?.status === 'open';
-  const purchases = invoice?.ledgerEntries.filter((e) => e.type === 'purchase') ?? [];
+  // 'installment_anticipation' entra aqui de propósito: é um débito real que soma no
+  // `purchasesTotalCents` do hero (calculateInvoice), então precisa aparecer na lista —
+  // senão o total "Compras" não bate com a soma das linhas mostradas.
+  const purchases = invoice?.ledgerEntries.filter((e) => e.type === 'purchase' || e.type === 'installment_anticipation') ?? [];
   const payments = invoice?.ledgerEntries.filter((e) => e.type === 'payment' || e.type === 'advance_payment') ?? [];
 
   return (
@@ -250,6 +253,7 @@ export function InvoicePage() {
               <div className="item-list">
                 {purchases.map((entry) => {
                   const label = txnDescriptions.get(entry.sourceTransactionId ?? '') ?? ledgerTypeLabels[entry.type as InvoiceLedgerEntryType];
+                  const isAnticipated = entry.type === 'installment_anticipation';
                   const installment =
                     entry.installmentNumber && entry.installmentTotal
                       ? `parcela ${entry.installmentNumber}/${entry.installmentTotal}`
@@ -259,7 +263,7 @@ export function InvoicePage() {
                       <div>
                         <strong>{label}</strong>
                         <span className="text-secondary">
-                          {installment ? `${installment} · ` : ''}
+                          {isAnticipated ? 'Parcela antecipada · ' : installment ? `${installment} · ` : ''}
                           {formatFriendlyDate(entry.effectiveAt)}
                         </span>
                       </div>

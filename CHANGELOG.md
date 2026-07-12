@@ -2,6 +2,12 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-12 — fix: parcela antecipada some da lista "Compras" da fatura
+
+- O total "Compras" no topo da fatura (`invoice.purchasesTotalCents`) soma tanto a compra normal do mês quanto qualquer parcela **antecipada** trazida de uma fatura futura (`installment_anticipation`, que também é um débito real na fatura atual). Mas a lista "Compras" logo abaixo só filtrava `type === 'purchase'` — as parcelas antecipadas engordavam o total sem aparecer em nenhuma linha. Sintoma real (achado pelo dono numa fatura de teste): total "R$ 1.200" com a lista mostrando só "R$ 300".
+- `purchases` em `InvoicePage.tsx` agora inclui `installment_anticipation` também; cada uma aparece com o rótulo "Parcela antecipada" (em vez do número de parcela, que essas entradas não carregam) pra não se confundir com a compra normal do mês.
+- Verificado ao vivo: fatura que tinha 1 compra normal (R$300) + 3 parcelas antecipadas (R$300 cada) agora lista as 4 linhas, somando os R$1.200 do topo. 247 testes, typecheck, lint (linha de base) e build limpos. Sem mudança de regra/dados.
+
 ## 2026-07-12 — feat: "Próximos compromissos" clicável + filtro por cartão nas Transações
 
 - **As linhas de "Próximos compromissos" no Dashboard viraram clicáveis**: tocar numa **Fatura** abre a fatura do cartão (`/app/cards/:id/invoices/:invoiceId`), **conta a pagar** abre Compromissos, **recorrência** abre Recorrências. Antes eram só texto — dava pra ver o que vencia primeiro, mas não chegar lá. (`UpcomingCommitment` ganhou `cardId`; linhas usam o `.list-row--link` que já existia.)
