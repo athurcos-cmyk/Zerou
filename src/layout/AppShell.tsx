@@ -5,6 +5,7 @@ import {
   BarChart2,
   Banknote,
   CalendarClock,
+  HelpCircle,
   Home,
   LogOut,
   MoreHorizontal,
@@ -22,6 +23,8 @@ import { BrandLockup } from '../components/BrandLogo';
 import { logout } from '../auth/authService';
 import { useAuth } from '../auth/AuthContext';
 import { useConfirm } from '../components/ConfirmDialog';
+import { WelcomeTour } from '../onboarding/WelcomeTour';
+import { useWelcomeTour } from '../onboarding/welcomeTour.store';
 
 function getNavClass({ isActive }: { isActive: boolean }) {
   return `nav-link${isActive ? ' active' : ''}`;
@@ -32,6 +35,7 @@ export function AppShell() {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { confirm, dialog: confirmDialog } = useConfirm();
+  const openTour = useWelcomeTour((state) => state.openTour);
 
   // Pede permissão de push e registra o token FCM após o Firebase confirmar a sessão
   useEffect(() => {
@@ -103,6 +107,9 @@ export function AppShell() {
           <NavLink className={getNavClass} to="/app/settings/security/login-methods">
             <Shield size={19} aria-hidden="true" /> Segurança
           </NavLink>
+          <button className="nav-link" type="button" onClick={openTour}>
+            <HelpCircle size={19} aria-hidden="true" /> Como funciona
+          </button>
         </nav>
         <div className="sidebar-footer">
           <p className="text-secondary">{profile?.name ?? user?.email}</p>
@@ -167,6 +174,16 @@ export function AppShell() {
               <NavLink className={getNavClass} to="/app/settings/security/login-methods" onClick={() => setMobileMenuOpen(false)}>
                 <Shield size={19} aria-hidden="true" /> Segurança
               </NavLink>
+              <button
+                className="nav-link"
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  openTour();
+                }}
+              >
+                <HelpCircle size={19} aria-hidden="true" /> Como funciona
+              </button>
             </div>
             <button className="button button--ghost" type="button" onClick={() => void logout()}>
               <LogOut size={18} aria-hidden="true" /> Sair
@@ -206,6 +223,7 @@ export function AppShell() {
       ) : null}
 
       {confirmDialog}
+      <WelcomeTour />
     </div>
   );
 }

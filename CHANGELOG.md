@@ -2,6 +2,12 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-12 — feat: tour de boas-vindas em slides no primeiro acesso
+
+- Antes, quem criava conta caía direto no Dashboard sem ninguém explicar as features (o onboarding é só um questionário de configuração; o único explicador era o mini-tutorial do "Disponível"). Agora um **tour de boas-vindas em 6 slides** abre sozinho uma vez após o onboarding, apresentando os pilares: lançar tudo num lugar, cartões sem susto (parcelas), Compromissos × Recorrências, Disponível × Comprometido, e Metas/Casal/Análise. Com "Pular", "Voltar/Próximo", dots e "Começar".
+- **Reabrível a qualquer momento** em "Como funciona" (menu Mais / sidebar). "Já viu" mora no localStorage (`zerou.welcomeTourSeen`, mesmo padrão do prompt de instalação — sem write no Firestore). Sequenciado **antes** do mini-tutorial do "Disponível" pra não empilhar dois modais.
+- `WelcomeTour` + `welcomeTour.store` (Zustand) em `src/onboarding/`, montado no `AppShell`. Só tokens de tema no CSS (tema claro e escuro). Verificado ao vivo: auto-abre no 1º acesso, navega os 6 slides, "Começar" persiste e não reabre no reload, e o "Como funciona" reabre. 247 testes, typecheck, lint (linha de base) e build limpos.
+
 ## 2026-07-12 — feat: logos de serviço (6 oficiais + 13 tiles de marca "ícone de app")
 
 - O dono trouxe os 19 logos que faltavam. **6 tinham símbolo quadrado** usável no tile de 36px → adicionados como SVG oficial: ChatGPT, Microsoft 365, Oi, Google One, Claro, Rappi.
