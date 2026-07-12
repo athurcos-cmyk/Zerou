@@ -1115,8 +1115,12 @@ span.category-mark {
   gap: 0.75rem;
 }
 
-/* Marca de serviço (assinaturas e contas fixas). Mesmo desenho do `.bank-mark`. */
-.service-mark {
+/* Marca de serviço (assinaturas e contas fixas). Mesmo desenho do `.bank-mark`.
+   Seletor com `span.` de propósito: é um <span> dentro de `.list-row` (Recorrências,
+   Compromissos), e a regra genérica `.list-row span { display: block }` tem especificidade
+   maior — sem o `span.` ela derruba o `inline-grid`/`place-items:center` e joga as iniciais
+   pro canto superior-esquerdo do tile. Mesmo cuidado do `span.category-mark`. */
+span.service-mark {
   display: inline-grid;
   flex: 0 0 auto;
   width: 2.15rem;

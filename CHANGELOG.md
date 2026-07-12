@@ -2,6 +2,10 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-12 — fix: iniciais do selo de serviço encostadas à esquerda (Recorrências/Compromissos)
+
+- O tile de iniciais/ícone (`ServiceMark`) nas listas de Recorrências e Compromissos mostrava as letras coladas no canto esquerdo do quadrado, em vez de centralizadas. Causa: `.service-mark` usa `display: inline-grid; place-items: center`, mas a regra genérica `.list-row span { display: block }` (que empilha o texto das linhas) tem especificidade maior e derrubava a grade. Corrigido subindo o seletor para `span.service-mark` — exatamente o mesmo padrão do `span.category-mark`. É o **segundo** caso real desse bug de especificidade em tiles dentro de `.list-row`. Verificado ao vivo (o "EN" de Energia elétrica agora centralizado, folgas iguais nos 4 lados). Só CSS; 242 testes e build limpos.
+
 ## 2026-07-12 — feat: camada "Previsto" na Análise (recorrências projetadas) + categoria de compra conferida
 
 - **Mês futuro agora mostra "Previsto"**, não só o comprometido: além das parcelas de cartão e contas a pagar (obrigação firme), soma as **recorrências projetadas** para aquele mês (aluguel, assinaturas…). O KPI vira "Previsto no mês", um terceiro card mostra "Recorrências ~R$", e uma seção **"Recorrências previstas"** lista cada regra — deixando claro o que é firme (comprometido) e o que é estimativa (recorrência, pode mudar se cancelar/ajustar).
