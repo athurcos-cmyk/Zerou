@@ -8,14 +8,17 @@ import {
 import { BottomSheet } from '../components/BottomSheet';
 import { EmptyState } from '../components/EmptyState';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
-import { formatFriendlyDate } from '../finance/financeDates';
+import { formatFriendlyDate, toDate } from '../finance/financeDates';
 import { billStatusLabels, transactionTypeLabels } from '../finance/financeLabels';
 import { formatMoney } from '../finance/money';
 import {
+  committedByCategoryForMonth,
+  lastCommittedMonth,
   monthlyTotals,
   ongoingInstallmentPurchases,
   spendingByCategoryForMonth,
   NO_CATEGORY,
+  type BillForCommitment,
   type InvoiceForSpending
 } from '../finance/spendingAnalysis';
 import { categoryColors, defaultCategoryColor, defaultCategoryColors } from '../theme/palette';
@@ -153,6 +156,26 @@ export function SearchPage() {
     () => new Map(finance.transactions.map((t) => [t.id, t.description])),
     [finance.transactions]
   );
+  // Contas a pagar reduzidas ao que a projeção futura precisa (mês do vencimento resolvido aqui).
+  const billsForCommitment = useMemo<BillForCommitment[]>(
+    () =>
+      finance.bills.map((b) => {
+        const due = toDate(b.dueDate);
+        return {
+          categoryId: b.categoryId,
+          amountCents: b.amountCents,
+          status: b.status,
+          dueMonth: `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, '0')}`
+        };
+      }),
+    [finance.bills]
+  );
+  // Até onde a navegação pra frente pode ir: último mês com parcela/conta comprometida.
+  const maxMonth = useMemo(
+    () => lastCommittedMonth(currentMonth, invoicesForSpending, billsForCommitment),
+    [currentMonth, invoicesForSpending, billsForCommitment]
+  );
+  const isFutureMonth = selectedMonth > currentMonth;
 
   // Arriving from the Dashboard's "Buscar" shortcut opens straight into search.
   useEffect(() => {
@@ -168,13 +191,12 @@ export function SearchPage() {
   const categoryNames = useMemo(() => new Map(finance.categories.map((c) => [c.id, c.name])), [finance.categories]);
 
   // ── gastos do mês selecionado por categoria (regime de caixa: por parcela) ──
+  // Mês futuro não tem gasto realizado — mostra o que já está COMPROMETIDO (parcela + conta).
   const spendingByCategory = useMemo(() => {
-    const totals = spendingByCategoryForMonth(
-      selectedMonth,
-      finance.transactions,
-      invoicesForSpending,
-      (id) => (id ? txnCategoryById.get(id) : undefined)
-    );
+    const catOf = (id?: string) => (id ? txnCategoryById.get(id) : undefined);
+    const totals = isFutureMonth
+      ? committedByCategoryForMonth(selectedMonth, invoicesForSpending, billsForCommitment, catOf)
+      : spendingByCategoryForMonth(selectedMonth, finance.transactions, invoicesForSpending, catOf);
     return [...totals.entries()]
       .filter(([, amountCents]) => amountCents > 0) // mês só de estorno pode zerar/inverter uma categoria
       .map(([catId, amountCents]) => {
@@ -187,7 +209,7 @@ export function SearchPage() {
         };
       })
       .sort((a, b) => b.amountCents - a.amountCents);
-  }, [finance.transactions, invoicesForSpending, txnCategoryById, categoryMap, categoryNames, selectedMonth]);
+  }, [finance.transactions, invoicesForSpending, billsForCommitment, isFutureMonth, txnCategoryById, categoryMap, categoryNames, selectedMonth]);
 
   const totalSpent = spendingByCategory.reduce((s, c) => s + c.amountCents, 0);
 
@@ -215,7 +237,8 @@ export function SearchPage() {
       ),
     [finance.transactions, invoicesForSpending, txnCategoryById, prevMonth]
   );
-  const variation = prevExpense > 0
+  // Comparação só faz sentido entre meses realizados; mês futuro é comprometido, não gasto.
+  const variation = !isFutureMonth && prevExpense > 0
     ? Math.round(((totalSpent - prevExpense) / prevExpense) * 100)
     : null;
 
@@ -300,7 +323,7 @@ export function SearchPage() {
           <ChevronLeft size={18} aria-hidden="true" />
         </button>
         <strong>{fullMonthLabel(selectedMonth)}</strong>
-        <button className="icon-button" type="button" aria-label="Próximo mês" disabled={isCurrentMonth} onClick={() => changeMonth(1)}>
+        <button className="icon-button" type="button" aria-label="Próximo mês" disabled={selectedMonth >= maxMonth} onClick={() => changeMonth(1)}>
           <ChevronRight size={18} aria-hidden="true" />
         </button>
       </div>
@@ -309,7 +332,7 @@ export function SearchPage() {
       <div className="metric-strip">
         <MetricCard
           accent
-          label="Gasto no mês"
+          label={isFutureMonth ? 'Já comprometido' : 'Gasto no mês'}
           value={totalSpent > 0 ? formatMoney(totalSpent) : 'R$ 0'}
         />
         <MetricCard
@@ -321,7 +344,7 @@ export function SearchPage() {
         <MetricCard
           label="vs. mês anterior"
           value={variation !== null ? `${variation > 0 ? '+' : ''}${variation}%` : '—'}
-          sub={variation !== null ? (variation > 0 ? 'gastou mais' : variation < 0 ? 'gastou menos' : 'igual') : 'sem dados'}
+          sub={isFutureMonth ? 'só em meses passados' : variation !== null ? (variation > 0 ? 'gastou mais' : variation < 0 ? 'gastou menos' : 'igual') : 'sem dados'}
           icon={
             variation === null ? undefined :
             variation > 0 ? <TrendingUp size={13} /> :
@@ -335,10 +358,16 @@ export function SearchPage() {
       <article className="surface surface-pad" style={{ marginTop: '0.75rem' }}>
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Por categoria</p>
+            <p className="eyebrow">{isFutureMonth ? 'Comprometido por categoria' : 'Por categoria'}</p>
             <h2>{monthTitle}</h2>
           </div>
         </div>
+
+        {isFutureMonth && (
+          <p className="text-secondary" style={{ margin: '0.1rem 0 0.75rem', fontSize: '0.86rem' }}>
+            Mês ainda não chegou — isto é o que você <strong>já assumiu</strong> pra esse mês (parcelas de cartão e contas a pagar), não gasto real.
+          </p>
+        )}
 
         {totalSpent > 0 ? (
           <>
@@ -464,8 +493,10 @@ export function SearchPage() {
           <EmptyState
             illustration="wallet"
             compact
-            title={isCurrentMonth ? 'Nenhum gasto neste mês' : `Nenhum gasto em ${monthTitle}`}
-            description="Assim que uma despesa desse mês for lançada, ela aparece aqui dividida por categoria."
+            title={isFutureMonth ? `Nada comprometido em ${monthTitle}` : isCurrentMonth ? 'Nenhum gasto neste mês' : `Nenhum gasto em ${monthTitle}`}
+            description={isFutureMonth
+              ? 'Sem parcelas de cartão ou contas a pagar previstas pra esse mês.'
+              : 'Assim que uma despesa desse mês for lançada, ela aparece aqui dividida por categoria.'}
           />
         )}
       </article>

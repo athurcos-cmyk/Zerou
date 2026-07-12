@@ -2,10 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { Timestamp } from 'firebase/firestore';
 import type { InvoiceLedgerEntry, Transaction } from '../types/contracts';
 import {
+  billsByCategoryForMonth,
+  committedByCategoryForMonth,
+  lastCommittedMonth,
   monthlyTotals,
   ongoingInstallmentPurchases,
   spendingByCategoryForMonth,
   NO_CATEGORY,
+  type BillForCommitment,
   type InvoiceForSpending
 } from './spendingAnalysis';
 
@@ -220,5 +224,72 @@ describe('ongoingInstallmentPurchases', () => {
       { referenceMonth: '2026-02', ledgerEntries: [entry({ id: 'p2', type: 'purchase', amountCents: 30000, sourceTransactionId: 'buy', installmentTotal: 2 })] }
     ];
     expect(ongoingInstallmentPurchases('2026-07', invoices, () => 'Antiga')).toHaveLength(0);
+  });
+});
+
+describe('billsByCategoryForMonth', () => {
+  const bills: BillForCommitment[] = [
+    { categoryId: 'moradia', amountCents: 150000, status: 'pending', dueMonth: '2026-09' },
+    { categoryId: 'moradia', amountCents: 20000, status: 'overdue', dueMonth: '2026-09' },
+    { categoryId: 'lazer', amountCents: 5000, status: 'paid', dueMonth: '2026-09' }, // paga não conta
+    { categoryId: 'moradia', amountCents: 99900, status: 'pending', dueMonth: '2026-10' } // outro mês
+  ];
+
+  it('soma só contas em aberto que vencem no mês, por categoria', () => {
+    const result = billsByCategoryForMonth('2026-09', bills);
+    expect(result.get('moradia')).toBe(170000); // 1500 pendente + 200 atrasada
+    expect(result.has('lazer')).toBe(false); // paga
+  });
+
+  it('conta sem categoria cai em NO_CATEGORY', () => {
+    const result = billsByCategoryForMonth('2026-09', [{ amountCents: 8000, status: 'pending', dueMonth: '2026-09' }]);
+    expect(result.get(NO_CATEGORY)).toBe(8000);
+  });
+});
+
+describe('committedByCategoryForMonth', () => {
+  it('junta parcela de cartão + conta a pagar do mês', () => {
+    const invoices: InvoiceForSpending[] = [
+      { referenceMonth: '2026-09', ledgerEntries: [entry({ id: 'p', type: 'purchase', amountCents: 30000, sourceTransactionId: 'buy', installmentTotal: 10 })] }
+    ];
+    const bills: BillForCommitment[] = [{ categoryId: 'moradia', amountCents: 150000, status: 'pending', dueMonth: '2026-09' }];
+    const result = committedByCategoryForMonth('2026-09', invoices, bills, (id) => (id === 'buy' ? 'compras' : undefined));
+    expect(result.get('compras')).toBe(30000);
+    expect(result.get('moradia')).toBe(150000);
+  });
+});
+
+describe('lastCommittedMonth', () => {
+  it('vai até o mês da parcela mais distante', () => {
+    const invoices: InvoiceForSpending[] = [
+      { referenceMonth: '2026-08', ledgerEntries: [entry({ id: 'p1', type: 'purchase', amountCents: 30000, sourceTransactionId: 'buy', installmentTotal: 3 })] },
+      { referenceMonth: '2027-01', ledgerEntries: [entry({ id: 'p2', type: 'purchase', amountCents: 30000, sourceTransactionId: 'buy', installmentTotal: 3 })] }
+    ];
+    expect(lastCommittedMonth('2026-07', invoices, [])).toBe('2027-01');
+  });
+
+  it('considera conta a pagar futura mais distante que a parcela', () => {
+    const invoices: InvoiceForSpending[] = [
+      { referenceMonth: '2026-08', ledgerEntries: [entry({ id: 'p1', type: 'purchase', amountCents: 30000, sourceTransactionId: 'buy', installmentTotal: 2 })] }
+    ];
+    const bills: BillForCommitment[] = [{ amountCents: 5000, status: 'pending', dueMonth: '2026-12' }];
+    expect(lastCommittedMonth('2026-07', invoices, bills)).toBe('2026-12');
+  });
+
+  it('sem nada comprometido à frente, fica no mês atual', () => {
+    const invoices: InvoiceForSpending[] = [
+      { referenceMonth: '2026-05', ledgerEntries: [entry({ id: 'p1', type: 'purchase', amountCents: 30000, sourceTransactionId: 'buy', installmentTotal: 2 })] }
+    ];
+    expect(lastCommittedMonth('2026-07', invoices, [])).toBe('2026-07');
+  });
+
+  it('ignora fatura futura sem cobrança líquida (toda antecipada)', () => {
+    const invoices: InvoiceForSpending[] = [
+      { referenceMonth: '2026-09', ledgerEntries: [
+        entry({ id: 'p', type: 'purchase', amountCents: 30000, sourceTransactionId: 'buy', installmentTotal: 3 }),
+        entry({ id: 'c', type: 'installment_anticipation_credit', amountCents: 30000, sourceTransactionId: 'buy' })
+      ] }
+    ];
+    expect(lastCommittedMonth('2026-07', invoices, [])).toBe('2026-07');
   });
 });

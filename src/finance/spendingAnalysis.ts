@@ -227,3 +227,73 @@ export function ongoingInstallmentPurchases(
 
   return result.sort((a, b) => b.remainingCents - a.remainingCents);
 }
+
+// ─── Projeção de meses futuros: o que já está COMPROMETIDO ────────────────────
+//
+// Num mês que ainda não chegou não existe "gasto realizado" — o que existe é o que a
+// pessoa já assumiu: parcela de cartão caindo naquele mês (dado real do ledger) e conta
+// a pagar vencendo naquele mês. NÃO projetamos recorrências aqui de propósito: elas
+// seriam estimativa (valor/cancelamento incertos), e misturar previsão especulativa com
+// obrigação real numa tela de Análise engana. Recorrência é uma camada "Previsto" à parte.
+
+/** Conta a pagar reduzida ao que a projeção precisa (o caller resolve o mês do vencimento). */
+export interface BillForCommitment {
+  categoryId?: string;
+  amountCents: number;
+  status: string;
+  dueMonth: string;
+}
+
+function isOpenBill(bill: BillForCommitment): boolean {
+  return bill.status === 'pending' || bill.status === 'overdue';
+}
+
+/** Contas a pagar em aberto (pendente/atrasada) que vencem no mês, por categoria. */
+export function billsByCategoryForMonth(month: string, bills: BillForCommitment[]): Map<string, number> {
+  const totals = new Map<string, number>();
+  for (const bill of bills) {
+    if (bill.dueMonth !== month || !isOpenBill(bill)) continue;
+    const key = bill.categoryId || NO_CATEGORY;
+    totals.set(key, (totals.get(key) ?? 0) + bill.amountCents);
+  }
+  return totals;
+}
+
+/**
+ * O que está comprometido num mês futuro, por categoria: parcelas de cartão que caem na
+ * fatura daquele mês + contas a pagar em aberto que vencem nele. Reaproveita
+ * `spendingByCategoryForMonth` pro cartão (que já lida com antecipação) e soma as contas.
+ */
+export function committedByCategoryForMonth(
+  month: string,
+  invoices: InvoiceForSpending[],
+  bills: BillForCommitment[],
+  categoryOfTransaction: (transactionId: string | undefined) => string | undefined
+): Map<string, number> {
+  // Sem transações: num mês futuro não há gasto realizado, só o comprometido.
+  const totals = spendingByCategoryForMonth(month, [], invoices, categoryOfTransaction);
+  for (const [categoryId, cents] of billsByCategoryForMonth(month, bills)) {
+    totals.set(categoryId, (totals.get(categoryId) ?? 0) + cents);
+  }
+  return totals;
+}
+
+/**
+ * Mês mais distante (>= currentMonth) que já tem algo comprometido — parcela de cartão
+ * caindo na fatura ou conta a pagar vencendo. Define até onde o avançar-mês vai na Análise;
+ * sem nada comprometido à frente, devolve o próprio mês atual (não navega pro futuro).
+ */
+export function lastCommittedMonth(
+  currentMonth: string,
+  invoices: InvoiceForSpending[],
+  bills: BillForCommitment[]
+): string {
+  let max = currentMonth;
+  for (const invoice of invoices) {
+    if (invoice.referenceMonth > max && invoiceRecognizedExpense(invoice) > 0) max = invoice.referenceMonth;
+  }
+  for (const bill of bills) {
+    if (bill.dueMonth > max && isOpenBill(bill)) max = bill.dueMonth;
+  }
+  return max;
+}

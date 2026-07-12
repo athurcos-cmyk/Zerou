@@ -2,6 +2,13 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-12 — feat: projeção de meses futuros na Análise (o que já está comprometido)
+
+- **Dá pra avançar pra meses futuros na Análise** e ver o que já está comprometido lá. O botão de avançar mês, que parava no mês atual, agora vai **até o último mês com parcela/conta comprometida** (`lastCommittedMonth`) — sem meses vazios sobrando no fim.
+- **Mês futuro mostra "Já comprometido", não "Gasto"**: num mês que ainda não chegou não existe gasto realizado, então a tela conta **parcelas de cartão caindo naquele mês + contas a pagar (bills) vencendo nele**, por categoria. Rótulos, legenda ("Mês ainda não chegou — isto é o que você já assumiu…") e empty state adaptados; "vs. mês anterior" some (comparação só entre meses realizados).
+- **Recorrências ficaram de fora de propósito** (decisão de produto): projetar recorrência mês a mês seria estimativa (valor/cancelamento incertos), e misturar previsão especulativa com obrigação real numa Análise engana. Cartão (ledger) e contas a pagar são dados reais já cadastrados. Recorrência pode virar uma camada "Previsto" separada depois.
+- Verificado ao vivo (conta de teste): ago/2026 = R$300 (parcela 2/10), out/2026 = R$625 (10x QA R$300 + Geladeira 1/12 R$200 + Óculos 8/10 R$125), avançar trava no último mês comprometido, console limpo. 236 testes (7 novos: `billsByCategoryForMonth`, `committedByCategoryForMonth`, `lastCommittedMonth`), typecheck, lint (abaixo da linha de base) e build limpos. Sem mudança de regra/dados.
+
 ## 2026-07-11 — feat: Análise em regime de caixa (por parcela) + compras parceladas em andamento
 
 - **A Análise deixou de jogar a compra parcelada inteira no mês da compra.** Uma compra de R$3.000 em 10x aparecia como R$3.000 num mês só (a tela somava a transação `card_purchase`, que guarda o valor cheio no mês da compra) e os outros 9 meses zerados. Agora o cartão entra pela **parcela que cai na fatura de cada mês** — R$300 em cada um dos 10 meses. Casa com o "Comprometido" do Dashboard (que já contava por fatura) e com o que "quanto gastei no mês" significa. Nova lógica isolada em `src/finance/spendingAnalysis.ts`, pura e testada (11 casos).
