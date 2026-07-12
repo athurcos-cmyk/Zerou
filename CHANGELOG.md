@@ -2,6 +2,13 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-12 — feat: logos de serviço (6 oficiais + 13 tiles de marca "ícone de app")
+
+- O dono trouxe os 19 logos que faltavam. **6 tinham símbolo quadrado** usável no tile de 36px → adicionados como SVG oficial: ChatGPT, Microsoft 365, Oi, Google One, Claro, Rappi.
+- Os outros **13 eram só wordmark** (logo horizontal, ilegível espremido no quadradinho). Em vez de usá-los assim, o `ServiceMark` agora desenha um **tile "ícone de app"**: quadrado na cor da marca com as iniciais em branco (Prime Video azul "PV", Disney+ marinho "D+", Wellhub laranja "WH"…). Cores em `serviceBrandColors` (`src/theme/palette.ts`, lugar sancionado pra literais); novo estado `.service-mark--brand`. `logoPath` tem prioridade — dá pra promover qualquer uma a logo de verdade depois, é só trazer o SVG quadrado.
+- Genéricos (Aluguel, Água, Energia…) seguem no tile de iniciais neutro — não são marcas.
+- Verificado ao vivo em tema claro **e escuro** (a borda sutil foi mantida de propósito pros tiles bem escuros — Disney marinho, Smart Fit quase preto — não sumirem na superfície dos temas dark). Procedência dos 6 SVGs em `public/service-logos/MANUAL_SOURCES.md`. 247 testes (incl. `noHardcodedColors`), typecheck, lint (linha de base) e build limpos.
+
 ## 2026-07-12 — feat: pagar recorrência adiantado (janela de dias antes do vencimento)
 
 - Dava pra registrar uma recorrência **só a partir do dia do vencimento** — quem paga a conta uns dias antes (conta do dia 10 paga no dia 7) ficava travado no "Em dia", sem ação. Agora, dentro de uma **janela de ~7 dias antes** do vencimento, aparece o botão **"Pagar adiantado"**; registrar ali lança o pagamento hoje e a recorrência avança pro próximo período normalmente.

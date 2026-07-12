@@ -1154,6 +1154,14 @@ span.service-mark {
   text-transform: uppercase;
 }
 
+/* Tile "ícone de app" pra marca que só tem wordmark: fundo na cor da marca (inline, do
+   `serviceBrandColors`) + iniciais brancas. `span.` pela mesma razão do `span.service-mark`
+   (vencer `.list-row span`). Mantém a borda sutil da base de propósito: sem ela, um tile
+   bem escuro (Disney marinho, Smart Fit quase preto) somiria na superfície dos temas dark. */
+span.service-mark--brand {
+  color: var(--accent-foreground);
+}
+
 .service-picker {
   display: grid;
   gap: 0.55rem;

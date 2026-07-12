@@ -35,3 +35,25 @@ export const defaultCategoryColors: Record<string, string> = {
   both_transfer: '#4A5568',
   both_adjustment: '#7C6F64'
 };
+
+/**
+ * Cor de marca para serviços cujo logo real é só um wordmark (ilegível espremido num tile
+ * de 36px). Em vez do wordmark, o `ServiceMark` desenha um tile "ícone de app": quadrado na
+ * cor da marca com as iniciais em branco (`ACCENT_FOREGROUND`). Tons escolhidos com contraste
+ * suficiente pra texto branco. Serviço com `logoPath` ignora isto (logo tem prioridade).
+ */
+export const serviceBrandColors: Record<string, string> = {
+  'prime-video': '#146EB4',
+  'disney-plus': '#0E1E4A',
+  globoplay: '#EC1D2E',
+  'xbox-game-pass': '#107C10',
+  'nintendo-switch-online': '#E60012',
+  wellhub: '#E8590C',
+  'smart-fit': '#1D1D1F',
+  adobe: '#EB1000',
+  canva: '#7D2AE8',
+  kindle: '#137A8E',
+  vivo: '#660099',
+  tim: '#004691',
+  sky: '#0057B8'
+};

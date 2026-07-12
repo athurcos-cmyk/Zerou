@@ -19,10 +19,11 @@ export interface SubscriptionService {
 /**
  * Catálogo de assinaturas e contas fixas comuns no Brasil.
  *
- * Nem toda marca tem `logoPath`: Prime Video, Disney+, Wellhub, Xbox, Microsoft 365,
- * Adobe, Canva, ChatGPT e Globoplay não existem no `simple-icons` (que remove marcas a
- * pedido do dono), e não há versão quadrada de fonte documentada. Elas mostram o tile de
- * iniciais — exatamente como os bancos sem SVG já fazem. Ver `public/service-logos/SOURCES.md`.
+ * Três níveis de marca (ver `ServiceMark`): `logoPath` (SVG oficial quadrado — Netflix,
+ * Spotify, ChatGPT, Microsoft 365, Oi...); tile "ícone de app" na cor da marca com iniciais
+ * brancas pra quem só tem wordmark, que fica ilegível espremido num tile de 36px (Prime Video,
+ * Disney+, Wellhub, Vivo... via `serviceBrandColors` em `theme/palette.ts`); e tile de iniciais
+ * neutro pros genéricos (Aluguel, Água, Energia). Ver `public/service-logos/SOURCES.md`.
  */
 export const subscriptionServices: SubscriptionService[] = [
   // ── Streaming de vídeo ──────────────────────────────────────────────────────
@@ -53,7 +54,7 @@ export const subscriptionServices: SubscriptionService[] = [
   // ── Comida e mobilidade ─────────────────────────────────────────────────────
   { id: 'ifood', name: 'iFood Clube', aliases: ['ifood'], initials: 'IF', suggestedCategoryId: 'expense_food', logoPath: '/service-logos/ifood.svg' },
   { id: 'uber-eats', name: 'Uber Eats', aliases: [], initials: 'UE', suggestedCategoryId: 'expense_food', logoPath: '/service-logos/uber-eats.svg' },
-  { id: 'rappi', name: 'Rappi Prime', aliases: ['rappi'], initials: 'RP', suggestedCategoryId: 'expense_food' },
+  { id: 'rappi', name: 'Rappi Prime', aliases: ['rappi'], initials: 'RP', suggestedCategoryId: 'expense_food', logoPath: '/service-logos/rappi.svg' },
   { id: 'uber-one', name: 'Uber One', aliases: ['uber'], initials: 'UB', suggestedCategoryId: 'expense_transport', logoPath: '/service-logos/uber-one.svg' },
 
   // ── Saúde e academia ────────────────────────────────────────────────────────
@@ -65,13 +66,13 @@ export const subscriptionServices: SubscriptionService[] = [
 
   // ── Nuvem, software e IA ────────────────────────────────────────────────────
   { id: 'icloud', name: 'iCloud+', aliases: ['icloud'], initials: 'IC', suggestedCategoryId: 'expense_leisure', logoPath: '/service-logos/icloud.svg' },
-  { id: 'google-one', name: 'Google One', aliases: ['google drive'], initials: 'G1', suggestedCategoryId: 'expense_leisure' },
+  { id: 'google-one', name: 'Google One', aliases: ['google drive'], initials: 'G1', suggestedCategoryId: 'expense_leisure', logoPath: '/service-logos/google-one.svg' },
   { id: 'dropbox', name: 'Dropbox', aliases: [], initials: 'DB', suggestedCategoryId: 'expense_leisure', logoPath: '/service-logos/dropbox.svg' },
   { id: 'notion', name: 'Notion', aliases: [], initials: 'NT', suggestedCategoryId: 'expense_leisure', logoPath: '/service-logos/notion.svg' },
-  { id: 'microsoft-365', name: 'Microsoft 365', aliases: ['office 365', 'office', 'microsoft'], initials: 'M3', suggestedCategoryId: 'expense_leisure' },
+  { id: 'microsoft-365', name: 'Microsoft 365', aliases: ['office 365', 'office', 'microsoft'], initials: 'M3', suggestedCategoryId: 'expense_leisure', logoPath: '/service-logos/microsoft-365.svg' },
   { id: 'adobe', name: 'Adobe Creative Cloud', aliases: ['adobe', 'photoshop'], initials: 'AD', suggestedCategoryId: 'expense_leisure' },
   { id: 'canva', name: 'Canva Pro', aliases: ['canva'], initials: 'CV', suggestedCategoryId: 'expense_leisure' },
-  { id: 'chatgpt', name: 'ChatGPT Plus', aliases: ['chatgpt', 'openai'], initials: 'AI', suggestedCategoryId: 'expense_leisure' },
+  { id: 'chatgpt', name: 'ChatGPT Plus', aliases: ['chatgpt', 'openai'], initials: 'AI', suggestedCategoryId: 'expense_leisure', logoPath: '/service-logos/chatgpt.svg' },
   { id: 'claude', name: 'Claude', aliases: ['anthropic'], initials: 'CD', suggestedCategoryId: 'expense_leisure', logoPath: '/service-logos/claude.svg' },
 
   // ── Educação e leitura ──────────────────────────────────────────────────────
@@ -83,10 +84,10 @@ export const subscriptionServices: SubscriptionService[] = [
   { id: 'escola', name: 'Escola / faculdade', aliases: ['mensalidade', 'colegio', 'faculdade'], initials: 'ES' },
 
   // ── Telecom ─────────────────────────────────────────────────────────────────
-  { id: 'claro', name: 'Claro', aliases: [], initials: 'CL', suggestedCategoryId: 'expense_home' },
+  { id: 'claro', name: 'Claro', aliases: [], initials: 'CL', suggestedCategoryId: 'expense_home', logoPath: '/service-logos/claro.svg' },
   { id: 'vivo', name: 'Vivo', aliases: [], initials: 'VV', suggestedCategoryId: 'expense_home' },
   { id: 'tim', name: 'TIM', aliases: [], initials: 'TM', suggestedCategoryId: 'expense_home' },
-  { id: 'oi', name: 'Oi', aliases: [], initials: 'OI', suggestedCategoryId: 'expense_home' },
+  { id: 'oi', name: 'Oi', aliases: [], initials: 'OI', suggestedCategoryId: 'expense_home', logoPath: '/service-logos/oi.svg' },
   { id: 'sky', name: 'Sky', aliases: [], initials: 'SK', suggestedCategoryId: 'expense_home' },
   { id: 'celular', name: 'Celular', aliases: ['telefone', 'plano de celular'], initials: 'CE', suggestedCategoryId: 'expense_home' },
   { id: 'internet', name: 'Internet', aliases: ['banda larga', 'fibra', 'wifi'], initials: 'IN', suggestedCategoryId: 'expense_home' },
