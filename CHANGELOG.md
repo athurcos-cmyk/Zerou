@@ -2,6 +2,12 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-12 — feat: "Próximos compromissos" clicável + filtro por cartão nas Transações
+
+- **As linhas de "Próximos compromissos" no Dashboard viraram clicáveis**: tocar numa **Fatura** abre a fatura do cartão (`/app/cards/:id/invoices/:invoiceId`), **conta a pagar** abre Compromissos, **recorrência** abre Recorrências. Antes eram só texto — dava pra ver o que vencia primeiro, mas não chegar lá. (`UpcomingCommitment` ganhou `cardId`; linhas usam o `.list-row--link` que já existia.)
+- **Filtro por cartão na tela de Transações**: um seletor "Cartão" (todos / cada cartão) mostra só as compras daquele cartão — além da visão por fatura que já existia. Combina com a busca e os chips de tipo.
+- Verificado ao vivo: clicar na Fatura no Dashboard abre a fatura certa; filtrar por "Cartão QA" some com as compras dos outros cartões. 247 testes, typecheck, lint (linha de base) e build limpos. Sem mudança de regra/dados.
+
 ## 2026-07-12 — feat: tour de boas-vindas em slides no primeiro acesso
 
 - Antes, quem criava conta caía direto no Dashboard sem ninguém explicar as features (o onboarding é só um questionário de configuração; o único explicador era o mini-tutorial do "Disponível"). Agora um **tour de boas-vindas em 6 slides** abre sozinho uma vez após o onboarding, apresentando os pilares: lançar tudo num lugar, cartões sem susto (parcelas), Compromissos × Recorrências, Disponível × Comprometido, e Metas/Casal/Análise. Com "Pular", "Voltar/Próximo", dots e "Começar".

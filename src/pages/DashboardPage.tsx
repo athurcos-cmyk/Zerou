@@ -269,18 +269,27 @@ export function DashboardPage() {
           </div>
           {dashboard.upcomingCommitments.length > 0 ? (
             <div className="item-list">
-              {dashboard.upcomingCommitments.map((commitment) => (
-                <div className="list-row" key={`${commitment.kind}-${commitment.id}`}>
-                  <div>
-                    <strong>{commitment.description}</strong>
-                    <span className="text-secondary">
-                      {commitment.kind === 'bill' ? 'Conta a pagar' : commitment.kind === 'invoice' ? 'Fatura' : 'Recorrência'} ·{' '}
-                      {formatFriendlyDate(commitment.dueAt)}
-                    </span>
-                  </div>
-                  <strong className="amount--expense">{formatMoney(commitment.amountCents)}</strong>
-                </div>
-              ))}
+              {dashboard.upcomingCommitments.map((commitment) => {
+                // Fatura leva pra fatura do cartão; conta a pagar pros Compromissos; recorrência pras Recorrências.
+                const href =
+                  commitment.kind === 'invoice' && commitment.cardId
+                    ? `/app/cards/${commitment.cardId}/invoices/${commitment.id}`
+                    : commitment.kind === 'recurring'
+                    ? '/app/recurring'
+                    : '/app/bills';
+                return (
+                  <Link className="list-row list-row--link" to={href} key={`${commitment.kind}-${commitment.id}`}>
+                    <div>
+                      <strong>{commitment.description}</strong>
+                      <span className="text-secondary">
+                        {commitment.kind === 'bill' ? 'Conta a pagar' : commitment.kind === 'invoice' ? 'Fatura' : 'Recorrência'} ·{' '}
+                        {formatFriendlyDate(commitment.dueAt)}
+                      </span>
+                    </div>
+                    <strong className="amount--expense">{formatMoney(commitment.amountCents)}</strong>
+                  </Link>
+                );
+              })}
             </div>
           ) : (
             <EmptyState

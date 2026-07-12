@@ -2,9 +2,10 @@ import { useMemo, useState } from 'react';
 import { Plus, Search, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
-import { useFinanceContext } from '../finance/FinanceDataContext';
+import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { EmptyState } from '../components/EmptyState';
 import { CategoryMark } from '../components/categoryIcons';
+import { SelectField } from '../components/SelectField';
 import { useConfirm } from '../components/ConfirmDialog';
 import { defaultCategoryColors } from '../theme/palette';
 import { formatFriendlyDate } from '../finance/financeDates';
@@ -17,11 +18,20 @@ export function TransactionsPage() {
   const { user, profile } = useAuth();
   const workspaceId = profile?.defaultWorkspaceId;
   const finance = useFinanceContext();
+  const cardsData = useCardsContext();
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense' | 'transfer'>('all');
+  const [cardFilter, setCardFilter] = useState('');
 
   const categoryMap = useMemo(() => new Map(finance.categories.map((c) => [c.id, c])), [finance.categories]);
+  const cardOptions = useMemo(
+    () => [
+      { value: '', label: 'Todos os cartões' },
+      ...cardsData.cards.map((card) => ({ value: card.id, label: card.name }))
+    ],
+    [cardsData.cards]
+  );
   const activeTransactions = useMemo(
     () => finance.transactions.filter((transaction) => !transaction.deletedAt),
     [finance.transactions]
@@ -31,6 +41,8 @@ export function TransactionsPage() {
   // Busca por nome, estabelecimento, tag e categoria — os campos que a pessoa lembra.
   const visibleTransactions = useMemo(() => {
     return activeTransactions.filter((t) => {
+      // Filtro por cartão: só as compras daquele cartão.
+      if (cardFilter && (t.type !== 'card_purchase' || t.cardId !== cardFilter)) return false;
       if (typeFilter === 'income' && t.type !== 'income') return false;
       if (typeFilter === 'expense' && t.type !== 'expense' && t.type !== 'card_purchase') return false;
       if (typeFilter === 'transfer' && t.type !== 'transfer') return false;
@@ -42,7 +54,7 @@ export function TransactionsPage() {
         .toLocaleLowerCase('pt-BR');
       return haystack.includes(normalizedQuery);
     });
-  }, [activeTransactions, typeFilter, normalizedQuery, categoryMap]);
+  }, [activeTransactions, cardFilter, typeFilter, normalizedQuery, categoryMap]);
 
   const typeChips: Array<{ key: typeof typeFilter; label: string }> = [
     { key: 'all', label: 'Tudo' },
@@ -108,6 +120,16 @@ export function TransactionsPage() {
               </button>
             ))}
           </div>
+          {cardsData.cards.length > 0 && (
+            <SelectField
+              label="Cartão"
+              value={cardFilter}
+              onChange={setCardFilter}
+              options={cardOptions}
+              sheetTitle="Filtrar por cartão"
+              sheetSubtitle="Ver só as compras de um cartão"
+            />
+          )}
         </div>
       )}
 

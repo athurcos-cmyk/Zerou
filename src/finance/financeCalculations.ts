@@ -14,6 +14,8 @@ export interface UpcomingCommitment {
   description: string;
   amountCents: number;
   dueAt: Date;
+  /** Só em `kind: 'invoice'` — pra linkar direto pra fatura do cartão no Dashboard. */
+  cardId?: string;
 }
 
 // De onde veio a data-limite usada pra decidir o que conta como "Comprometido" —
@@ -185,7 +187,8 @@ export function buildUpcomingCommitments(
           kind: 'invoice',
           description: `Fatura ${invoice.referenceMonth}`,
           amountCents: invoice.outstandingBalanceCents,
-          dueAt: toDate(invoice.dueDate)
+          dueAt: toDate(invoice.dueDate),
+          cardId: invoice.cardId
         }) satisfies UpcomingCommitment
     );
 
