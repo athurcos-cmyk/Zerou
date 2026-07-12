@@ -7,11 +7,40 @@ import {
   lastCommittedMonth,
   monthlyTotals,
   ongoingInstallmentPurchases,
+  projectedRecurringForMonth,
+  recurringByCategoryForMonth,
   spendingByCategoryForMonth,
   NO_CATEGORY,
   type BillForCommitment,
-  type InvoiceForSpending
+  type InvoiceForSpending,
+  type RecurringForProjection
 } from './spendingAnalysis';
+
+// Stepper espelhando `nextOccurrenceDate` de financeService (evita importar firebase no teste).
+function step(date: Date, frequency: 'weekly' | 'monthly' | 'yearly', anchorDay?: number): Date {
+  if (frequency === 'weekly') {
+    const next = new Date(date);
+    next.setDate(next.getDate() + 7);
+    return next;
+  }
+  const day = anchorDay ?? date.getDate();
+  const targetYear = frequency === 'yearly' ? date.getFullYear() + 1 : date.getFullYear();
+  const targetMonth = frequency === 'yearly' ? date.getMonth() : date.getMonth() + 1;
+  const daysInTarget = new Date(targetYear, targetMonth + 1, 0).getDate();
+  return new Date(targetYear, targetMonth, Math.min(day, daysInTarget));
+}
+
+function rule(overrides: Partial<RecurringForProjection> & Pick<RecurringForProjection, 'id' | 'nextOccurrenceAt'>): RecurringForProjection {
+  return {
+    description: 'Regra',
+    categoryId: undefined,
+    amountCents: 10000,
+    frequency: 'monthly',
+    anchorDay: overrides.nextOccurrenceAt.getDate(),
+    isActive: true,
+    ...overrides
+  };
+}
 
 function txn(overrides: Partial<Transaction> & Pick<Transaction, 'id'>): Transaction {
   return {
@@ -291,5 +320,51 @@ describe('lastCommittedMonth', () => {
       ] }
     ];
     expect(lastCommittedMonth('2026-07', invoices, [])).toBe('2026-07');
+  });
+});
+
+describe('projectedRecurringForMonth', () => {
+  it('recorrência mensal cai uma vez no mês futuro', () => {
+    const rules = [rule({ id: 'aluguel', description: 'Aluguel', categoryId: 'moradia', amountCents: 150000, nextOccurrenceAt: new Date(2026, 6, 5) })];
+    const set = projectedRecurringForMonth('2026-09', rules, step);
+    expect(set).toHaveLength(1);
+    expect(set[0]).toMatchObject({ id: 'aluguel', amountCents: 150000, categoryId: 'moradia' });
+  });
+
+  it('recorrência semanal soma as ocorrências do mês', () => {
+    // Toda quarta a partir de 01/07/2026; agosto/2026 tem quartas em 5,12,19,26 = 4 ocorrências.
+    const rules = [rule({ id: 'feira', amountCents: 8000, frequency: 'weekly', nextOccurrenceAt: new Date(2026, 6, 1) })];
+    const set = projectedRecurringForMonth('2026-08', rules, step);
+    expect(set[0].amountCents).toBe(32000);
+  });
+
+  it('recorrência anual só aparece no mês do aniversário', () => {
+    const rules = [rule({ id: 'seguro', amountCents: 60000, frequency: 'yearly', nextOccurrenceAt: new Date(2026, 2, 10), anchorDay: 10 })];
+    expect(projectedRecurringForMonth('2027-03', rules, step)[0].amountCents).toBe(60000);
+    expect(projectedRecurringForMonth('2027-04', rules, step)).toHaveLength(0);
+  });
+
+  it('ignora regra inativa ou sem valor', () => {
+    const rules = [
+      rule({ id: 'off', amountCents: 5000, isActive: false, nextOccurrenceAt: new Date(2026, 6, 5) }),
+      rule({ id: 'zero', amountCents: 0, nextOccurrenceAt: new Date(2026, 6, 5) })
+    ];
+    expect(projectedRecurringForMonth('2026-09', rules, step)).toHaveLength(0);
+  });
+
+  it('não conta recorrência que só começa depois do mês', () => {
+    const rules = [rule({ id: 'futura', amountCents: 5000, nextOccurrenceAt: new Date(2026, 10, 5) })]; // começa nov/2026
+    expect(projectedRecurringForMonth('2026-09', rules, step)).toHaveLength(0);
+  });
+
+  it('recurringByCategoryForMonth soma por categoria', () => {
+    const rules = [
+      rule({ id: 'a', categoryId: 'moradia', amountCents: 150000, nextOccurrenceAt: new Date(2026, 6, 5) }),
+      rule({ id: 'b', categoryId: 'moradia', amountCents: 20000, nextOccurrenceAt: new Date(2026, 6, 10) }),
+      rule({ id: 'c', amountCents: 4000, nextOccurrenceAt: new Date(2026, 6, 15) })
+    ];
+    const totals = recurringByCategoryForMonth('2026-09', rules, step);
+    expect(totals.get('moradia')).toBe(170000);
+    expect(totals.get(NO_CATEGORY)).toBe(4000);
   });
 });

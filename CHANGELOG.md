@@ -2,6 +2,13 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-12 — feat: camada "Previsto" na Análise (recorrências projetadas) + categoria de compra conferida
+
+- **Mês futuro agora mostra "Previsto"**, não só o comprometido: além das parcelas de cartão e contas a pagar (obrigação firme), soma as **recorrências projetadas** para aquele mês (aluguel, assinaturas…). O KPI vira "Previsto no mês", um terceiro card mostra "Recorrências ~R$", e uma seção **"Recorrências previstas"** lista cada regra — deixando claro o que é firme (comprometido) e o que é estimativa (recorrência, pode mudar se cancelar/ajustar).
+- **Projeção mês a mês** (`projectedRecurringForMonth`/`recurringByCategoryForMonth` em `spendingAnalysis.ts`): trata mensal (1×/mês), semanal (soma as ocorrências do mês) e anual (só no mês do aniversário), com o avançador de ocorrência (`nextOccurrenceDate`) injetado pra manter o módulo puro. O horizonte de navegação passou a ir até a última parcela/conta **ou** +12 meses quando há recorrência ativa (recorrência é "infinita", precisa de teto).
+- **Categoria conferida ao vivo, nos dois caminhos** (dúvida do dono): compra no cartão com categoria mostra a fatia certa no donut (parcela → transação-mãe → categoria: "Alimentação R$200"), e recorrência idem ("Casa R$1.500"). Antes a conta de teste tinha tudo sem categoria, então parecia "Sem categoria 100%".
+- Verificado ao vivo: ago/2026 = R$2.000 previsto (R$300 parcela + R$1.500 recorrência + R$200 compra categorizada), donut com 3 fatias, seção de recorrências e console limpo. 242 testes (6 novos de projeção de recorrência), typecheck, lint (abaixo da linha de base) e build limpos. Sem mudança de regra/dados.
+
 ## 2026-07-12 — feat: projeção de meses futuros na Análise (o que já está comprometido)
 
 - **Dá pra avançar pra meses futuros na Análise** e ver o que já está comprometido lá. O botão de avançar mês, que parava no mês atual, agora vai **até o último mês com parcela/conta comprometida** (`lastCommittedMonth`) — sem meses vazios sobrando no fim.

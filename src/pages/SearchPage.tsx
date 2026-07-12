@@ -9,6 +9,7 @@ import { BottomSheet } from '../components/BottomSheet';
 import { EmptyState } from '../components/EmptyState';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { formatFriendlyDate, toDate } from '../finance/financeDates';
+import { nextOccurrenceDate } from '../finance/financeService';
 import { billStatusLabels, transactionTypeLabels } from '../finance/financeLabels';
 import { formatMoney } from '../finance/money';
 import {
@@ -16,10 +17,13 @@ import {
   lastCommittedMonth,
   monthlyTotals,
   ongoingInstallmentPurchases,
+  projectedRecurringForMonth,
+  recurringByCategoryForMonth,
   spendingByCategoryForMonth,
   NO_CATEGORY,
   type BillForCommitment,
-  type InvoiceForSpending
+  type InvoiceForSpending,
+  type RecurringForProjection
 } from '../finance/spendingAnalysis';
 import { categoryColors, defaultCategoryColor, defaultCategoryColors } from '../theme/palette';
 
@@ -170,11 +174,32 @@ export function SearchPage() {
       }),
     [finance.bills]
   );
-  // Até onde a navegação pra frente pode ir: último mês com parcela/conta comprometida.
-  const maxMonth = useMemo(
-    () => lastCommittedMonth(currentMonth, invoicesForSpending, billsForCommitment),
-    [currentMonth, invoicesForSpending, billsForCommitment]
+  // Recorrências (sempre despesa) reduzidas ao que a projeção precisa.
+  const rulesForProjection = useMemo<RecurringForProjection[]>(
+    () =>
+      finance.recurringRules.map((r) => ({
+        id: r.id,
+        description: r.description,
+        categoryId: r.categoryId,
+        amountCents: r.amountCents ?? 0,
+        frequency: r.frequency,
+        nextOccurrenceAt: toDate(r.nextOccurrenceAt),
+        anchorDay: r.anchorDay,
+        isActive: r.isActive
+      })),
+    [finance.recurringRules]
   );
+  const hasProjectableRecurring = useMemo(
+    () => rulesForProjection.some((r) => r.isActive && r.amountCents > 0),
+    [rulesForProjection]
+  );
+  // Até onde a navegação pra frente pode ir: última parcela/conta comprometida, ou — se há
+  // recorrência ativa — pelo menos 12 meses à frente (recorrência é "infinita", precisa de teto).
+  const maxMonth = useMemo(() => {
+    const committed = lastCommittedMonth(currentMonth, invoicesForSpending, billsForCommitment);
+    const recurringHorizon = hasProjectableRecurring ? shiftMonth(currentMonth, 12) : currentMonth;
+    return recurringHorizon > committed ? recurringHorizon : committed;
+  }, [currentMonth, invoicesForSpending, billsForCommitment, hasProjectableRecurring]);
   const isFutureMonth = selectedMonth > currentMonth;
 
   // Arriving from the Dashboard's "Buscar" shortcut opens straight into search.
@@ -191,12 +216,19 @@ export function SearchPage() {
   const categoryNames = useMemo(() => new Map(finance.categories.map((c) => [c.id, c.name])), [finance.categories]);
 
   // ── gastos do mês selecionado por categoria (regime de caixa: por parcela) ──
-  // Mês futuro não tem gasto realizado — mostra o que já está COMPROMETIDO (parcela + conta).
+  // Mês futuro não tem gasto realizado — mostra o PREVISTO: comprometido (parcela + conta) +
+  // recorrências projetadas (estimativa). Mês atual/passado usa o gasto realizado.
   const spendingByCategory = useMemo(() => {
     const catOf = (id?: string) => (id ? txnCategoryById.get(id) : undefined);
-    const totals = isFutureMonth
-      ? committedByCategoryForMonth(selectedMonth, invoicesForSpending, billsForCommitment, catOf)
-      : spendingByCategoryForMonth(selectedMonth, finance.transactions, invoicesForSpending, catOf);
+    let totals: Map<string, number>;
+    if (isFutureMonth) {
+      totals = committedByCategoryForMonth(selectedMonth, invoicesForSpending, billsForCommitment, catOf);
+      for (const [cat, cents] of recurringByCategoryForMonth(selectedMonth, rulesForProjection, nextOccurrenceDate)) {
+        totals.set(cat, (totals.get(cat) ?? 0) + cents);
+      }
+    } else {
+      totals = spendingByCategoryForMonth(selectedMonth, finance.transactions, invoicesForSpending, catOf);
+    }
     return [...totals.entries()]
       .filter(([, amountCents]) => amountCents > 0) // mês só de estorno pode zerar/inverter uma categoria
       .map(([catId, amountCents]) => {
@@ -209,9 +241,16 @@ export function SearchPage() {
         };
       })
       .sort((a, b) => b.amountCents - a.amountCents);
-  }, [finance.transactions, invoicesForSpending, billsForCommitment, isFutureMonth, txnCategoryById, categoryMap, categoryNames, selectedMonth]);
+  }, [finance.transactions, invoicesForSpending, billsForCommitment, rulesForProjection, isFutureMonth, txnCategoryById, categoryMap, categoryNames, selectedMonth]);
 
   const totalSpent = spendingByCategory.reduce((s, c) => s + c.amountCents, 0);
+
+  // ── recorrências previstas do mês futuro (a parte "estimativa" do previsto) ──
+  const recurringProjected = useMemo(
+    () => (isFutureMonth ? projectedRecurringForMonth(selectedMonth, rulesForProjection, nextOccurrenceDate) : []),
+    [isFutureMonth, selectedMonth, rulesForProjection]
+  );
+  const recurringTotalCents = recurringProjected.reduce((s, r) => s + r.amountCents, 0);
 
   // ── histórico mensal (últimos 6 meses reais — não acompanha selectedMonth) ─
   const monthlyData = useMemo(
@@ -332,7 +371,7 @@ export function SearchPage() {
       <div className="metric-strip">
         <MetricCard
           accent
-          label={isFutureMonth ? 'Já comprometido' : 'Gasto no mês'}
+          label={isFutureMonth ? 'Previsto no mês' : 'Gasto no mês'}
           value={totalSpent > 0 ? formatMoney(totalSpent) : 'R$ 0'}
         />
         <MetricCard
@@ -341,31 +380,39 @@ export function SearchPage() {
           value={topCat?.name ?? '—'}
           sub={topCat ? formatMoney(topCat.amountCents) : undefined}
         />
-        <MetricCard
-          label="vs. mês anterior"
-          value={variation !== null ? `${variation > 0 ? '+' : ''}${variation}%` : '—'}
-          sub={isFutureMonth ? 'só em meses passados' : variation !== null ? (variation > 0 ? 'gastou mais' : variation < 0 ? 'gastou menos' : 'igual') : 'sem dados'}
-          icon={
-            variation === null ? undefined :
-            variation > 0 ? <TrendingUp size={13} /> :
-            variation < 0 ? <TrendingDown size={13} /> :
-            <Minus size={13} />
-          }
-        />
+        {isFutureMonth ? (
+          <MetricCard
+            label="Recorrências"
+            value={recurringTotalCents > 0 ? `~${formatMoney(recurringTotalCents)}` : 'R$ 0'}
+            sub="estimativa do mês"
+          />
+        ) : (
+          <MetricCard
+            label="vs. mês anterior"
+            value={variation !== null ? `${variation > 0 ? '+' : ''}${variation}%` : '—'}
+            sub={variation !== null ? (variation > 0 ? 'gastou mais' : variation < 0 ? 'gastou menos' : 'igual') : 'sem dados'}
+            icon={
+              variation === null ? undefined :
+              variation > 0 ? <TrendingUp size={13} /> :
+              variation < 0 ? <TrendingDown size={13} /> :
+              <Minus size={13} />
+            }
+          />
+        )}
       </div>
 
       {/* ── Donut + legenda ─────────────────────────────────────────────────── */}
       <article className="surface surface-pad" style={{ marginTop: '0.75rem' }}>
         <div className="section-heading">
           <div>
-            <p className="eyebrow">{isFutureMonth ? 'Comprometido por categoria' : 'Por categoria'}</p>
+            <p className="eyebrow">{isFutureMonth ? 'Previsto por categoria' : 'Por categoria'}</p>
             <h2>{monthTitle}</h2>
           </div>
         </div>
 
         {isFutureMonth && (
           <p className="text-secondary" style={{ margin: '0.1rem 0 0.75rem', fontSize: '0.86rem' }}>
-            Mês ainda não chegou — isto é o que você <strong>já assumiu</strong> pra esse mês (parcelas de cartão e contas a pagar), não gasto real.
+            Mês ainda não chegou — é uma previsão: parcelas de cartão e contas a pagar (<strong>já comprometidas</strong>) mais recorrências (<strong>estimativa</strong>).
           </p>
         )}
 
@@ -493,13 +540,39 @@ export function SearchPage() {
           <EmptyState
             illustration="wallet"
             compact
-            title={isFutureMonth ? `Nada comprometido em ${monthTitle}` : isCurrentMonth ? 'Nenhum gasto neste mês' : `Nenhum gasto em ${monthTitle}`}
+            title={isFutureMonth ? `Nada previsto em ${monthTitle}` : isCurrentMonth ? 'Nenhum gasto neste mês' : `Nenhum gasto em ${monthTitle}`}
             description={isFutureMonth
-              ? 'Sem parcelas de cartão ou contas a pagar previstas pra esse mês.'
+              ? 'Sem parcelas de cartão, contas a pagar ou recorrências previstas pra esse mês.'
               : 'Assim que uma despesa desse mês for lançada, ela aparece aqui dividida por categoria.'}
           />
         )}
       </article>
+
+      {/* ── Recorrências previstas (só no mês futuro) ──────────────────────── */}
+      {isFutureMonth && recurringProjected.length > 0 && (
+        <article className="surface surface-pad" style={{ marginTop: '0.75rem' }}>
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Recorrências previstas</p>
+              <h2>{monthTitle}</h2>
+            </div>
+          </div>
+          <p className="text-secondary" style={{ margin: '0.1rem 0 1rem', fontSize: '0.86rem' }}>
+            Estimativa pelas suas recorrências ativas — pode mudar se você cancelar ou ajustar alguma.
+          </p>
+          <div className="item-list">
+            {recurringProjected.map((r) => (
+              <div className="list-row" key={r.id}>
+                <div>
+                  <strong>{r.description}</strong>
+                  <span className="text-secondary">{r.categoryId ? (categoryNames.get(r.categoryId) ?? 'Sem categoria') : 'Sem categoria'}</span>
+                </div>
+                <strong>{formatMoney(r.amountCents)}</strong>
+              </div>
+            ))}
+          </div>
+        </article>
+      )}
 
       {/* ── Compras parceladas em andamento ────────────────────────────────── */}
       {ongoing.length > 0 && (

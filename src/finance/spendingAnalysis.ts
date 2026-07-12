@@ -297,3 +297,86 @@ export function lastCommittedMonth(
   }
   return max;
 }
+
+// ─── Camada "Previsto": recorrências projetadas ───────────────────────────────
+//
+// Separada do "comprometido" (cartão + contas), que é obrigação real já cadastrada.
+// Recorrência é sempre despesa (recordRecurringPayment cria type:'expense') e é uma
+// ESTIMATIVA pro futuro (valor/continuidade incertos) — por isso entra rotulada como
+// previsão, não como dado firme. Só faz sentido pra meses futuros: no mês corrente e nos
+// passados a Análise usa transações reais, e projetar duplicaria o que a automação lançou.
+
+type Frequency = 'weekly' | 'monthly' | 'yearly';
+
+/** Regra de recorrência reduzida ao que a projeção precisa (nextOccurrenceAt já como Date). */
+export interface RecurringForProjection {
+  id: string;
+  description: string;
+  categoryId?: string;
+  amountCents: number;
+  frequency: Frequency;
+  nextOccurrenceAt: Date;
+  anchorDay?: number;
+  isActive: boolean;
+}
+
+/** Uma recorrência projetada num mês, com o total do mês (soma das ocorrências). */
+export interface ProjectedRecurring {
+  id: string;
+  description: string;
+  categoryId?: string;
+  amountCents: number;
+}
+
+/** Passos máximos ao avançar ocorrências — trava contra loop infinito (semanal por décadas). */
+const RECURRING_STEP_CAP = 600;
+
+function monthKeyOf(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/**
+ * Recorrências (despesa) que caem num mês, com o total do mês por regra. `step` é o
+ * avançador de ocorrência injetado (`nextOccurrenceDate` de financeService) — passado por
+ * parâmetro pra manter este módulo puro e sem dependência de firebase.
+ */
+export function projectedRecurringForMonth(
+  month: string,
+  rules: RecurringForProjection[],
+  step: (date: Date, frequency: Frequency, anchorDay?: number) => Date
+): ProjectedRecurring[] {
+  const result: ProjectedRecurring[] = [];
+  for (const rule of rules) {
+    if (!rule.isActive || rule.amountCents <= 0) continue;
+    let occ = rule.nextOccurrenceAt;
+    let guard = 0;
+    while (monthKeyOf(occ) < month && guard < RECURRING_STEP_CAP) {
+      occ = step(occ, rule.frequency, rule.anchorDay);
+      guard += 1;
+    }
+    let amountCents = 0;
+    while (monthKeyOf(occ) === month && guard < RECURRING_STEP_CAP) {
+      amountCents += rule.amountCents;
+      occ = step(occ, rule.frequency, rule.anchorDay);
+      guard += 1;
+    }
+    if (amountCents > 0) {
+      result.push({ id: rule.id, description: rule.description, categoryId: rule.categoryId, amountCents });
+    }
+  }
+  return result.sort((a, b) => b.amountCents - a.amountCents);
+}
+
+/** Recorrências projetadas de um mês somadas por categoria (pra entrar no donut do previsto). */
+export function recurringByCategoryForMonth(
+  month: string,
+  rules: RecurringForProjection[],
+  step: (date: Date, frequency: Frequency, anchorDay?: number) => Date
+): Map<string, number> {
+  const totals = new Map<string, number>();
+  for (const item of projectedRecurringForMonth(month, rules, step)) {
+    const key = item.categoryId || NO_CATEGORY;
+    totals.set(key, (totals.get(key) ?? 0) + item.amountCents);
+  }
+  return totals;
+}
