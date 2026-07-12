@@ -2,6 +2,12 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-12 — feat: busca direta na tela de Transações
+
+- A tela de Transações (o extrato) ganhou uma **barra de busca sempre visível** no topo + **chips de filtro por tipo** (Tudo / Despesas / Receitas / Transferências). A busca por texto filtra a lista **ao vivo** por **nome, categoria, tag e estabelecimento** — os campos que a pessoa lembra. "Despesas" inclui compras no cartão. Empty state próprio quando o filtro/busca não acha nada ("Nenhum resultado"), distinto do "nenhuma transação ainda".
+- Antes só existia busca na Análise, escondida atrás de um ícone (BottomSheet). Aqui é inline, no lugar mais natural pra achar um lançamento. Reaproveita `.input-with-icon` e `.chip`/`.chip--active` (nova `.transactions-filter` só pra espaçar).
+- Verificado ao vivo: buscar "eletr" acha o Notebook pela **categoria** (não está no nome), "mercado" acha pelo nome, texto sem match mostra "Nenhum resultado", e o chip "Receitas" esvazia a lista de despesas (com destaque no chip). Typecheck, 242 testes, lint (linha de base) e build limpos.
+
 ## 2026-07-12 — fix: iniciais do selo de serviço encostadas à esquerda (Recorrências/Compromissos)
 
 - O tile de iniciais/ícone (`ServiceMark`) nas listas de Recorrências e Compromissos mostrava as letras coladas no canto esquerdo do quadrado, em vez de centralizadas. Causa: `.service-mark` usa `display: inline-grid; place-items: center`, mas a regra genérica `.list-row span { display: block }` (que empilha o texto das linhas) tem especificidade maior e derrubava a grade. Corrigido subindo o seletor para `span.service-mark` — exatamente o mesmo padrão do `span.category-mark`. É o **segundo** caso real desse bug de especificidade em tiles dentro de `.list-row`. Verificado ao vivo (o "EN" de Energia elétrica agora centralizado, folgas iguais nos 4 lados). Só CSS; 242 testes e build limpos.

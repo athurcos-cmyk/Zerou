@@ -1,4 +1,5 @@
-import { Plus, Trash2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Plus, Search, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useFinanceContext } from '../finance/FinanceDataContext';
@@ -17,8 +18,38 @@ export function TransactionsPage() {
   const workspaceId = profile?.defaultWorkspaceId;
   const finance = useFinanceContext();
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const visibleTransactions = finance.transactions.filter((transaction) => !transaction.deletedAt);
-  const categoryMap = new Map(finance.categories.map((c) => [c.id, c]));
+  const [query, setQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense' | 'transfer'>('all');
+
+  const categoryMap = useMemo(() => new Map(finance.categories.map((c) => [c.id, c])), [finance.categories]);
+  const activeTransactions = useMemo(
+    () => finance.transactions.filter((transaction) => !transaction.deletedAt),
+    [finance.transactions]
+  );
+
+  const normalizedQuery = query.trim().toLocaleLowerCase('pt-BR');
+  // Busca por nome, estabelecimento, tag e categoria — os campos que a pessoa lembra.
+  const visibleTransactions = useMemo(() => {
+    return activeTransactions.filter((t) => {
+      if (typeFilter === 'income' && t.type !== 'income') return false;
+      if (typeFilter === 'expense' && t.type !== 'expense' && t.type !== 'card_purchase') return false;
+      if (typeFilter === 'transfer' && t.type !== 'transfer') return false;
+      if (!normalizedQuery) return true;
+      const categoryName = t.categoryId ? (categoryMap.get(t.categoryId)?.name ?? '') : '';
+      const haystack = [t.description, t.merchant, t.tags?.join(' '), categoryName]
+        .filter(Boolean)
+        .join(' ')
+        .toLocaleLowerCase('pt-BR');
+      return haystack.includes(normalizedQuery);
+    });
+  }, [activeTransactions, typeFilter, normalizedQuery, categoryMap]);
+
+  const typeChips: Array<{ key: typeof typeFilter; label: string }> = [
+    { key: 'all', label: 'Tudo' },
+    { key: 'expense', label: 'Despesas' },
+    { key: 'income', label: 'Receitas' },
+    { key: 'transfer', label: 'Transferências' }
+  ];
 
   async function handleDelete(transactionId: string, isCardPurchase: boolean) {
     if (!workspaceId || !user) {
@@ -53,8 +84,53 @@ export function TransactionsPage() {
         </Link>
       </div>
 
+      {activeTransactions.length > 0 && (
+        <div className="transactions-filter">
+          <div className="input-with-icon">
+            <Search size={17} aria-hidden="true" />
+            <input
+              className="input"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Buscar por nome, categoria, tag, estabelecimento…"
+              aria-label="Buscar transações"
+            />
+          </div>
+          <div className="chip-row">
+            {typeChips.map((chip) => (
+              <button
+                key={chip.key}
+                type="button"
+                className={`chip${typeFilter === chip.key ? ' chip--active' : ''}`}
+                onClick={() => setTypeFilter(chip.key)}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <article className="surface surface-pad">
-        {visibleTransactions.length > 0 ? (
+        {activeTransactions.length === 0 ? (
+          <EmptyState
+            illustration="transactions"
+            title="Nenhuma transação registrada"
+            description="Seus lançamentos de entradas, gastos e transferências aparecem aqui."
+            action={
+              <Link className="button button--primary button--compact" to="/app/transactions/new">
+                <Plus size={16} aria-hidden="true" /> Cadastrar primeira
+              </Link>
+            }
+          />
+        ) : visibleTransactions.length === 0 ? (
+          <EmptyState
+            illustration="transactions"
+            compact
+            title="Nenhum resultado"
+            description={normalizedQuery ? `Nada encontrado para "${query.trim()}".` : 'Nenhuma transação nesse filtro.'}
+          />
+        ) : (
           <div className="item-list">
             {visibleTransactions.map((transaction) => {
               const isIncome = transaction.type === 'income';
@@ -98,17 +174,6 @@ export function TransactionsPage() {
               );
             })}
           </div>
-        ) : (
-          <EmptyState
-            illustration="transactions"
-            title="Nenhuma transação registrada"
-            description="Seus lançamentos de entradas, gastos e transferências aparecem aqui."
-            action={
-              <Link className="button button--primary button--compact" to="/app/transactions/new">
-                <Plus size={16} aria-hidden="true" /> Cadastrar primeira
-              </Link>
-            }
-          />
         )}
       </article>
       {confirmDialog}

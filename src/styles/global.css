@@ -2992,6 +2992,13 @@ span.service-mark {
   cursor: pointer;
 }
 
+/* Barra de busca + filtros da tela de Transações. */
+.transactions-filter {
+  display: grid;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
 /* --- Select field row (opens a bottom sheet) --- */
 .select-row {
   display: flex;
