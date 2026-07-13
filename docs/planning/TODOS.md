@@ -15,6 +15,14 @@ Itens acionáveis. Fechou? Mova para "Concluído" ou remova. Detalhe histórico 
 - [ ] Emails oficiais de suporte/privacidade.
 - [ ] `recordRecurringPayment` (`financeService.ts`) usa `opts.accountId || rule.accountId` — mesmo padrão que foi corrigido pra `??` em `payBill` (2026-07-12, ver `docs/CORRECAO_BUGS_2026-07-12.md`), mas o gêmeo ficou pra trás. Inofensivo hoje (único caller já normaliza `''` pra `undefined`); trocar por `??` quando mexer nessa função de novo.
 
+### Lançamento via WhatsApp (Fase 2 — pendente)
+- [ ] Arthur criar conta no Meta for Developers / WhatsApp Business e configurar secrets (`WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`).
+- [ ] Implementar vínculo de conta WhatsApp ↔ workspace (`linkAccount.ts`, `WhatsappLinkSection.tsx`, novas coleções + regras).
+- [ ] Webhook de recebimento (`webhookHandler.ts` — validação de assinatura HMAC-SHA256, responder 200 rápido).
+- [ ] Extração de gasto via DeepSeek + criação de transação server-side (`extractExpense.ts`, `createTransactionFromMessage.ts`).
+- [ ] Resposta de confirmação via Meta Send API.
+- [ ] Teste manual E2E: mandar msg real, criar transação, conferir no app.
+
 ### Automação server-side (futuro — exige worker/Functions)
 - [ ] Fechar fatura automaticamente, gerar recorrências e lembretes sem depender do app aberto. Decidir entre Cloud Run (perto do Firestore) e Railway. Hoje só roda quando o usuário abre o app.
 

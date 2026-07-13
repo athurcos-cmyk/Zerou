@@ -4,6 +4,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   BarChart2,
   Banknote,
+  Bot,
   CalendarClock,
   HelpCircle,
   Home,
@@ -97,6 +98,9 @@ export function AppShell() {
           <NavLink className={getNavClass} to="/app/shared">
             <Users size={19} aria-hidden="true" /> Compartilhado
           </NavLink>
+          <NavLink className={getNavClass} to="/app/assistant">
+            <Bot size={19} aria-hidden="true" /> Assistente
+          </NavLink>
           <p className="eyebrow" style={{ margin: '0.75rem 0 0.15rem 0.6rem' }}>Conta</p>
           <NavLink className={getNavClass} to="/app/settings/payday">
             <Banknote size={19} aria-hidden="true" /> Recebimento
@@ -163,6 +167,9 @@ export function AppShell() {
               </NavLink>
               <NavLink className={getNavClass} to="/app/search" onClick={() => setMobileMenuOpen(false)}>
                 <BarChart2 size={19} aria-hidden="true" /> Análise
+              </NavLink>
+              <NavLink className={getNavClass} to="/app/assistant" onClick={() => setMobileMenuOpen(false)}>
+                <Bot size={19} aria-hidden="true" /> Assistente
               </NavLink>
               <p className="eyebrow" style={{ gridColumn: '1 / -1', margin: '0.5rem 0 0' }}>Conta</p>
               <NavLink className={getNavClass} to="/app/settings/payday" onClick={() => setMobileMenuOpen(false)}>

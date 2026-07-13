@@ -10,6 +10,7 @@ import { ThemeRuntime } from './theme/ThemeRuntime';
 import { AppShell } from './layout/AppShell';
 import { ScrollToTop } from './layout/ScrollToTop';
 import { AppearanceSettingsPage } from './settings/AppearanceSettingsPage';
+import { AssistantPage } from './pages/AssistantPage';
 import { AccountsPage } from './pages/AccountsPage';
 import { BillsPage } from './pages/BillsPage';
 import { CardDetailPage } from './pages/CardDetailPage';
@@ -90,6 +91,7 @@ export function App() {
                 <Route path="recurring" element={<RecurringPage />} />
                 <Route path="search" element={<SearchPage />} />
                 <Route path="shared" element={<SharedSpacePage />} />
+                <Route path="assistant" element={<AssistantPage />} />
                 <Route path="settings/appearance" element={<AppearanceSettingsPage />} />
                 <Route path="settings/billing" element={<Navigate to="/app/settings/appearance" replace />} />
                 <Route path="settings/payday" element={<PaydaySettingsPage />} />

@@ -13,6 +13,9 @@ import { safeReturnUrl } from './billing/urlSafety.js';
 // ─── Automação server-side ────────────────────────────────────────────────────
 export { closeInvoicesDue, generateRecurrences, sendDueReminders, sendDailyLogReminder } from './automation.js';
 
+// ─── Assistente de IA ─────────────────────────────────────────────────────────
+export { financialAssistantChat } from './ai/financialAssistant.js';
+
 // ─── Admin ────────────────────────────────────────────────────────────────────
 // adminDeleteUser NÃO fica aqui — vive isolado em functions-admin/ (codebase
 // "admin"), sem dependência do Stripe, pra poder deployar independente do
