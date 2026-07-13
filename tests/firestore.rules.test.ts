@@ -1236,6 +1236,36 @@ describe('firestore security rules', () => {
     );
   });
 
+  // Regressão: uma versão anterior de `createOrUpdateBudget` (financeService.ts) chamava
+  // setDoc() com o payload INTEIRO (incluindo createdAt: serverTimestamp()) tanto na
+  // criação quanto numa edição posterior. Como validBudgetUpdate exige createdAt igual
+  // ao do documento existente, a segunda chamada era rejeitada pelo servidor sempre —
+  // silenciosamente, por causa do fire-and-forget (mesmo padrão dos incidentes descritos
+  // no CLAUDE.md). Corrigido separando `createBudget` (setDoc, só na criação) de
+  // `updateBudgetLimit` (updateDoc parcial, só limitCents/isActive/updatedAt). Este teste
+  // documenta que reenviar createdAt/createdBy num setDoc sobre um budget já existente
+  // deve continuar sendo rejeitado — se algum dia voltar a um único setDoc "createOrUpdate",
+  // este teste falha e avisa antes de ir pra produção.
+  it('rejects a setDoc that resends createdAt on an existing budget (regression)', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(
+      setDoc(doc(aliceDb, 'workspaces/workspaceA/categories/budgetCat2'), categoryPayload('workspaceA', 'budgetCat2', 'alice'))
+    );
+    const budgetRef = doc(aliceDb, 'workspaces/workspaceA/budgets/budgetCat2');
+    await assertSucceeds(setDoc(budgetRef, budgetPayload('workspaceA', 'budgetCat2', 'alice')));
+
+    // Um segundo setDoc completo (createdAt novo via serverTimestamp()) sobre um budget
+    // que já existe precisa falhar — é exatamente o payload que causava o bug real.
+    await assertFails(
+      setDoc(budgetRef, budgetPayload('workspaceA', 'budgetCat2', 'alice', { limitCents: 70000 }))
+    );
+    // A forma correta de editar (updateBudgetLimit): updateDoc parcial, sem createdAt.
+    await assertSucceeds(updateDoc(budgetRef, { limitCents: 70000, isActive: true, updatedAt: serverTimestamp() }));
+    // deleteBudget: remoção completa do documento.
+    await assertSucceeds(deleteDoc(budgetRef));
+  });
+
   it('allows an owner to create a couple workspace atomically', async () => {
     const aliceDb = testEnv.authenticatedContext('alice').firestore();
 

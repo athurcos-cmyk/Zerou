@@ -562,7 +562,13 @@ export function subscribeGoals(
 
 // ─── Budgets ───────────────────────────────────────────────────────────────────
 
-export function createOrUpdateBudget(
+/**
+ * Só para o PRIMEIRO valor de um orçamento (o documento ainda não existe). Reenviar
+ * `createdAt`/`createdBy` numa edição posterior faria `validBudgetUpdate` rejeitar a
+ * escrita (`createdAt` precisa ficar igual ao do documento existente) — por isso
+ * criar e editar são funções separadas, igual `createCategory`/`updateCategory`.
+ */
+export function createBudget(
   workspaceId: string,
   userId: string,
   categoryId: string,
@@ -581,6 +587,21 @@ export function createOrUpdateBudget(
       updatedAt: serverTimestamp()
     }))
   );
+}
+
+/** Edita o limite de um orçamento já existente — só os campos que `validBudgetUpdate` permite mudar. */
+export function updateBudgetLimit(workspaceId: string, categoryId: string, limitCents: number) {
+  fireWrite(
+    updateDoc(documentRef(workspaceId, 'budgets', categoryId), {
+      limitCents,
+      isActive: true,
+      updatedAt: serverTimestamp()
+    })
+  );
+}
+
+export function deleteBudget(workspaceId: string, categoryId: string) {
+  fireWrite(deleteDoc(documentRef(workspaceId, 'budgets', categoryId)));
 }
 
 export function subscribeBudgets(

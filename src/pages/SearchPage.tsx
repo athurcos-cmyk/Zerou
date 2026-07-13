@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Download, Minus, Plus, Search, Settings, TrendingDown, TrendingUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Minus, Plus, Search, Settings, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
 import {
   PieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -15,7 +15,7 @@ import { billStatusLabels, transactionTypeLabels } from '../finance/financeLabel
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { centsToInputValue } from '../finance/money';
 import { downloadCsv, transactionsToCsv } from '../finance/csvExport';
-import { createOrUpdateBudget } from '../finance/financeService';
+import { createBudget, deleteBudget, updateBudgetLimit } from '../finance/financeService';
 import {
   committedByCategoryForMonth,
   lastCommittedMonth,
@@ -784,6 +784,7 @@ export function SearchPage() {
         <div className="form-stack">
           {expenseCategories.map((cat) => {
             const value = budgetValues[cat.id] ?? '';
+            const existingBudget = budgetByCategoryId.get(cat.id);
             return (
               <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span style={{ flex: 1, fontSize: '0.88rem', fontWeight: 500 }}>{cat.name}</span>
@@ -796,11 +797,33 @@ export function SearchPage() {
                   placeholder="0,00"
                   onBlur={() => {
                     const cents = parseMoneyToCents(value);
-                    if (cents > 0 && workspaceId && user) {
-                      createOrUpdateBudget(workspaceId, user.uid, cat.id, cents);
+                    if (cents <= 0 || !workspaceId || !user) return;
+                    if (existingBudget) {
+                      updateBudgetLimit(workspaceId, cat.id, cents);
+                    } else {
+                      createBudget(workspaceId, user.uid, cat.id, cents);
                     }
                   }}
                 />
+                {existingBudget && (
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label={`Remover orçamento de ${cat.name}`}
+                    title="Remover orçamento"
+                    onClick={() => {
+                      if (!workspaceId) return;
+                      deleteBudget(workspaceId, cat.id);
+                      setBudgetValues((prev) => {
+                        const next = { ...prev };
+                        delete next[cat.id];
+                        return next;
+                      });
+                    }}
+                  >
+                    <Trash2 size={15} aria-hidden="true" />
+                  </button>
+                )}
               </div>
             );
           })}
