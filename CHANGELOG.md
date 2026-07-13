@@ -2,6 +2,23 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-13 — fix: exclusão de conta apagava dados mas não excluía o login de verdade
+
+- **Bug real, achado pelo dono e verificado ao vivo:** `onDeleteAccount` (`LoginMethodsPage.tsx`)
+  apagava todos os dados do Firestore **antes** de tentar deletar o usuário do Firebase
+  Auth, sem reautenticar. `deleteUser()` exige sessão recente e quase sempre falhava com
+  `auth/requires-recent-login` — mas só depois que os dados já tinham sumido. A sessão do
+  Firebase Auth continuava válida, e a pessoa caía em `/app/onboarding` como se fosse conta
+  nova, sem precisar logar de novo — **a conta nunca era excluída de verdade, só os dados**.
+- **Correção:** nova função `runAccountDeletion` (`accountDeletionService.ts`) reautentica
+  (Google ou senha) **antes** de apagar qualquer dado. Reautenticação falhou → nada é
+  apagado. Exclusão do Auth falha mesmo assim (janela residual menor) → força `logout()`
+  antes de propagar o erro, nunca mais deixa sessão zumbi.
+- **Verificado ao vivo de ponta a ponta** com conta de teste real: exclusão vai pra landing
+  (não mais onboarding), `/app` redireciona pra login, login com a mesma senha depois falha
+  (usuário do Auth realmente deletado). 5 testes de regressão novos. Typecheck, 276 testes,
+  build limpos. Não toca `firestore.rules`.
+
 ## 2026-07-13 — fix: orçamento não sincronizava após a 1ª edição + remove orçamento + backlog revisado
 
 - **Bug real corrigido:** `createOrUpdateBudget` reenviava `createdAt` (novo, via
