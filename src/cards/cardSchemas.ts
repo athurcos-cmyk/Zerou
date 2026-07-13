@@ -76,7 +76,11 @@ export const anticipateInstallmentsSchema = z.object({
   credits: z.array(z.object({
     invoiceId: z.string().trim().min(1),
     amountCents: moneyCentsSchema,
-    sourceTransactionId: z.string().trim()
+    sourceTransactionId: z.string().trim(),
+    // Pra rotular "Parcela antecipada · 8/10" na fatura de origem, em vez de um genérico
+    // "Parcela antecipada" sem dizer qual. Opcional pra não quebrar quem já anticipou sem isso.
+    installmentNumber: z.number().int().min(1).max(72).optional(),
+    installmentTotal: z.number().int().min(1).max(72).optional()
   })).min(1),
   effectiveAt: z.date()
 });

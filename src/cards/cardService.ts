@@ -509,7 +509,9 @@ export async function anticipateInstallments(workspaceId: string, userId: string
         effectiveAt: parsed.effectiveAt,
         idempotencyKey: creditKey,
         createdBy: userId,
-        sourceTransactionId: credit.sourceTransactionId
+        sourceTransactionId: credit.sourceTransactionId,
+        installmentNumber: credit.installmentNumber,
+        installmentTotal: credit.installmentTotal
       })
     );
 
@@ -527,7 +529,12 @@ export async function anticipateInstallments(workspaceId: string, userId: string
         effectiveAt: parsed.effectiveAt,
         idempotencyKey: debitKey,
         createdBy: userId,
-        sourceTransactionId: credit.sourceTransactionId
+        sourceTransactionId: credit.sourceTransactionId,
+        // Rótulo "parcela 8/10 antecipada" na fatura de origem — sem isso, a fatura de destino
+        // já não mostra mais qual parcela era (sumiu, ver anticipatedAwayEntryIds), e a origem
+        // só dizia "Parcela antecipada" genérico, dando a impressão de faltar parcela no fim.
+        installmentNumber: credit.installmentNumber,
+        installmentTotal: credit.installmentTotal
       })
     );
   });

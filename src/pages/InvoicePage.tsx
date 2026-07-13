@@ -96,8 +96,12 @@ export function InvoicePage() {
   async function handleAnticipation() {
     if (!workspaceId || !user || !cardId || !invoiceId) return;
     // Por compra, as N ÚLTIMAS parcelas (o grupo já vem ordenado da última pra primeira).
+    // `installmentTotal` vem do grupo (não de cada parcela) — leva junto pra poder rotular
+    // "parcela 8/10 antecipada" na fatura de origem, em vez de um genérico sem número.
     const selected = anticipatableGroups.flatMap((group) =>
-      group.installments.slice(0, anticipateCounts[group.sourceTransactionId] ?? 0)
+      group.installments
+        .slice(0, anticipateCounts[group.sourceTransactionId] ?? 0)
+        .map((inst) => ({ ...inst, installmentTotal: group.installmentTotal }))
     );
     if (selected.length === 0) return;
 
@@ -117,7 +121,9 @@ export function InvoicePage() {
     const credits = selected.map((inst) => ({
       invoiceId: inst.invoiceId,
       amountCents: inst.amountCents,
-      sourceTransactionId: inst.sourceTransactionId
+      sourceTransactionId: inst.sourceTransactionId,
+      installmentNumber: inst.installmentNumber,
+      installmentTotal: inst.installmentTotal
     }));
     setAnticipateCounts({});
     setMessage(null);
@@ -286,12 +292,16 @@ export function InvoicePage() {
                     entry.installmentNumber && entry.installmentTotal
                       ? `parcela ${entry.installmentNumber}/${entry.installmentTotal}`
                       : null;
+                  // "parcela 8/10 antecipada" quando sabemos o número (deixa claro que 8, 9 e 10
+                  // vieram pra cá, sem parecer que sumiu parcela). Antecipação antiga sem o número
+                  // guardado (de antes desse fix) cai no genérico "Parcela antecipada".
+                  const prefix = isAnticipated ? (installment ? `${installment} antecipada` : 'Parcela antecipada') : installment;
                   return (
                     <div className="list-row" key={entry.id}>
                       <div>
                         <strong>{label}</strong>
                         <span className="text-secondary">
-                          {isAnticipated ? 'Parcela antecipada · ' : installment ? `${installment} · ` : ''}
+                          {prefix ? `${prefix} · ` : ''}
                           {formatFriendlyDate(entry.effectiveAt)}
                         </span>
                       </div>

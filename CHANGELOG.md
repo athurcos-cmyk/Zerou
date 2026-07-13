@@ -2,6 +2,12 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-12 — fix: número da parcela antecipada some no caminho, "Parcela antecipada" ficava genérica
+
+- Ao antecipar, o número da parcela (8/10, 5/5...) era descartado antes de gravar no ledger — nem o débito (fatura de origem) nem o crédito (fatura de destino) guardavam qual parcela era. Combinado com o fix anterior (parcela antecipada some da fatura futura), isso dava a impressão de que sobravam parcelas: a última visível de uma compra em 10x parava em "7/10" sem nenhuma pista de que 8, 9 e 10 foram antecipadas — parecia fatura incompleta, não paga adiantado.
+- `anticipateInstallmentsSchema` ganhou `installmentNumber`/`installmentTotal` opcionais por parcela; `InvoicePage` carrega esses números (do grupo de antecipação) e `cardService.anticipateInstallments` grava os dois no débito e no crédito. A regra do Firestore **já aceitava** esses campos genericamente pra qualquer tipo de lançamento — não precisou mudar. Fatura de origem agora rotula "parcela 8/10 antecipada" em vez de "Parcela antecipada" sem número; antecipações antigas (sem o dado salvo) continuam com o texto genérico como fallback.
+- Verificado ao vivo: antecipei 2 parcelas novas ("Notebook teste", 4/5 e 5/5) e a fatura de origem mostrou "parcela 5/5 antecipada" e "parcela 4/5 antecipada" corretamente; as faturas de destino (nov/dez de 2026) tiveram o valor reduzido em R$1.000 cada e o Limite Usado total do cartão **não mudou** (R$8.700 antes e depois — antecipar só move entre faturas). 256 testes, typecheck, lint (linha de base) e build limpos. Sem mudança de regra/dados.
+
 ## 2026-07-12 — fix: parcela antecipada some da fatura futura (igual Nubank)
 
 - Depois do fix anterior (parcela antecipada aparecendo na fatura de origem), sobrou uma confusão do lado oposto: a fatura **futura** de onde a parcela saiu continuava mostrando "Compras R$300 / Créditos −R$300" lado a lado — dinheiro fantasma que se cancela mas fica visível, e a fatura em si (com saldo R$0) ainda aparecia no histórico do cartão como se tivesse algo pendente. No cartão de verdade (Nubank), a parcela antecipada só **some** da fatura futura.
