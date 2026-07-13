@@ -2,6 +2,35 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-13 — fix: orçamento não sincronizava após a 1ª edição + remove orçamento + backlog revisado
+
+- **Bug real corrigido:** `createOrUpdateBudget` reenviava `createdAt` (novo, via
+  `serverTimestamp()`) em todo `setDoc`, tanto na criação quanto numa edição
+  posterior. `validBudgetUpdate` exige `createdAt` igual ao do documento existente —
+  toda edição de um orçamento já criado era **rejeitada pelo servidor
+  silenciosamente** (fire-and-forget engolia o erro; a UI mostrava o valor novo por
+  um instante e revertia sem aviso). Confirmado com teste de regra reproduzindo o
+  payload real do cliente antes da correção.
+- **Correção:** `createBudget` (só na criação) separado de `updateBudgetLimit`
+  (`updateDoc` parcial, só `limitCents`/`isActive`/`updatedAt`) — mesmo padrão de
+  `createCategory`/`updateCategory`. Teste de regressão em
+  `tests/firestore.rules.test.ts` documentando por que as duas funções não podem
+  virar uma "createOrUpdate" de novo.
+- **`deleteBudget`** + botão de remover na tela de Orçamentos (Análise) — antes só
+  dava pra criar/editar, não pra tirar.
+- **Barra de orçamento na Análise:** o marcador de limite ficava sempre colado na
+  borda direita (nunca se movia). Reescalado pra 0-150% do orçamento — o marcador
+  agora fica numa posição fixa significativa e a barra pode ultrapassá-lo pra
+  mostrar o estouro.
+- **Backlog revisado** (`docs/SUGESTOES_FEATURES_2026-07-12.md`): itens 8
+  (importação OFX/CSV), 10 (split de conta entre amigos) e 11 (modo escuro
+  agendado) removidos a pedido do dono — decisão de produto, não recolocar sem
+  pedido explícito.
+- **Convenção nova:** arquivos `*.local.md` (gitignorados) para docs que nunca
+  devem ser commitadas — primeiro uso: `TEST_ACCOUNTS.local.md` com credenciais de
+  contas de teste, referenciado no mapa de contexto do `CLAUDE.md`.
+- Typecheck, 271 testes unitários, 48 testes de regra e build limpos.
+
 ## 2026-07-13 — feat: reconciliação "conferido" nas transações
 
 - **Novo campo `reconciledAt?: Timestamp` em `Transaction`** (`contracts.ts`): marca quando
