@@ -6,12 +6,13 @@ import {
   markOverdueBills,
   subscribeAccounts,
   subscribeBills,
+  subscribeBudgets,
   subscribeCategories,
   subscribeRecurringRules,
   subscribeTransactions,
   type LocalSynced
 } from './financeService';
-import type { Account, Bill, Category, RecurringRule, Transaction } from '../types/contracts';
+import type { Account, Bill, Budget, Category, RecurringRule, Transaction } from '../types/contracts';
 
 const FINANCE_BOOT_RETRY_DELAYS_MS = [600, 1200, 2400, 4000];
 const preparedDefaultCategoryWorkspaces = new Set<string>();
@@ -22,6 +23,7 @@ interface FinanceDataState {
   transactions: Array<LocalSynced<Transaction>>;
   bills: Array<LocalSynced<Bill>>;
   recurringRules: Array<LocalSynced<RecurringRule>>;
+  budgets: Array<LocalSynced<Budget>>;
   loading: boolean;
   error: string | null;
 }
@@ -32,6 +34,7 @@ const initialState: FinanceDataState = {
   transactions: [],
   bills: [],
   recurringRules: [],
+  budgets: [],
   loading: true,
   error: null
 };
@@ -47,9 +50,9 @@ function canRetryFinanceBoot(error: unknown, attempt: number) {
   );
 }
 
-type FinanceSliceKey = keyof Pick<FinanceDataState, 'accounts' | 'categories' | 'transactions' | 'bills' | 'recurringRules'>;
+type FinanceSliceKey = keyof Pick<FinanceDataState, 'accounts' | 'categories' | 'transactions' | 'bills' | 'recurringRules' | 'budgets'>;
 
-const REQUIRED_SLICES: FinanceSliceKey[] = ['accounts', 'categories', 'transactions', 'bills', 'recurringRules'];
+const REQUIRED_SLICES: FinanceSliceKey[] = ['accounts', 'categories', 'transactions', 'bills', 'recurringRules', 'budgets'];
 
 function setSlice<K extends FinanceSliceKey>(
   key: K,
@@ -172,7 +175,8 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
         markOverdueBills(activeWorkspaceId, items);
         setState(setSlice('bills', items, markSliceLoaded('bills')));
       }),
-      subscribeWithBootRetry(subscribeRecurringRules, (items) => setState(setSlice('recurringRules', items, markSliceLoaded('recurringRules'))))
+      subscribeWithBootRetry(subscribeRecurringRules, (items) => setState(setSlice('recurringRules', items, markSliceLoaded('recurringRules')))),
+      subscribeWithBootRetry(subscribeBudgets, (items) => setState(setSlice('budgets', items, markSliceLoaded('budgets'))))
     ];
 
     return () => {
@@ -207,10 +211,10 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
 
   const pendingWrites = useMemo(
     () =>
-      [...state.accounts, ...state.categories, ...state.transactions, ...state.bills, ...state.recurringRules].some(
+      [...state.accounts, ...state.categories, ...state.transactions, ...state.bills, ...state.recurringRules, ...state.budgets].some(
         (item) => item.localSyncStatus === 'pending'
       ),
-    [state.accounts, state.bills, state.categories, state.recurringRules, state.transactions]
+    [state.accounts, state.bills, state.budgets, state.categories, state.recurringRules, state.transactions]
   );
 
   return {

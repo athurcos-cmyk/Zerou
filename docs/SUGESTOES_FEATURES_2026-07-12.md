@@ -29,7 +29,7 @@ só com autorização explícita do dono.
 - [x] 4. Widget "quanto posso gastar por dia"
 - [x] 5. Atalho de pagamento mais completo a partir de um compromisso (escopo revisado)
 - [x] 6. Tags personalizadas (escopo revisado)
-- [ ] 7. Orçamento mensal por categoria
+- [x] 7. Orçamento mensal por categoria
 - [ ] 8. Importação OFX/CSV bancário
 - [ ] 9. Reconciliação "conferido"
 - [ ] 10. Split de conta entre amigos (fora do casal)

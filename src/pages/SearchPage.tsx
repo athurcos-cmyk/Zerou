@@ -1,18 +1,21 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Download, Minus, Search, TrendingDown, TrendingUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Minus, Plus, Search, Settings, TrendingDown, TrendingUp } from 'lucide-react';
 import {
   PieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from 'recharts';
+import { useAuth } from '../auth/AuthContext';
 import { BottomSheet } from '../components/BottomSheet';
 import { EmptyState } from '../components/EmptyState';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { formatFriendlyDate, toDate } from '../finance/financeDates';
 import { nextOccurrenceDate } from '../finance/financeService';
 import { billStatusLabels, transactionTypeLabels } from '../finance/financeLabels';
-import { formatMoney } from '../finance/money';
+import { formatMoney, parseMoneyToCents } from '../finance/money';
+import { centsToInputValue } from '../finance/money';
 import { downloadCsv, transactionsToCsv } from '../finance/csvExport';
+import { createOrUpdateBudget } from '../finance/financeService';
 import {
   committedByCategoryForMonth,
   lastCommittedMonth,
@@ -133,6 +136,8 @@ function MetricCard({ label, value, sub, accent = false, icon, long = false }: {
 // ─── componente principal ──────────────────────────────────────────────────────
 
 export function SearchPage() {
+  const { user, profile } = useAuth();
+  const workspaceId = profile?.defaultWorkspaceId;
   const finance = useFinanceContext();
   const cardsData = useCardsContext();
   const location = useLocation();
@@ -140,6 +145,13 @@ export function SearchPage() {
   const [query, setQuery] = useState('');
   const [selectedCatIndex, setSelectedCatIndex] = useState<number | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [budgetOpen, setBudgetOpen] = useState(false);
+  const [budgetValues, setBudgetValues] = useState<Record<string, string>>({});
+
+  const expenseCategories = useMemo(
+    () => finance.categories.filter((c) => c.type === 'expense' || c.type === 'both'),
+    [finance.categories]
+  );
 
   const currentMonth = new Date().toISOString().slice(0, 7);
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
@@ -236,6 +248,7 @@ export function SearchPage() {
         const isNone = catId === NO_CATEGORY;
         const cat = isNone ? null : categoryMap.get(catId);
         return {
+          categoryId: isNone ? null : catId,
           name: isNone ? 'Sem categoria' : (categoryNames.get(catId) ?? 'Sem categoria'),
           amountCents,
           color: cat ? resolveCategoryColor(cat) : defaultCategoryColor
@@ -245,6 +258,21 @@ export function SearchPage() {
   }, [finance.transactions, invoicesForSpending, billsForCommitment, rulesForProjection, isFutureMonth, txnCategoryById, categoryMap, categoryNames, selectedMonth]);
 
   const totalSpent = spendingByCategory.reduce((s, c) => s + c.amountCents, 0);
+
+  const budgetByCategoryId = useMemo(
+    () => new Map(finance.budgets.filter((b) => b.isActive).map((b) => [b.categoryId, b])),
+    [finance.budgets]
+  );
+
+  useEffect(() => {
+    if (budgetOpen) {
+      const values: Record<string, string> = {};
+      for (const b of finance.budgets) {
+        if (b.isActive) values[b.categoryId] = centsToInputValue(b.limitCents);
+      }
+      setBudgetValues(values);
+    }
+  }, [budgetOpen, finance.budgets]);
 
   // ── recorrências previstas do mês futuro (a parte "estimativa" do previsto) ──
   const recurringProjected = useMemo(
@@ -366,6 +394,9 @@ export function SearchPage() {
           <h1 className="page-title page-title--compact">Seus gastos</h1>
         </div>
         <div style={{ display: 'flex', gap: '0.25rem' }}>
+          <button className="icon-button" type="button" aria-label="Orçamentos" onClick={() => setBudgetOpen(true)}>
+            <Settings size={18} aria-hidden="true" />
+          </button>
           <button className="icon-button" type="button" aria-label="Exportar CSV" onClick={handleExportCsv}>
             <Download size={18} aria-hidden="true" />
           </button>
@@ -502,6 +533,11 @@ export function SearchPage() {
                   const pct = Math.round((cat.amountCents / totalSpent) * 100);
                   const isSelected = selectedCatIndex === i;
                   const isDimmed = selectedCatIndex !== null && !isSelected;
+                  const budget = cat.categoryId ? budgetByCategoryId.get(cat.categoryId) : undefined;
+                  const budgetPct = budget ? Math.round((cat.amountCents / budget.limitCents) * 100) : null;
+                  const barColor = budgetPct !== null
+                    ? budgetPct >= 100 ? 'var(--danger)' : budgetPct >= 80 ? 'var(--warning)' : 'var(--success)'
+                    : cat.color;
                   return (
                     <button
                       key={cat.name}
@@ -523,16 +559,31 @@ export function SearchPage() {
                         <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', flexShrink: 0 }}>{pct}%</span>
                         <span style={{ fontSize: '0.82rem', fontWeight: 700, flexShrink: 0, minWidth: '4.5rem', textAlign: 'right' }}>
                           {formatMoney(cat.amountCents)}
+                          {budget ? ` / ${formatMoney(budget.limitCents)}` : ''}
                         </span>
                       </div>
                       {/* barra de progresso */}
-                      <div style={{ height: 4, borderRadius: 999, background: 'var(--border-subtle)', overflow: 'hidden' }}>
+                      <div style={{ height: 4, borderRadius: 999, background: 'var(--border-subtle)', overflow: 'hidden', position: 'relative' }}>
                         <div style={{
                           height: 4, borderRadius: 999,
-                          background: cat.color,
-                          width: `${pct}%`,
+                          background: barColor,
+                          width: budgetPct !== null ? `${Math.min(budgetPct, 100)}%` : `${pct}%`,
                           transition: 'width 400ms ease',
                         }} />
+                        {budget && (
+                          <div style={{
+                            position: 'absolute', top: 0, height: 4,
+                            left: '100%', width: 6,
+                            transform: 'translateX(-6px)',
+                          }}>
+                            <div style={{
+                              width: 2, height: 4,
+                              background: 'var(--text-secondary)',
+                              borderRadius: 1,
+                              marginLeft: 2,
+                            }} />
+                          </div>
+                        )}
                       </div>
                     </button>
                   );
@@ -715,6 +766,41 @@ export function SearchPage() {
             ) : (
               <p className="text-secondary" style={{ margin: 0 }}>Nenhum resultado para "{query}".</p>
             )
+          )}
+        </div>
+      </BottomSheet>
+
+      <BottomSheet
+        open={budgetOpen}
+        onClose={() => setBudgetOpen(false)}
+        title="Orçamentos"
+        subtitle="Defina um limite por categoria — ele vale todo mês"
+      >
+        <div className="form-stack">
+          {expenseCategories.map((cat) => {
+            const value = budgetValues[cat.id] ?? '';
+            return (
+              <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ flex: 1, fontSize: '0.88rem', fontWeight: 500 }}>{cat.name}</span>
+                <input
+                  className="input input--money"
+                  style={{ width: '9rem' }}
+                  inputMode="decimal"
+                  value={value}
+                  onChange={(e) => setBudgetValues((prev) => ({ ...prev, [cat.id]: e.target.value }))}
+                  placeholder="0,00"
+                  onBlur={() => {
+                    const cents = parseMoneyToCents(value);
+                    if (cents > 0 && workspaceId && user) {
+                      createOrUpdateBudget(workspaceId, user.uid, cat.id, cents);
+                    }
+                  }}
+                />
+              </div>
+            );
+          })}
+          {expenseCategories.length === 0 && (
+            <p className="text-secondary" style={{ margin: 0 }}>Nenhuma categoria de despesa cadastrada.</p>
           )}
         </div>
       </BottomSheet>

@@ -36,9 +36,9 @@ import {
   type CreateRecurringRuleInput,
   type CreateTransactionInput
 } from './financeSchemas';
-import type { Account, Bill, Category, Goal, GoalContribution, RecurringRule, SyncStatus, Transaction } from '../types/contracts';
+import type { Account, Bill, Budget, Category, Goal, GoalContribution, RecurringRule, SyncStatus, Transaction } from '../types/contracts';
 
-export type FinancialCollectionName = 'accounts' | 'categories' | 'transactions' | 'bills' | 'recurring' | 'goals' | 'goalContributions';
+export type FinancialCollectionName = 'accounts' | 'categories' | 'transactions' | 'bills' | 'recurring' | 'goals' | 'goalContributions' | 'budgets';
 
 export type LocalSynced<T> = T & {
   localSyncStatus: SyncStatus;
@@ -543,6 +543,42 @@ export function subscribeGoals(
     collectionRef(workspaceId, 'goals'),
     { includeMetadataChanges: true },
     (snapshot) => onNext(snapshot.docs.map((item) => withLocalSync<Goal>(item))),
+    onError
+  );
+}
+
+// ─── Budgets ───────────────────────────────────────────────────────────────────
+
+export function createOrUpdateBudget(
+  workspaceId: string,
+  userId: string,
+  categoryId: string,
+  limitCents: number
+) {
+  const id = categoryId;
+  fireWrite(
+    setDoc(documentRef(workspaceId, 'budgets', id), omitUndefined({
+      id,
+      workspaceId,
+      categoryId,
+      limitCents,
+      isActive: true,
+      createdBy: userId,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    }))
+  );
+}
+
+export function subscribeBudgets(
+  workspaceId: string,
+  onNext: (items: Array<LocalSynced<Budget>>) => void,
+  onError: (error: Error) => void
+): Unsubscribe {
+  return onSnapshot(
+    collectionRef(workspaceId, 'budgets'),
+    { includeMetadataChanges: true },
+    (snapshot) => onNext(snapshot.docs.map((item) => withLocalSync<Budget>(item))),
     onError
   );
 }

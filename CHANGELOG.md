@@ -2,6 +2,35 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-13 — feat: orçamento mensal por categoria (maior feature do backlog)
+
+- **Novo tipo `Budget`** (`contracts.ts`): `id === categoryId` (determinístico), `limitCents`,
+  `isActive`, `createdBy`. Um orçamento por categoria, recorrente todo mês até ser mudado.
+- **`createOrUpdateBudget` + `subscribeBudgets`** (`financeService.ts`): fire-and-forget
+  com `setDoc` (id determinístico = categoria), snapshot sem `orderBy` (padrão de
+  `subscribeGoals`). Coleção `'budgets'` adicionada a `FinancialCollectionName`.
+- **`useFinanceData`** ganhou slice `budgets`: integrado ao `FinanceDataState`,
+  `REQUIRED_SLICES`, array de unsubscribers e `pendingWrites`. Mock atualizado no teste.
+- **`firestore.rules`**: `validBudgetCreate` (exige categoria existente via `exists(...)`,
+  `id == categoryId`, `createdBy == request.auth.uid`) + `validBudgetUpdate` (só
+  `limitCents`/`isActive`/`updatedAt` mutáveis). Match block completo com read/create/
+  update/delete. **`npm run test:rules` passa (46 testes)**.
+- **Testes de regra** (`firestore.rules.test.ts`): `budgetPayload` helper + caso
+  `validates budget documents` — cria orçamento válido, atualiza limite, rejeita
+  campo travado, rejeita `createdBy` forjado, rejeita categoria inexistente.
+- **Barra de orçamento na Análise** (`SearchPage`): `spendingByCategory` agora inclui
+  `categoryId`; legenda de categorias cruza com `budgetByCategoryId` e colore a barra:
+  verde (`--success`) < 80%, amarela (`--warning`) 80-100%, vermelha (`--danger`) > 100%.
+  Valor mostra "gasto / limite" quando há orçamento.
+- **Sheet de configuração** (`SearchPage`): botão Settings no cabeçalho abre
+  `BottomSheet` com input de valor por categoria de despesa; `onBlur` grava via
+  `createOrUpdateBudget` (fire-and-forget). Valores inicializados do Firestore ao abrir.
+- **Dashboard fora do escopo do v1** — só a Análise mostra orçamento por decisão de
+  produto documentada.
+- Typecheck, 271 testes unitários, 46 testes de regras e build limpos.
+- **⚠️ Esta feature tocou `firestore.rules`** — deploy da regra só com autorização
+  explícita do dono (commit local apenas).
+
 ## 2026-07-13 — feat: tags com chips visuais + filtro por tag nas Transações
 
 - **Novo componente `TagInput`** (`src/components/TagInput.tsx`): substitui o campo de

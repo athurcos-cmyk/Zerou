@@ -156,6 +156,22 @@ function goalPayload(workspaceId: string, goalId: string, uid: string, overrides
   };
 }
 
+function budgetPayload(workspaceId: string, budgetId: string, uid: string, overrides: Record<string, unknown> = {}) {
+  const now = serverTimestamp();
+
+  return {
+    id: budgetId,
+    workspaceId,
+    categoryId: budgetId,
+    limitCents: 50000,
+    isActive: true,
+    createdBy: uid,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides
+  };
+}
+
 function goalContributionPayload(workspaceId: string, contribId: string, goalId: string, uid: string, overrides: Record<string, unknown> = {}) {
   return {
     id: contribId,
@@ -1176,6 +1192,30 @@ describe('firestore security rules', () => {
         doc(aliceDb, 'workspaces/workspaceA/goalContributions/contribZero'),
         goalContributionPayload('workspaceA', 'contribZero', 'goalA', 'alice', { amountCents: 0 })
       )
+    );
+  });
+
+  it('validates budget documents', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    // Budget creation requires the referenced category to exist first.
+    await assertSucceeds(
+      setDoc(doc(aliceDb, 'workspaces/workspaceA/categories/budgetCat'), categoryPayload('workspaceA', 'budgetCat', 'alice'))
+    );
+
+    const budgetRef = doc(aliceDb, 'workspaces/workspaceA/budgets/budgetCat');
+    await assertSucceeds(setDoc(budgetRef, budgetPayload('workspaceA', 'budgetCat', 'alice')));
+    // Update limit: allowed.
+    await assertSucceeds(updateDoc(budgetRef, { limitCents: 60000, updatedAt: serverTimestamp() }));
+    // Update a locked field: must fail.
+    await assertFails(updateDoc(budgetRef, { createdBy: 'bob', updatedAt: serverTimestamp() }));
+    // Create with another user's uid: must fail.
+    await assertFails(
+      setDoc(doc(aliceDb, 'workspaces/workspaceA/budgets/forgedBudget'), budgetPayload('workspaceA', 'forgedBudget', 'bob'))
+    );
+    // Create referencing a nonexistent category: must fail.
+    await assertFails(
+      setDoc(doc(aliceDb, 'workspaces/workspaceA/budgets/nonexistent'), budgetPayload('workspaceA', 'nonexistent', 'alice'))
     );
   });
 

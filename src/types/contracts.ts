@@ -186,6 +186,17 @@ export interface Category {
   updatedAt?: Timestamp;
 }
 
+export interface Budget {
+  id: string; // === categoryId
+  workspaceId: string;
+  categoryId: string;
+  limitCents: MoneyCents;
+  isActive: boolean;
+  createdBy: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
 export interface Transaction {
   id: string;
   workspaceId: string;

@@ -7,6 +7,7 @@ const financeMocks = vi.hoisted(() => ({
   markOverdueBills: vi.fn(),
   subscribeAccounts: vi.fn(),
   subscribeBills: vi.fn(),
+  subscribeBudgets: vi.fn(),
   subscribeCategories: vi.fn(),
   subscribeRecurringRules: vi.fn(),
   subscribeTransactions: vi.fn()
@@ -34,6 +35,7 @@ describe('useFinanceData', () => {
 
     for (const subscribe of [
       financeMocks.subscribeBills,
+      financeMocks.subscribeBudgets,
       financeMocks.subscribeCategories,
       financeMocks.subscribeRecurringRules,
       financeMocks.subscribeTransactions

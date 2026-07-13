@@ -767,6 +767,53 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time;
     }
 
+    function validBudgetCreate(workspaceId, budgetId) {
+      return isActiveMember(workspaceId)
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'workspaceId',
+          'categoryId',
+          'limitCents',
+          'isActive',
+          'createdBy',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'id',
+          'workspaceId',
+          'categoryId',
+          'limitCents',
+          'isActive',
+          'createdBy',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.id == budgetId
+        && request.resource.data.id == request.resource.data.categoryId
+        && request.resource.data.workspaceId == workspaceId
+        && exists(/databases/$(database)/documents/workspaces/$(workspaceId)/categories/$(request.resource.data.categoryId))
+        && validMoneyCents(request.resource.data.limitCents)
+        && request.resource.data.isActive is bool
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validBudgetUpdate(workspaceId) {
+      return isActiveMember(workspaceId)
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.workspaceId == resource.data.workspaceId
+        && request.resource.data.workspaceId == workspaceId
+        && request.resource.data.categoryId == resource.data.categoryId
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['limitCents', 'isActive', 'updatedAt'])
+        && validMoneyCents(request.resource.data.limitCents)
+        && request.resource.data.isActive is bool
+        && request.resource.data.updatedAt == request.time;
+    }
+
     function validCardCreate(workspaceId, cardId) {
       return isActiveMember(workspaceId)
         && request.resource.data.keys().hasOnly([
@@ -1494,6 +1541,13 @@ service cloud.firestore {
         allow create: if validRecurringCreate(workspaceId, recurringId);
         allow update: if validRecurringUpdate(workspaceId);
         allow delete: if canDeleteWorkspaceTree(workspaceId);
+      }
+
+      match /budgets/{budgetId} {
+        allow read: if isActiveMember(workspaceId);
+        allow create: if validBudgetCreate(workspaceId, budgetId);
+        allow update: if validBudgetUpdate(workspaceId);
+        allow delete: if isActiveMember(workspaceId);
       }
 
       match /goals/{goalId} {
