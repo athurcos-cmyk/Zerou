@@ -5,12 +5,14 @@ import {
   addPasswordProvider,
   deleteAuthenticatedUser,
   linkGoogleProvider,
+  logout,
+  reauthenticateWithGoogle,
   reauthenticateWithPassword,
   unlinkProvider
 } from '../auth/authService';
 import { getAuthErrorMessage } from '../auth/authErrors';
 import { FormMessage } from '../components/FormMessage';
-import { deleteAccountData } from './accountDeletionService';
+import { deleteAccountData, runAccountDeletion } from './accountDeletionService';
 
 const providerLabels: Record<string, string> = {
   password: 'Email e senha',
@@ -77,8 +79,16 @@ export function LoginMethodsPage() {
         throw new Error('Digite EXCLUIR para confirmar.');
       }
 
-      await deleteAccountData(user.uid);
-      await deleteAuthenticatedUser(user);
+      await runAccountDeletion({
+        hasGoogle,
+        hasPassword,
+        currentPassword,
+        reauthenticateWithGoogle: () => reauthenticateWithGoogle(user),
+        reauthenticateWithPassword: (password) => reauthenticateWithPassword(user, password),
+        deleteAccountData: () => deleteAccountData(user.uid),
+        deleteAuthenticatedUser: () => deleteAuthenticatedUser(user),
+        logout: () => logout()
+      });
       window.location.assign('/');
     } catch (error) {
       setMessage(getAuthErrorMessage(error));
@@ -153,7 +163,7 @@ export function LoginMethodsPage() {
 
           {hasPassword ? (
             <div className="field">
-              <label htmlFor="current-password">Senha atual (necessária para remover um método)</label>
+              <label htmlFor="current-password">Senha atual (necessária para remover um método{!hasGoogle ? ' ou excluir a conta' : ''})</label>
               <input
                 className="input"
                 id="current-password"
@@ -240,7 +250,12 @@ export function LoginMethodsPage() {
           <button
             className="button button--danger"
             type="button"
-            disabled={busy || authFromCache || deleteConfirmation.trim() !== 'EXCLUIR'}
+            disabled={
+              busy ||
+              authFromCache ||
+              deleteConfirmation.trim() !== 'EXCLUIR' ||
+              (!hasGoogle && hasPassword && !currentPassword)
+            }
             onClick={() => void onDeleteAccount()}
           >
             <Trash2 size={18} aria-hidden="true" /> {busy ? 'Excluindo...' : 'Excluir minha conta'}

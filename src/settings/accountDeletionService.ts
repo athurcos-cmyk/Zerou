@@ -129,6 +129,56 @@ async function leavePartnerWorkspace(workspaceId: string, userId: string) {
   await batch.commit();
 }
 
+export interface AccountDeletionDeps {
+  hasGoogle: boolean;
+  hasPassword: boolean;
+  currentPassword: string;
+  reauthenticateWithGoogle: () => Promise<unknown>;
+  reauthenticateWithPassword: (password: string) => Promise<unknown>;
+  deleteAccountData: () => Promise<unknown>;
+  deleteAuthenticatedUser: () => Promise<unknown>;
+  logout: () => Promise<unknown>;
+}
+
+/**
+ * Orquestra a exclusão de conta na ordem que garante que o passo IRREVERSÍVEL
+ * (apagar todos os dados do Firestore) só roda depois de confirmar que a sessão
+ * está "fresca" o suficiente pra Firebase aceitar apagar o usuário do Auth também.
+ *
+ * Bug real que isso corrige: sem reautenticar antes, `deleteAuthenticatedUser`
+ * quase sempre falhava com `auth/requires-recent-login` (Firebase exige login
+ * recente pra deletar usuário) — mas isso só era descoberto DEPOIS que
+ * `deleteAccountData` já tinha apagado tudo. Resultado: dados sumidos, mas a
+ * sessão do Firebase Auth continuava válida (não dá pra desautenticar sozinho
+ * um `deleteUser()` que falhou) — a pessoa caía em `/app/onboarding` como se
+ * fosse conta nova, sem precisar logar de novo, achando que a exclusão não
+ * tinha funcionado.
+ *
+ * Ainda existe uma janela residual (bem menor): `deleteAccountData` pode
+ * suceder e `deleteAuthenticatedUser` falhar por outro motivo (rede, etc.)
+ * mesmo com a sessão fresca. Nesse caso força `logout()` antes de propagar o
+ * erro — a pessoa cai deslogada em vez de numa sessão zumbi.
+ */
+export async function runAccountDeletion(deps: AccountDeletionDeps) {
+  if (deps.hasGoogle) {
+    await deps.reauthenticateWithGoogle();
+  } else if (deps.hasPassword) {
+    if (!deps.currentPassword) {
+      throw new Error('Digite sua senha atual para confirmar a exclusão.');
+    }
+    await deps.reauthenticateWithPassword(deps.currentPassword);
+  }
+
+  await deps.deleteAccountData();
+
+  try {
+    await deps.deleteAuthenticatedUser();
+  } catch (error) {
+    await deps.logout();
+    throw error;
+  }
+}
+
 export async function deleteAccountData(userId: string) {
   const refs: DocumentReference[] = [];
   const workspaceRefs = await collectUserWorkspaceRefs(userId);
