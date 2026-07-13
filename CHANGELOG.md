@@ -2,6 +2,34 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-13 — fix: regras de orçamento e reconciliação finalmente deployadas + UX de descoberta do limite por categoria
+
+- **Deploy pendente resolvido:** as regras do Firestore para orçamento por categoria
+  (item 7) e reconciliação "conferido" (item 9) estavam commitadas desde a sessão
+  anterior mas nunca publicadas em produção (ver avisos ⚠️ mais abaixo neste arquivo,
+  "commit local apenas"). Rodado agora: `npx firebase deploy --only firestore:rules
+  --project zerou-26757`. Confirmado ao vivo, numa conta de teste: criar um orçamento
+  antes era rejeitado silenciosamente pelo servidor (`permission-denied`, mascarado
+  pelo padrão fire-and-forget — a UI deixava digitar e fechar normalmente sem indicar
+  erro nenhum); depois do deploy, criar/editar/remover orçamento persiste de verdade.
+- **UX: descoberta do limite por categoria** (`SearchPage.tsx`): o único ponto de
+  entrada da feature era um ícone de engrenagem genérico no cabeçalho da Análise,
+  sem rótulo visível — indistinguível de "configurações do app", achado só por acaso.
+  Trocado por um ícone de alvo (`Target`, mais associado a "limite/meta" em apps
+  financeiros) com `aria-label`/`title` explícitos. Adicionado também um aviso
+  contextual dentro do card "Por categoria" — some sozinho assim que o primeiro
+  orçamento existir — convidando a definir um limite (ex.: "até R$100 em Doces
+  por mês").
+- 276 testes unitários, typecheck e build limpos.
+
+## 2026-07-13 — feat: assistente de IA financeiro (Fase 1)
+
+- **Nova Cloud Function `financialAssistantChat`** (`functions/src/ai/`) — assistente de IA via DeepSeek (`deepseek-chat`) que responde perguntas sobre os gastos do usuário com base nos dados reais do workspace. Prompt de sistema em português, contexto financeiro agregado (gasto por categoria, top 5, contas próximas, saldos), rate limit de 60 msgs/dia por workspace.
+- **Nova página `AssistantPage`** (`/app/assistant`) — chat com bolhas, sugestões iniciais, loading e tratamento de erro. Navegação na sidebar e menu mobile (ícone Bot, posição após "Compartilhado").
+- **Cliente DeepSeek isolado** (`callDeepSeek`, JSON mode, timeout 15s, secret `DEEPSEEK_API_KEY`) + **verificador de membership** (`verifyWorkspaceMembership`) + **agregador de contexto** (`buildFinancialContext`).
+- **Secret `DEEPSEEK_API_KEY` configurado** no Firebase. Nenhuma chave vaza pro bundle client (verificado em `dist/`).
+- Testes unitários de `buildFinancialContext` (4 casos: gastos com categoria, transações excluídas ignoradas, contas próximas, workspace vazio) e `verifyWorkspaceMembership` (4 casos: membro ativo, não-membro, status não-ativo, dados nulos). Typecheck, 276 testes, 48 regras, build client + functions limpos.
+
 ## 2026-07-13 — fix: exclusão de conta apagava dados mas não excluía o login de verdade
 
 - **Bug real, achado pelo dono e verificado ao vivo:** `onDeleteAccount` (`LoginMethodsPage.tsx`)

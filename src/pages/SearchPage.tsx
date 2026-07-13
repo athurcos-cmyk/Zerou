@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Download, Minus, Plus, Search, Settings, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Minus, Plus, Search, Target, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
 import {
   PieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -394,8 +394,8 @@ export function SearchPage() {
           <h1 className="page-title page-title--compact">Seus gastos</h1>
         </div>
         <div style={{ display: 'flex', gap: '0.25rem' }}>
-          <button className="icon-button" type="button" aria-label="Orçamentos" onClick={() => setBudgetOpen(true)}>
-            <Settings size={18} aria-hidden="true" />
+          <button className="icon-button" type="button" aria-label="Definir limite de gasto por categoria" title="Limite por categoria" onClick={() => setBudgetOpen(true)}>
+            <Target size={18} aria-hidden="true" />
           </button>
           <button className="icon-button" type="button" aria-label="Exportar CSV" onClick={handleExportCsv}>
             <Download size={18} aria-hidden="true" />
@@ -464,6 +464,20 @@ export function SearchPage() {
           <p className="text-secondary" style={{ margin: '0.1rem 0 0.75rem', fontSize: '0.86rem' }}>
             Mês ainda não chegou — é uma previsão: parcelas de cartão e contas a pagar (<strong>já comprometidas</strong>) mais recorrências (<strong>estimativa</strong>).
           </p>
+        )}
+
+        {budgetByCategoryId.size === 0 && (
+          <div className="notice" style={{ marginBottom: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.75rem', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+            <span>Quer travar um limite por categoria (ex.: até R$100 em Doces por mês)?</span>
+            <button
+              type="button"
+              className="button button--primary button--compact"
+              onClick={() => setBudgetOpen(true)}
+              style={{ flexShrink: 0 }}
+            >
+              Definir limite
+            </button>
+          </div>
         )}
 
         {totalSpent > 0 ? (
