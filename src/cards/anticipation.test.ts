@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { groupAnticipatablePurchases, type AnticipatableInvoice } from './anticipation';
+import {
+  anticipatedAwayEntryIds,
+  groupAnticipatablePurchases,
+  invoiceHasVisibleActivity,
+  type AnticipatableInvoice
+} from './anticipation';
 
 const current = { id: 'card-1_2026-07', cardId: 'card-1', referenceMonth: '2026-07' };
 
@@ -147,5 +152,64 @@ describe('groupAnticipatablePurchases', () => {
     );
 
     expect(groups).toEqual([]);
+  });
+});
+
+// Nubank esconde a parcela antecipada da fatura futura — não deixa "compra R$300 / crédito
+// -R$300" visível lado a lado. Casa purchase↔credit pela mesma compra e valor.
+describe('anticipatedAwayEntryIds', () => {
+  it('esconde a parcela e o crédito quando eles se cancelam', () => {
+    const entries = [purchase('p1', 30000), anticipationCredit('c1', 30000)];
+    expect(anticipatedAwayEntryIds(entries)).toEqual(new Set(['p1', 'c1']));
+  });
+
+  it('não esconde uma compra sem crédito correspondente', () => {
+    const entries = [purchase('p1', 30000)];
+    expect(anticipatedAwayEntryIds(entries)).toEqual(new Set());
+  });
+
+  it('não esconde uma compra nova que caiu na mesma fatura (não casa em valor)', () => {
+    // A parcela antiga (8/10, R$300) foi antecipada; uma compra nova de R$500 chegou depois.
+    const entries = [purchase('p-old', 30000, { sourceTransactionId: 'txn-old' }), anticipationCredit('c1', 30000, 'txn-old'), purchase('p-new', 50000, { sourceTransactionId: 'txn-new' })];
+    expect(anticipatedAwayEntryIds(entries)).toEqual(new Set(['p-old', 'c1']));
+  });
+
+  it('casa um crédito por parcela quando há mais de uma da mesma compra', () => {
+    const entries = [
+      purchase('p1', 30000),
+      purchase('p2', 30000),
+      anticipationCredit('c1', 30000)
+    ];
+    const hidden = anticipatedAwayEntryIds(entries);
+    expect(hidden.size).toBe(2);
+    expect(hidden.has('c1')).toBe(true);
+    // Só uma das duas parcelas é anulada — a outra continua visível.
+    expect(hidden.has('p1') !== hidden.has('p2')).toBe(true);
+  });
+
+  it('não esconde crédito de outro tipo (estorno) que não seja de antecipação', () => {
+    const entries = [purchase('p1', 30000), { id: 'r1', type: 'refund_credit', amountCents: 30000, sourceTransactionId: 'txn-1' }];
+    expect(anticipatedAwayEntryIds(entries)).toEqual(new Set());
+  });
+});
+
+describe('invoiceHasVisibleActivity', () => {
+  it('fatura só com o par antecipado fica vazia', () => {
+    const entries = [purchase('p1', 30000), anticipationCredit('c1', 30000)];
+    expect(invoiceHasVisibleActivity(entries)).toBe(false);
+  });
+
+  it('fatura sem nenhum lançamento fica vazia', () => {
+    expect(invoiceHasVisibleActivity([])).toBe(false);
+  });
+
+  it('fatura com uma compra nova (não casada) continua visível', () => {
+    const entries = [purchase('p-old', 30000, { sourceTransactionId: 'txn-old' }), anticipationCredit('c1', 30000, 'txn-old'), purchase('p-new', 50000, { sourceTransactionId: 'txn-new' })];
+    expect(invoiceHasVisibleActivity(entries)).toBe(true);
+  });
+
+  it('fatura com pagamento continua visível mesmo com saldo zero', () => {
+    const entries = [purchase('p1', 30000), { id: 'pay1', type: 'payment', amountCents: 30000, sourceTransactionId: 'txn-1' }];
+    expect(invoiceHasVisibleActivity(entries)).toBe(true);
   });
 });

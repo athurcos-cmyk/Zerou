@@ -9,7 +9,7 @@ import { SelectField } from '../components/SelectField';
 import { useConfirm } from '../components/ConfirmDialog';
 import { FormMessage } from '../components/FormMessage';
 import { invoiceStatusLabels, ledgerTypeLabels } from '../cards/cardLabels';
-import { groupAnticipatablePurchases } from '../cards/anticipation';
+import { anticipatedAwayEntryIds, groupAnticipatablePurchases } from '../cards/anticipation';
 import {
   anticipateInstallments,
   recordInvoiceCredit,
@@ -177,11 +177,35 @@ export function InvoicePage() {
 
   const isPaid = invoice?.status === 'paid' || invoice?.status === 'overpaid';
   const isOpen = invoice?.status === 'open';
+  // Parcela que foi antecipada PRA FORA desta fatura: o crédito que a cancela nasce aqui
+  // mesmo (na fatura de origem), e mostrar "compra R$300 / crédito -R$300" lado a lado é ruído
+  // — no cartão de verdade a parcela antecipada só SOME da fatura futura. `anticipatedAwayEntryIds`
+  // casa cada parcela com o crédito que a anula (mesma compra, mesmo valor).
+  const hiddenEntryIds = invoice ? anticipatedAwayEntryIds(invoice.ledgerEntries) : new Set<string>();
   // 'installment_anticipation' entra aqui de propósito: é um débito real que soma no
   // `purchasesTotalCents` do hero (calculateInvoice), então precisa aparecer na lista —
-  // senão o total "Compras" não bate com a soma das linhas mostradas.
-  const purchases = invoice?.ledgerEntries.filter((e) => e.type === 'purchase' || e.type === 'installment_anticipation') ?? [];
+  // senão o total "Compras" não bate com a soma das linhas mostradas. Diferente do caso
+  // acima: essa é a parcela pousando AGORA nesta fatura, sempre visível.
+  const purchases = (invoice?.ledgerEntries.filter((e) => e.type === 'purchase' || e.type === 'installment_anticipation') ?? []).filter(
+    (e) => !hiddenEntryIds.has(e.id)
+  );
   const payments = invoice?.ledgerEntries.filter((e) => e.type === 'payment' || e.type === 'advance_payment') ?? [];
+
+  // Números do resumo (hero) descontando o par antecipado/anulado — senão "Compras: R$300"
+  // ficaria contradizendo a lista logo abaixo, que não mostra mais essa parcela.
+  const hiddenPurchaseCents =
+    invoice?.ledgerEntries.filter((e) => e.type === 'purchase' && hiddenEntryIds.has(e.id)).reduce((s, e) => s + e.amountCents, 0) ?? 0;
+  const hiddenCreditCents =
+    invoice?.ledgerEntries
+      .filter((e) => e.type === 'installment_anticipation_credit' && hiddenEntryIds.has(e.id))
+      .reduce((s, e) => s + e.amountCents, 0) ?? 0;
+  const displayPurchasesTotalCents = (invoice?.purchasesTotalCents ?? 0) - hiddenPurchaseCents;
+  const displayCreditsTotalCents = (invoice?.creditsTotalCents ?? 0) - hiddenCreditCents;
+  const hasVisibleBreakdown =
+    displayPurchasesTotalCents > 0 ||
+    displayCreditsTotalCents > 0 ||
+    (invoice?.feesTotalCents ?? 0) > 0 ||
+    (invoice?.paymentsTotalCents ?? 0) > 0;
 
   return (
     <section className="page-content page-content--narrow">
@@ -217,10 +241,13 @@ export function InvoicePage() {
               <span className="sync-badge sync-badge--synced">{invoiceStatusLabels[invoice.status]}</span>
             </div>
 
+            {hasVisibleBreakdown && (
             <div className="invoice-breakdown">
-              <span>Compras<strong>{formatMoney(invoice.purchasesTotalCents)}</strong></span>
-              {invoice.creditsTotalCents > 0 && (
-                <span>Créditos<strong className="amount--income">− {formatMoney(invoice.creditsTotalCents)}</strong></span>
+              {displayPurchasesTotalCents > 0 && (
+                <span>Compras<strong>{formatMoney(displayPurchasesTotalCents)}</strong></span>
+              )}
+              {displayCreditsTotalCents > 0 && (
+                <span>Créditos<strong className="amount--income">− {formatMoney(displayCreditsTotalCents)}</strong></span>
               )}
               {invoice.feesTotalCents > 0 && (
                 <span>Juros/tarifas<strong className="amount--expense">+ {formatMoney(invoice.feesTotalCents)}</strong></span>
@@ -229,6 +256,7 @@ export function InvoicePage() {
                 <span>Pagamentos<strong className="amount--income">− {formatMoney(invoice.paymentsTotalCents)}</strong></span>
               )}
             </div>
+            )}
 
             {!isPaid && (
               <>
@@ -272,6 +300,8 @@ export function InvoicePage() {
                   );
                 })}
               </div>
+            ) : hiddenEntryIds.size > 0 ? (
+              <p className="text-secondary">A parcela que caía aqui foi antecipada pra uma fatura anterior.</p>
             ) : (
               <p className="text-secondary">Nenhuma compra nesta fatura ainda.</p>
             )}

@@ -2,6 +2,12 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-12 — fix: parcela antecipada some da fatura futura (igual Nubank)
+
+- Depois do fix anterior (parcela antecipada aparecendo na fatura de origem), sobrou uma confusão do lado oposto: a fatura **futura** de onde a parcela saiu continuava mostrando "Compras R$300 / Créditos −R$300" lado a lado — dinheiro fantasma que se cancela mas fica visível, e a fatura em si (com saldo R$0) ainda aparecia no histórico do cartão como se tivesse algo pendente. No cartão de verdade (Nubank), a parcela antecipada só **some** da fatura futura.
+- `anticipatedAwayEntryIds` (`src/cards/anticipation.ts`) casa cada parcela `purchase` com o crédito `installment_anticipation_credit` que a anula (mesma compra, mesmo valor) e esconde os dois. `InvoicePage` deixa de listar essa parcela e some com a linha "Compras" do resumo quando não sobra nada pra mostrar (mensagem "A parcela que caía aqui foi antecipada pra uma fatura anterior."). `CardDetailPage` some com a fatura do "Histórico de faturas" quando, depois de esconder o par antecipado, não sobra nenhuma atividade real (`invoiceHasVisibleActivity`) — nada é apagado, é recalculado toda vez: se uma compra nova cair nessa mesma fatura depois, ela deixa de ficar vazia e reaparece sozinha, com o valor real.
+- Verificado ao vivo: as 3 faturas de 2027 zeradas por antecipação sumiram do histórico do cartão (a de janeiro/2027, com compra de verdade, continua aparecendo normal); a fatura de origem (julho/2026) continua mostrando as 4 parcelas somando R$1.200, sem regressão do fix anterior. 256 testes (9 novos), typecheck, lint (linha de base) e build limpos. Só UI; sem mudança de regra/dados — o ledger continua intacto e append-only, isso é puramente como a tela escolhe mostrar.
+
 ## 2026-07-12 — fix: parcela antecipada some da lista "Compras" da fatura
 
 - O total "Compras" no topo da fatura (`invoice.purchasesTotalCents`) soma tanto a compra normal do mês quanto qualquer parcela **antecipada** trazida de uma fatura futura (`installment_anticipation`, que também é um débito real na fatura atual). Mas a lista "Compras" logo abaixo só filtrava `type === 'purchase'` — as parcelas antecipadas engordavam o total sem aparecer em nenhuma linha. Sintoma real (achado pelo dono numa fatura de teste): total "R$ 1.200" com a lista mostrando só "R$ 300".

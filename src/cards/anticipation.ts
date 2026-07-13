@@ -141,3 +141,58 @@ export function groupAnticipatablePurchases(
       return leftNearest.localeCompare(rightNearest);
     });
 }
+
+export interface NettableLedgerEntry {
+  id: string;
+  type: string;
+  amountCents: number;
+  sourceTransactionId?: string;
+}
+
+/**
+ * IDs de lançamentos que devem ficar invisíveis nesta fatura: uma parcela `purchase` que foi
+ * antecipada pra fatura atual tem, na fatura ONDE ELA CAÍA ORIGINALMENTE, um crédito
+ * `installment_anticipation_credit` que a anula por completo (mesma compra, mesmo valor).
+ * Mostrar os dois lado a lado ("Compra R$300" + "Crédito −R$300") é ruído contábil sem
+ * significado pra quem usa o app — no cartão de verdade (Nubank), a parcela antecipada
+ * simplesmente SOME da fatura futura, não fica lá riscada. Casa por (sourceTransactionId,
+ * amountCents); cada crédito anula exatamente uma parcela.
+ *
+ * Não confundir com `installment_anticipation` (o débito que pousa na fatura ATUAL/origem
+ * quando se antecipa): esse é visível de propósito — é dinheiro pesando agora, correto.
+ */
+export function anticipatedAwayEntryIds(entries: NettableLedgerEntry[]): Set<string> {
+  const availableCredits = new Map<string, string[]>();
+  for (const entry of entries) {
+    if (entry.type !== 'installment_anticipation_credit' || !entry.sourceTransactionId) continue;
+    const key = `${entry.sourceTransactionId}_${entry.amountCents}`;
+    const list = availableCredits.get(key) ?? [];
+    list.push(entry.id);
+    availableCredits.set(key, list);
+  }
+
+  const hidden = new Set<string>();
+  for (const entry of entries) {
+    if (entry.type !== 'purchase' || !entry.sourceTransactionId) continue;
+    const key = `${entry.sourceTransactionId}_${entry.amountCents}`;
+    const list = availableCredits.get(key);
+    if (list && list.length > 0) {
+      hidden.add(entry.id);
+      hidden.add(list.shift() as string);
+    }
+  }
+  return hidden;
+}
+
+/**
+ * Se a fatura tem algo pra mostrar de verdade, depois de esconder os pares parcela↔crédito
+ * antecipados. Uma fatura só com esse par (sem outra compra, tarifa ou pagamento) fica vazia
+ * do ponto de vista de quem usa o app — a parcela que existia ali já foi embora — então some
+ * do histórico de faturas, exatamente como sumiu da própria tela dela. Se um dia uma compra
+ * nova cair nessa mesma fatura, ela deixa de ficar vazia e volta a aparecer sozinha.
+ */
+export function invoiceHasVisibleActivity(entries: NettableLedgerEntry[]): boolean {
+  if (entries.length === 0) return false;
+  const hidden = anticipatedAwayEntryIds(entries);
+  return entries.some((entry) => !hidden.has(entry.id));
+}

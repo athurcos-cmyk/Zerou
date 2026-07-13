@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { BottomSheet } from '../components/BottomSheet';
 import { OngoingInstallmentsSheet } from '../cards/OngoingInstallmentsSheet';
+import { invoiceHasVisibleActivity } from '../cards/anticipation';
 import { useConfirm } from '../components/ConfirmDialog';
 import { FormMessage } from '../components/FormMessage';
 import { invoiceStatusLabels } from '../cards/cardLabels';
@@ -25,6 +26,10 @@ export function CardDetailPage() {
   const finance = useFinanceContext();
   const card = cardsData.cards.find((item) => item.id === cardId);
   const invoices = cardsData.invoices.filter((invoice) => invoice.cardId === cardId);
+  // Uma fatura futura cuja única parcela foi antecipada pra cá some do histórico — igual sumiu
+  // da própria tela dela (`anticipatedAwayEntryIds`). Se uma compra nova cair nela depois, ela
+  // deixa de ficar vazia e reaparece sozinha (não é um estado gravado, é sempre recalculado).
+  const visibleInvoices = invoices.filter((invoice) => invoiceHasVisibleActivity(invoice.ledgerEntries));
   const [message, setMessage] = useState<string | null>(null);
   const { confirm, dialog: confirmDialog } = useConfirm();
 
@@ -214,9 +219,9 @@ export function CardDetailPage() {
           </div>
           <CalendarClock size={22} aria-hidden="true" />
         </div>
-        {invoices.length > 0 ? (
+        {visibleInvoices.length > 0 ? (
           <div className="item-list">
-            {invoices.map((invoice) => {
+            {visibleInvoices.map((invoice) => {
               const isPaid = invoice.status === 'paid' || invoice.status === 'overpaid';
               return (
                 <Link className="list-row list-row--link" key={invoice.id} to={`/app/cards/${invoice.cardId}/invoices/${invoice.id}`}>
