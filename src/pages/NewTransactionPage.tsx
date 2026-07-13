@@ -8,6 +8,7 @@ import { createCardPurchase } from '../cards/cardService';
 import { CategoryField } from '../components/CategoryField';
 import { FormMessage } from '../components/FormMessage';
 import { SelectField } from '../components/SelectField';
+import { TagInput } from '../components/TagInput';
 import { fromDateInputValue, todayInputValue } from '../finance/financeDates';
 import { accountTypeLabels, transactionTypeLabels } from '../finance/financeLabels';
 import { createCategory, createTransaction, deleteCategory, updateCategory } from '../finance/financeService';
@@ -48,7 +49,7 @@ export function NewTransactionPage() {
   const [date, setDate] = useState(todayInputValue());
   const [merchant, setMerchant] = useState('');
   const [notes, setNotes] = useState('');
-  const [tags, setTags] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
   const [message, setMessage] = useState<string | null>(null);
 
   const activeCards = cardsData.cards.filter((card) => card.isActive !== false);
@@ -136,10 +137,7 @@ export function NewTransactionPage() {
         accountId,
         destinationAccountId: type === 'transfer' ? destinationAccountId : undefined,
         date: fromDateInputValue(date),
-        tags: tags
-          .split(',')
-          .map((tag) => tag.trim())
-          .filter(Boolean),
+        tags,
         notes
       });
 
@@ -264,7 +262,7 @@ export function NewTransactionPage() {
             </label>
             <label className="field">
               <span>Tags</span>
-              <input className="input" value={tags} onChange={(event) => setTags(event.target.value)} placeholder="casa, essencial" />
+              <TagInput value={tags} onChange={setTags} placeholder="casa, essencial" />
             </label>
             <label className="field">
               <span>Notas</span>

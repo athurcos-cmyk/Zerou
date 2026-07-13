@@ -23,6 +23,7 @@ export function TransactionsPage() {
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense' | 'transfer'>('all');
   const [cardFilter, setCardFilter] = useState('');
+  const [tagFilter, setTagFilter] = useState<Set<string>>(new Set());
 
   const categoryMap = useMemo(() => new Map(finance.categories.map((c) => [c.id, c])), [finance.categories]);
   const cardOptions = useMemo(
@@ -37,6 +38,24 @@ export function TransactionsPage() {
     [finance.transactions]
   );
 
+  const availableTags = useMemo(() => {
+    const tags = new Set<string>();
+    for (const t of activeTransactions) {
+      for (const tag of t.tags ?? []) {
+        if (tag) tags.add(tag);
+      }
+    }
+    return [...tags].sort();
+  }, [activeTransactions]);
+
+  function toggleTagFilter(tag: string) {
+    setTagFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(tag)) next.delete(tag); else next.add(tag);
+      return next;
+    });
+  }
+
   const normalizedQuery = query.trim().toLocaleLowerCase('pt-BR');
   // Busca por nome, estabelecimento, tag e categoria — os campos que a pessoa lembra.
   const visibleTransactions = useMemo(() => {
@@ -46,6 +65,10 @@ export function TransactionsPage() {
       if (typeFilter === 'income' && t.type !== 'income') return false;
       if (typeFilter === 'expense' && t.type !== 'expense' && t.type !== 'card_purchase') return false;
       if (typeFilter === 'transfer' && t.type !== 'transfer') return false;
+      if (tagFilter.size > 0) {
+        const txTags = t.tags ?? [];
+        if (!txTags.some((tag) => tagFilter.has(tag))) return false;
+      }
       if (!normalizedQuery) return true;
       const categoryName = t.categoryId ? (categoryMap.get(t.categoryId)?.name ?? '') : '';
       const haystack = [t.description, t.merchant, t.tags?.join(' '), categoryName]
@@ -54,7 +77,7 @@ export function TransactionsPage() {
         .toLocaleLowerCase('pt-BR');
       return haystack.includes(normalizedQuery);
     });
-  }, [activeTransactions, cardFilter, typeFilter, normalizedQuery, categoryMap]);
+  }, [activeTransactions, cardFilter, typeFilter, tagFilter, normalizedQuery, categoryMap]);
 
   const typeChips: Array<{ key: typeof typeFilter; label: string }> = [
     { key: 'all', label: 'Tudo' },
@@ -120,6 +143,20 @@ export function TransactionsPage() {
               </button>
             ))}
           </div>
+          {availableTags.length > 0 && (
+            <div className="chip-row">
+              {availableTags.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  className={`chip${tagFilter.has(tag) ? ' chip--active' : ''}`}
+                  onClick={() => toggleTagFilter(tag)}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          )}
           {cardsData.cards.length > 0 && (
             <SelectField
               label="Cartão"

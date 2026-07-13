@@ -2999,6 +2999,60 @@ span.service-mark--brand {
   cursor: pointer;
 }
 
+/* Tag input (componente de chips editável). */
+.tag-input {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  cursor: text;
+  min-height: 2.6rem;
+}
+
+.tag-input:focus-within {
+  border-color: var(--action-primary);
+  box-shadow: 0 0 0 2px var(--action-primary-soft);
+}
+
+.tag-input-chip {
+  cursor: default;
+}
+
+.tag-input-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--text-secondary);
+  border-radius: 50%;
+}
+
+.tag-input-remove:hover {
+  color: var(--danger);
+}
+
+.tag-input-field {
+  border: none;
+  background: none;
+  outline: none;
+  flex: 1;
+  min-width: 80px;
+  font: inherit;
+  color: inherit;
+  padding: 0.15rem 0;
+}
+
+.tag-input-field::placeholder {
+  color: var(--text-placeholder);
+}
+
 /* Barra de busca + filtros da tela de Transações. */
 .transactions-filter {
   display: grid;

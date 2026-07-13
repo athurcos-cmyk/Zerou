@@ -2,6 +2,26 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-13 — feat: tags com chips visuais + filtro por tag nas Transações
+
+- **Novo componente `TagInput`** (`src/components/TagInput.tsx`): substitui o campo de
+  texto livre separado por vírgula por chips visuais — Enter ou vírgula adiciona um chip,
+  Backspace no campo vazio remove o último chip, clique no X remove um chip específico.
+  Normaliza tags (trim + lowercase) e evita duplicatas por capitalização.
+- **Integrado em `NewTransactionPage` e `EditTransactionPage`**: ambos trocaram o
+  `<input>` de texto por `<TagInput>`. Estado interno mudou de `string` (separado por
+  vírgula) para `string[]` — o payload do Firestore já era `string[]`, sem mudança de
+  schema.
+- **Filtro por tag em `TransactionsPage`**: chips das tags únicas encontradas nas
+  transações ativas, multi-seleção (OR entre tags), filtro client-side integrado ao
+  `useMemo` de `visibleTransactions`.
+- **CSS do `TagInput`** em `global.css`: container com borda e foco estilizado, campo
+  interno sem borda, botão de remover com hover `--danger`. Reaproveita a classe `.chip`
+  existente para os chips.
+- Sem mudança no Firestore nem em `firestore.rules` — `validTags()` já cobria o array
+  como estava.
+- Typecheck, 271 testes e build limpos.
+
 ## 2026-07-13 — feat: pagamento de compromisso com descrição e categoria editáveis
 
 - **Sheet "Confirmar pagamento" agora tem campos de descrição e categoria** (`BillsPage`):

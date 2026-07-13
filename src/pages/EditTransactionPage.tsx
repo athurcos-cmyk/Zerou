@@ -6,6 +6,7 @@ import { useFinanceContext } from '../finance/FinanceDataContext';
 import { CategoryField } from '../components/CategoryField';
 import { FormMessage } from '../components/FormMessage';
 import { SelectField } from '../components/SelectField';
+import { TagInput } from '../components/TagInput';
 import { fromDateInputValue, toDateInputValue } from '../finance/financeDates';
 import { accountTypeLabels, transactionTypeLabels } from '../finance/financeLabels';
 import { createCategory, deleteCategory, updateCategory, updateTransaction } from '../finance/financeService';
@@ -44,7 +45,7 @@ export function EditTransactionPage() {
   const [date, setDate] = useState('');
   const [merchant, setMerchant] = useState('');
   const [notes, setNotes] = useState('');
-  const [tags, setTags] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -61,7 +62,7 @@ export function EditTransactionPage() {
     setDate(toDateInputValue(transaction.date));
     setMerchant(transaction.merchant ?? '');
     setNotes(transaction.notes ?? '');
-    setTags(transaction.tags.join(', '));
+    setTags(transaction.tags);
   }, [transaction]);
 
   const accountOptions = finance.accounts.map((account) => ({
@@ -113,10 +114,7 @@ export function EditTransactionPage() {
         accountId,
         destinationAccountId: type === 'transfer' ? destinationAccountId : undefined,
         date: fromDateInputValue(date),
-        tags: tags
-          .split(',')
-          .map((tag) => tag.trim())
-          .filter(Boolean),
+        tags,
         notes
       });
 
@@ -248,7 +246,7 @@ export function EditTransactionPage() {
             </label>
             <label className="field">
               <span>Tags</span>
-              <input className="input" value={tags} onChange={(event) => setTags(event.target.value)} />
+              <TagInput value={tags} onChange={setTags} />
             </label>
             <label className="field">
               <span>Notas</span>
