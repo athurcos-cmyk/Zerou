@@ -161,7 +161,7 @@ export function CardDetailPage() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
                 <div>
                   <p className="eyebrow" style={{ marginBottom: '0.15rem' }}>Fatura atual</p>
-                  <strong style={{ fontSize: '1.1rem', fontFamily: 'DM Sans, system-ui, sans-serif' }}>
+                  <strong style={{ display: 'block', fontSize: '1.1rem', fontFamily: 'DM Sans, system-ui, sans-serif' }}>
                     <span className={openInvoice.outstandingBalanceCents > 0 ? 'amount--expense' : 'amount--income'}>
                       {formatMoney(openInvoice.outstandingBalanceCents)}
                     </span>
@@ -316,7 +316,7 @@ export function CardDetailPage() {
           open={ongoingSheetOpen}
           workspaceId={workspaceId}
           userId={user?.uid}
-          cardId={card.id}
+          card={card}
           onClose={() => setOngoingSheetOpen(false)}
         />
       ) : null}

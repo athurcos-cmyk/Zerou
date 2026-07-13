@@ -2040,8 +2040,7 @@ span.service-mark--brand {
   color: var(--text-secondary);
 }
 
-.entitlement-list li,
-.notice {
+.entitlement-list li {
   display: flex;
   align-items: flex-start;
   gap: 0.55rem;

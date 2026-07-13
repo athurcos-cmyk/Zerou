@@ -2,6 +2,47 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-13 — fix: 2 bugs de CSS achados testando a tela nova (dinheiro colado no texto + resumo ilegível no mobile)
+
+- **`.notice` estava com `display: flex` sem `flex-wrap` vazando de uma regra morta**
+  (`global.css`): `.entitlement-list li, .notice { display: flex; ... }` — `entitlement-list`
+  é da feature de billing (inativa) e não existe em nenhum `.tsx`, mas o `.notice`
+  agrupado na mesma regra é usado em 7 lugares vivos do app. Qualquer `.notice` com
+  texto misturado a `<strong>` (como o resumo do formulário de compra parcelada)
+  virava uma fileira de itens de flex sem quebra, cortando texto e empilhando pedaços
+  fora de ordem. `.notice` removido do agrupamento — a regra base (borda/padding,
+  sem flex) volta a valer sozinha.
+- **"Fatura atual" (`CardDetailPage`) mostrava o valor colado no texto seguinte**
+  (`R$ 3.200,002026-07 · em aberto...`, sem espaço): o `<strong>` do valor e o
+  `<span className="text-secondary">` do texto secundário são elementos inline sem
+  quebra entre eles — diferente do resto do app, que usa `.list-row` (que já empilha
+  texto por regra global). Essa seção usa `<div>` com estilo próprio, fora desse
+  padrão. `display: 'block'` adicionado ao `<strong>`.
+- Verificado ao vivo no navegador em viewport mobile (375px): os dois pontos
+  reproduzidos antes do fix e confirmados corrigidos depois. Checados os outros
+  lugares que usam o mesmo par `<strong>`+`<span className="text-secondary">` —
+  todos os demais já estão dentro de `.list-row` ou têm CSS próprio de grid/flex
+  intencional (`.dash-metric`, `.anticipation-group-head`), únicos os dois corrigidos.
+- Typecheck, 261 testes e build limpos.
+
+## 2026-07-13 — feat: formulário de "compra parcelada que já começou" simplificado
+
+- Feedback direto do dono usando a própria tela: pra lançar uma compra parcelada que já
+  estava rolando, o formulário pedia "próxima parcela é a Nº de M" (dois números fáceis
+  de trocar) + "em qual mês essa parcela cai na fatura" — a última exige olhar o extrato
+  do banco, informação que ninguém sabe de cabeça.
+- Trocado por "quando você comprou" (date picker, igual o de compra nova) + "total de
+  parcelas" + "quantas já pagou". O mês da próxima parcela deixou de ser perguntado e
+  passou a ser **calculado** (`resolveInstallmentCycle`, a mesma função que já resolve
+  compra nova, usando o fechamento/vencimento já cadastrados do cartão) — só aparece no
+  resumo pra confirmar, não é mais um campo cru. `OngoingInstallmentsSheet` passou a
+  receber o cartão inteiro em vez de só o id, pra ter `closingDay`/`dueDay` no cálculo.
+- Verificado ao vivo: compra em 15/mar num cartão que fecha dia 10 (1ª parcela cai em
+  abril), 10 parcelas, 6 já pagas → calculou sozinho "próxima (7/10) cai na fatura de
+  outubro/2026", 4 parcelas restantes somando R$600 — bate com a conta manual.
+- 261 testes, typecheck e build limpos. Sem mudança de regra/schema — só o formulário e
+  o cálculo que já preenchia o campo que sumiu.
+
 ## 2026-07-12 — fix: 13 bugs de uma varredura de investigação (casal, cartão, Análise)
 
 - Investigação por 4 agentes achou 20 bugs (`docs/BUGS_INVESTIGACAO_2026-07-12.md`);

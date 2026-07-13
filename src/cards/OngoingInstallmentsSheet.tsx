@@ -4,43 +4,58 @@ import { ptBR } from 'date-fns/locale';
 import { BottomSheet } from '../components/BottomSheet';
 import { FormMessage } from '../components/FormMessage';
 import { registerOngoingInstallments } from './cardService';
+import { resolveInstallmentCycle } from './cardDates';
+import { fromDateInputValue, todayInputValue } from '../finance/financeDates';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
+import type { CreditCard } from '../types/contracts';
 
 interface OngoingInstallmentsSheetProps {
   open: boolean;
   workspaceId?: string;
   userId?: string;
-  cardId: string;
+  card: Pick<CreditCard, 'id' | 'closingDay' | 'dueDay'>;
   onClose: () => void;
 }
 
-function currentMonthValue() {
-  return format(new Date(), 'yyyy-MM');
+function firstDayOfReferenceMonth(referenceMonth: string) {
+  const [year, month] = referenceMonth.split('-').map(Number);
+  return new Date(year, (month || 1) - 1, 1, 12, 0, 0);
 }
 
 /**
- * Lança uma compra parcelada que já estava rolando (ex.: óculos 10x, já na parcela 7).
- * A pessoa informa o valor da parcela, em qual está (7 de 10) e em que mês cai a próxima;
- * o app cria só as que faltam, nas faturas certas, rotuladas 7/10…10/10.
+ * Lança uma compra parcelada que já estava rolando (ex.: óculos 10x, já pagou 6).
+ * A pessoa informa quando comprou, o total de parcelas e quantas já pagou — o app
+ * calcula sozinho em qual fatura cai a próxima (mesma lógica de uma compra nova,
+ * `resolveInstallmentCycle`, usando o fechamento/vencimento já cadastrados do cartão)
+ * e cria só as parcelas que faltam, rotuladas corretamente (ex.: 7/10…10/10).
  */
-export function OngoingInstallmentsSheet({ open, workspaceId, userId, cardId, onClose }: OngoingInstallmentsSheetProps) {
+export function OngoingInstallmentsSheet({ open, workspaceId, userId, card, onClose }: OngoingInstallmentsSheetProps) {
   const [description, setDescription] = useState('');
   const [value, setValue] = useState('');
-  const [current, setCurrent] = useState('1');
+  const [purchaseDate, setPurchaseDate] = useState(todayInputValue());
   const [total, setTotal] = useState('2');
-  const [month, setMonth] = useState(currentMonthValue());
+  const [alreadyPaid, setAlreadyPaid] = useState('0');
   const [message, setMessage] = useState<string | null>(null);
 
-  const currentNum = Number(current) || 0;
   const totalNum = Number(total) || 0;
+  const alreadyPaidNum = Number(alreadyPaid) || 0;
+  const currentNum = alreadyPaidNum + 1;
   const valueCents = value.trim() ? parseMoneyToCents(value) : 0;
-  const remaining = totalNum >= currentNum && currentNum >= 1 ? totalNum - currentNum + 1 : 0;
+  const remaining = totalNum >= 1 && alreadyPaidNum >= 0 && alreadyPaidNum < totalNum ? totalNum - alreadyPaidNum : 0;
+
+  const nextCycle = useMemo(() => {
+    if (remaining <= 0) return null;
+    try {
+      return resolveInstallmentCycle(fromDateInputValue(purchaseDate), card.closingDay, card.dueDay, alreadyPaidNum);
+    } catch {
+      return null;
+    }
+  }, [remaining, purchaseDate, card.closingDay, card.dueDay, alreadyPaidNum]);
 
   const preview = useMemo(() => {
-    if (remaining <= 0 || !valueCents) return null;
-    const [year, m] = month.split('-').map(Number);
-    const firstMonth = new Date(year, (m || 1) - 1, 1);
+    if (!nextCycle || !valueCents) return null;
+    const firstMonth = firstDayOfReferenceMonth(nextCycle.referenceMonth);
     const lastMonth = addMonths(firstMonth, remaining - 1);
     return {
       count: remaining,
@@ -48,36 +63,36 @@ export function OngoingInstallmentsSheet({ open, workspaceId, userId, cardId, on
       firstLabel: format(firstMonth, 'MMM yyyy', { locale: ptBR }),
       lastLabel: format(lastMonth, 'MMM yyyy', { locale: ptBR })
     };
-  }, [remaining, valueCents, month]);
+  }, [nextCycle, remaining, valueCents]);
 
   const canSubmit =
     Boolean(workspaceId && userId) &&
     description.trim().length >= 2 &&
     valueCents > 0 &&
-    currentNum >= 1 &&
     totalNum >= 2 &&
-    currentNum <= totalNum;
+    alreadyPaidNum >= 0 &&
+    alreadyPaidNum < totalNum &&
+    Boolean(nextCycle);
 
   function reset() {
     setDescription('');
     setValue('');
-    setCurrent('1');
+    setPurchaseDate(todayInputValue());
     setTotal('2');
-    setMonth(currentMonthValue());
+    setAlreadyPaid('0');
   }
 
   function handleSubmit() {
-    if (!workspaceId || !userId || !canSubmit) return;
-    const [year, m] = month.split('-').map(Number);
+    if (!workspaceId || !userId || !canSubmit || !nextCycle) return;
     setMessage(null);
     onClose();
     registerOngoingInstallments(workspaceId, userId, {
-      cardId,
+      cardId: card.id,
       description: description.trim(),
       installmentValueCents: valueCents,
       currentInstallment: currentNum,
       totalInstallments: totalNum,
-      nextDueMonth: new Date(year, (m || 1) - 1, 1, 12, 0, 0)
+      nextDueMonth: firstDayOfReferenceMonth(nextCycle.referenceMonth)
     }).catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível lançar a compra agora.')));
     reset();
   }
@@ -108,30 +123,30 @@ export function OngoingInstallmentsSheet({ open, workspaceId, userId, cardId, on
             />
           </label>
 
+          <label className="field">
+            <span>Quando você comprou?</span>
+            <input className="input" type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} />
+          </label>
+
           <div className="form-grid-2">
             <label className="field">
-              <span>Próxima parcela</span>
-              <input className="input" type="number" inputMode="numeric" min={1} max={totalNum || 72} value={current} onChange={(e) => setCurrent(e.target.value)} />
+              <span>Total de parcelas</span>
+              <input className="input" type="number" inputMode="numeric" min={2} max={72} value={total} onChange={(e) => setTotal(e.target.value)} />
             </label>
             <label className="field">
-              <span>De um total de</span>
-              <input className="input" type="number" inputMode="numeric" min={2} max={72} value={total} onChange={(e) => setTotal(e.target.value)} />
+              <span>Quantas já pagou</span>
+              <input className="input" type="number" inputMode="numeric" min={0} max={Math.max(0, totalNum - 1)} value={alreadyPaid} onChange={(e) => setAlreadyPaid(e.target.value)} />
             </label>
           </div>
           <span className="field-hint" style={{ marginTop: '-0.4rem' }}>
-            Se já pagou algumas, coloque a próxima que ainda vai cair (ex.: 7 de 10). Se a compra é futura e ainda não
-            começou a ser cobrada, deixe 1.
+            Deixe 0 se a compra é futura e ainda não começou a ser cobrada.
           </span>
 
-          <label className="field">
-            <span>Essa próxima parcela cai em qual mês?</span>
-            <input className="input" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
-            <span className="field-hint">O mês da fatura onde ela aparece — pode ser um mês futuro (ex.: outubro).</span>
-          </label>
-
-          {preview ? (
+          {preview && nextCycle ? (
             <div className="notice">
-              Vamos lançar <strong>{preview.count} {preview.count === 1 ? 'parcela' : 'parcelas'}</strong> de{' '}
+              A próxima parcela ({currentNum}/{totalNum}) cai na fatura de{' '}
+              <strong>{format(firstDayOfReferenceMonth(nextCycle.referenceMonth), 'MMM yyyy', { locale: ptBR })}</strong>. Vamos lançar{' '}
+              <strong>{preview.count} {preview.count === 1 ? 'parcela' : 'parcelas'}</strong> de{' '}
               <strong>{formatMoney(valueCents)}</strong> ({currentNum}/{totalNum} até {totalNum}/{totalNum}), de{' '}
               <strong>{preview.firstLabel}</strong> a <strong>{preview.lastLabel}</strong>. Total que falta:{' '}
               <strong>{formatMoney(preview.totalCents)}</strong>. As parcelas já pagas não são recriadas.
