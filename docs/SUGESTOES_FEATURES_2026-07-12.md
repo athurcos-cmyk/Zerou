@@ -26,7 +26,7 @@ só com autorização explícita do dono.
 - [x] 1. Filtro por status nos Compromissos
 - [x] 2. Meta com data-limite visível no card
 - [x] 3. Exportar transações (CSV)
-- [ ] 4. Widget "quanto posso gastar por dia"
+- [x] 4. Widget "quanto posso gastar por dia"
 - [ ] 5. Atalho de pagamento mais completo a partir de um compromisso (escopo revisado)
 - [ ] 6. Tags personalizadas (escopo revisado)
 - [ ] 7. Orçamento mensal por categoria

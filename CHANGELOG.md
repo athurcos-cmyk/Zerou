@@ -2,6 +2,19 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-13 — feat: widget "quanto posso gastar por dia" no Dashboard
+
+- **Valor por dia no card "Disponível"**: substitui "Livre agora." por
+  "≈ R$ X,XX/dia até {data}" quando há saldo disponível e data de corte resolvida
+  (receita futura, próximo recebimento ou janela de dias). Cálculo: `freeToSpendCents /
+  daysUntilCutoff`, arredondado pra baixo.
+- **Casos de borda**: saldo negativo ou zero mostra "Você já comprometeu tudo que tem
+  disponível."; loading mostra "Carregando..."; sem `committedCutoff` mantém "Livre
+  agora." (fallback).
+- Reaproveita 100% de dado já calculado (`dashboard.freeToSpendCents` +
+  `dashboard.committedCutoff`) — sem nova leitura do Firestore.
+- Typecheck, 271 testes e build limpos.
+
 ## 2026-07-13 — feat: exportar transações do mês em CSV
 
 - **Novo módulo `src/finance/csvExport.ts`**: funções puras `transactionsToCsv` e

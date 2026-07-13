@@ -10,6 +10,7 @@ import type { AvailableMode } from '../types/contracts';
 import { calculateDashboardSummary } from '../finance/financeCalculations';
 import { defaultAvailableMode } from '../finance/availableMode';
 import { readCachedDashboardSummary, saveCachedDashboardSummary } from '../finance/dashboardSummaryCache';
+import { differenceInCalendarDays } from 'date-fns';
 import { formatFriendlyDate } from '../finance/financeDates';
 import { transactionTypeLabels } from '../finance/financeLabels';
 import { formatMoney } from '../finance/money';
@@ -54,6 +55,16 @@ export function DashboardPage() {
       : dashboard.committedCutoffSource === 'payday'
       ? `Considerando seu recebimento em ${formatFriendlyDate(dashboard.committedCutoff!)}`
       : `Considerando os próximos ${profile?.committedWindowDays ?? 30} dias`;
+
+  const perDayDisplay = useMemo(() => {
+    if (isCommittedLoading || !dashboard.committedCutoff) return null;
+    if (dashboard.freeToSpendCents <= 0) return null;
+    const daysUntilCutoff = Math.max(1, differenceInCalendarDays(dashboard.committedCutoff, new Date()));
+    const perDayCents = Math.floor(dashboard.freeToSpendCents / daysUntilCutoff);
+    return perDayCents > 0
+      ? `≈ ${formatMoney(perDayCents)}/dia até ${formatFriendlyDate(dashboard.committedCutoff)}`
+      : null;
+  }, [isCommittedLoading, dashboard.committedCutoff, dashboard.freeToSpendCents]);
 
   // Só depois que o perfil carregou (senão o sheet pisca antes de sabermos a escolha) e
   // depois que o tour de boas-vindas fechou — pra não empilhar dois modais no primeiro acesso.
@@ -151,7 +162,15 @@ export function DashboardPage() {
           <article className="surface surface-pad dash-metric dash-metric--available">
             <p className="eyebrow">Disponível</p>
             <strong className="display-number">{freeToSpendDisplay}</strong>
-            <span className="text-secondary">Livre agora.</span>
+            <span className="text-secondary">
+              {perDayDisplay
+                ? perDayDisplay
+                : isCommittedLoading
+                ? 'Carregando...'
+                : dashboard.freeToSpendCents <= 0
+                ? 'Você já comprometeu tudo que tem disponível.'
+                : 'Livre agora.'}
+            </span>
           </article>
           <article className="surface surface-pad dash-metric dash-metric--committed">
             <p className="eyebrow">Comprometido</p>
