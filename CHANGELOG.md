@@ -2,6 +2,21 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-13 — feat: filtro por status nos Compromissos
+
+- **Chips de filtro em `BillsPage`**: botões "Todos", "Pendentes", "Vencidos", "Pagos"
+  entre o cabeçalho "Lista" e a lista de compromissos — mesmo padrão de `chip-row` já
+  usado nos filtros de tipo das Transações.
+- **Filtro 100% client-side** (`useMemo` sobre `finance.bills`): sem chamada de rede,
+  reage instantaneamente à troca de chip e a bills que viram `overdue` automaticamente
+  (via `markOverdueBills`, já existente).
+- **EmptyState com `illustration="bills"`** (ilustração de calendário+check, já existia
+  mas nunca era usada nesta página — antes usava `wallet`): variante `compact` para
+  "Nenhum resultado" (filtro sem match) e variante normal para "Nenhum compromisso
+  ainda" (lista vazia de verdade).
+- Sem mudança no Firestore nem em `firestore.rules`.
+- Typecheck, 261 testes e build limpos.
+
 ## 2026-07-13 — fix: 2 bugs de CSS achados testando a tela nova (dinheiro colado no texto + resumo ilegível no mobile)
 
 - **`.notice` estava com `display: flex` sem `flex-wrap` vazando de uma regra morta**

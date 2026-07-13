@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useFinanceContext } from '../finance/FinanceDataContext';
@@ -32,6 +32,19 @@ export function BillsPage() {
   const [payAccountId, setPayAccountId] = useState('');
   const [payAmount, setPayAmount] = useState('');
   const [formOpen, setFormOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'overdue' | 'paid'>('all');
+
+  const statusChips: Array<{ key: typeof statusFilter; label: string }> = [
+    { key: 'all', label: 'Todos' },
+    { key: 'pending', label: 'Pendentes' },
+    { key: 'overdue', label: 'Vencidos' },
+    { key: 'paid', label: 'Pagos' }
+  ];
+
+  const visibleBills = useMemo(() => {
+    if (statusFilter === 'all') return finance.bills;
+    return finance.bills.filter((bill) => bill.status === statusFilter);
+  }, [finance.bills, statusFilter]);
 
   const serviceSuggestions = searchSubscriptionServices(description);
 
@@ -185,9 +198,24 @@ export function BillsPage() {
 
         <article className="surface surface-pad">
           <p className="eyebrow">Lista</p>
+          {finance.bills.length > 0 && (
+            <div className="chip-row">
+              {statusChips.map((chip) => (
+                <button
+                  key={chip.key}
+                  type="button"
+                  className={`chip${statusFilter === chip.key ? ' chip--active' : ''}`}
+                  onClick={() => setStatusFilter(chip.key)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          )}
           {finance.bills.length > 0 ? (
+            visibleBills.length > 0 ? (
             <div className="item-list">
-              {finance.bills.map((bill) => (
+              {visibleBills.map((bill) => (
                 <div className="list-row list-row--with-icon" key={bill.id}>
                   <ServiceMark service={findSubscriptionService(bill.description)} />
                   <div className="list-row-body">
@@ -213,9 +241,17 @@ export function BillsPage() {
                 </div>
               ))}
             </div>
+            ) : (
+              <EmptyState
+                illustration="bills"
+                compact
+                title="Nenhum resultado"
+                description="Nenhum compromisso nesse filtro."
+              />
+            )
           ) : (
             <EmptyState
-              illustration="wallet"
+              illustration="bills"
               title="Nenhum compromisso ainda"
               description="Cadastre contas a pagar para lembrar dos vencimentos antes que eles cheguem."
             />
