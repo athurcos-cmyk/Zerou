@@ -44,3 +44,6 @@ Novo Documento de Texto.txt
 coverage/
 .playwright/
 test-results/
+
+# Docs locais (nunca comitar — credenciais, notas de máquina local)
+*.local.md

@@ -27,6 +27,7 @@ O Java desta máquina estava quebrado: dois JDK 25 sem a pasta `bin/` e um stub 
 | Segurança/privacidade | `docs/SECURITY.md`, `docs/PRIVACY.md` |
 | Operação/deploy | `docs/RUNBOOK.md`, `docs/PRODUCTION_CHECKLIST.md` |
 | Billing futuro (inativo) | `docs/BILLING.md`, `docs/BOOTSTRAP_FIREBASE_STRIPE.md` |
+| Contas de teste (login p/ verificação em navegador) | `TEST_ACCOUNTS.local.md` (local, fora do git — não existe se ninguém criou na sua máquina) |
 
 ## Projeto
 

@@ -30,10 +30,11 @@ só com autorização explícita do dono.
 - [x] 5. Atalho de pagamento mais completo a partir de um compromisso (escopo revisado)
 - [x] 6. Tags personalizadas (escopo revisado)
 - [x] 7. Orçamento mensal por categoria
-- [ ] 8. Importação OFX/CSV bancário
 - [x] 9. Reconciliação "conferido"
-- [ ] 10. Split de conta entre amigos (fora do casal)
-- [ ] 11. Modo escuro agendado — **confirmar necessidade antes de construir** (ver nota)
+
+> Itens 8 (importação OFX/CSV), 10 (split de conta entre amigos) e 11 (modo escuro
+> agendado) foram removidos do backlog a pedido do dono em 2026-07-13 — decisão de
+> produto, não falta de tempo. Não recolocar sem pedido explícito.
 
 ---
 
@@ -501,55 +502,11 @@ escapou dos testes por meses, segundo o histórico do projeto).
 
 ---
 
-## Tier 3 — Baixa prioridade / decisões de produto maiores
-
-### 8. Importação OFX/CSV bancário
-
-**Prioridade:** reordenada **antes** da reconciliação (item 9) — importar em lote é o
-que cria a necessidade real de conciliar, então faz mais sentido nessa ordem mesmo
-sendo a feature mais cara da lista.
-**Esforço:** ~1-2 semanas (mantido do documento original — é o item mais caro daqui).
-**Por que vale a pena mesmo caro:** dado de contexto, não do código — digitar todo o
-histórico financeiro na mão é provavelmente a maior barreira de ativação de um app
-financeiro pessoal. Vale considerar antecipar esta feature mesmo sendo cara, se
-ativação/retenção de novos usuários virar prioridade do produto.
-
-**O que a leitura do código confirma:**
-- Não existe nenhum parser de arquivo no projeto hoje (nem financeiro, nem de outro
-  tipo) — seria a primeira feature desse tipo.
-- `createTransaction(workspaceId, userId, input: CreateTransactionInput)`
-  (`src/finance/financeService.ts:147-180`) já é reutilizável em lote — mas cada
-  chamada faz um `setDoc` individual (`await setDoc(...)`, linha 154), não um
-  `writeBatch`. Importar 200 transações de um extrato faria 200 escritas
-  individuais — trocar por `writeBatch` (limite de 500 operações por batch do
-  Firestore; extratos maiores precisam de múltiplos batches sequenciais).
-- `Entitlements.canImportStatements` já existe no tipo (`src/types/contracts.ts:376`)
-  mas não é lido em lugar nenhum do app hoje (só existe em `billingService.ts`,
-  billing inativo) — **não amarrar esta feature ao sistema de billing**, ele está
-  desligado por decisão de produto (ver `CLAUDE.md`, "não ativar billing... sem
-  pedido explícito").
-
-**Escopo recomendado pro v1 (reduzir o "1-2 semanas" se possível):** começar só com
-CSV genérico (usuário exporta do banco em CSV e mapeia colunas manualmente num
-preview), não OFX. OFX tem dialeto por banco e exige parser mais robusto — CSV com
-preview + mapeamento manual de colunas cobre a maior parte do valor com uma fração do
-esforço. Se o dono confirmar que quer OFX de bancos específicos, tratar como
-segunda fase.
-
-**Não detalhado a fundo nesta revisão** (esforço grande demais pra caber num item de
-"baixa prioridade" sem antes confirmar apetite do dono pra essa frente) — antes de
-começar a implementação, validar com o dono: (a) CSV genérico é suficiente pro v1? (b)
-quais bancos priorizar se for OFX? (c) como tratar duplicata (mesma transação
-importada duas vezes)?
-
----
+## Tier 3 — Baixa prioridade
 
 ### 9. Reconciliação "conferido"
 
-**Prioridade:** baixa, e **depende conceitualmente do item 8** — conciliar contra um
-extrato só faz sentido pleno quando existe um jeito de trazer o extrato pro app.
-Sem import, "conferido" vira só um checkbox manual de "já revisei isso", que tem
-valor bem menor.
+**Status:** implementado (commit `016d1c4`).
 **Esforço:** ~4h (revisado pra baixo do "~1 dia" original — o campo é simples).
 **Arquivo:** `src/pages/EditTransactionPage.tsx` (não lido nesta revisão — conferir
 estrutura antes de editar), [`src/pages/TransactionsPage.tsx`](../src/pages/TransactionsPage.tsx).
@@ -583,95 +540,6 @@ estrutura antes de editar), [`src/pages/TransactionsPage.tsx`](../src/pages/Tran
 **Testes de regra:** adicionar caso em `tests/firestore.rules.test.ts` — marcar
 `reconciledAt` num update deve suceder; incluir `reconciledAt` no create deve falhar
 (se a opção explícita do passo 2 for adotada).
-
----
-
-### 10. Split de conta entre amigos (fora do casal)
-
-**Prioridade:** baixa, mas com uma ressalva importante — **o esforço real não é
-"~1 semana"**. É a única feature deste documento que muda o **modelo de confiança**
-do produto inteiro, não só adiciona uma tela.
-
-**Por que isso é diferente de tudo mais na lista:** hoje, **toda** leitura/escrita do
-app exige autenticação — confirmado lendo `firestore.rules` inteiro: a única exceção
-existente é `match /coupleInvites/{inviteId}`, cujo `allow read` aceita
-`resource.data.status == 'active' && resource.data.expiresAt > request.time` **sem**
-exigir `signedIn()` (`firestore.rules:1561-1564`). Mas mesmo essa brecha nunca é
-exercida de fato: `JoinInvitePage.tsx` (`src/pages/JoinInvitePage.tsx:25-33`) só chama
-`previewCoupleInvite(code)` quando `user` já está autenticado
-(`if (!code || !user || !hasFoundation...) return;`, linha 26) — ou seja, **o produto
-nunca teve, na prática, uma jornada de usuário 100% anônima.** Login sempre vem antes
-de qualquer leitura de dado real, mesmo quando a regra tecnicamente permitiria ler
-sem.
-
-Um "link compartilhável" pra split com amigos, do jeito que o documento original
-descreve (pessoa sem conta abre o link, vê o valor, confirma a parte dela), seria a
-**primeira jornada verdadeiramente anônima do produto**. Isso implica, no mínimo:
-- Rate limiting contra alguém varrendo tokens/IDs pra achar claims de outras pessoas
-  (hoje não existe nenhum mecanismo de rate limit no projeto — é tudo Security Rules
-  + client-side).
-- Nenhum rastro de quem confirmou o quê (sem `request.auth.uid`, a única identidade
-  possível é o token da URL — mais fácil de compartilhar/vazar sem querer que uma
-  sessão logada).
-- Um caminho de escrita pública (confirmar "minha parte") — mais delicado que o
-  precedente de `coupleInvites`, que só permite **leitura** anônima; toda escrita no
-  projeto hoje, sem exceção, exige `isActiveMember`/`isSelf`/`signedIn()`.
-
-**Recomendação:** não tratar como item de cauda longa de roadmap junto com "modo
-escuro agendado". Antes de estimar esforço de verdade, decidir com o dono, como
-decisão de produto e segurança separada:
-1. Vale abrir mão de "sem conta" e em vez disso reusar o modelo de convite do casal
-   (pessoa recebe o link, mas precisa criar conta/logar antes de confirmar — igual
-   `JoinInvitePage` hoje)? Isso elimina o problema de confiança inteiro e reaproveita
-   `sharedService.ts`/`inviteCode.ts` quase como estão.
-2. Se for mesmo pra ser anônimo (sem conta), esse "quase é a primeira Cloud Function
-   do fluxo principal" do produto — Security Rules sozinhas ficam frágeis pra esse
-   tipo de acesso (não dá pra fazer rate limit em regra do Firestore). Vale revisitar
-   a decisão "sem Cloud Functions no fluxo principal" (`CLAUDE.md`) só pra este caso.
-
-**Não escrever passo a passo de implementação até essa decisão ser tomada** — o
-"como" muda completamente dependendo da resposta.
-
----
-
-### 11. Modo escuro agendado — confirmar necessidade antes de construir
-
-**Prioridade:** baixa, e **possivelmente redundante** — vale confirmar com o dono
-antes de gastar esforço aqui.
-
-**Descoberta importante:** o modo `system` já existe e já é dinâmico. Em
-`src/theme/ThemeRuntime.tsx:17-27`, o app escuta
-`window.matchMedia('(prefers-color-scheme: dark)')` com `addEventListener('change',
-...)` — ou seja, quando o **sistema operacional** troca de claro pra escuro (iOS e
-Android modernos já tem agendamento nativo "claro de dia, escuro de noite" nas
-configurações de tela), o app já reage em tempo real, sem precisar reabrir. Ver
-também `AppearanceSettingsPage.tsx:20-38`, onde o modo `system` já mapeia claro→Paper,
-escuro→Obsidian.
-
-**O que a feature proposta adicionaria de fato:** só cobriria o caso de alguém que (a)
-não quer usar o agendamento do próprio celular, ou (b) está num dispositivo/navegador
-sem suporte a `prefers-color-scheme` agendado (raro em 2026). Antes de implementar,
-vale perguntar ao dono se esse caso de uso é real o suficiente pra justificar o
-esforço.
-
-**Se decidir seguir mesmo assim — esforço real é maior que o "~2h" do documento
-original**, porque `themeMode` é validado em `firestore.rules` também (não é só
-`localStorage` como o documento original assumia):
-- `ThemeMode` (`src/theme/theme.types.ts:2`) precisaria de um terceiro valor, ex.
-  `'scheduled'`.
-- `validThemeFields()` (`firestore.rules:57-63`) trava
-  `themeMode in ['manual', 'system']` — **precisa adicionar `'scheduled'` na mesma
-  hora que o tipo TypeScript muda**, ou cai exatamente no padrão de bug documentado
-  na regra principal deste projeto (campo/enum novo sem atualizar a regra no mesmo
-  commit). Este é um exemplo direto onde a "regra principal" do `CLAUDE.md` se
-  aplica a uma mudança de **preferência de usuário**, não só dado financeiro.
-- `appearance.store.ts` (não lido a fundo nesta revisão) precisaria de um novo efeito
-  baseado em horário (`new Date().getHours()`), coexistindo com o efeito existente de
-  `matchMedia` em `ThemeRuntime.tsx`.
-- UI nova em `AppearanceSettingsPage.tsx` pra configurar os horários (ou horário fixo
-  6h-18h, mais simples).
-
-Esforço revisado: **~3-4h**, não 2h, por causa do ponto da regra do Firestore.
 
 ---
 
