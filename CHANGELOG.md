@@ -2,6 +2,33 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-12 — fix: 13 bugs de uma varredura de investigação (casal, cartão, Análise)
+
+- Investigação por 4 agentes achou 20 bugs (`docs/BUGS_INVESTIGACAO_2026-07-12.md`);
+  18 confirmados reais, 2 descartados (contrariavam a arquitetura offline-first do
+  projeto ou eram limitação de modelagem, não bug). 13 corrigidos
+  (`docs/CORRECAO_BUGS_2026-07-12.md`): erro engolido nas escritas do espaço a dois
+  (`fireWrite`), status de fatura travado após reconciliação manual, dupla
+  antecipação de parcela por falta de idempotência, guardar/resgatar do cofrinho
+  não-atômico entre workspace do casal e pessoal, status `overdue` de fatura nunca
+  produzido, Análise ignorando `refund`/`reimbursement`/`adjustment`, entre outros.
+  Zero mudança em `firestore.rules`.
+- Revisão de código da própria correção (feita porque o dispatch de subagentes
+  falhou no ambiente, revisão manual direto no diff) achou 2 fixes incompletos:
+  o do erro engolido só cobria 2 das 5 funções afetadas (as outras 3 são de uma
+  feature "acerto de contas" sem UI ainda, sem sintoma hoje mas armadilha pra
+  quando for construída), e o da Análise só corrigia o total do mês, não o
+  detalhamento por categoria. Ambos completados; 2 funções que ficaram sem
+  nenhum caller (`addGoalContribution`/`withdrawGoalContribution`) removidas.
+- 261 testes (3 novos), typecheck e build limpos.
+
+## 2026-07-12 — fix: spread frágil na saída do espaço a dois + bills viram "vencido" sozinhas
+
+- Análise de arquitetura feita junto com outra IA (Deepseek — ver `docs/ANALISE_PROJETO_2026-07-12.md`) revisada ponto a ponto contra o código antes de implementar; dois achados de baixo risco/alto valor foram aplicados, um terceiro (apertar a regra de exclusão de conta pra `canDeleteWorkspaceTree`) foi descartado depois de achar que qualquer membro ativo pode excluir a própria conta hoje pela UI — apertar a regra quebraria isso silenciosamente pro parceiro não-dono, o mesmo padrão de bug que este projeto já sofreu 3 vezes.
+- `accountDeletionService.ts` (`leavePartnerWorkspace`): trocado o `{...workspaceRefData, status, updatedAt}` por objeto explícito `{status, updatedAt}` — a pendência que estava documentada no `CLAUDE.md`.
+- `markOverdueBills` (`financeService.ts`) roda a cada snapshot de `subscribeBills` e marca `pending → overdue` (fire-and-forget) toda bill com vencimento em dia anterior a hoje; regra do Firestore já aceitava o valor, não precisou mudar. `BillsPage` ganhou os botões "Pago"/"Cancelar" também pra bills `overdue` (antes só apareciam pra `pending` — a marcação automática ia esconder a ação de pagar uma conta vencida).
+- 258 testes (2 novos, cobrindo os limites de `markOverdueBills`: dia de vencimento vs hoje vs futuro, e os 3 status que não devem disparar escrita), typecheck e build limpos. Sem mudança de regra do Firestore.
+
 ## 2026-07-12 — fix: número da parcela antecipada some no caminho, "Parcela antecipada" ficava genérica
 
 - Ao antecipar, o número da parcela (8/10, 5/5...) era descartado antes de gravar no ledger — nem o débito (fatura de origem) nem o crédito (fatura de destino) guardavam qual parcela era. Combinado com o fix anterior (parcela antecipada some da fatura futura), isso dava a impressão de que sobravam parcelas: a última visível de uma compra em 10x parava em "7/10" sem nenhuma pista de que 8, 9 e 10 foram antecipadas — parecia fatura incompleta, não paga adiantado.

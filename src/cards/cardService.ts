@@ -486,7 +486,6 @@ export async function recordInvoiceFee(workspaceId: string, userId: string, inpu
 export async function anticipateInstallments(workspaceId: string, userId: string, input: AnticipateInstallmentsInput) {
   const parsed = anticipateInstallmentsSchema.parse(input);
   const batch = writeBatch(getFirebaseDb());
-  const seed = createId('anticipation');
 
   // Um lançamento de débito por parcela antecipada (não um único débito somado) —
   // cada um carrega o `sourceTransactionId` da compra original correspondente. Sem
@@ -495,7 +494,7 @@ export async function anticipateInstallments(workspaceId: string, userId: string
   // lançamentos com `sourceTransactionId` apontando pra uma transação excluída, e um
   // débito somado sem esse vínculo nunca seria limpo.
   parsed.credits.forEach((credit, index) => {
-    const creditKey = `${seed}_credit_${credit.invoiceId}_${index}`;
+    const creditKey = `anticipation_credit_${credit.sourceTransactionId}_${credit.invoiceId}`;
     const creditEntryId = idempotentEntryId(creditKey);
     batch.set(
       ledgerDocRef(workspaceId, parsed.cardId, credit.invoiceId, creditEntryId),
@@ -515,7 +514,7 @@ export async function anticipateInstallments(workspaceId: string, userId: string
       })
     );
 
-    const debitKey = `${seed}_debit_${index}`;
+    const debitKey = `anticipation_debit_${credit.sourceTransactionId}_${credit.invoiceId}`;
     const debitEntryId = idempotentEntryId(debitKey);
     batch.set(
       ledgerDocRef(workspaceId, parsed.cardId, parsed.currentInvoiceId, debitEntryId),

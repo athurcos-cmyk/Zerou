@@ -4,7 +4,7 @@ import { BottomSheet } from '../../components/BottomSheet';
 import { categoryColors } from '../../components/categoryIcons';
 import { ACCENT_FOREGROUND } from '../../theme/palette';
 import { EmptyState } from '../../components/EmptyState';
-import { addGoalContribution, createGoal, createTransaction, deleteGoal, withdrawGoalContribution } from '../../finance/financeService';
+import { coupleGoalDeposit, coupleGoalWithdraw, createGoal, deleteGoal } from '../../finance/financeService';
 import { calculateAccountBalances } from '../../finance/financeCalculations';
 import { formatMoney, parseMoneyToCents } from '../../finance/money';
 import { getUserFacingErrorMessage } from '../../utils/userFacingError';
@@ -88,33 +88,15 @@ export function CoupleSavingsSection({
     onMessage(null);
 
     if (guardarSign === 1) {
-      addGoalContribution(workspaceId, userId, guardarTarget.goal.id, amountCents)
-        .catch((error) => onMessage(getUserFacingErrorMessage(error, 'Não foi possível guardar agora.')));
-      if (guardarFromAccount && personalDefaultWorkspaceId) {
-        createTransaction(personalDefaultWorkspaceId, userId, {
-          type: 'expense',
-          amountCents,
-          description: `Cofrinho: ${guardarTarget.goal.name}`,
-          categoryId: 'both_cofrinho',
-          accountId: guardarFromAccount,
-          date: new Date(),
-          tags: ['cofrinho']
-        }).catch(() => undefined);
-      }
+      coupleGoalDeposit(workspaceId, personalDefaultWorkspaceId, userId, guardarTarget.goal.id, amountCents, {
+        description: `Cofrinho: ${guardarTarget.goal.name}`,
+        accountId: guardarFromAccount
+      }).catch((error) => onMessage(getUserFacingErrorMessage(error, 'Não foi possível guardar agora.')));
     } else {
-      withdrawGoalContribution(workspaceId, userId, guardarTarget.goal.id, amountCents)
-        .catch((error) => onMessage(getUserFacingErrorMessage(error, 'Não foi possível resgatar agora.')));
-      if (guardarFromAccount && personalDefaultWorkspaceId) {
-        createTransaction(personalDefaultWorkspaceId, userId, {
-          type: 'income',
-          amountCents,
-          description: `Cofrinho: ${guardarTarget.goal.name} (resgate)`,
-          categoryId: 'both_cofrinho',
-          accountId: guardarFromAccount,
-          date: new Date(),
-          tags: ['cofrinho']
-        }).catch(() => undefined);
-      }
+      coupleGoalWithdraw(workspaceId, personalDefaultWorkspaceId, userId, guardarTarget.goal.id, amountCents, {
+        description: `Cofrinho: ${guardarTarget.goal.name} (resgate)`,
+        accountId: guardarFromAccount
+      }).catch((error) => onMessage(getUserFacingErrorMessage(error, 'Não foi possível resgatar agora — talvez seu parceiro tenha resgatado antes. Confira o saldo e tente de novo.')));
     }
 
     setGuardarTarget(null);

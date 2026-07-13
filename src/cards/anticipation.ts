@@ -61,7 +61,8 @@ function collectFutureInstallments(
         invoice.cardId === currentInvoice.cardId &&
         invoice.referenceMonth > currentInvoice.referenceMonth &&
         invoice.status !== 'paid' &&
-        invoice.status !== 'overpaid'
+        invoice.status !== 'overpaid' &&
+        invoice.status !== 'partial'
     )
     .flatMap((invoice) => {
       const alreadyAnticipated = new Map<string, number>();

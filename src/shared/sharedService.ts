@@ -21,7 +21,6 @@ import {
 import { addHours } from 'date-fns';
 import { getBillingEntitlementsForUser } from '../billing/billingService';
 import { getFirebaseDb } from '../firebase/config';
-import { fireWrite } from '../firebase/fireWrite';
 import { readSnapshotDoc } from '../firebase/snapshotData';
 import { getPersonalWorkspaceId } from '../workspaces/workspaceService';
 import {
@@ -407,6 +406,10 @@ export async function cancelCoupleWorkspace(workspaceId: string, userId: string,
     throw new Error('Confirme que deseja cancelar o espaço compartilhado.');
   }
   const db = getFirebaseDb();
+  const wsSnap = await getDoc(workspaceRef(workspaceId));
+  if (wsSnap.exists() && (wsSnap.data().activeMemberCount ?? 1) > 1) {
+    throw new Error('Não é possível cancelar um espaço com parceiro ativo. Remova o parceiro primeiro.');
+  }
   const batch = writeBatch(db);
   // Deletes are allowed: member (canDeleteWorkspaceTree), workspaceRef (isSelf), workspace (ownerUserId).
   // No audit log here — the rule requires existsAfter(currentMemberDoc) which would be false.
@@ -507,8 +510,14 @@ export async function createSharedExpenseClaim(workspaceId: string, userId: stri
   const audit = auditEntry(workspaceId, userId, 'shared_claim_created', 'claim', id, 'Claim resumido criado.');
   batch.set(audit.reference, audit.payload);
 
-  fireWrite(batch.commit());
-  return id;
+  const commit = batch.commit();
+  if (import.meta.env.DEV) {
+    commit.catch((err: unknown) => {
+      const code = (err as { code?: string })?.code ?? 'unknown';
+      console.error(`[fireWrite] createSharedExpenseClaim rejeitada (${code})`, err);
+    });
+  }
+  return commit.then(() => id);
 }
 
 export async function updateSharedExpenseClaimStatus(workspaceId: string, userId: string, input: UpdateClaimStatusInput) {
@@ -531,7 +540,14 @@ export async function updateSharedExpenseClaimStatus(workspaceId: string, userId
   const audit = auditEntry(workspaceId, userId, `shared_claim_${parsed.status}`, 'claim', parsed.claimId, `Claim marcado como ${parsed.status}.`);
   batch.set(audit.reference, audit.payload);
 
-  fireWrite(batch.commit());
+  const commit = batch.commit();
+  if (import.meta.env.DEV) {
+    commit.catch((err: unknown) => {
+      const code = (err as { code?: string })?.code ?? 'unknown';
+      console.error(`[fireWrite] updateSharedExpenseClaimStatus rejeitada (${code})`, err);
+    });
+  }
+  return commit;
 }
 
 export async function createSettlementProposal(workspaceId: string, userId: string, input: CreateSettlementInput) {
@@ -557,8 +573,14 @@ export async function createSettlementProposal(workspaceId: string, userId: stri
   const audit = auditEntry(workspaceId, userId, 'settlement_proposed', 'settlement', id, 'Proposta de acerto criada.');
   batch.set(audit.reference, audit.payload);
 
-  fireWrite(batch.commit());
-  return id;
+  const commit = batch.commit();
+  if (import.meta.env.DEV) {
+    commit.catch((err: unknown) => {
+      const code = (err as { code?: string })?.code ?? 'unknown';
+      console.error(`[fireWrite] createSettlementProposal rejeitada (${code})`, err);
+    });
+  }
+  return commit.then(() => id);
 }
 
 export async function acceptSettlement(workspaceId: string, userId: string, settlementId: string) {
@@ -580,7 +602,14 @@ export async function acceptSettlement(workspaceId: string, userId: string, sett
   const audit = auditEntry(workspaceId, userId, 'settlement_accepted', 'settlement', settlementId, 'Acerto aceito.');
   batch.set(audit.reference, audit.payload);
 
-  fireWrite(batch.commit());
+  const commit = batch.commit();
+  if (import.meta.env.DEV) {
+    commit.catch((err: unknown) => {
+      const code = (err as { code?: string })?.code ?? 'unknown';
+      console.error(`[fireWrite] acceptSettlement rejeitada (${code})`, err);
+    });
+  }
+  return commit;
 }
 
 export async function recordSettlementPayment(workspaceId: string, userId: string, input: RecordSettlementPaymentInput) {
@@ -606,7 +635,14 @@ export async function recordSettlementPayment(workspaceId: string, userId: strin
   const audit = auditEntry(workspaceId, userId, 'settlement_payment_recorded', 'settlement', parsed.settlementId, 'Pagamento de acerto registrado.');
   batch.set(audit.reference, audit.payload);
 
-  fireWrite(batch.commit());
+  const commit = batch.commit();
+  if (import.meta.env.DEV) {
+    commit.catch((err: unknown) => {
+      const code = (err as { code?: string })?.code ?? 'unknown';
+      console.error(`[fireWrite] recordSettlementPayment rejeitada (${code})`, err);
+    });
+  }
+  return commit;
 }
 
 export function subscribeWorkspaceRefs(

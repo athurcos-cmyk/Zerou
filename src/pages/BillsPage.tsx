@@ -199,7 +199,7 @@ export function BillsPage() {
                   <div className="list-row-end">
                     <strong>{formatMoney(bill.amountCents)}</strong>
                     <SyncStatusBadge status={bill.localSyncStatus} />
-                    {bill.status === 'pending' ? (
+                    {bill.status === 'pending' || bill.status === 'overdue' ? (
                       <>
                         <button className="button button--subtle button--compact" type="button" onClick={() => handleOpenPay(bill)}>
                           Pago

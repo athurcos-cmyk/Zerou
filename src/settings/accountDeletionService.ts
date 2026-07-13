@@ -105,7 +105,7 @@ async function collectBillingRefs(userId: string) {
   ];
 }
 
-async function leavePartnerWorkspace(workspaceId: string, userId: string, workspaceRefData: WorkspaceRef) {
+async function leavePartnerWorkspace(workspaceId: string, userId: string) {
   const db = getFirebaseDb();
   const batch = writeBatch(db);
   const memberRef = doc(db, 'workspaces', workspaceId, 'members', userId);
@@ -117,7 +117,6 @@ async function leavePartnerWorkspace(workspaceId: string, userId: string, worksp
     updatedAt: serverTimestamp()
   });
   batch.update(userWorkspaceRef, {
-    ...workspaceRefData,
     status: 'removed',
     updatedAt: serverTimestamp()
   });
@@ -156,7 +155,7 @@ export async function deleteAccountData(userId: string) {
       continue;
     }
 
-    await leavePartnerWorkspace(workspaceRef.id, userId, workspaceRef.data);
+    await leavePartnerWorkspace(workspaceRef.id, userId);
     refs.push(doc(getFirebaseDb(), 'workspaces', workspaceRef.id, 'members', userId));
   }
 

@@ -23,6 +23,7 @@ import {
 import { getFirebaseDb } from '../firebase/config';
 import { fireWrite } from '../firebase/fireWrite';
 import { readSnapshotData, readSnapshotDoc } from '../firebase/snapshotData';
+import { startOfDay } from 'date-fns';
 import { buildDefaultCategory, defaultCategories } from './defaultCategories';
 import { monthKeyFromDate } from './financeDates';
 import {
@@ -254,15 +255,22 @@ export async function contributeToGoal(workspaceId: string, goalId: string, delt
 }
 
 /**
- * Record a contribution to a (shared) goal: writes a per-person contribution doc and
- * bumps the goal total in one batch. Used by the couple "cofrinho".
+ * Guardar no cofrinho do casal com transação pessoal no mesmo batch: atômico, cross-workspace.
+ * Se `opts.accountId` for omitido, só grava a contribuição — sem mexer no workspace pessoal.
  */
-export async function addGoalContribution(workspaceId: string, userId: string, goalId: string, amountCents: number) {
-  const id = createId('contrib');
-  const now = new Date();
+export async function coupleGoalDeposit(
+  workspaceId: string,
+  personalWorkspaceId: string | undefined,
+  userId: string,
+  goalId: string,
+  amountCents: number,
+  opts: { description?: string; accountId?: string } = {}
+) {
   const batch = writeBatch(getFirebaseDb());
-  batch.set(documentRef(workspaceId, 'goalContributions', id), {
-    id,
+  const now = new Date();
+  const contribId = createId('contrib');
+  batch.set(documentRef(workspaceId, 'goalContributions', contribId), {
+    id: contribId,
     workspaceId,
     goalId,
     userId,
@@ -275,23 +283,51 @@ export async function addGoalContribution(workspaceId: string, userId: string, g
     savedCents: increment(amountCents),
     updatedAt: serverTimestamp()
   });
-  await batch.commit();
-  return id;
+  if (opts.accountId && personalWorkspaceId) {
+    const txnId = createId('txn');
+    const cashMonth = monthKeyFromDate(now);
+    batch.set(documentRef(personalWorkspaceId, 'transactions', txnId), omitUndefined({
+      id: txnId,
+      workspaceId: personalWorkspaceId,
+      createdBy: userId,
+      updatedBy: userId,
+      type: 'expense' as const,
+      amountCents,
+      description: opts.description ?? 'Cofrinho',
+      categoryId: 'both_cofrinho',
+      accountId: opts.accountId,
+      date: Timestamp.fromDate(now),
+      competenceMonth: cashMonth,
+      cashMonth,
+      tags: ['cofrinho'],
+      isRecurring: false,
+      clientMutationId: txnId,
+      syncStatus: 'synced' as const,
+      version: 1,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    }));
+  }
+  return batch.commit();
 }
 
 /**
- * Registra um resgate (retirada) de um cofrinho compartilhado: mesma mecânica de
- * addGoalContribution, mas em sentido inverso — decrementa savedCents e grava a
- * contribuição com type: 'withdrawal'. amountCents é sempre a magnitude positiva
- * do valor resgatado. A regra do Firestore (validMoneyCents em savedCents) rejeita
- * a escrita caso o resgate deixe o cofrinho negativo.
+ * Resgatar do cofrinho do casal com transação pessoal no mesmo batch: atômico, cross-workspace.
+ * Se `opts.accountId` for omitido, só grava a contribuição — sem mexer no workspace pessoal.
  */
-export async function withdrawGoalContribution(workspaceId: string, userId: string, goalId: string, amountCents: number) {
-  const id = createId('contrib');
-  const now = new Date();
+export async function coupleGoalWithdraw(
+  workspaceId: string,
+  personalWorkspaceId: string | undefined,
+  userId: string,
+  goalId: string,
+  amountCents: number,
+  opts: { description?: string; accountId?: string } = {}
+) {
   const batch = writeBatch(getFirebaseDb());
-  batch.set(documentRef(workspaceId, 'goalContributions', id), {
-    id,
+  const now = new Date();
+  const contribId = createId('contrib');
+  batch.set(documentRef(workspaceId, 'goalContributions', contribId), {
+    id: contribId,
     workspaceId,
     goalId,
     userId,
@@ -304,8 +340,32 @@ export async function withdrawGoalContribution(workspaceId: string, userId: stri
     savedCents: increment(-amountCents),
     updatedAt: serverTimestamp()
   });
-  await batch.commit();
-  return id;
+  if (opts.accountId && personalWorkspaceId) {
+    const txnId = createId('txn');
+    const cashMonth = monthKeyFromDate(now);
+    batch.set(documentRef(personalWorkspaceId, 'transactions', txnId), omitUndefined({
+      id: txnId,
+      workspaceId: personalWorkspaceId,
+      createdBy: userId,
+      updatedBy: userId,
+      type: 'income' as const,
+      amountCents,
+      description: opts.description ?? 'Cofrinho (resgate)',
+      categoryId: 'both_cofrinho',
+      accountId: opts.accountId,
+      date: Timestamp.fromDate(now),
+      competenceMonth: cashMonth,
+      cashMonth,
+      tags: ['cofrinho'],
+      isRecurring: false,
+      clientMutationId: txnId,
+      syncStatus: 'synced' as const,
+      version: 1,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    }));
+  }
+  return batch.commit();
 }
 
 export function subscribeGoalContributions(
@@ -397,6 +457,16 @@ export async function updateBillStatus(workspaceId: string, billId: string, stat
     status,
     updatedAt: serverTimestamp()
   }));
+}
+
+/** Marca como `overdue` toda bill `pending` cujo dia de vencimento já passou. Chamado a
+ * cada snapshot de `subscribeBills` — silencioso, sem feedback de UI (não é ação do usuário). */
+export function markOverdueBills(workspaceId: string, bills: Array<Pick<Bill, 'id' | 'status' | 'dueDate'>>) {
+  const todayStart = startOfDay(new Date());
+
+  bills
+    .filter((bill) => bill.status === 'pending' && bill.dueDate.toDate() < todayStart)
+    .forEach((bill) => updateBillStatus(workspaceId, bill.id, 'overdue'));
 }
 
 export async function createRecurringRule(workspaceId: string, userId: string, input: CreateRecurringRuleInput) {
@@ -537,7 +607,7 @@ export function payBill(
   opts: { accountId?: string; amountCents?: number } = {}
 ) {
   const amount = opts.amountCents ?? bill.amountCents;
-  const acctId = opts.accountId || bill.accountId;
+  const acctId = opts.accountId ?? bill.accountId;
   const batch = writeBatch(getFirebaseDb());
   batch.update(documentRef(workspaceId, 'bills', bill.id), { status: 'paid', updatedAt: serverTimestamp() });
   if (acctId) {
@@ -616,7 +686,7 @@ export function recordRecurringPayment(
   opts: { accountId?: string; amountCents?: number } = {}
 ) {
   const amount = opts.amountCents ?? rule.amountCents;
-  if (!amount) return;
+  if (amount == null) return;
   const acctId = opts.accountId || rule.accountId;
   const occurrenceAt = rule.nextOccurrenceAt.toDate();
   const nextDate = nextOccurrenceDate(occurrenceAt, rule.frequency, rule.anchorDay);

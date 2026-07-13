@@ -4,6 +4,7 @@ import { useFinanceData } from './useFinanceData';
 
 const financeMocks = vi.hoisted(() => ({
   ensureDefaultCategories: vi.fn(),
+  markOverdueBills: vi.fn(),
   subscribeAccounts: vi.fn(),
   subscribeBills: vi.fn(),
   subscribeCategories: vi.fn(),

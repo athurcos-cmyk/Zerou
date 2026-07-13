@@ -182,6 +182,18 @@ describe('spendingByCategoryForMonth', () => {
     ];
     expect(spendingByCategoryForMonth('2026-07', [], invoices, () => 'compras').get('compras')).toBe(30000);
   });
+
+  it('estorno/reembolso/ajuste entram como crédito negativo na categoria, não como gasto', () => {
+    const compra = txn({ id: 'c', type: 'expense', amountCents: 10000, categoryId: 'mercado', competenceMonth: '2026-07', cashMonth: '2026-07' });
+    const estorno = txn({ id: 'r', type: 'refund', amountCents: 4000, categoryId: 'mercado', competenceMonth: '2026-07', cashMonth: '2026-07' });
+    const reembolso = txn({ id: 're', type: 'reimbursement', amountCents: 1000, categoryId: 'saude', competenceMonth: '2026-07', cashMonth: '2026-07' });
+    const ajuste = txn({ id: 'a', type: 'adjustment', amountCents: 500, categoryId: 'mercado', competenceMonth: '2026-07', cashMonth: '2026-07' });
+
+    const result = spendingByCategoryForMonth('2026-07', [compra, estorno, reembolso, ajuste], [], () => undefined);
+
+    expect(result.get('mercado')).toBe(10000 - 4000 - 500);
+    expect(result.get('saude')).toBe(-1000);
+  });
 });
 
 describe('monthlyTotals', () => {

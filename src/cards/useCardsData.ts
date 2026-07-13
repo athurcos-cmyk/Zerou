@@ -229,7 +229,8 @@ export function useCardsData(workspaceId?: string, transactionIndex?: Transactio
         effectiveAt: toDate(entry.effectiveAt),
         idempotencyKey: entry.idempotencyKey
       }));
-      const calculation = calculateInvoice(entries, invoice.status === 'closed' ? 'closed' : 'open');
+      const lifecycle = invoice.status === 'open' ? 'open' : 'closed';
+      const calculation = calculateInvoice(entries, lifecycle, invoice.dueDate?.toDate());
 
       return {
         ...invoice,
@@ -239,7 +240,7 @@ export function useCardsData(workspaceId?: string, transactionIndex?: Transactio
         feesTotalCents: calculation.feesTotalCents,
         outstandingBalanceCents: calculation.outstandingBalanceCents,
         overpaidCreditCents: calculation.overpaidCreditCents,
-        status: invoice.status === 'open' || invoice.status === 'closed' ? calculation.status : invoice.status,
+        status: calculation.status,
         ledgerEntries: invoiceLedgerEntries
       };
     });

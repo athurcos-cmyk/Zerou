@@ -3,6 +3,7 @@ import { buildDefaultCategory, defaultCategories } from './defaultCategories';
 import { calculateAccountBalances } from './financeCalculations';
 import {
   ensureDefaultCategories,
+  markOverdueBills,
   subscribeAccounts,
   subscribeBills,
   subscribeCategories,
@@ -167,7 +168,10 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
       subscribeWithBootRetry(subscribeAccounts, (items) => setState(setSlice('accounts', items, markSliceLoaded('accounts')))),
       subscribeWithBootRetry(subscribeCategories, (items) => setState(setSlice('categories', items, markSliceLoaded('categories')))),
       subscribeWithBootRetry(subscribeTransactions, (items) => setState(setSlice('transactions', items, markSliceLoaded('transactions')))),
-      subscribeWithBootRetry(subscribeBills, (items) => setState(setSlice('bills', items, markSliceLoaded('bills')))),
+      subscribeWithBootRetry(subscribeBills, (items) => {
+        markOverdueBills(activeWorkspaceId, items);
+        setState(setSlice('bills', items, markSliceLoaded('bills')));
+      }),
       subscribeWithBootRetry(subscribeRecurringRules, (items) => setState(setSlice('recurringRules', items, markSliceLoaded('recurringRules'))))
     ];
 

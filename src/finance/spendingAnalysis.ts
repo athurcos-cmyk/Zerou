@@ -52,11 +52,15 @@ export interface InvoiceForSpending {
   ledgerEntries: InvoiceLedgerEntry[];
 }
 
+const refundLikeTypes = new Set<Transaction['type']>(['refund', 'reimbursement', 'adjustment']);
+
 function isCountableExpense(t: Transaction, month: string): boolean {
   if (t.deletedAt) return false;
   // Cartão entra pelo ledger (por parcela), nunca pela transação (valor cheio no mês da compra).
-  if (t.type !== 'expense') return false;
-  if (t.cashMonth !== month && t.competenceMonth !== month) return false;
+  // Estorno/reembolso/ajuste também entram — como crédito negativo na própria categoria, igual
+  // ao crédito de cartão logo abaixo (signedCharge) — não como "gasto" positivo.
+  if (t.type !== 'expense' && !refundLikeTypes.has(t.type)) return false;
+  if ((t.cashMonth ?? t.competenceMonth) !== month) return false;
   // Aporte a meta/cofrinho não é "gasto".
   if (t.tags?.includes('meta') || t.tags?.includes('cofrinho')) return false;
   return true;
@@ -83,7 +87,7 @@ export function spendingByCategoryForMonth(
 
   for (const t of transactions) {
     if (!isCountableExpense(t, month)) continue;
-    add(t.categoryId, t.amountCents);
+    add(t.categoryId, refundLikeTypes.has(t.type) ? -t.amountCents : t.amountCents);
   }
 
   for (const invoice of invoices) {
@@ -133,10 +137,10 @@ export function monthlyTotals(
       const m = t.cashMonth ?? t.competenceMonth;
       if (m !== month) continue;
       if (t.tags?.includes('meta') || t.tags?.includes('cofrinho')) continue;
-      if (t.type === 'income') incomeCents += t.amountCents;
-      else if (t.type === 'expense') expenseCents += t.amountCents;
+      if (t.type === 'expense') expenseCents += t.amountCents;
+      else if (t.type === 'income' || t.type === 'refund' || t.type === 'reimbursement' || t.type === 'adjustment') incomeCents += t.amountCents;
     }
-    return { month, incomeCents, expenseCents: Math.max(0, expenseCents) };
+    return { month, incomeCents, expenseCents };
   });
 }
 

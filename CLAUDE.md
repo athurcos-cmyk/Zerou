@@ -12,10 +12,6 @@ Rode-o **sempre** que mexer em `firestore.rules`. Ele é a única defesa automá
 
 O Java desta máquina estava quebrado: dois JDK 25 sem a pasta `bin/` e um stub órfão da Oracle (`Common Files\Oracle\Java\javapath`) primeiro no PATH do sistema, morrendo com `0xC0000409` (3221226505). Sem admin não dá pra corrigir o PATH do sistema, então `npm run test:rules` e `npm run emulators` passam por `scripts/with-java.mjs`: ele testa `java -version` nos candidatos e coloca o primeiro que funciona na frente do PATH só daquele comando. Um JDK Temurin 21 foi extraído em `%USERPROFILE%\tools\jdk` — se sumir, o wrapper diz como reinstalar. `firebase-tools` chama `spawn("java")` cru e **ignora `JAVA_HOME`**, por isso não adianta só apontar a variável.
 
-## ⚠️ Pendência remanescente
-
-**`accountDeletionService.ts` (`leavePartnerWorkspace`) espalha `...workspaceRefData` inteiro num `batch.update`** antes de sobrescrever `status`/`updatedAt`. Funciona hoje porque os valores lidos são idênticos aos já salvos (Firestore só considera "alterado" o que difere de verdade), mas é frágil: se o tipo `WorkspaceRef` ganhar um campo novo amanhã sem a regra `validCoupleWorkspaceRefUpdate` prever esse campo no `diff().affectedKeys().hasOnly([...])`, a saída do parceiro do espaço compartilhado quebra do mesmo jeito que a criação de categoria já quebrou. Mais seguro seria escrever só `{ status: 'removed', updatedAt }` explicitamente, sem spread.
-
 ## Mapa de contexto
 
 | Tema | Arquivo |

@@ -29,7 +29,7 @@ export function appendLedgerEntry(entries: InvoiceLedgerInput[], entry: InvoiceL
   return { entries: [...entries, entry], created: true };
 }
 
-export function calculateInvoice(entries: InvoiceLedgerInput[], lifecycle: 'open' | 'closed' = 'open'): InvoiceCalculation {
+export function calculateInvoice(entries: InvoiceLedgerInput[], lifecycle: 'open' | 'closed' = 'open', dueDate?: Date): InvoiceCalculation {
   const appliedEntries = uniqueEntries(entries);
   let purchasesTotalCents = 0;
   let paymentsTotalCents = 0;
@@ -76,7 +76,8 @@ export function calculateInvoice(entries: InvoiceLedgerInput[], lifecycle: 'open
     overpaidCreditCents,
     paymentsTotalCents,
     purchasesTotalCents,
-    feesTotalCents
+    feesTotalCents,
+    dueDate
   });
 
   return {
@@ -99,6 +100,7 @@ function resolveInvoiceStatus(input: {
   paymentsTotalCents: number;
   purchasesTotalCents: number;
   feesTotalCents: number;
+  dueDate?: Date;
 }) {
   if (input.overpaidCreditCents > 0) {
     return 'overpaid';
@@ -116,6 +118,10 @@ function resolveInvoiceStatus(input: {
 
   if (input.paymentsTotalCents > 0) {
     return 'partial';
+  }
+
+  if (input.dueDate && input.dueDate < new Date() && input.outstandingBalanceCents > 0) {
+    return 'overdue';
   }
 
   return 'closed';
