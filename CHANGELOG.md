@@ -2,6 +2,18 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-13 — feat: meta com data-limite visível no card
+
+- **Prazo da meta agora aparece no card** (`GoalsPage`): linha abaixo da barra de
+  progresso mostra "Até {data}" quando falta mais de 7 dias, com destaque `--warning`
+  quando faltam 7 dias ou menos, e "Atrasada — venceu {data}" em `--danger` quando o
+  prazo já passou. Meta concluída não mostra prazo (já exibe "concluída").
+- Usa `differenceInCalendarDays` do date-fns (já era dependência do projeto) +
+  `formatFriendlyDate` (helper existente). Campo `Goal.dueDate` já existia no tipo e
+  na regra do Firestore — nenhuma mudança de schema ou regra.
+- CSS mínimo: `.goal-card-due` com fonte 0.82rem e margem superior de 0.25rem.
+- Typecheck, 261 testes e build limpos.
+
 ## 2026-07-13 — feat: filtro por status nos Compromissos
 
 - **Chips de filtro em `BillsPage`**: botões "Todos", "Pendentes", "Vencidos", "Pagos"

@@ -24,7 +24,7 @@ só com autorização explícita do dono.
 
 - [x] ~~Bills automaticamente `overdue`~~ — **já implementado**, ver nota abaixo. Removido do backlog.
 - [x] 1. Filtro por status nos Compromissos
-- [ ] 2. Meta com data-limite visível no card
+- [x] 2. Meta com data-limite visível no card
 - [ ] 3. Exportar transações (CSV)
 - [ ] 4. Widget "quanto posso gastar por dia"
 - [ ] 5. Atalho de pagamento mais completo a partir de um compromisso (escopo revisado)

@@ -9,7 +9,8 @@ import { EmptyState } from '../components/EmptyState';
 import { FormMessage } from '../components/FormMessage';
 import { useFinanceContext } from '../finance/FinanceDataContext';
 import { contributeToGoalWithTransaction, createGoal, deleteGoal } from '../finance/financeService';
-import { fromDateInputValue } from '../finance/financeDates';
+import { formatFriendlyDate, fromDateInputValue } from '../finance/financeDates';
+import { differenceInCalendarDays } from 'date-fns';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
@@ -145,6 +146,19 @@ export function GoalsPage() {
                   <span className="display-number goal-amount">{formatMoney(goal.savedCents)}</span>
                   <span className="text-secondary">de {formatMoney(goal.targetCents)} · {pct}%</span>
                 </div>
+
+                {goal.dueDate && !done && (() => {
+                  const daysLeft = differenceInCalendarDays(goal.dueDate!.toDate(), new Date());
+                  const urgent = daysLeft <= 7 && daysLeft >= 0;
+                  const overdue = daysLeft < 0;
+                  return (
+                    <div className="goal-card-due" style={overdue ? { color: 'var(--danger)' } : urgent ? { color: 'var(--warning)' } : undefined}>
+                      {overdue
+                        ? `Atrasada — venceu ${formatFriendlyDate(goal.dueDate!)}`
+                        : `Até ${formatFriendlyDate(goal.dueDate!)}`}
+                    </div>
+                  );
+                })()}
 
                 <button className="button button--subtle button--block" type="button" onClick={() => { setContributeGoal(goal); setContributeSign(1); }}>
                   {goal.kind === 'debt' ? 'Registrar pagamento' : 'Guardar valor'}

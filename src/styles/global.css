@@ -3955,6 +3955,11 @@ span.service-mark--brand {
   gap: 0.5rem;
 }
 
+.goal-card-due {
+  font-size: 0.82rem;
+  margin-top: 0.25rem;
+}
+
 .goal-amount {
   font-size: 1.35rem;
 }
