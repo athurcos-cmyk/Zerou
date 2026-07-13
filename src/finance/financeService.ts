@@ -604,10 +604,12 @@ export function payBill(
   workspaceId: string,
   userId: string,
   bill: Pick<Bill, 'id' | 'description' | 'amountCents' | 'categoryId' | 'accountId'>,
-  opts: { accountId?: string; amountCents?: number } = {}
+  opts: { accountId?: string; amountCents?: number; description?: string; categoryId?: string } = {}
 ) {
   const amount = opts.amountCents ?? bill.amountCents;
   const acctId = opts.accountId ?? bill.accountId;
+  const desc = opts.description ?? bill.description;
+  const catId = opts.categoryId ?? bill.categoryId;
   const batch = writeBatch(getFirebaseDb());
   batch.update(documentRef(workspaceId, 'bills', bill.id), { status: 'paid', updatedAt: serverTimestamp() });
   if (acctId) {
@@ -615,8 +617,8 @@ export function payBill(
     const now = new Date();
     batch.set(documentRef(workspaceId, 'transactions', id), omitUndefined({
       id, workspaceId, createdBy: userId, updatedBy: userId,
-      type: 'expense', amountCents: amount, description: bill.description,
-      categoryId: bill.categoryId, accountId: acctId,
+      type: 'expense', amountCents: amount, description: desc,
+      categoryId: catId, accountId: acctId,
       date: Timestamp.fromDate(now), competenceMonth: monthKeyFromDate(now), cashMonth: monthKeyFromDate(now),
       tags: ['bill'], isRecurring: false, clientMutationId: id,
       syncStatus: 'synced', version: 1, createdAt: serverTimestamp(), updatedAt: serverTimestamp()

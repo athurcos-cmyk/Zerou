@@ -31,6 +31,8 @@ export function BillsPage() {
   const [payingBill, setPayingBill] = useState<Bill | null>(null);
   const [payAccountId, setPayAccountId] = useState('');
   const [payAmount, setPayAmount] = useState('');
+  const [payDescription, setPayDescription] = useState('');
+  const [payCategoryId, setPayCategoryId] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'overdue' | 'paid'>('all');
 
@@ -60,15 +62,24 @@ export function BillsPage() {
     setPayingBill(bill);
     setPayAccountId(bill.accountId ?? '');
     setPayAmount('');
+    setPayDescription(bill.description);
+    setPayCategoryId(bill.categoryId ?? '');
   }
 
   function handleConfirmPay() {
     if (!workspaceId || !user || !payingBill) return;
     const amount = payAmount.trim() ? parseMoneyToCents(payAmount) : payingBill.amountCents;
-    payBill(workspaceId, user.uid, payingBill, { accountId: payAccountId || undefined, amountCents: amount });
+    payBill(workspaceId, user.uid, payingBill, {
+      accountId: payAccountId || undefined,
+      amountCents: amount,
+      description: payDescription !== payingBill.description ? payDescription : undefined,
+      categoryId: payCategoryId !== payingBill.categoryId ? payCategoryId : undefined
+    });
     setPayingBill(null);
     setPayAccountId('');
     setPayAmount('');
+    setPayDescription('');
+    setPayCategoryId('');
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -259,7 +270,7 @@ export function BillsPage() {
         </article>
       </div>
 
-      <BottomSheet open={Boolean(payingBill)} onClose={() => setPayingBill(null)} title="Confirmar pagamento" subtitle={payingBill?.description}>
+      <BottomSheet open={Boolean(payingBill)} onClose={() => { setPayingBill(null); setPayDescription(''); setPayCategoryId(''); }} title="Confirmar pagamento" subtitle={payingBill?.description}>
         <div className="form-stack">
           <label className="field">
             <span>Valor pago</span>
@@ -273,6 +284,34 @@ export function BillsPage() {
             />
             <span className="field-hint">Deixe em branco para usar o valor do compromisso.</span>
           </label>
+          <label className="field">
+            <span>Descrição</span>
+            <input
+              className="input"
+              value={payDescription}
+              onChange={(e) => setPayDescription(e.target.value)}
+              placeholder="Nome do gasto no extrato"
+            />
+          </label>
+          <CategoryField
+            value={payCategoryId}
+            onChange={setPayCategoryId}
+            categories={finance.categories}
+            filterType="expense"
+            onCreateCategory={async (name, icon, type, color) => {
+              if (!workspaceId || !user) return;
+              const id = await createCategory(workspaceId, user.uid, { name, icon, type, color });
+              setPayCategoryId(id);
+            }}
+            onUpdateCategory={async (id, patch) => {
+              if (!workspaceId) return;
+              await updateCategory(workspaceId, id, patch);
+            }}
+            onDeleteCategory={async (id) => {
+              if (!workspaceId) return;
+              await deleteCategory(workspaceId, id);
+            }}
+          />
           <div className="field">
             <span className="field-label">De qual conta saiu?</span>
             <div className="chip-row">

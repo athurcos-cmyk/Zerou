@@ -2,6 +2,22 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-13 — feat: pagamento de compromisso com descrição e categoria editáveis
+
+- **Sheet "Confirmar pagamento" agora tem campos de descrição e categoria** (`BillsPage`):
+  além de valor e conta (que já existiam), é possível mudar a descrição (ex.: compromisso
+  genérico "Contas do mês" pago como "Luz") e a categoria antes de confirmar. Campos vêm
+  pré-preenchidos com os valores do compromisso original.
+- **`payBill` (`financeService.ts`) aceita `description` e `categoryId` como overrides
+  opcionais** em `opts` — sem mudar o contrato existente, quem chama sem esses campos
+  continua funcionando igual (usa os valores do compromisso).
+- **`CategoryField` reutilizado no sheet** (já era importado na página) — mesma
+  experiência de criar/editar/excluir categoria inline que o form de criação de
+  compromisso já oferece.
+- Sem mudança no Firestore nem em `firestore.rules` — o payload da transação gerada
+  (`validTransactionCreate`) já aceita qualquer `categoryId`/`description`.
+- Typecheck, 271 testes e build limpos.
+
 ## 2026-07-13 — feat: widget "quanto posso gastar por dia" no Dashboard
 
 - **Valor por dia no card "Disponível"**: substitui "Livre agora." por
