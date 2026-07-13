@@ -2,6 +2,25 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-13 — feat: exportar transações do mês em CSV
+
+- **Novo módulo `src/finance/csvExport.ts`**: funções puras `transactionsToCsv` e
+  `downloadCsv`, sem dependência de Firebase/React. Delimitador `;` (ponto e vírgula)
+  para compatibilidade com Excel brasileiro, valores em formato `1234,56` (vírgula
+  decimal, sem `R$`), BOM UTF-8 no início do arquivo para acentos abrirem corretos
+  no Excel do Windows.
+- **Colunas**: Data, Tipo, Descrição, Categoria, Conta, Valor, Tags. Categoria e Conta
+  resolvidas via `Map` (mesmo padrão da Análise). Tipo usa `transactionTypeLabels`.
+- **Testes unitários** (`csvExport.test.ts`, 9 casos): BOM, delimitador, formato
+  brasileiro, valores negativos, escape de campos com `;`/`"`, acentos, lista vazia.
+- **Botão Download no cabeçalho da Análise** (`SearchPage`): ícone ao lado da lupa,
+  exporta as transações do `selectedMonth` atual (filtradas por `!deletedAt` +
+  `cashMonth || competenceMonth`). Arquivo: `granativa-YYYY-MM.csv`.
+- Exporta o valor bruto da transação (`amountCents`), não a visão diluída por
+  parcela do regime de caixa — limitação documentada no código.
+- Sem mudança no Firestore nem em `firestore.rules`.
+- Typecheck, 271 testes (28 arquivos) e build limpos.
+
 ## 2026-07-13 — feat: meta com data-limite visível no card
 
 - **Prazo da meta agora aparece no card** (`GoalsPage`): linha abaixo da barra de

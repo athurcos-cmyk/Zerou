@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Minus, Search, TrendingDown, TrendingUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Minus, Search, TrendingDown, TrendingUp } from 'lucide-react';
 import {
   PieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -12,6 +12,7 @@ import { formatFriendlyDate, toDate } from '../finance/financeDates';
 import { nextOccurrenceDate } from '../finance/financeService';
 import { billStatusLabels, transactionTypeLabels } from '../finance/financeLabels';
 import { formatMoney } from '../finance/money';
+import { downloadCsv, transactionsToCsv } from '../finance/csvExport';
 import {
   committedByCategoryForMonth,
   lastCommittedMonth,
@@ -344,6 +345,19 @@ export function SearchPage() {
     setSelectedMonth((m) => shiftMonth(m, delta));
   }
 
+  function handleExportCsv() {
+    const monthTxs = finance.transactions.filter(
+      (t) => !t.deletedAt && (t.cashMonth === selectedMonth || t.competenceMonth === selectedMonth)
+    );
+    const csv = transactionsToCsv(monthTxs, categoryMap, accountMap);
+    downloadCsv(`granativa-${selectedMonth}.csv`, csv);
+  }
+
+  const accountMap = useMemo(
+    () => new Map(finance.accounts.map((a) => [a.id, a])),
+    [finance.accounts]
+  );
+
   return (
     <section className="page-content page-content--narrow">
       <div className="page-heading-row page-heading-row--tight">
@@ -351,9 +365,14 @@ export function SearchPage() {
           <p className="eyebrow">Análise</p>
           <h1 className="page-title page-title--compact">Seus gastos</h1>
         </div>
-        <button className="icon-button" type="button" aria-label="Buscar" onClick={() => setSearchOpen(true)}>
-          <Search size={18} aria-hidden="true" />
-        </button>
+        <div style={{ display: 'flex', gap: '0.25rem' }}>
+          <button className="icon-button" type="button" aria-label="Exportar CSV" onClick={handleExportCsv}>
+            <Download size={18} aria-hidden="true" />
+          </button>
+          <button className="icon-button" type="button" aria-label="Buscar" onClick={() => setSearchOpen(true)}>
+            <Search size={18} aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
       {/* ── Seletor de mês ─────────────────────────────────────────────────── */}
