@@ -538,6 +538,14 @@ export function SearchPage() {
                   const barColor = budgetPct !== null
                     ? budgetPct >= 100 ? 'var(--danger)' : budgetPct >= 80 ? 'var(--warning)' : 'var(--success)'
                     : cat.color;
+                  // Escala com folga até 150% do orçamento — sem isso, o traço do limite
+                  // sempre cairia na borda direita (a barra já é limitada a 100% ali), virando
+                  // um marcador que nunca se move e não comunica nada.
+                  const BUDGET_SCALE_CAP_PCT = 150;
+                  const budgetMarkerLeftPct = (100 / BUDGET_SCALE_CAP_PCT) * 100;
+                  const budgetBarWidthPct = budgetPct !== null
+                    ? (Math.min(budgetPct, BUDGET_SCALE_CAP_PCT) / BUDGET_SCALE_CAP_PCT) * 100
+                    : null;
                   return (
                     <button
                       key={cat.name}
@@ -567,22 +575,19 @@ export function SearchPage() {
                         <div style={{
                           height: 4, borderRadius: 999,
                           background: barColor,
-                          width: budgetPct !== null ? `${Math.min(budgetPct, 100)}%` : `${pct}%`,
+                          width: budgetBarWidthPct !== null ? `${budgetBarWidthPct}%` : `${pct}%`,
                           transition: 'width 400ms ease',
                         }} />
                         {budget && (
-                          <div style={{
-                            position: 'absolute', top: 0, height: 4,
-                            left: '100%', width: 6,
-                            transform: 'translateX(-6px)',
-                          }}>
-                            <div style={{
-                              width: 2, height: 4,
+                          <div
+                            title={`Limite: ${formatMoney(budget.limitCents)}`}
+                            style={{
+                              position: 'absolute', top: 0, height: 4,
+                              left: `${budgetMarkerLeftPct}%`, width: 2,
                               background: 'var(--text-secondary)',
                               borderRadius: 1,
-                              marginLeft: 2,
-                            }} />
-                          </div>
+                            }}
+                          />
                         )}
                       </div>
                     </button>
