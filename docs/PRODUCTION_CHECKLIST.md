@@ -23,7 +23,7 @@ Do not mark broad public production as ready until every blocking item is comple
 ## Vercel
 
 - [ ] Production environment variables `VITE_FIREBASE_*` configured.
-- [ ] Production URL and canonical URL updated from `zerou-five.vercel.app` to the final domain — `granativa.com.br` bought and added in Vercel (2026-07-08); code (canonical/OG, sitemap, robots.txt, Cloud Functions push links) already points to it. Still pending: DNS records at registro.br (blocked for a few hours on newly-registered domains — "domínio em transição"), authorizing the domain in Firebase Auth, and deploying `functions` for `APP_BASE_URL` to take effect in production.
+- [x] Production URL and canonical URL updated from `zerou-five.vercel.app` to `granativa.com.br` — DNS at registro.br configured, domain authorized in Firebase Auth, `functions` deployed with the new `APP_BASE_URL`. Live end-to-end since 2026-07-12 (Google login confirmed working in production by the owner). `zerou-five.vercel.app` still works as a legacy Vercel URL. See `docs/planning/TODOS.md`.
 - [ ] CSP verified against Auth, Firestore, Analytics and PWA.
 - [ ] Preview and production deployment policy confirmed.
 

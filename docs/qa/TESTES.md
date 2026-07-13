@@ -16,7 +16,7 @@ Antes de entregar: `npm run typecheck`, `npm test`, `npm run build`. **Se tocou 
 
 - **Unit/domínio** (`src/`): cálculos financeiros, saldos do casal (`src/domain/shared/calculateSharedBalances.test.ts`), lógica de cartão/fatura (`src/cards/cardDates.test.ts`, `src/cards/useCardsData.test.tsx`), payday/Comprometido (`src/finance/payday.test.ts`, `src/finance/financeCalculations.test.ts`), etc.
 - **`noHardcodedColors`** (`src/test/noHardcodedColors.test.ts`): falha se houver hex/rgba literal fora de `src/styles/themes.css` e `src/theme/palette.ts`. Exceção: `src/landing/`.
-- **Regras** (`tests/firestore.rules.test.ts`, `tests/storage.rules.test.ts`): rodam no emulador do Firestore, **43 testes, verdes desde 2026-07-10**. Ficaram meses sem rodar por causa de um Java quebrado nesta máquina, e **isso já custou 3 bugs reais** (categoria em 2026-06; `installment_anticipation_credit` faltando na regra desde a criação da feature de antecipar parcelas; `availableMode` em 2026-07-09). Ao voltarem a rodar, revelaram 5 testes que estavam errados havia tempo — inclusive um `expiresAt` hardcoded que virou bomba-relógio, e um seed que fazia o teste de "criar fundação" nunca exercitar a regra de create. Lição: um teste que não roda não é uma rede de segurança, é uma ilusão.
+- **Regras** (`tests/firestore.rules.test.ts`, `tests/storage.rules.test.ts`): rodam no emulador do Firestore, **48 testes (verdes desde 2026-07-10, cresceu de 43 conforme novas coleções ganharam cobertura — não hardcode este número, confira `npm run test:rules`)**. Ficaram meses sem rodar por causa de um Java quebrado nesta máquina, e **isso já custou 3 bugs reais** (categoria em 2026-06; `installment_anticipation_credit` faltando na regra desde a criação da feature de antecipar parcelas; `availableMode` em 2026-07-09). Ao voltarem a rodar, revelaram 5 testes que estavam errados havia tempo — inclusive um `expiresAt` hardcoded que virou bomba-relógio, e um seed que fazia o teste de "criar fundação" nunca exercitar a regra de create. Lição: um teste que não roda não é uma rede de segurança, é uma ilusão.
 - **E2E** (`tests/e2e/`): Playwright; exige runner próprio (não roda junto do `npm test`).
 
 Rodar só os unitários estáveis: `npx vitest run src`.
@@ -33,4 +33,4 @@ Fluxos a validar fim a fim num aparelho real: cadastro, login (email + Google), 
 
 - Dados em centavos inteiros — conferir formatação com `formatMoney()`.
 - Não expor erro técnico: validar mensagens via `getUserFacingErrorMessage`.
-- Cenários de sucesso/erro herdados ficam em `documentacao-v12.2/QA_SCENARIOS.md` (legado).
+- Cenários de sucesso/erro herdados ficam em `../legacy/documentacao-v12.2/QA_SCENARIOS.md` (legado).

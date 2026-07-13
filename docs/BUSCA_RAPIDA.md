@@ -18,7 +18,8 @@ Use este arquivo como mapa antes de abrir documentos grandes. Regra: leia o meno
 | Operação / deploy | `docs/RUNBOOK.md`, `docs/PRODUCTION_CHECKLIST.md` | Rotina e checklist |
 | Billing futuro (inativo) | `docs/BILLING.md`, `docs/BOOTSTRAP_FIREBASE_STRIPE.md` | Não ativar sem pedido |
 | Setup de infra manual | `docs/MANUAL_SETUP_REQUIRED.md` | Passos fora do código |
-| Instruções pra agentes | `CLAUDE.md`, `CODEX.md` | Regra de docs e restrições |
+| Instruções pra agentes | `CLAUDE.md` | Regra de docs e restrições |
+| Contas de teste (login p/ navegador) | `TEST_ACCOUNTS.local.md` (raiz, local, fora do git) | Só existe se criado na máquina |
 
 ## Onde está cada coisa no código
 
@@ -30,6 +31,11 @@ Use este arquivo como mapa antes de abrir documentos grandes. Regra: leia o meno
 | Componentes-base de UX | `src/components/` (`BottomSheet`, `SelectField`, `CategoryField`, `ConfirmDialog`, `EmptyState`) |
 | Ícones + cores de categoria | `src/components/categoryIcons.tsx`, `src/theme/palette.ts` |
 | Serviço financeiro | `src/finance/financeService.ts` |
+| Dashboard (resumo, Disponível/Comprometido) | `src/pages/DashboardPage.tsx`, `src/finance/financeCalculations.ts` |
+| Transações (criar/editar/listar/filtrar) | `src/pages/NewTransactionPage.tsx`, `src/pages/EditTransactionPage.tsx`, `src/pages/TransactionsPage.tsx`, `src/components/TagInput.tsx` |
+| Compromissos (contas a pagar) | `src/pages/BillsPage.tsx` (`markOverdueBills` em `financeService.ts` marca atraso sozinho) |
+| Orçamento por categoria | `createBudget`/`updateBudgetLimit`/`deleteBudget`/`subscribeBudgets` (`financeService.ts`), UI em `src/pages/SearchPage.tsx` (sheet "Orçamentos") |
+| Exportar CSV | `src/finance/csvExport.ts` |
 | Cartões / faturas | `src/cards/` |
 | Espaço do casal + cofrinho | `src/pages/SharedSpacePage.tsx` (orquestrador), `src/pages/shared/` (convite/modo/cofrinho/despesas), `src/shared/` (serviço/hooks) |
 | Análise / gráficos / busca | `src/pages/SearchPage.tsx` (UI); `src/finance/spendingAnalysis.ts` (gasto por mês/categoria em regime de caixa — cartão pela parcela da fatura, não pela transação) |

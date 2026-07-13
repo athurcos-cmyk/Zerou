@@ -1,3 +1,8 @@
+> ⚠️ **ARQUIVADO — não use como contexto inicial.** Este arquivo ficou desatualizado
+> (ex.: ainda cita `zerou-five.vercel.app` como URL de produção; hoje é
+> `granativa.com.br`). Para contexto atual, leia `SESSAO.md` e `CLAUDE.md` na raiz do
+> projeto. Mantido só por valor histórico.
+
 # Handoff para Claude
 
 Use este arquivo como contexto inicial para continuar o projeto Zerou em outra ferramenta.
