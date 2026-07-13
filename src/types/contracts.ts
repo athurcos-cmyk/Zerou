@@ -223,6 +223,7 @@ export interface Transaction {
   syncStatus: SyncStatus;
   version: number;
   deletedAt?: Timestamp;
+  reconciledAt?: Timestamp;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }

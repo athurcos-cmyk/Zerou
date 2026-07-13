@@ -2,6 +2,27 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-13 — feat: reconciliação "conferido" nas transações
+
+- **Novo campo `reconciledAt?: Timestamp` em `Transaction`** (`contracts.ts`): marca quando
+  a transação foi conferida contra extrato. Checkbox manual — sem integração com
+  importação ainda (item 8 bloqueado).
+- **`toggleTransactionReconciled`** (`financeService.ts`): `updateDoc` com
+  `reconciledAt: serverTimestamp() | deleteField()`, fire-and-forget. Inclui
+  `updatedAt: serverTimestamp()` para passar na regra.
+- **`firestore.rules`**: `reconciledAt` adicionado a `validTransactionUpdate.hasOnly`
+  com validação condicional `is timestamp`. **Não** adicionado a `validTransactionCreate`
+  (reconciliação só depois de existir). `npm run test:rules` passa (47 testes).
+- **Teste de regra** (`firestore.rules.test.ts`): verifica que `reconciledAt` no
+  create é rejeitado (não está no `hasOnly`).
+- **Ícone de check em cada transação** (`TransactionsPage`): botão verde (`--success`)
+  quando conferido, cinza padrão quando não. Clique alterna reconciliação.
+- **Filtro "Não conferidos"**: chip toggle filtra transações sem `reconciledAt`,
+  client-side.
+- Typecheck, 271 testes unitários, 47 testes de regras e build limpos.
+- **⚠️ Esta feature tocou `firestore.rules`** — deploy da regra só com autorização
+  explícita do dono.
+
 ## 2026-07-13 — feat: orçamento mensal por categoria (maior feature do backlog)
 
 - **Novo tipo `Budget`** (`contracts.ts`): `id === categoryId` (determinístico), `limitCents`,

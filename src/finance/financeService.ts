@@ -428,6 +428,19 @@ export async function updateTransaction(
       updatedAt: serverTimestamp()
     })
   );
+}// ─── toggleTransactionReconciled ───────────────────────────────────────────────
+
+export function toggleTransactionReconciled(
+  workspaceId: string,
+  transactionId: string,
+  reconciled: boolean
+) {
+  fireWrite(
+    updateDoc(documentRef(workspaceId, 'transactions', transactionId), {
+      reconciledAt: reconciled ? serverTimestamp() : deleteField(),
+      updatedAt: serverTimestamp()
+    })
+  );
 }
 
 export async function createBill(workspaceId: string, userId: string, input: CreateBillInput) {

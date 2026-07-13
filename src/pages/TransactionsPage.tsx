@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Plus, Search, Trash2 } from 'lucide-react';
+import { Check, Plus, Search, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
@@ -10,7 +10,7 @@ import { useConfirm } from '../components/ConfirmDialog';
 import { defaultCategoryColors } from '../theme/palette';
 import { formatFriendlyDate } from '../finance/financeDates';
 import { transactionTypeLabels } from '../finance/financeLabels';
-import { softDeleteTransaction } from '../finance/financeService';
+import { softDeleteTransaction, toggleTransactionReconciled } from '../finance/financeService';
 import { formatMoney } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
 
@@ -24,6 +24,7 @@ export function TransactionsPage() {
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense' | 'transfer'>('all');
   const [cardFilter, setCardFilter] = useState('');
   const [tagFilter, setTagFilter] = useState<Set<string>>(new Set());
+  const [showUnreconciledOnly, setShowUnreconciledOnly] = useState(false);
 
   const categoryMap = useMemo(() => new Map(finance.categories.map((c) => [c.id, c])), [finance.categories]);
   const cardOptions = useMemo(
@@ -69,6 +70,7 @@ export function TransactionsPage() {
         const txTags = t.tags ?? [];
         if (!txTags.some((tag) => tagFilter.has(tag))) return false;
       }
+      if (showUnreconciledOnly && t.reconciledAt) return false;
       if (!normalizedQuery) return true;
       const categoryName = t.categoryId ? (categoryMap.get(t.categoryId)?.name ?? '') : '';
       const haystack = [t.description, t.merchant, t.tags?.join(' '), categoryName]
@@ -77,7 +79,7 @@ export function TransactionsPage() {
         .toLocaleLowerCase('pt-BR');
       return haystack.includes(normalizedQuery);
     });
-  }, [activeTransactions, cardFilter, typeFilter, tagFilter, normalizedQuery, categoryMap]);
+  }, [activeTransactions, cardFilter, typeFilter, tagFilter, showUnreconciledOnly, normalizedQuery, categoryMap]);
 
   const typeChips: Array<{ key: typeof typeFilter; label: string }> = [
     { key: 'all', label: 'Tudo' },
@@ -157,6 +159,15 @@ export function TransactionsPage() {
               ))}
             </div>
           )}
+          <div className="chip-row">
+            <button
+              type="button"
+              className={`chip${showUnreconciledOnly ? ' chip--active' : ''}`}
+              onClick={() => setShowUnreconciledOnly((v) => !v)}
+            >
+              <Check size={13} aria-hidden="true" /> Não conferidos
+            </button>
+          </div>
           {cardsData.cards.length > 0 && (
             <SelectField
               label="Cartão"
@@ -215,6 +226,19 @@ export function TransactionsPage() {
                       {isIncome ? '+' : isExpense ? '−' : ''}{formatMoney(transaction.amountCents)}
                     </strong>
                     <SyncStatusBadge status={transaction.localSyncStatus} />
+                    <button
+                      className="icon-button"
+                      type="button"
+                      aria-label={transaction.reconciledAt ? 'Desmarcar como conferido' : 'Marcar como conferido'}
+                      title={transaction.reconciledAt ? 'Conferido' : 'Marcar como conferido'}
+                      style={transaction.reconciledAt ? { color: 'var(--success)' } : undefined}
+                      onClick={() => {
+                        if (!workspaceId) return;
+                        toggleTransactionReconciled(workspaceId, transaction.id, !transaction.reconciledAt);
+                      }}
+                    >
+                      <Check size={16} aria-hidden="true" />
+                    </button>
                     {transaction.type !== 'card_purchase' ? (
                       <Link className="button button--subtle button--compact" to={`/app/transactions/${transaction.id}/edit`}>
                         Editar

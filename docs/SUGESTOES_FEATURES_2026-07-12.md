@@ -31,7 +31,7 @@ só com autorização explícita do dono.
 - [x] 6. Tags personalizadas (escopo revisado)
 - [x] 7. Orçamento mensal por categoria
 - [ ] 8. Importação OFX/CSV bancário
-- [ ] 9. Reconciliação "conferido"
+- [x] 9. Reconciliação "conferido"
 - [ ] 10. Split de conta entre amigos (fora do casal)
 - [ ] 11. Modo escuro agendado — **confirmar necessidade antes de construir** (ver nota)
 

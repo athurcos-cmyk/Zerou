@@ -1195,6 +1195,23 @@ describe('firestore security rules', () => {
     );
   });
 
+  it('rejects reconciledAt in transaction create payload', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(
+      setDoc(doc(aliceDb, 'workspaces/workspaceA/accounts/accountA'), accountPayload('workspaceA', 'accountA', 'alice'))
+    );
+
+    // reconciledAt in create payload should be rejected — validTransactionCreate
+    // does not list 'reconciledAt' in hasOnly, so any create with that key fails.
+    await assertFails(
+      setDoc(doc(aliceDb, 'workspaces/workspaceA/transactions/txReconciledCreate'), {
+        ...transactionPayload('workspaceA', 'txReconciledCreate', 'alice', 'accountA'),
+        reconciledAt: serverTimestamp()
+      })
+    );
+  });
+
   it('validates budget documents', async () => {
     const aliceDb = testEnv.authenticatedContext('alice').firestore();
 
