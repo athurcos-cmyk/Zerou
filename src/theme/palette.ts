@@ -57,3 +57,27 @@ export const serviceBrandColors: Record<string, string> = {
   tim: '#004691',
   sky: '#0057B8'
 };
+
+/** Avatar cartoon: skin tones, hair colors, and accessory strokes. */
+export const avatarSkinTones = {
+  clara: '#FDDCB5',
+  media: '#E8B87A',
+  escura: '#8D6E5C',
+  cravo: '#C68642',
+  branco: '#FFF4E6',
+} as const;
+
+export const avatarHairColors = {
+  castanhoEscuro: '#6B3A2E',
+  castanhoMedio: '#8B5E3C',
+  castanhoClaro: '#D4A056',
+  preto: '#2C1810',
+  muitoEscuro: '#1A0E08',
+  ruivo: '#C4956A',
+} as const;
+
+export const avatarAccessoryStroke = '#333333';
+export const avatarMouthRed = '#CC4444';
+export const avatarBoneTangerina = '#EE5524';
+export const avatarBoneVerde = '#2E7D32';
+export const avatarEyeWhite = '#ffffff';

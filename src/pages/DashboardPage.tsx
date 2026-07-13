@@ -289,7 +289,7 @@ export function DashboardPage() {
           {dashboard.upcomingCommitments.length > 0 ? (
             <div className="item-list">
               {dashboard.upcomingCommitments.map((commitment) => {
-                // Fatura leva pra fatura do cartão; conta a pagar pros Compromissos; recorrência pras Recorrências.
+                // Fatura leva pra fatura do cartao; conta a pagar pros Compromissos; despesa fixa pras Despesas Fixas.
                 const href =
                   commitment.kind === 'invoice' && commitment.cardId
                     ? `/app/cards/${commitment.cardId}/invoices/${commitment.id}`
@@ -301,7 +301,7 @@ export function DashboardPage() {
                     <div>
                       <strong>{commitment.description}</strong>
                       <span className="text-secondary">
-                        {commitment.kind === 'bill' ? 'Conta a pagar' : commitment.kind === 'invoice' ? 'Fatura' : 'Recorrência'} ·{' '}
+                        {commitment.kind === 'bill' ? 'Conta a pagar' : commitment.kind === 'invoice' ? 'Fatura' : 'Despesa Fixa'} ·{' '}
                         {formatFriendlyDate(commitment.dueAt)}
                       </span>
                     </div>

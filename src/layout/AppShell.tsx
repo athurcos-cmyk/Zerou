@@ -9,7 +9,6 @@ import {
   HelpCircle,
   Home,
   LogOut,
-  MoreHorizontal,
   Palette,
   Plus,
   ReceiptText,
@@ -20,6 +19,7 @@ import {
   WalletCards,
   X
 } from 'lucide-react';
+import { UserAvatar } from '../profile/UserAvatar';
 import { BrandLockup } from '../components/BrandLogo';
 import { logout } from '../auth/authService';
 import { useAuth } from '../auth/AuthContext';
@@ -90,7 +90,7 @@ export function AppShell() {
             <Target size={19} aria-hidden="true" /> Metas
           </NavLink>
           <NavLink className={getNavClass} to="/app/recurring">
-            <Repeat size={19} aria-hidden="true" /> Recorrências
+            <Repeat size={19} aria-hidden="true" /> Despesas Fixas
           </NavLink>
           <NavLink className={getNavClass} to="/app/search">
             <BarChart2 size={19} aria-hidden="true" /> Análise
@@ -139,17 +139,18 @@ export function AppShell() {
             aria-label="Fechar menu"
             onClick={() => setMobileMenuOpen(false)}
           />
-          <section className="mobile-more-sheet" aria-label="Mais opções">
-            <div className="section-heading">
+          <section className="mobile-menu-sheet" aria-label="Menu">
+            <div className="mobile-menu-header">
+              <UserAvatar profile={profile} size={44} />
               <div>
-                <p className="eyebrow">Menu</p>
-                <h2>Mais opções</h2>
+                <strong>{profile?.name ?? user?.email}</strong>
+                {profile?.name ? <span className="text-secondary" style={{ fontSize: '0.8rem' }}>{user?.email}</span> : null}
               </div>
               <button className="icon-button" type="button" aria-label="Fechar menu" onClick={() => setMobileMenuOpen(false)}>
                 <X size={18} aria-hidden="true" />
               </button>
             </div>
-            <div className="mobile-more-grid">
+            <div className="mobile-menu-grid">
               <NavLink className={getNavClass} to="/app/accounts" onClick={() => setMobileMenuOpen(false)}>
                 <WalletCards size={19} aria-hidden="true" /> Contas
               </NavLink>
@@ -163,7 +164,7 @@ export function AppShell() {
                 <Target size={19} aria-hidden="true" /> Metas
               </NavLink>
               <NavLink className={getNavClass} to="/app/recurring" onClick={() => setMobileMenuOpen(false)}>
-                <Repeat size={19} aria-hidden="true" /> Recorrências
+                <Repeat size={19} aria-hidden="true" /> Despesas Fixas
               </NavLink>
               <NavLink className={getNavClass} to="/app/search" onClick={() => setMobileMenuOpen(false)}>
                 <BarChart2 size={19} aria-hidden="true" /> Análise
@@ -171,30 +172,24 @@ export function AppShell() {
               <NavLink className={getNavClass} to="/app/assistant" onClick={() => setMobileMenuOpen(false)}>
                 <Bot size={19} aria-hidden="true" /> Assistente
               </NavLink>
-              <p className="eyebrow" style={{ gridColumn: '1 / -1', margin: '0.5rem 0 0' }}>Conta</p>
+            </div>
+            <div className="mobile-menu-footer">
               <NavLink className={getNavClass} to="/app/settings/payday" onClick={() => setMobileMenuOpen(false)}>
-                <Banknote size={19} aria-hidden="true" /> Recebimento
+                <Banknote size={17} aria-hidden="true" /> Recebimento
               </NavLink>
               <NavLink className={getNavClass} to="/app/settings/appearance" onClick={() => setMobileMenuOpen(false)}>
-                <Palette size={19} aria-hidden="true" /> Aparência
+                <Palette size={17} aria-hidden="true" /> Aparência
               </NavLink>
               <NavLink className={getNavClass} to="/app/settings/security/login-methods" onClick={() => setMobileMenuOpen(false)}>
-                <Shield size={19} aria-hidden="true" /> Segurança
+                <Shield size={17} aria-hidden="true" /> Segurança
               </NavLink>
-              <button
-                className="nav-link"
-                type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  openTour();
-                }}
-              >
-                <HelpCircle size={19} aria-hidden="true" /> Como funciona
+              <button className="nav-link" type="button" onClick={() => { setMobileMenuOpen(false); openTour(); }}>
+                <HelpCircle size={17} aria-hidden="true" /> Como funciona
+              </button>
+              <button className="nav-link" type="button" onClick={() => { setMobileMenuOpen(false); void logout(); }}>
+                <LogOut size={17} aria-hidden="true" /> Sair
               </button>
             </div>
-            <button className="button button--ghost" type="button" onClick={() => void logout()}>
-              <LogOut size={18} aria-hidden="true" /> Sair
-            </button>
           </section>
         </>
       ) : null}
@@ -217,14 +212,14 @@ export function AppShell() {
           <span>Cartões</span>
         </NavLink>
         <button
-          className={`nav-link mobile-more-trigger${mobileMenuOpen ? ' active' : ''}`}
+          className={`nav-link mobile-menu-trigger${mobileMenuOpen ? ' active' : ''}`}
           type="button"
-          aria-label="Mais opções"
+          aria-label="Menu"
           aria-expanded={mobileMenuOpen}
           onClick={() => setMobileMenuOpen((open) => !open)}
         >
-          <MoreHorizontal size={20} aria-hidden="true" />
-          <span>Mais</span>
+          <UserAvatar profile={profile} size={24} />
+          <span>Menu</span>
         </button>
         </nav>
       ) : null}

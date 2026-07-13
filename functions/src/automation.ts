@@ -243,7 +243,7 @@ export const generateRecurrences = onSchedule(
 
       await sendPushToUser(
         rule.createdBy,
-        `Recorrência: ${rule.description}`,
+        `Despesa Fixa: ${rule.description}`,
         `${formatBRL(rule.amountCents)} registrado automaticamente.`
       ).catch(() => {});
     }

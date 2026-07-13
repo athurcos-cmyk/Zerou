@@ -1,12 +1,28 @@
 import { MonitorSmartphone } from 'lucide-react';
+import { useAuth } from '../auth/AuthContext';
 import { useAppearanceStore } from '../theme/appearance.store';
 import { THEME_DEFINITIONS } from '../theme/theme.registry';
+import { AvatarPicker } from '../profile/AvatarPicker';
+import { updateAvatarStyle } from '../profile/updateAvatarStyle';
+import { useState } from 'react';
 
 export function AppearanceSettingsPage() {
+  const { user, profile } = useAuth();
   const preferences = useAppearanceStore((state) => state.preferences);
   const resolvedThemeId = useAppearanceStore((state) => state.resolvedThemeId);
   const setThemeMode = useAppearanceStore((state) => state.setThemeMode);
   const setThemeId = useAppearanceStore((state) => state.setThemeId);
+  const [saving, setSaving] = useState(false);
+
+  async function handleAvatarChange(avatarId: string | undefined) {
+    if (!user) return;
+    setSaving(true);
+    try {
+      await updateAvatarStyle(user.uid, avatarId);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <section className="page-content">
@@ -17,6 +33,11 @@ export function AppearanceSettingsPage() {
       </p>
 
       <div className="settings-grid">
+        <section className="surface surface-pad" aria-labelledby="avatar-title">
+          <h2 id="avatar-title">Avatar</h2>
+          <AvatarPicker profile={profile} onSelect={handleAvatarChange} disabled={saving} />
+        </section>
+
         <section className="surface surface-pad" aria-labelledby="theme-mode-title">
           <div className="option-row">
             <div>

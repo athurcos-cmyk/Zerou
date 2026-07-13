@@ -2,6 +2,14 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-13 — Grazi: rewrite do contexto financeiro + rename Recorrências → Despesas Fixas
+
+- **Grazi agora vê tudo que o Dashboard vê**: `buildFinancialContext` reescrito para incluir despesas fixas (`recurring`), faturas de cartão (`cards/*/invoices`), bills vencidas (`overdue`), saldo individual por conta, e total "Comprometido" calculado (contas + despesas fixas + faturas). O contexto inclui seções RESÚMO, GASTOS POR CATEGORIA e COMPROMETIDO com quebra por tipo.
+- **Antes**: Grazi só via transactions (`expense`/`card_purchase`) + bills `pending` 7 dias + nomes de contas. **Agora**: vê recorrências ativas (próx. ocorrência), faturas com saldo devedor (open/closed/overdue/partial), bills pending+overdue 30 dias, saldo das contas (abertura + transações), receitas do mês, e total livre para gastar.
+- **Prompt atualizado**: regra #3 explícita para usar a seção COMPROMETIDO e nunca dizer "não tem nada" se houver itens listados.
+- **Rename "Recorrências" → "Despesas Fixas"**: textos de UI (nav, página, Dashboard, Análise, Welcome Tour, push notification) atualizados. Identificadores de código (`RecurringRule`, `recurringRules`, rota `/app/recurring`) mantidos.
+- 28 testes functions (4 novos: overdue bills, despesas fixas, total comprometido, saldo conta), 276 client, typecheck/build limpos. Deployado.
+
 ## 2026-07-13 — fix: regras de orçamento e reconciliação finalmente deployadas + UX de descoberta do limite por categoria
 
 - **Deploy pendente resolvido:** as regras do Firestore para orçamento por categoria
@@ -21,6 +29,18 @@ Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/his
   orçamento existir — convidando a definir um limite (ex.: "até R$100 em Doces
   por mês").
 - 276 testes unitários, typecheck e build limpos.
+
+## 2026-07-13 — fix: bugs da Grazi encontrados em investigação com 7 agentes
+
+- **7 agentes em 3 rodadas** (Explore, security, QA, produção, regressão) acharam bugs na Fase 1. Corrigidos todos os críticos/altos:
+- **card_purchase invisível**: `buildFinancialContext` só contava `type: 'expense'`, ignorava `card_purchase` — quem só usa cartão via "R$ 0,00" de gasto.
+- **BRT timezone**: `buildFinancialContext` usava `new Date()` (UTC), não `nowInBRT()`. 3h por mês com dados errados (21h-00h BRT no último dia do mês).
+- **Rate limit**: contador era incrementado ANTES do DeepSeek — cada falha de API queimava cota. Movido pra depois do sucesso; pre-check de limite mantido.
+- **Validação de input**: `history` sem validação permitia injeção de role `system`, strings gigantes, e crash com `history` não-array. `workspaceId` com whitespace passava. `request.data` undefined crashava. Tudo validado agora com `validateHistory()` + trim + guard.
+- **`??` vs `||`**: `competenceMonth`/`categoryId` com string vazia não caía no fallback com `??`. Trocado por `||` + `cashMonth`.
+- **Null dueDate**: uma bill sem `dueDate` derrubava `buildFinancialContext` inteiro. Tratamento defensivo com skip + `isNaN`.
+- **Timeout DeepSeek**: 15s → 45s. API key validation adicionada. Retry único pra 429/503.
+- 24 testes functions, 276 client, typecheck/build limpos. Deployado.
 
 ## 2026-07-13 — feat: assistente de IA financeiro (Fase 1)
 

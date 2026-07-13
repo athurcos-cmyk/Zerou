@@ -29,7 +29,11 @@ export function AssistantPage() {
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     const text = input.trim();
-    if (!text || loading || !workspaceId) return;
+    if (!text || loading) return;
+    if (!workspaceId) {
+      setError('Conclua seu cadastro antes de usar o assistente.');
+      return;
+    }
 
     setInput('');
     setError(null);
@@ -60,7 +64,7 @@ export function AssistantPage() {
       <header className="section-heading">
         <div>
           <p className="eyebrow">Assistente</p>
-          <h1>Granativa IA</h1>
+          <h1>Grazi</h1>
         </div>
       </header>
 

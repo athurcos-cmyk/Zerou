@@ -432,7 +432,7 @@ export function SearchPage() {
         />
         {isFutureMonth ? (
           <MetricCard
-            label="Recorrências"
+            label="Despesas Fixas"
             value={recurringTotalCents > 0 ? `~${formatMoney(recurringTotalCents)}` : 'R$ 0'}
             sub="estimativa do mês"
           />
@@ -642,7 +642,7 @@ export function SearchPage() {
         <article className="surface surface-pad" style={{ marginTop: '0.75rem' }}>
           <div className="section-heading">
             <div>
-              <p className="eyebrow">Recorrências previstas</p>
+              <p className="eyebrow">Despesas Fixas previstas</p>
               <h2>{monthTitle}</h2>
             </div>
           </div>

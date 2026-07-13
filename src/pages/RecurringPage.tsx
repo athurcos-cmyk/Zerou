@@ -106,9 +106,9 @@ export function RecurringPage() {
     <section className="page-content">
       <div className="page-heading-row">
         <div>
-          <p className="eyebrow">Recorrências</p>
-          <h1 className="page-title">Gastos que se repetem.</h1>
-          <p className="page-description">Salve assinaturas, mensalidades e contas fixas para lembrar antes do vencimento.</p>
+          <p className="eyebrow">Despesas Fixas</p>
+          <h1 className="page-title">Suas despesas do dia a dia.</h1>
+          <p className="page-description">Assinaturas, mensalidades e contas fixas que se repetem todo mes.</p>
         </div>
         <Repeat size={28} aria-hidden="true" />
       </div>

@@ -68,6 +68,7 @@ export interface UserProfile extends AppearancePreferences {
   name: string;
   email: string;
   avatarUrl?: string;
+  avatarStyle?: string;
   defaultWorkspaceId?: string;
   locale: 'pt-BR';
   timezone: 'America/Sao_Paulo';
