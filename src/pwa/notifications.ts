@@ -20,9 +20,21 @@ export async function requestAndRegisterPushToken(): Promise<void> {
   if (permission !== 'granted') return;
 
   try {
+    // O VitePWA registra /sw.js pra precaching offline. O Firebase Messaging
+    // precisa de um SW separado (/firebase-messaging-sw.js) com onBackgroundMessage
+    // pra receber push com o app fechado. Registramos explicitamente e passamos
+    // pro getToken — senão ele usa o SW errado e notificações em background somem.
+    let swRegistration = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
+    if (!swRegistration) {
+      swRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    }
+
     const { getMessaging, getToken } = await import('firebase/messaging');
     const messaging = getMessaging(getFirebaseServices().app);
-    const token = await getToken(messaging, { vapidKey: VAPID_KEY });
+    const token = await getToken(messaging, {
+      vapidKey: VAPID_KEY,
+      serviceWorkerRegistration: swRegistration,
+    });
     if (!token) return;
 
     const user = getFirebaseAuth().currentUser;
