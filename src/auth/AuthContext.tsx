@@ -98,6 +98,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const finishBoot = (nextUser: User | null) => {
         bootResolved = true;
+
+        // Quando offline, o Firebase Auth pode disparar null se nao conseguir renovar
+        // o token. Se temos perfil em cache, confiamos nele em vez de deslogar o usuario
+        // e limpar todos os dados da tela (o Firestore continua servindo do cache local).
+        if (!nextUser) {
+          const cachedProfile = readLastCachedProfile();
+          if (cachedProfile) {
+            setAuthFromCache(true);
+            setUser(buildCachedUserFromProfile(cachedProfile));
+            applyProfile(cachedProfile);
+            setProfileLoading(false);
+            setLoading(false);
+            return;
+          }
+        }
+
         setAuthFromCache(false);
         setUser(nextUser);
         const cachedProfile = readCachedProfile(nextUser?.uid);

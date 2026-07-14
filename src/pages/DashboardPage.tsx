@@ -270,14 +270,14 @@ export function DashboardPage() {
               );
             })}
           </div>
-        ) : (
+        ) : !isCommittedLoading ? (
           <EmptyState
             illustration="wallet"
             compact
             title="Sem gastos este mês"
             description="Quando você lançar gastos, as maiores categorias do mês aparecem aqui."
           />
-        )}
+        ) : null}
       </article>
 
       <div className="finance-grid">
@@ -291,7 +291,7 @@ export function DashboardPage() {
               Ver todos
             </Link>
           </div>
-          {dashboard.upcomingCommitments.length > 0 ? (
+          {isCommittedLoading ? null : dashboard.upcomingCommitments.length > 0 ? (
             <div className="item-list">
               {dashboard.upcomingCommitments.map((commitment) => {
                 // Fatura leva pra fatura do cartao; conta a pagar pros Compromissos; despesa fixa pras Despesas Fixas.
@@ -315,14 +315,14 @@ export function DashboardPage() {
                 );
               })}
             </div>
-          ) : (
+          ) : !isCommittedLoading ? (
             <EmptyState
               illustration="bills"
               compact
               title="Nenhum compromisso pendente"
               description="Contas a pagar, faturas e recorrências futuras aparecem aqui."
             />
-          )}
+          ) : null}
         </article>
 
         <article className="surface surface-pad">
@@ -335,7 +335,7 @@ export function DashboardPage() {
               Ver todas
             </Link>
           </div>
-          {dashboard.recentTransactions.length > 0 ? (
+          {isLoading ? null : dashboard.recentTransactions.length > 0 ? (
             <div className="item-list">
               {dashboard.recentTransactions.map((transaction) => {
                 const isIncome = transaction.type === 'income';
@@ -363,7 +363,7 @@ export function DashboardPage() {
                 );
               })}
             </div>
-          ) : (
+          ) : !isLoading ? (
             <EmptyState
               illustration="transactions"
               compact
@@ -375,7 +375,7 @@ export function DashboardPage() {
                 </Link>
               }
             />
-          )}
+          ) : null}
         </article>
       </div>
     </section>
