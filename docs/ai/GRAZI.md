@@ -15,7 +15,7 @@ Grazi é a assistente de IA do Granativa. Ela responde perguntas sobre os gastos
 | Arquivo | Função |
 |---|---|
 | `functions/src/ai/deepseekClient.ts` | Cliente HTTP para API DeepSeek (`deepseek-chat`). Timeout 45s, retry único para 429/503, validação de API key. |
-| `functions/src/ai/buildFinancialContext.ts` | Agrega dados do workspace (transações 90 dias, bills, contas) em string de texto ≤ 2000 chars para o prompt. Usa BRT (`nowInBRT()`), conta `expense` + `card_purchase`, trata null/undefined/vazio defensivamente. |
+| `functions/src/ai/buildFinancialContext.ts` | Agrega dados do workspace (transações 90 dias, bills, contas, budgets, goals, perfil) em string de texto ≤ 5000 chars para o prompt. Lê também perfil do usuário e espaço do casal. Usa BRT (`nowInBRT()`), conta `expense` + `card_purchase`, trata null/undefined/vazio defensivamente. |
 | `functions/src/ai/verifyWorkspaceMembership.ts` | Verifica `workspaces/{id}/members/{uid}` com `status == 'active'`. |
 | `functions/src/ai/financialAssistant.ts` | Cloud Function `onCall` principal. Fluxo: auth → membership → rate limit pre-check → contexto → DeepSeek → rate limit increment. |
 | `functions/src/ai/buildFinancialContext.test.ts` | 7 testes: gastos com categoria, card_purchase, fallback string vazia, deletados, bills, null dueDate, workspace vazio. |

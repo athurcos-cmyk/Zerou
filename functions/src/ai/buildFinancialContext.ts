@@ -54,7 +54,6 @@ interface GoalData {
   targetCents: number;
   savedCents: number;
   isActive: boolean;
-  dueDate?: Timestamp;
 }
 
 interface RecurringRuleData {
@@ -389,7 +388,7 @@ export async function buildFinancialContext(
 
   for (const doc of goalsSnap.docs) {
     const goal = doc.data() as GoalData;
-    const pct = goal.targetCents > 0 ? (goal.savedCents / goal.targetCents) * 100 : 0;
+    const pct = goal.targetCents > 0 ? ((goal.savedCents ?? 0) / goal.targetCents) * 100 : 0;
     goalLines.push({
       name: sanitize(goal.name ?? ''),
       kind: goal.kind === 'debt' ? 'quitacao' : 'guardar',
@@ -420,7 +419,7 @@ export async function buildFinancialContext(
 
       for (const doc of coupleGoalsSnap.docs) {
         const goal = doc.data() as GoalData;
-        const pct = goal.targetCents > 0 ? (goal.savedCents / goal.targetCents) * 100 : 0;
+        const pct = goal.targetCents > 0 ? ((goal.savedCents ?? 0) / goal.targetCents) * 100 : 0;
         coupleGoalLines.push({
           name: sanitize(goal.name ?? ''),
           saved: goal.savedCents,

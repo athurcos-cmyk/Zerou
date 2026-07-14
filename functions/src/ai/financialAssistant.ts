@@ -151,7 +151,7 @@ export const financialAssistantChat = onCall(
     // quanto para atualizar — sem race condition entre if/else com exists obsoleto.
     try {
       await usageRef.set(
-        { count: FieldValue.increment(1), createdAt: FieldValue.serverTimestamp() },
+        { count: FieldValue.increment(1), updatedAt: FieldValue.serverTimestamp() },
         { merge: true },
       );
     } catch (err) {
