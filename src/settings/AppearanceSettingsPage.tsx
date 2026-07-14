@@ -5,7 +5,7 @@ import { THEME_DEFINITIONS } from '../theme/theme.registry';
 import { AvatarPicker } from '../profile/AvatarPicker';
 import { updateAvatarStyle } from '../profile/updateAvatarStyle';
 import { FormMessage } from '../components/FormMessage';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 
 export function AppearanceSettingsPage() {
   const { user, profile } = useAuth();
@@ -32,6 +32,11 @@ export function AppearanceSettingsPage() {
     setOptimisticAvatarId(avatarId);
     updateAvatarStyle(user.uid, avatarId);
   }, [user]);
+
+  const { lightThemes, darkThemes } = useMemo(() => ({
+    lightThemes: THEME_DEFINITIONS.filter((t) => t.tone === 'light'),
+    darkThemes: THEME_DEFINITIONS.filter((t) => t.tone === 'dark'),
+  }), []);
 
   return (
     <section className="page-content">
@@ -69,9 +74,34 @@ export function AppearanceSettingsPage() {
         </section>
 
         <section className="surface surface-pad" aria-labelledby="themes-title">
-          <h2 id="themes-title">Temas oficiais</h2>
+          <h2 id="themes-title">Temas</h2>
+
+          <h3 className="theme-group-label">Claros</h3>
           <div className="theme-grid">
-            {THEME_DEFINITIONS.map((theme) => (
+            {lightThemes.map((theme) => (
+              <button
+                className="theme-card"
+                type="button"
+                key={theme.id}
+                aria-pressed={preferences.themeMode === 'manual' && preferences.themeId === theme.id}
+                onClick={() => setThemeId(theme.id)}
+              >
+                <span className="theme-preview" data-preview-theme={theme.id} aria-hidden="true">
+                  <span className="theme-preview-main" />
+                  <span className="theme-preview-side">
+                    <span className="theme-preview-pill" />
+                    <span className="theme-preview-line" />
+                    <span className="theme-preview-line" />
+                  </span>
+                </span>
+                <strong>{theme.name}</strong>
+              </button>
+            ))}
+          </div>
+
+          <h3 className="theme-group-label">Escuros</h3>
+          <div className="theme-grid">
+            {darkThemes.map((theme) => (
               <button
                 className="theme-card"
                 type="button"

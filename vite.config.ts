@@ -96,7 +96,7 @@ export default defineConfig(({ mode }) => {
           skipWaiting: true,
           clientsClaim: true,
           cleanupOutdatedCaches: true,
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest,jpg,jpeg,webp}'],
           navigateFallback: '/index.html',
           runtimeCaching: [
             {

@@ -2085,6 +2085,19 @@ span.service-mark--brand {
   gap: 0.6rem;
 }
 
+.theme-group-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 1rem 0 0.5rem;
+}
+
+.theme-group-label:first-of-type {
+  margin-top: 0;
+}
+
 .theme-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
