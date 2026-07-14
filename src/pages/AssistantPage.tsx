@@ -10,6 +10,13 @@ interface ChatMessage {
   content: string;
 }
 
+function renderAssistantMessage(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/\n/g, '<br/>');
+}
+
 export function AssistantPage() {
   const { profile } = useAuth();
   const workspaceId = profile?.defaultWorkspaceId;
@@ -101,7 +108,11 @@ export function AssistantPage() {
               key={`${msg.role}-${i}`}
               className={`assistant-bubble ${msg.role === 'user' ? 'assistant-bubble--user' : 'assistant-bubble--assistant'}`}
             >
-              <p>{msg.content}</p>
+              {msg.role === 'assistant' ? (
+                <p dangerouslySetInnerHTML={{ __html: renderAssistantMessage(msg.content) }} />
+              ) : (
+                <p>{msg.content}</p>
+              )}
             </div>
           ))
         )}

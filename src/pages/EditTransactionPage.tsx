@@ -15,12 +15,6 @@ import { centsToInputValue, parseMoneyToCents } from '../finance/money';
 
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
 
-function waitForLocalWrite() {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, 350);
-  });
-}
-
 const primaryTypes: SupportedTransactionType[] = ['income', 'expense', 'transfer'];
 
 function yesterdayInputValue() {
@@ -105,7 +99,7 @@ export function EditTransactionPage() {
     }
 
     try {
-      const write = updateTransaction(workspaceId, user.uid, transactionId, {
+      updateTransaction(workspaceId, user.uid, transactionId, {
         type,
         amountCents: parseMoneyToCents(amount),
         description,
@@ -118,8 +112,6 @@ export function EditTransactionPage() {
         notes
       });
 
-      await Promise.race([write, waitForLocalWrite()]);
-      void write.catch(() => undefined);
       navigate('/app/transactions');
     } catch (error) {
       setMessage(getUserFacingErrorMessage(error, 'Não foi possível atualizar a transação agora.'));

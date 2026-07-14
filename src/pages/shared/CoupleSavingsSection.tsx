@@ -58,7 +58,7 @@ export function CoupleSavingsSection({
       targetCents: cofrinhoTarget ? parseMoneyToCents(cofrinhoTarget) : 0,
       icon: 'piggy',
       color: cofrinhoColor
-    }).catch((error) => onMessage(getUserFacingErrorMessage(error, 'Não foi possível criar o cofrinho agora.')));
+    });
     setCofrinhoName('');
     setCofrinhoTarget('');
     setCofrinhoColor(categoryColors[0]);
@@ -91,12 +91,12 @@ export function CoupleSavingsSection({
       coupleGoalDeposit(workspaceId, personalDefaultWorkspaceId, userId, guardarTarget.goal.id, amountCents, {
         description: `Cofrinho: ${guardarTarget.goal.name}`,
         accountId: guardarFromAccount
-      }).catch((error) => onMessage(getUserFacingErrorMessage(error, 'Não foi possível guardar agora.')));
+      });
     } else {
       coupleGoalWithdraw(workspaceId, personalDefaultWorkspaceId, userId, guardarTarget.goal.id, amountCents, {
         description: `Cofrinho: ${guardarTarget.goal.name} (resgate)`,
         accountId: guardarFromAccount
-      }).catch((error) => onMessage(getUserFacingErrorMessage(error, 'Não foi possível resgatar agora — talvez seu parceiro tenha resgatado antes. Confira o saldo e tente de novo.')));
+      });
     }
 
     setGuardarTarget(null);

@@ -2,6 +2,47 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-14 — App 100% offline (auditoria + correção de 11 funções)
+
+- **Auditoria completa de offline-first**: todos os `await` em escritas no Firestore, `getDocs`/`getDoc` que falham sem cache, componentes com "Carregando..." que nunca resolvem offline. 2 agentes fizeram a auditoria e revisaram as decisões.
+- **8 escritas convertidas para `fireWrite`**: `createAccount`, `createTransaction`, `createGoal`, `contributeToGoal`, `updateTransaction`, `coupleGoalDeposit`, `coupleGoalWithdrawal`, `ensureDefaultCategories` — todas estavam com `await` e travavam forms/sheets offline.
+- **`useFinanceData`**: timeout de 2.5s por slice (`SLICE_BOOT_TIMEOUT_MS`) — se `onSnapshot` não disparar (cache vazio + offline), assume `[]` e destrava o loading. Antes, bastava UMA coleção sem cache pra dashboard ficar presa em "Carregando..." pra sempre.
+- **Dashboard "disponível por dia"**: agora usa `cachedSummary.freeToSpendCents` como fallback enquanto carrega, em vez de mostrar "Carregando...".
+- **Dead code removido**: `waitForLocalWrite()` + `Promise.race` em `NewTransactionPage`/`EditTransactionPage` (já eram inúteis — `createCardPurchase` já usava `fireWrite`). `.catch()` mortos em `CoupleSavingsSection`.
+- **2 correções extras**: `updateAvatarStyle` e `syncAppearanceForUser` convertidas pra `fireWrite`.
+- 276 testes unitários + 49 testes de regra (emuladores) + typecheck + build limpos. Detalhes da auditoria em `docs/history/2026-07.md`.
+
+## 2026-07-14 — Redesign dos avatares (+ bug de permissão nunca funcionou) e polimento da sidebar
+
+- **Avatares redesenhados**: os 12 rostinhos SVG desenhados à mão (`src/profile/avatarCatalog.tsx`) foram trocados por retratos recortados de um asset comprado no Adobe Stock (licença comercial confirmada pelo dono, `AdobeStock_420429519`, grid 16×6 de 96 retratos — grid detectado por análise de pixel, 12 recortados/redimensionados pra 256×256 JPEG). Uma primeira tentativa gerou avatares com o estilo open-source "Personas" (DiceBear) antes do dono pedir pra usar essa imagem própria em vez disso — infra do DiceBear (`@dicebear/*`, `scripts/generate-avatars.mjs`) removida. Arquivos estáticos em `public/avatars/*.jpg`, mesmos 12 `id`/rótulo de antes (sem migração de dado). Proveniência em `public/avatars/SOURCES.md`.
+- **Bug real encontrado ao verificar ao vivo**: escolher um avatar sempre falhava silenciosamente — `firestore.rules` nunca permitiu o campo `avatarStyle` na regra de update do perfil (`onlyAppearanceChanged()`), então todo `updateDoc` voltava `permission-denied` do servidor. Mesmo padrão dos 2 incidentes anteriores documentados no `CLAUDE.md` (campo novo em payload sem atualizar a regra no mesmo commit). Corrigido: `avatarStyle` adicionado ao `hasOnly` + `validAvatarStyle()` valida contra os 12 ids válidos. Deploy publicado (`firebase deploy --only firestore:rules`) e confirmado ao vivo (seleção sobrevive a reload).
+- De quebra, `AppearanceSettingsPage.handleAvatarChange` parou de dar `await` no write (violava a regra de offline-first) e passou a mostrar erro via `FormMessage` em vez de engolir silenciosamente.
+- Teste de regressão em `tests/firestore.rules.test.ts`. 276 testes unitários + 49 de regra, typecheck e build limpos. Ver `docs/history/2026-07.md` para detalhe da escolha de estilo.
+- **Mesma sessão, dono pediu ajuste**: rótulos trocados de adjetivo de personalidade ("Esperto",
+  "Focado"...) pra nomes próprios (Ana, Bruno, Carla...) e catálogo expandido de 12 pra 24
+  avatares — mais variedade de cor de cabelo/pele/acessório, escolhida à mão pra evitar
+  repetir demais o cabelo ruivo (predominante no asset de origem). `validAvatarStyle()` e
+  `tests/firestore.rules.test.ts` atualizados pros 24 ids novos, regra redeployada com
+  autorização explícita do dono (2ª vez na mesma sessão — cada deploy pedido de novo, sem
+  generalizar a autorização anterior). Também corrigido um recorte com margem grande demais
+  que deixava um anel branco visível atrás do círculo no tema escuro — `.avatar-picker__svg-wrap`
+  nunca tinha `border-radius`/`overflow:hidden` (só o avatar do header tinha).
+- **Rótulos removidos de vez**: dono pediu pra tirar o nome de baixo de cada avatar na grade —
+  agora é só a foto, com `aria-label="Avatar N"` numerado (não o nome) pra acessibilidade.
+- **Bug real na sidebar, achado por print do dono**: `.sidebar` tem `height: 100vh` fixo sem
+  `overflow`, e o menu cresceu pra 17 itens (10 links + 4 de conta + rodapé) — em tela mais
+  baixa o conteúdo não cabia e o botão "Sair" podia ficar inacessível. Corrigido com
+  `overflow-y: auto` + scrollbar escondida (`scrollbar-width: none` etc.). De quebra: nome do
+  usuário movido do rodapé pro topo (embaixo da logo), e os dois botões de logout ("Sair" /
+  "Sair deste aparelho" — **não eram equivalentes**, o segundo também limpava o cache local do
+  Firestore) fundidos num só "Sair" que sempre faz a limpeza completa, com aviso no diálogo de
+  confirmação sobre perder alterações offline não sincronizadas. Ver `docs/history/2026-07.md`
+  para a investigação completa.
+- **Espaçamento apertado corrigido** em telas com label + chips de filtro + lista (Compromissos,
+  Despesas Fixas): `.eyebrow`/`.chip-row` não tinham margem própria quando filhos diretos de
+  `.surface-pad`. Fix escopado (`.surface-pad > .eyebrow`, `.surface-pad > .chip-row`) pra não
+  afetar os chip-rows que já viviam dentro de `.field` (com espaçamento próprio).
+
 ## 2026-07-13 — Grazi: rewrite do contexto financeiro + rename Recorrências → Despesas Fixas
 
 - **Grazi agora vê tudo que o Dashboard vê**: `buildFinancialContext` reescrito para incluir despesas fixas (`recurring`), faturas de cartão (`cards/*/invoices`), bills vencidas (`overdue`), saldo individual por conta, e total "Comprometido" calculado (contas + despesas fixas + faturas). O contexto inclui seções RESÚMO, GASTOS POR CATEGORIA e COMPROMETIDO com quebra por tipo.

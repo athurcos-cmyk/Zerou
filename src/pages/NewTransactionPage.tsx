@@ -19,12 +19,6 @@ import { getUserFacingErrorMessage } from '../utils/userFacingError';
 
 const CARD_PREFIX = 'card:';
 
-function waitForLocalWrite() {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, 350);
-  });
-}
-
 const primaryTypes: SupportedTransactionType[] = ['income', 'expense', 'transfer'];
 
 function yesterdayInputValue() {
@@ -114,7 +108,7 @@ export function NewTransactionPage() {
     try {
       if (payingWithCard) {
         const cardId = accountId.slice(CARD_PREFIX.length);
-        const write = createCardPurchase(workspaceId, user.uid, {
+        createCardPurchase(workspaceId, user.uid, {
           cardId,
           description,
           amountCents: parseMoneyToCents(amount),
@@ -122,13 +116,11 @@ export function NewTransactionPage() {
           categoryId: categoryId || undefined,
           installments
         });
-        await Promise.race([write, waitForLocalWrite()]);
-        void write.catch(() => undefined);
         navigate(`/app/cards/${cardId}`);
         return;
       }
 
-      const write = createTransaction(workspaceId, user.uid, {
+      createTransaction(workspaceId, user.uid, {
         type,
         amountCents: parseMoneyToCents(amount),
         description,
@@ -141,8 +133,6 @@ export function NewTransactionPage() {
         notes
       });
 
-      await Promise.race([write, waitForLocalWrite()]);
-      void write.catch(() => undefined);
       navigate('/app/transactions');
     } catch (error) {
       setMessage(getUserFacingErrorMessage(error, 'Não foi possível registrar a transação agora.'));

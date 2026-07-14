@@ -1,9 +1,10 @@
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { getFirebaseDb } from '../firebase/config';
+import { fireWrite } from '../firebase/fireWrite';
 
 export async function updateAvatarStyle(uid: string, avatarStyle: string | undefined) {
-  await updateDoc(doc(getFirebaseDb(), 'users', uid), {
+  fireWrite(updateDoc(doc(getFirebaseDb(), 'users', uid), {
     avatarStyle: avatarStyle ?? null,
     updatedAt: serverTimestamp(),
-  });
+  }));
 }

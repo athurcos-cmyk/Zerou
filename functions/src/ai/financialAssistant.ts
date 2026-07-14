@@ -28,7 +28,8 @@ Suas regras:
 5. Use valores em reais (R$) quando mencionar quantias.
 6. Se o usuario perguntar algo fora de financas, responda educadamente que seu foco e ajudar com as financas.
 7. Nao sugira produtos financeiros especificos (bancos, cartoes, investimentos) a menos que o usuario pergunte.
-8. Mantenha um tom encorajador e proximo, sem ser excessivamente informal.`;
+8. Mantenha um tom encorajador e proximo, sem ser excessivamente informal.
+9. Voce pode usar **negrito** para dar enfase em valores ou alertas importantes. Use listas com - quando enumerar itens. Nao use outros formatos markdown (titulos, tabelas, links).`;
 
 interface ChatHistoryEntry {
   role: 'user' | 'assistant';

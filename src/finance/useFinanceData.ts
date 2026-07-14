@@ -15,6 +15,9 @@ import {
 import type { Account, Bill, Budget, Category, RecurringRule, Transaction } from '../types/contracts';
 
 const FINANCE_BOOT_RETRY_DELAYS_MS = [600, 1200, 2400, 4000];
+// Se um listener onSnapshot não disparar em 2.5s (cache vazio + offline), assume []
+// para destravar o loading. Quando a rede voltar, o listener entrega os dados reais.
+const SLICE_BOOT_TIMEOUT_MS = 2500;
 const preparedDefaultCategoryWorkspaces = new Set<string>();
 
 interface FinanceDataState {
@@ -143,8 +146,22 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
       attempt = 0
     ): () => void {
       let unsubscribe: () => void = () => undefined;
+      let resolved = false;
 
-      unsubscribe = subscribe(activeWorkspaceId, onNext, (error) => {
+      const wrappedOnNext = (items: T[]) => {
+        resolved = true;
+        onNext(items);
+      };
+
+      const bootTimeout = window.setTimeout(() => {
+        if (cancelled || resolved) return;
+        resolved = true;
+        onNext([]);
+      }, SLICE_BOOT_TIMEOUT_MS);
+      timers.push(bootTimeout);
+
+      unsubscribe = subscribe(activeWorkspaceId, wrappedOnNext, (error) => {
+        window.clearTimeout(bootTimeout);
         unsubscribe();
 
         if (cancelled) {
@@ -162,7 +179,10 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
         onError();
       });
 
-      return () => unsubscribe();
+      return () => {
+        window.clearTimeout(bootTimeout);
+        unsubscribe();
+      };
     }
 
     prepareDefaultCategories();

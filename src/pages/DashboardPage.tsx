@@ -56,16 +56,6 @@ export function DashboardPage() {
       ? `Considerando seu recebimento em ${formatFriendlyDate(dashboard.committedCutoff!)}`
       : `Considerando os próximos ${profile?.committedWindowDays ?? 30} dias`;
 
-  const perDayDisplay = useMemo(() => {
-    if (isCommittedLoading || !dashboard.committedCutoff) return null;
-    if (dashboard.freeToSpendCents <= 0) return null;
-    const daysUntilCutoff = Math.max(1, differenceInCalendarDays(dashboard.committedCutoff, new Date()));
-    const perDayCents = Math.floor(dashboard.freeToSpendCents / daysUntilCutoff);
-    return perDayCents > 0
-      ? `≈ ${formatMoney(perDayCents)}/dia até ${formatFriendlyDate(dashboard.committedCutoff)}`
-      : null;
-  }, [isCommittedLoading, dashboard.committedCutoff, dashboard.freeToSpendCents]);
-
   // Só depois que o perfil carregou (senão o sheet pisca antes de sabermos a escolha) e
   // depois que o tour de boas-vindas fechou — pra não empilhar dois modais no primeiro acesso.
   const shouldAutoOpenTutorial = Boolean(profile) && !hasChosenAvailableMode && !tutorialDismissed && welcomeTourSeen;
@@ -86,6 +76,21 @@ export function DashboardPage() {
   // Firestore ainda não entregaram o primeiro snapshot — evita o "—" piscando
   // por 1-2s a cada reload, sem alterar a lógica de correção do loading em si.
   const cachedSummary = useMemo(() => readCachedDashboardSummary(workspaceId), [workspaceId]);
+
+  const effectiveFreeToSpend = isCommittedLoading && cachedSummary
+    ? cachedSummary.freeToSpendCents
+    : dashboard.freeToSpendCents;
+
+  const perDayDisplay = useMemo(() => {
+    if (!dashboard.committedCutoff) return null;
+    if (effectiveFreeToSpend <= 0) return null;
+    const daysUntilCutoff = Math.max(1, differenceInCalendarDays(dashboard.committedCutoff, new Date()));
+    const perDayCents = Math.floor(effectiveFreeToSpend / daysUntilCutoff);
+    return perDayCents > 0
+      ? `≈ ${formatMoney(perDayCents)}/dia até ${formatFriendlyDate(dashboard.committedCutoff)}`
+      : null;
+  }, [dashboard.committedCutoff, effectiveFreeToSpend]);
+
   useEffect(() => {
     if (!isCommittedLoading && workspaceId) {
       saveCachedDashboardSummary(workspaceId, {

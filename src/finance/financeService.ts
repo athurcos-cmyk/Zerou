@@ -88,7 +88,7 @@ export async function ensureDefaultCategories(workspaceId: string) {
     });
   });
 
-  await batch.commit();
+  fireWrite(batch.commit());
 }
 
 export async function createAccount(workspaceId: string, userId: string, input: CreateAccountInput) {
@@ -96,7 +96,7 @@ export async function createAccount(workspaceId: string, userId: string, input: 
   const id = createId('acct');
   const now = serverTimestamp();
 
-  await setDoc(documentRef(workspaceId, 'accounts', id), {
+  fireWrite(setDoc(documentRef(workspaceId, 'accounts', id), {
     id,
     workspaceId,
     name: parsed.name,
@@ -106,7 +106,7 @@ export async function createAccount(workspaceId: string, userId: string, input: 
     createdBy: userId,
     createdAt: now,
     updatedAt: now
-  });
+  }));
 
   return id;
 }
@@ -151,7 +151,7 @@ export async function createTransaction(workspaceId: string, userId: string, inp
   const date = Timestamp.fromDate(parsed.date);
   const monthKey = monthKeyFromDate(parsed.date);
 
-  await setDoc(documentRef(workspaceId, 'transactions', id), omitUndefined({
+  fireWrite(setDoc(documentRef(workspaceId, 'transactions', id), omitUndefined({
     id,
     workspaceId,
     createdBy: userId,
@@ -174,7 +174,7 @@ export async function createTransaction(workspaceId: string, userId: string, inp
     version: 1,
     createdAt: now,
     updatedAt: now
-  }));
+  })));
 
   return id;
 }
@@ -229,7 +229,7 @@ export async function createGoal(
 ) {
   const id = createId('goal');
   const now = serverTimestamp();
-  await setDoc(documentRef(workspaceId, 'goals', id), omitUndefined({
+  fireWrite(setDoc(documentRef(workspaceId, 'goals', id), omitUndefined({
     id,
     workspaceId,
     name: input.name.trim(),
@@ -243,15 +243,15 @@ export async function createGoal(
     createdBy: userId,
     createdAt: now,
     updatedAt: now
-  }));
+  })));
   return id;
 }
 
 export async function contributeToGoal(workspaceId: string, goalId: string, deltaCents: number) {
-  await updateDoc(documentRef(workspaceId, 'goals', goalId), {
+  fireWrite(updateDoc(documentRef(workspaceId, 'goals', goalId), {
     savedCents: increment(deltaCents),
     updatedAt: serverTimestamp()
-  });
+  }));
 }
 
 /**
@@ -308,7 +308,7 @@ export async function coupleGoalDeposit(
       updatedAt: serverTimestamp()
     }));
   }
-  return batch.commit();
+  fireWrite(batch.commit());
 }
 
 /**
@@ -365,7 +365,7 @@ export async function coupleGoalWithdraw(
       updatedAt: serverTimestamp()
     }));
   }
-  return batch.commit();
+  fireWrite(batch.commit());
 }
 
 export function subscribeGoalContributions(
@@ -406,7 +406,7 @@ export async function updateTransaction(
   const date = Timestamp.fromDate(parsed.date);
   const monthKey = monthKeyFromDate(parsed.date);
 
-  await updateDoc(
+  fireWrite(updateDoc(
     documentRef(workspaceId, 'transactions', transactionId),
     omitUndefined({
       updatedBy: userId,
@@ -427,7 +427,7 @@ export async function updateTransaction(
       version: increment(1),
       updatedAt: serverTimestamp()
     })
-  );
+  ));
 }// ─── toggleTransactionReconciled ───────────────────────────────────────────────
 
 export function toggleTransactionReconciled(

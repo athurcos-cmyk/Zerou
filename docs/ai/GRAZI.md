@@ -110,8 +110,13 @@ Está em `financialAssistant.ts:16-24` (constante `SYSTEM_PROMPT`). Regras:
 5. Fora de finanças → recusa educadamente
 6. Não sugere produtos financeiros específicos
 7. Tom encorajador, não informal demais
+8. Pode usar `**negrito**` para ênfase e listas com `-` (adicionado 2026-07-14)
 
 Para alterar o tom/persona: editar `SYSTEM_PROMPT`. Para alterar o nome: editar o prompt + `src/pages/AssistantPage.tsx` (título `<h1>`).
+
+### Renderização Markdown (2026-07-14)
+
+O cliente (`AssistantPage.tsx`) converte `**negrito**` → `<strong>` e `*itálico*` → `<em>` via `renderAssistantMessage()`. Quebras de linha viram `<br/>`. Apenas mensagens da assistant passam por renderização; mensagens do usuário são texto puro. Se adicionar mais formatação (listas, links), expandir `renderAssistantMessage`.
 
 ## Bugs conhecidos (histórico)
 

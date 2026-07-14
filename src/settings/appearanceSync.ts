@@ -1,6 +1,7 @@
 import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
 import { getFirebaseDb, isFirebaseConfigured } from '../firebase/config';
+import { fireWrite } from '../firebase/fireWrite';
 import type { AppearancePreferences } from '../theme/theme.types';
 
 export async function syncAppearanceForUser(user: User | null, preferences: AppearancePreferences) {
@@ -8,7 +9,7 @@ export async function syncAppearanceForUser(user: User | null, preferences: Appe
     return;
   }
 
-  await setDoc(
+  fireWrite(setDoc(
     doc(getFirebaseDb(), 'users', user.uid),
     {
       themeMode: preferences.themeMode,
@@ -19,5 +20,5 @@ export async function syncAppearanceForUser(user: User | null, preferences: Appe
       updatedAt: serverTimestamp()
     },
     { merge: true }
-  );
+  ));
 }
