@@ -4,9 +4,8 @@ import { useAppearanceStore } from '../theme/appearance.store';
 import { THEME_DEFINITIONS } from '../theme/theme.registry';
 import { AvatarPicker } from '../profile/AvatarPicker';
 import { updateAvatarStyle } from '../profile/updateAvatarStyle';
-import { getUserFacingErrorMessage } from '../utils/userFacingError';
 import { FormMessage } from '../components/FormMessage';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 
 export function AppearanceSettingsPage() {
   const { user, profile } = useAuth();
@@ -14,15 +13,25 @@ export function AppearanceSettingsPage() {
   const resolvedThemeId = useAppearanceStore((state) => state.resolvedThemeId);
   const setThemeMode = useAppearanceStore((state) => state.setThemeMode);
   const setThemeId = useAppearanceStore((state) => state.setThemeId);
-  const [avatarMessage, setAvatarMessage] = useState<string | null>(null);
-
-  function handleAvatarChange(avatarId: string | undefined) {
-    if (!user) return;
-    setAvatarMessage(null);
-    updateAvatarStyle(user.uid, avatarId).catch((error) =>
-      setAvatarMessage(getUserFacingErrorMessage(error, 'Não foi possível salvar o avatar agora.'))
-    );
+  // Estado otimista: reflete a escolha imediatamente, mesmo antes do Firestore
+  // confirmar. O onSnapshot do perfil eventualmente sincroniza e sobrescreve.
+  const [optimisticAvatarId, setOptimisticAvatarId] = useState<string | undefined>(undefined);
+  const hasOptimistic = optimisticAvatarId !== undefined && optimisticAvatarId !== profile?.avatarStyle;
+  const effectiveAvatarStyle = hasOptimistic ? optimisticAvatarId : profile?.avatarStyle;
+  // Quando o perfil real chega com o mesmo valor, limpa o otimista
+  if (hasOptimistic && optimisticAvatarId === profile?.avatarStyle) {
+    queueMicrotask(() => setOptimisticAvatarId(undefined));
   }
+
+  const pickerProfile = effectiveAvatarStyle !== profile?.avatarStyle
+    ? { name: profile?.name ?? '', avatarStyle: effectiveAvatarStyle }
+    : profile;
+
+  const handleAvatarChange = useCallback((avatarId: string | undefined) => {
+    if (!user) return;
+    setOptimisticAvatarId(avatarId);
+    updateAvatarStyle(user.uid, avatarId);
+  }, [user]);
 
   return (
     <section className="page-content">
@@ -35,8 +44,8 @@ export function AppearanceSettingsPage() {
       <div className="settings-grid">
         <section className="surface surface-pad" aria-labelledby="avatar-title">
           <h2 id="avatar-title">Avatar</h2>
-          <AvatarPicker profile={profile} onSelect={handleAvatarChange} />
-          <FormMessage>{avatarMessage}</FormMessage>
+          <AvatarPicker profile={pickerProfile} onSelect={handleAvatarChange} />
+          <FormMessage />
         </section>
 
         <section className="surface surface-pad" aria-labelledby="theme-mode-title">
