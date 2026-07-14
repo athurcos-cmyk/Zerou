@@ -2,6 +2,12 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-14 — Auditoria offline (6 agentes) + push notifications + Grazi deploy
+
+- **Auditoria offline com 6 agentes**: ~100 arquivos analisados em paralelo. Corrigido: boot timeout de 2.5s em 4 hooks (`useCardsData`, `useGoalsData`, `useSharedWorkspaceData`, `useCoupleSavings`), `subscribeWithTransientRetry` ignora `unavailable` (SDK retenta sozinho), `profileLoading` sempre desbloqueia após timeout, `RootRoute` mostra "Carregando..." em vez de tela branca, perfil `onSnapshot` ganhou `includeMetadataChanges: true`, `createCardPurchase` com `.catch()`.
+- **Push notifications com app fechado**: `firebase-messaging-sw.js` agora é registrado explicitamente e passado via `serviceWorkerRegistration` pro `getToken()`. Antes o SW do VitePWA roubava o lugar e notificações em background nunca chegavam.
+- **Grazi**: build das functions + deploy (system prompt atualizado com 11 regras, contexto expandido pra 9 seções, bugs de auditoria corrigidos).
+
 ## 2026-07-14 — Offline: sessão mantida sem internet + avatar otimista + dashboard sem flash
 
 - **Offline não desloga mais**: `finishBoot` no `AuthContext` agora rejeita `onAuthStateChanged(null)` quando há perfil em cache. Antes, Firebase Auth disparava null ao falhar renovação de token offline → user/profile zerados → redirect pra /login → todos os dados sumiam da tela.
