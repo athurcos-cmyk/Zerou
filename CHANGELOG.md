@@ -2,6 +2,13 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-14 — Offline: sessão mantida sem internet + avatar otimista + dashboard sem flash
+
+- **Offline não desloga mais**: `finishBoot` no `AuthContext` agora rejeita `onAuthStateChanged(null)` quando há perfil em cache. Antes, Firebase Auth disparava null ao falhar renovação de token offline → user/profile zerados → redirect pra /login → todos os dados sumiam da tela.
+- **Avatar com estado otimista**: `AppearanceSettingsPage` reflete a seleção imediatamente (`optimisticAvatarId`), sem esperar o `onSnapshot` do perfil. No mobile a latência dava impressão de "não foi".
+- **Dashboard sem flash de empty state**: seções de gastos, compromissos e transações recentes não mostram mais `EmptyState` durante o loading (~200ms). Só renderizam quando o carregamento termina e realmente não há dados.
+- **Arquivos da sessão anterior commitados**: avatares JPG em `public/avatars/`, `firestore.rules` com `validAvatarStyle()`, sidebar com scroll, reset de `button/input/select/textarea` no `global.css`.
+
 ## 2026-07-14 — Grazi expandida: 6 novos contextos + auditoria
 
 - **Contexto expandido de 3 para 9 seções**: SEU CICLO (payday/availableMode), TENDENCIA (6 meses), ORCAMENTOS (limites com %), METAS (progresso), CASAL (cofrinhos do parceiro). GASTOS POR LUGAR considerado e removido (campo merchant escondido em "Mais detalhes", sem normalização = inútil).
