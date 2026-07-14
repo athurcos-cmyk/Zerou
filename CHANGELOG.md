@@ -2,6 +2,15 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-14 — 12 temas do Plantao + FAB adaptativo + avatares offline
+
+- **12 temas portados do Plantao**: 6 claros (Paper, Pérola, Floresta, Lavanda, Rosa, Areia) e 6 escuros (Noturno, Carbono, Cobalto, Ametista, Grafite, Vinho). Substituem Sakura, Obsidian, Midnight, Aurora e Rose Gold.
+- **FAB e amount-hero adaptam ao tema**: `--gradient-brand` e sombras do FAB saem do bloco compartilhado e vão pra cada tema individual. Botão laranja de lançar transação agora reflete a cor do tema ativo.
+- **Seletor agrupado claro/escuro**: `AppearanceSettingsPage` divide os temas em duas seções ("Claros" / "Escuros"), igual ao Plantao.
+- **Avatares offline**: `.jpg` adicionado aos `globPatterns` do PWA — as 24 fotos agora são precacheadas.
+- **Push notifications com app fechado**: `firebase-messaging-sw.js` registrado explicitamente com `serviceWorkerRegistration` no `getToken()`.
+- **Auditoria offline (6 agentes)**: boot timeout 2.5s em 4 hooks, `subscribeWithTransientRetry` ignora `unavailable`, `profileLoading` sempre desbloqueia, `RootRoute` mostra loading em vez de tela branca, perfil `onSnapshot` com `includeMetadataChanges`.
+
 ## 2026-07-14 — Auditoria offline (6 agentes) + push notifications + Grazi deploy
 
 - **Auditoria offline com 6 agentes**: ~100 arquivos analisados em paralelo. Corrigido: boot timeout de 2.5s em 4 hooks (`useCardsData`, `useGoalsData`, `useSharedWorkspaceData`, `useCoupleSavings`), `subscribeWithTransientRetry` ignora `unavailable` (SDK retenta sozinho), `profileLoading` sempre desbloqueia após timeout, `RootRoute` mostra "Carregando..." em vez de tela branca, perfil `onSnapshot` ganhou `includeMetadataChanges: true`, `createCardPurchase` com `.catch()`.
