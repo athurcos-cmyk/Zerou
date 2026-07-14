@@ -456,11 +456,12 @@ function ConfirmModal({ title, body, confirmLabel, danger, onConfirm, onCancel }
 
 const THEME_LABELS: Record<string, string> = {
   paper: 'Paper (Sol)',
-  sakura: 'Sakura',
-  obsidian: 'Obsidian',
-  midnight: 'Midnight',
-  aurora: 'Aurora',
-  'rose-gold': 'Rose Gold',
+  perola: 'Perola',
+  floresta: 'Floresta',
+  lavanda: 'Lavanda',
+  noturno: 'Noturno',
+  carbono: 'Carbono',
+  ametista: 'Ametista',
 };
 
 // Painel de detalhes — só mostra metadados que o admin já consegue ler hoje

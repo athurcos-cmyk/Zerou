@@ -8,34 +8,40 @@ export const THEME_DEFINITIONS: ThemeDefinition[] = [
     description: 'Claro, leve e institucional.'
   },
   {
-    id: 'sakura',
-    name: 'Sakura',
+    id: 'perola',
+    name: 'Pérola',
     tone: 'light',
-    description: 'Quente e acolhedor, com contraste suave.'
+    description: 'Limpo e profissional, azul acinzentado.'
   },
   {
-    id: 'obsidian',
-    name: 'Obsidian',
-    tone: 'dark',
-    description: 'Escuro neutro, discreto e concentrado.'
+    id: 'floresta',
+    name: 'Floresta',
+    tone: 'light',
+    description: 'Verde calmante com fundo menta.'
   },
   {
-    id: 'midnight',
-    name: 'Midnight',
-    tone: 'dark',
-    description: 'Indigo profundo para foco noturno.'
+    id: 'lavanda',
+    name: 'Lavanda',
+    tone: 'light',
+    description: 'Roxo suave e relaxante.'
   },
   {
-    id: 'aurora',
-    name: 'Aurora',
+    id: 'noturno',
+    name: 'Noturno',
     tone: 'dark',
-    description: 'Escuro com base verde fria e calma.'
+    description: 'Azul marinho profundo, excelente contraste.'
   },
   {
-    id: 'rose-gold',
-    name: 'Rose Gold',
+    id: 'carbono',
+    name: 'Carbono',
     tone: 'dark',
-    description: 'Escuro quente, elegante e moderado.'
+    description: 'Cinza escuro com toque ciano.'
+  },
+  {
+    id: 'ametista',
+    name: 'Ametista',
+    tone: 'dark',
+    description: 'Roxo escuro com destaque violeta.'
   }
 ];
 

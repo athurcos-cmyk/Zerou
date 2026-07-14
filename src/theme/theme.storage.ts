@@ -62,7 +62,7 @@ export function persistAppearance(preferences: AppearancePreferences) {
 
 export function resolveThemeId(themeMode: ThemeMode, themeId: ThemeId, prefersDark: boolean): ThemeId {
   if (themeMode === 'system') {
-    return prefersDark ? 'obsidian' : 'paper';
+    return prefersDark ? 'noturno' : 'paper';
   }
 
   return themeId;

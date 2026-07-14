@@ -148,17 +148,15 @@ html[data-reduce-motion='true'] *::after {
   display: none;
 }
 
-[data-theme='obsidian'] .brand-logo-light,
-[data-theme='midnight'] .brand-logo-light,
-[data-theme='aurora'] .brand-logo-light,
-[data-theme='rose-gold'] .brand-logo-light {
+[data-theme='noturno'] .brand-logo-light,
+[data-theme='carbono'] .brand-logo-light,
+[data-theme='ametista'] .brand-logo-light {
   display: none;
 }
 
-[data-theme='obsidian'] .brand-logo-dark,
-[data-theme='midnight'] .brand-logo-dark,
-[data-theme='aurora'] .brand-logo-dark,
-[data-theme='rose-gold'] .brand-logo-dark {
+[data-theme='noturno'] .brand-logo-dark,
+[data-theme='carbono'] .brand-logo-dark,
+[data-theme='ametista'] .brand-logo-dark {
   display: block;
 }
 

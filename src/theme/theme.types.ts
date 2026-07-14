@@ -1,4 +1,4 @@
-export type ThemeId = 'paper' | 'sakura' | 'obsidian' | 'midnight' | 'aurora' | 'rose-gold';
+export type ThemeId = 'paper' | 'perola' | 'floresta' | 'lavanda' | 'noturno' | 'carbono' | 'ametista';
 export type ThemeMode = 'manual' | 'system';
 export type Density = 'comfortable' | 'compact';
 export type FontScale = 'sm' | 'md' | 'lg';

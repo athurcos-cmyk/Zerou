@@ -3,25 +3,26 @@ import { THEME_DEFINITIONS } from './theme.registry';
 import { DEFAULT_APPEARANCE, resolveThemeId } from './theme.storage';
 
 describe('Granativa theme system', () => {
-  it('registers all six official themes', () => {
+  it('registers all seven official themes', () => {
     expect(THEME_DEFINITIONS.map((theme) => theme.id)).toEqual([
       'paper',
-      'sakura',
-      'obsidian',
-      'midnight',
-      'aurora',
-      'rose-gold'
+      'perola',
+      'floresta',
+      'lavanda',
+      'noturno',
+      'carbono',
+      'ametista'
     ]);
   });
 
-  it('resolves system mode to Paper for light and Obsidian for dark', () => {
-    expect(resolveThemeId('system', 'aurora', false)).toBe('paper');
-    expect(resolveThemeId('system', 'aurora', true)).toBe('obsidian');
+  it('resolves system mode to Paper for light and Noturno for dark', () => {
+    expect(resolveThemeId('system', 'lavanda', false)).toBe('paper');
+    expect(resolveThemeId('system', 'lavanda', true)).toBe('noturno');
   });
 
   it('keeps manual theme selection independent from system preference', () => {
-    expect(resolveThemeId('manual', 'rose-gold', false)).toBe('rose-gold');
-    expect(resolveThemeId('manual', 'rose-gold', true)).toBe('rose-gold');
+    expect(resolveThemeId('manual', 'carbono', false)).toBe('carbono');
+    expect(resolveThemeId('manual', 'carbono', true)).toBe('carbono');
   });
 
   it('defaults to the light Paper theme for first render persistence', () => {
