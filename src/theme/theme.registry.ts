@@ -26,6 +26,18 @@ export const THEME_DEFINITIONS: ThemeDefinition[] = [
     description: 'Roxo suave e relaxante.'
   },
   {
+    id: 'rosa',
+    name: 'Rosa',
+    tone: 'light',
+    description: 'Rosado delicado e acolhedor.'
+  },
+  {
+    id: 'areia',
+    name: 'Areia',
+    tone: 'light',
+    description: 'Bege natural com toque dourado.'
+  },
+  {
     id: 'noturno',
     name: 'Noturno',
     tone: 'dark',
@@ -38,10 +50,28 @@ export const THEME_DEFINITIONS: ThemeDefinition[] = [
     description: 'Cinza escuro com toque ciano.'
   },
   {
+    id: 'cobalto',
+    name: 'Cobalto',
+    tone: 'dark',
+    description: 'Azul intenso e vibrante.'
+  },
+  {
     id: 'ametista',
     name: 'Ametista',
     tone: 'dark',
     description: 'Roxo escuro com destaque violeta.'
+  },
+  {
+    id: 'grafite',
+    name: 'Grafite',
+    tone: 'dark',
+    description: 'Cinza neutro e discreto.'
+  },
+  {
+    id: 'vinho',
+    name: 'Vinho',
+    tone: 'dark',
+    description: 'Tom avermelhado quente e elegante.'
   }
 ];
 

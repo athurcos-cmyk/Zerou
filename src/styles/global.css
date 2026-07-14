@@ -150,13 +150,19 @@ html[data-reduce-motion='true'] *::after {
 
 [data-theme='noturno'] .brand-logo-light,
 [data-theme='carbono'] .brand-logo-light,
-[data-theme='ametista'] .brand-logo-light {
+[data-theme='cobalto'] .brand-logo-light,
+[data-theme='ametista'] .brand-logo-light,
+[data-theme='grafite'] .brand-logo-light,
+[data-theme='vinho'] .brand-logo-light {
   display: none;
 }
 
 [data-theme='noturno'] .brand-logo-dark,
 [data-theme='carbono'] .brand-logo-dark,
-[data-theme='ametista'] .brand-logo-dark {
+[data-theme='cobalto'] .brand-logo-dark,
+[data-theme='ametista'] .brand-logo-dark,
+[data-theme='grafite'] .brand-logo-dark,
+[data-theme='vinho'] .brand-logo-dark {
   display: block;
 }
 

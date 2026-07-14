@@ -459,9 +459,14 @@ const THEME_LABELS: Record<string, string> = {
   perola: 'Perola',
   floresta: 'Floresta',
   lavanda: 'Lavanda',
+  rosa: 'Rosa',
+  areia: 'Areia',
   noturno: 'Noturno',
   carbono: 'Carbono',
+  cobalto: 'Cobalto',
   ametista: 'Ametista',
+  grafite: 'Grafite',
+  vinho: 'Vinho',
 };
 
 // Painel de detalhes — só mostra metadados que o admin já consegue ler hoje

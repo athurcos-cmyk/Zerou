@@ -3,15 +3,20 @@ import { THEME_DEFINITIONS } from './theme.registry';
 import { DEFAULT_APPEARANCE, resolveThemeId } from './theme.storage';
 
 describe('Granativa theme system', () => {
-  it('registers all seven official themes', () => {
+  it('registers all twelve official themes', () => {
     expect(THEME_DEFINITIONS.map((theme) => theme.id)).toEqual([
       'paper',
       'perola',
       'floresta',
       'lavanda',
+      'rosa',
+      'areia',
       'noturno',
       'carbono',
-      'ametista'
+      'cobalto',
+      'ametista',
+      'grafite',
+      'vinho'
     ]);
   });
 
