@@ -26,7 +26,7 @@ export function UserAvatar({ profile, size = 32, className }: UserAvatarProps) {
           style={{ width: size, height: size }}
           aria-label={profile?.name ?? 'Usuário'}
         >
-          {avatar.svg}
+          <img src={avatar.src} alt="" width={size} height={size} />
         </span>
       );
     }

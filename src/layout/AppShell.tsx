@@ -46,10 +46,10 @@ export function AppShell() {
   }, [authFromCache]);
   const isFoundationPending = location.pathname.startsWith('/app/onboarding') || Boolean(user && !profile?.defaultWorkspaceId);
 
-  async function handleClearLocalDataLogout() {
+  async function handleLogout() {
     const ok = await confirm({
-      title: 'Sair deste aparelho?',
-      message: 'Remove os dados salvos localmente. Use isso em celular emprestado ou computador compartilhado.',
+      title: 'Sair da conta?',
+      message: 'Isso limpa os dados salvos neste aparelho. Se você tiver alterações feitas offline que ainda não sincronizaram, elas serão perdidas.',
       confirmLabel: 'Sair',
       danger: true
     });
@@ -69,7 +69,12 @@ export function AppShell() {
     <div className={`app-layout${isFoundationPending ? ' app-layout--focus' : ''}`}>
       {!isFoundationPending ? (
         <aside className="sidebar" aria-label="Navegação principal">
-        <BrandLockup />
+        <div>
+          <BrandLockup />
+          <p className="text-secondary" style={{ margin: '0.5rem 0 0 0.6rem', fontSize: '0.85rem' }}>
+            {profile?.name ?? user?.email}
+          </p>
+        </div>
         <nav className="sidebar-nav">
           <NavLink className={getNavClass} to="/app" end>
             <Home size={19} aria-hidden="true" /> Início
@@ -116,12 +121,8 @@ export function AppShell() {
           </button>
         </nav>
         <div className="sidebar-footer">
-          <p className="text-secondary">{profile?.name ?? user?.email}</p>
-          <button className="button button--ghost" type="button" onClick={() => void logout()}>
+          <button className="button button--ghost" type="button" onClick={() => void handleLogout()}>
             <LogOut size={18} aria-hidden="true" /> Sair
-          </button>
-          <button className="button button--ghost" type="button" onClick={() => void handleClearLocalDataLogout()}>
-            Sair deste aparelho
           </button>
         </div>
         </aside>
@@ -186,7 +187,7 @@ export function AppShell() {
               <button className="nav-link" type="button" onClick={() => { setMobileMenuOpen(false); openTour(); }}>
                 <HelpCircle size={17} aria-hidden="true" /> Como funciona
               </button>
-              <button className="nav-link" type="button" onClick={() => { setMobileMenuOpen(false); void logout(); }}>
+              <button className="nav-link" type="button" onClick={() => { setMobileMenuOpen(false); void handleLogout(); }}>
                 <LogOut size={17} aria-hidden="true" /> Sair
               </button>
             </div>

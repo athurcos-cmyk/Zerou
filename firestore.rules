@@ -69,8 +69,20 @@ service cloud.firestore {
         'density',
         'fontScale',
         'reduceMotion',
+        'avatarStyle',
         'updatedAt'
       ]);
+    }
+
+    function validAvatarStyle() {
+      return !request.resource.data.keys().hasAny(['avatarStyle'])
+        || request.resource.data.avatarStyle == null
+        || request.resource.data.avatarStyle in [
+          'ana', 'beatriz', 'carla', 'duda', 'elisa', 'fernanda',
+          'gabriela', 'helena', 'iris', 'julia', 'larissa', 'manuela',
+          'bruno', 'caio', 'diego', 'enzo', 'felipe', 'gustavo',
+          'hugo', 'igor', 'joaquim', 'lucas', 'rafael', 'theo'
+        ];
     }
 
     function onlyPaydaySettingsChanged() {
@@ -1472,7 +1484,7 @@ service cloud.firestore {
       allow read: if isSelf(uid) || isAdmin();
       allow create: if validUserFoundationCreate(uid);
       allow update: if isSelf(uid) && (
-        (onlyAppearanceChanged() && validThemeFields())
+        (onlyAppearanceChanged() && validThemeFields() && validAvatarStyle())
         || (
           onlyPaydaySettingsChanged()
           && (!request.resource.data.keys().hasAny(['payday']) || validPayday(request.resource.data.payday))

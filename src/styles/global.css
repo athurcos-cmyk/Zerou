@@ -565,9 +565,16 @@ html[data-reduce-motion='true'] *::after {
   height: 100vh;
   flex-direction: column;
   gap: 1.5rem;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   border-right: 1px solid var(--border-subtle);
   background: var(--bg-surface);
   padding: 1.25rem;
+}
+
+.sidebar::-webkit-scrollbar {
+  display: none;
 }
 
 .sidebar-nav,
@@ -3011,6 +3018,19 @@ span.service-mark--brand {
   gap: 0.5rem;
 }
 
+/* `.eyebrow`/`.chip-row` used as a bare label + filter row directly inside a `.surface-pad`
+   card (ex.: BillsPage "Lista", RecurringPage "Ativas") have no gap of their own — `.field`
+   already spaces chip-rows used inside a form via its own grid `gap`, so this only targets
+   the direct-child case to avoid double-spacing there. Pages that already set their own
+   inline margin on the eyebrow (ex.: InvoicePage) keep that value — inline wins over this. */
+.surface-pad > .eyebrow {
+  margin-bottom: 0.75rem;
+}
+
+.surface-pad > .chip-row {
+  margin-bottom: 1rem;
+}
+
 .chip {
   position: relative;
   display: inline-flex;
@@ -5325,9 +5345,11 @@ span.service-mark--brand {
   border: 1.5px solid var(--border-subtle);
 }
 
-.user-avatar--cartoon svg {
+.user-avatar--cartoon img {
   width: 100%;
   height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 /* ── Avatar Picker ──────────────────────────────────── */
@@ -5386,11 +5408,15 @@ span.service-mark--brand {
   justify-content: center;
   width: 40px;
   height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
 }
 
-.avatar-picker__svg-wrap svg {
+.avatar-picker__svg-wrap img {
   width: 100%;
   height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 @media (max-width: 360px) {

@@ -16,9 +16,11 @@ export function AvatarPicker({ profile, onSelect, disabled }: AvatarPickerProps)
       <div className="avatar-picker__preview">
         <p className="avatar-picker__label">Seu avatar</p>
         <UserAvatar profile={profile} size={56} />
-        <p className="text-secondary" style={{ fontSize: '0.82rem', margin: '0.35rem 0 0' }}>
-          {currentId ? avatarCatalog.find((a) => a.id === currentId)?.label ?? 'Personalizado' : 'Iniciais do nome'}
-        </p>
+        {!currentId && (
+          <p className="text-secondary" style={{ fontSize: '0.82rem', margin: '0.35rem 0 0' }}>
+            Iniciais do nome
+          </p>
+        )}
       </div>
 
       <p className="avatar-picker__label" style={{ marginTop: '1rem' }}>Escolha um estilo</p>
@@ -32,20 +34,20 @@ export function AvatarPicker({ profile, onSelect, disabled }: AvatarPickerProps)
           aria-label="Sem avatar (iniciais)"
         >
           <UserAvatar profile={{ name: profile?.name ?? '?', avatarStyle: undefined }} size={40} />
-          <span>Iniciais</span>
         </button>
 
-        {avatarCatalog.map((avatar) => (
+        {avatarCatalog.map((avatar, index) => (
           <button
             key={avatar.id}
             type="button"
             className={`avatar-picker__option${currentId === avatar.id ? ' avatar-picker__option--selected' : ''}`}
             onClick={() => onSelect(avatar.id)}
             disabled={disabled}
-            aria-label={avatar.label}
+            aria-label={`Avatar ${index + 1}`}
           >
-            <span className="avatar-picker__svg-wrap">{avatar.svg}</span>
-            <span>{avatar.label}</span>
+            <span className="avatar-picker__svg-wrap">
+              <img src={avatar.src} alt="" />
+            </span>
           </button>
         ))}
       </div>

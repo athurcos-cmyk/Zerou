@@ -4,6 +4,8 @@ import { useAppearanceStore } from '../theme/appearance.store';
 import { THEME_DEFINITIONS } from '../theme/theme.registry';
 import { AvatarPicker } from '../profile/AvatarPicker';
 import { updateAvatarStyle } from '../profile/updateAvatarStyle';
+import { getUserFacingErrorMessage } from '../utils/userFacingError';
+import { FormMessage } from '../components/FormMessage';
 import { useState } from 'react';
 
 export function AppearanceSettingsPage() {
@@ -12,16 +14,14 @@ export function AppearanceSettingsPage() {
   const resolvedThemeId = useAppearanceStore((state) => state.resolvedThemeId);
   const setThemeMode = useAppearanceStore((state) => state.setThemeMode);
   const setThemeId = useAppearanceStore((state) => state.setThemeId);
-  const [saving, setSaving] = useState(false);
+  const [avatarMessage, setAvatarMessage] = useState<string | null>(null);
 
-  async function handleAvatarChange(avatarId: string | undefined) {
+  function handleAvatarChange(avatarId: string | undefined) {
     if (!user) return;
-    setSaving(true);
-    try {
-      await updateAvatarStyle(user.uid, avatarId);
-    } finally {
-      setSaving(false);
-    }
+    setAvatarMessage(null);
+    updateAvatarStyle(user.uid, avatarId).catch((error) =>
+      setAvatarMessage(getUserFacingErrorMessage(error, 'Não foi possível salvar o avatar agora.'))
+    );
   }
 
   return (
@@ -35,7 +35,8 @@ export function AppearanceSettingsPage() {
       <div className="settings-grid">
         <section className="surface surface-pad" aria-labelledby="avatar-title">
           <h2 id="avatar-title">Avatar</h2>
-          <AvatarPicker profile={profile} onSelect={handleAvatarChange} disabled={saving} />
+          <AvatarPicker profile={profile} onSelect={handleAvatarChange} />
+          <FormMessage>{avatarMessage}</FormMessage>
         </section>
 
         <section className="surface surface-pad" aria-labelledby="theme-mode-title">

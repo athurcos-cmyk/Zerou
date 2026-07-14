@@ -31,6 +31,15 @@ Itens acionáveis. Fechou? Mova para "Concluído" ou remova. Detalhe histórico 
 - [ ] Billing real (Stripe) — só com decisão explícita de produto (hoje 100% gratuito).
 
 ## Concluído (recente)
+- [x] **Avatares cartoon estão feios** (2026-07-14): trocados por 24 retratos recortados de um
+  asset comprado no Adobe Stock (licença comercial confirmada pelo dono; grid 16×6 detectado
+  por análise de pixel, ver `public/avatars/SOURCES.md`), JPEGs estáticos em `public/avatars/`,
+  rótulos com nomes próprios (Ana, Bruno, Carla...) em vez de adjetivo de personalidade.
+  Verificação ao vivo achou um bug real e maior: escolher
+  qualquer avatar sempre falhava silenciosamente em produção porque `firestore.rules` nunca
+  permitiu o campo `avatarStyle` na regra de update do perfil — mesmo padrão dos 2 incidentes
+  anteriores descritos na REGRA PRINCIPAL do `CLAUDE.md`. Corrigido, testado no emulador
+  (49 testes de regra) e deployado. Ver `CHANGELOG.md` e `docs/history/2026-07.md`.
 - [x] **Exclusão de conta apagava dados mas não excluía o login de verdade** (2026-07-13,
   achado pelo dono ao vivo): `onDeleteAccount` apagava todo o Firestore antes de deletar o
   usuário do Firebase Auth, sem reautenticar — `deleteUser()` quase sempre falhava com

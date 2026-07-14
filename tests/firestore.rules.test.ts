@@ -716,6 +716,29 @@ describe('firestore security rules', () => {
     await assertFails(updateDoc(doc(aliceDb, 'users/alice'), { defaultWorkspaceId: 'workspaceB' }));
   });
 
+  it('allows a user to set and clear their own avatarStyle, rejects an unknown id', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        avatarStyle: 'ana',
+        updatedAt: serverTimestamp()
+      })
+    );
+    await assertSucceeds(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        avatarStyle: null,
+        updatedAt: serverTimestamp()
+      })
+    );
+    await assertFails(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        avatarStyle: 'not-a-real-avatar',
+        updatedAt: serverTimestamp()
+      })
+    );
+  });
+
   it('allows a user to set, change and clear their own payday preference', async () => {
     const aliceDb = testEnv.authenticatedContext('alice').firestore();
 
