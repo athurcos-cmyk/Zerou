@@ -115,7 +115,7 @@ export function NewTransactionPage() {
           purchaseDate: fromDateInputValue(date),
           categoryId: categoryId || undefined,
           installments
-        });
+        }).catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível criar a compra no cartão agora.')));
         navigate(`/app/cards/${cardId}`);
         return;
       }

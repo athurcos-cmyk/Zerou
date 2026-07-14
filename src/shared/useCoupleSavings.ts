@@ -29,6 +29,10 @@ export function useCoupleSavings(workspaceId?: string) {
     }
     setState((current) => ({ ...current, loading: true, error: null }));
 
+    const bootTimer = window.setTimeout(() => {
+      setState((current) => current.loading ? { ...current, loading: false } : current);
+    }, 2500);
+
     const unsubGoals = subscribeWithTransientRetry({
       subscribe: (onError) =>
         subscribeGoals(
@@ -54,6 +58,7 @@ export function useCoupleSavings(workspaceId?: string) {
     });
 
     return () => {
+      window.clearTimeout(bootTimer);
       unsubGoals();
       unsubContribs();
     };

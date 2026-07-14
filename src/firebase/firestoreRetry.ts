@@ -26,14 +26,18 @@ export function subscribeWithTransientRetry({
   let cancelled = false;
   let unsubscribe: Unsubscribe = () => undefined;
   const timers: number[] = [];
+  let resolved = false;
 
   function start(attempt = 0) {
     unsubscribe = subscribe((error) => {
-      unsubscribe();
+      if (cancelled) return;
 
-      if (cancelled) {
-        return;
-      }
+      const code = getFirestoreErrorCode(error);
+
+      // unavailable = offline. Se ja recebeu dados, ignora. O SDK retenta sozinho.
+      if (code === 'unavailable') return;
+
+      unsubscribe();
 
       if (attempt < retryDelaysMs.length && isTransientFirestoreError(error)) {
         onRetrying?.();
@@ -46,7 +50,9 @@ export function subscribeWithTransientRetry({
         return;
       }
 
-      onError(error);
+      if (!resolved) {
+        onError(error);
+      }
     });
   }
 

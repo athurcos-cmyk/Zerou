@@ -39,7 +39,7 @@ import { VerifyEmailPage } from './pages/VerifyEmailPage';
 
 function RootRoute() {
   const { user, profile, loading } = useAuth();
-  if (loading) return null;
+  if (loading) return <div className="public-page">Carregando Granativa...</div>;
   if (user) return <Navigate to={profile?.defaultWorkspaceId ? '/app' : '/app/onboarding'} replace />;
   return <LandingCss />;
 }

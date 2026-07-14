@@ -22,7 +22,11 @@ export function useGoalsData(workspaceId?: string) {
 
     setState((current) => ({ ...current, loading: true, error: null }));
 
-    return subscribeWithTransientRetry({
+    const bootTimer = window.setTimeout(() => {
+      setState((current) => current.loading ? { ...current, loading: false } : current);
+    }, 2500);
+
+    const unsub = subscribeWithTransientRetry({
       subscribe: (onError) =>
         subscribeGoals(
           workspaceId,
@@ -38,6 +42,11 @@ export function useGoalsData(workspaceId?: string) {
       onRetrying: () => setState((current) => ({ ...current, loading: true, error: null })),
       onError: () => setState({ goals: [], loading: false, error: 'Não foi possível carregar suas metas.' })
     });
+
+    return () => {
+      window.clearTimeout(bootTimer);
+      unsub();
+    };
   }, [workspaceId]);
 
   const pendingWrites = state.goals.some((goal) => goal.localSyncStatus === 'pending');

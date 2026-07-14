@@ -52,7 +52,11 @@ export function useSharedWorkspaceData(userId?: string) {
 
     setState((current) => ({ ...current, loading: true, error: null }));
 
-    return subscribeWithTransientRetry({
+    const bootTimer = window.setTimeout(() => {
+      setState((current) => current.loading ? { ...current, loading: false } : current);
+    }, 2500);
+
+    const unsub = subscribeWithTransientRetry({
       subscribe: (onError) =>
         subscribeWorkspaceRefs(
           userId,
@@ -73,6 +77,11 @@ export function useSharedWorkspaceData(userId?: string) {
           error: 'Não foi possível carregar seus espaços Granativa.'
         }))
     });
+
+    return () => {
+      window.clearTimeout(bootTimer);
+      unsub();
+    };
   }, [userId]);
 
   const activeCoupleRef = useMemo(

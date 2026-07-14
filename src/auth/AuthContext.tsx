@@ -183,12 +183,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const fallbackProfile = readCachedProfile(user.uid);
       if (fallbackProfile) {
         applyProfile(fallbackProfile);
-        setProfileLoading(false);
       }
+      setProfileLoading(false);
     }, PROFILE_BOOT_TIMEOUT_MS);
 
     const unsubscribe = onSnapshot(
       doc(getFirebaseDb(), 'users', user.uid),
+      { includeMetadataChanges: true },
       (snapshot) => {
         window.clearTimeout(profileTimeout);
         const nextProfile = snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() } as UserProfile) : null;

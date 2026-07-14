@@ -74,7 +74,11 @@ export function useCardsData(workspaceId?: string, transactionIndex?: Transactio
 
     setState((current) => ({ ...current, loading: true, error: null }));
 
-    return subscribeWithTransientRetry({
+    const bootTimer = window.setTimeout(() => {
+      setState((current) => current.loading ? { ...current, loading: false } : current);
+    }, 2500);
+
+    const unsub = subscribeWithTransientRetry({
       subscribe: (onError) =>
         subscribeCards(
           workspaceId,
@@ -89,6 +93,11 @@ export function useCardsData(workspaceId?: string, transactionIndex?: Transactio
           error: 'Não foi possível carregar os cartões.'
         }))
     });
+
+    return () => {
+      window.clearTimeout(bootTimer);
+      unsub();
+    };
   }, [workspaceId]);
 
   useEffect(() => {
