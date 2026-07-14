@@ -161,12 +161,25 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
       timers.push(bootTimeout);
 
       unsubscribe = subscribe(activeWorkspaceId, wrappedOnNext, (error) => {
-        window.clearTimeout(bootTimeout);
-        unsubscribe();
+        if (cancelled) return;
 
-        if (cancelled) {
-          return;
-        }
+        const code = getErrorCode(error);
+
+        // unavailable = offline ou rede flaky. O SDK do Firestore ja retenta
+        // automaticamente quando a conexao voltar. Se ja temos dados do cache
+        // (ou o boot timeout ja entregou []), nao fazemos nada — o erro eh
+        // esperado e os dados continuam aparecendo. Se ainda nao recebemos nada,
+        // o boot timeout corre em paralelo e resolve com [] em 2.5s.
+        // Nunca matamos o listener — o SDK cuida do reconnect.
+        if (code === 'unavailable') return;
+
+        // Erro real (permission-denied, deadline-exceeded sem ser offline):
+        // so eh fatal se o listener nunca entregou dados.
+        window.clearTimeout(bootTimeout);
+
+        if (resolved) return;
+
+        unsubscribe();
 
         if (canRetryFinanceBoot(error, attempt)) {
           setState((current) => ({ ...current, loading: true, error: null }));
