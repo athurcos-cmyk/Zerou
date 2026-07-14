@@ -26,7 +26,8 @@ interface FakeDoc {
 interface FakeCollection {
   docs: FakeDoc[];
   where?: () => FakeCollection;
-  get: () => Promise<{ docs: FakeDoc[] }>;
+  limit?: () => FakeCollection;
+  get: () => Promise<{ docs: FakeDoc[]; empty: boolean }>;
 }
 
 function fakeDoc(id: string, record: Record<string, unknown>): FakeDoc {
@@ -36,9 +37,10 @@ function fakeDoc(id: string, record: Record<string, unknown>): FakeDoc {
 function fakeQuery(docs: FakeDoc[]): FakeCollection {
   const self: FakeCollection = {
     docs,
-    get: async () => ({ docs }),
+    get: async () => ({ docs, empty: docs.length === 0 }),
   };
   self.where = () => self;
+  self.limit = () => self;
   return self;
 }
 
@@ -48,11 +50,20 @@ function fakeQuery(docs: FakeDoc[]): FakeCollection {
 // Set up test data with matching accountId so balance calculation is coherent.
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mockDb(collections: Record<string, FakeDoc[]>): any {
+function mockDb(docs: Record<string, Record<string, unknown>>, collections: Record<string, FakeDoc[]>): any {
   return {
+    doc: (path: string) => {
+      const data = docs[path];
+      return {
+        get: async () => ({
+          exists: data !== undefined,
+          data: () => data ?? {},
+        }),
+      };
+    },
     collection: (path: string) => {
-      const docs = collections[path] ?? [];
-      return fakeQuery(docs);
+      const colDocs = collections[path] ?? [];
+      return fakeQuery(colDocs);
     },
   };
 }
@@ -69,7 +80,7 @@ describe('buildFinancialContext', () => {
   };
 
   it('builds context with spending, categories, and balance', async () => {
-    const db = mockDb({
+    const db = mockDb({}, {
       ...emptyCollections,
       'workspaces/ws1/categories': [
         fakeDoc('cat_alimentacao', { id: 'cat_alimentacao', name: 'Alimentacao', isActive: true }),
@@ -98,7 +109,7 @@ describe('buildFinancialContext', () => {
       ],
     });
 
-    const context = await buildFinancialContext(db, 'ws1');
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
 
     expect(context).toContain('Alimentacao');
     expect(context).toContain('Transporte');
@@ -108,7 +119,7 @@ describe('buildFinancialContext', () => {
   });
 
   it('counts card_purchase transactions as spending', async () => {
-    const db = mockDb({
+    const db = mockDb({}, {
       ...emptyCollections,
       'workspaces/ws1/categories': [
         fakeDoc('cat_alimentacao', { id: 'cat_alimentacao', name: 'Alimentacao', isActive: true }),
@@ -124,14 +135,14 @@ describe('buildFinancialContext', () => {
       'workspaces/ws1/accounts': [],
     });
 
-    const context = await buildFinancialContext(db, 'ws1');
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
 
     expect(context).toMatch(/R\$\s*45[,.]00/);
     expect(context).toContain('Alimentacao');
   });
 
   it('falls back with || when competenceMonth is empty string', async () => {
-    const db = mockDb({
+    const db = mockDb({}, {
       ...emptyCollections,
       'workspaces/ws1/categories': [],
       'workspaces/ws1/transactions': [
@@ -145,12 +156,12 @@ describe('buildFinancialContext', () => {
       'workspaces/ws1/accounts': [],
     });
 
-    const context = await buildFinancialContext(db, 'ws1');
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
     expect(context).toMatch(/R\$\s*12[,.]34/);
   });
 
   it('skips deleted transactions', async () => {
-    const db = mockDb({
+    const db = mockDb({}, {
       ...emptyCollections,
       'workspaces/ws1/categories': [],
       'workspaces/ws1/transactions': [
@@ -165,13 +176,13 @@ describe('buildFinancialContext', () => {
       'workspaces/ws1/accounts': [],
     });
 
-    const context = await buildFinancialContext(db, 'ws1');
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
     expect(context).not.toMatch(/R\$\s*99[,.]99/);
   });
 
   it('includes upcoming bills in committed section', async () => {
     const tomorrow = makeDateFuture(1);
-    const db = mockDb({
+    const db = mockDb({}, {
       ...emptyCollections,
       'workspaces/ws1/categories': [],
       'workspaces/ws1/transactions': [],
@@ -184,7 +195,7 @@ describe('buildFinancialContext', () => {
       'workspaces/ws1/accounts': [],
     });
 
-    const context = await buildFinancialContext(db, 'ws1');
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
     expect(context).toContain('Aluguel');
     expect(context).toContain('COMPROMETIDO');
     expect(context).toMatch(/R\$\s*1[.]?500[,.]00/);
@@ -192,7 +203,7 @@ describe('buildFinancialContext', () => {
 
   it('includes overdue bills', async () => {
     const yesterday = makeDate(1);
-    const db = mockDb({
+    const db = mockDb({}, {
       ...emptyCollections,
       'workspaces/ws1/categories': [],
       'workspaces/ws1/transactions': [],
@@ -205,14 +216,14 @@ describe('buildFinancialContext', () => {
       'workspaces/ws1/accounts': [],
     });
 
-    const context = await buildFinancialContext(db, 'ws1');
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
     expect(context).toContain('Conta vencida');
     expect(context).toContain('VENCIDA');
   });
 
   it('includes recurring rules as despesas fixas', async () => {
     const nextWeek = makeDateFuture(7);
-    const db = mockDb({
+    const db = mockDb({}, {
       ...emptyCollections,
       'workspaces/ws1/categories': [],
       'workspaces/ws1/transactions': [],
@@ -228,7 +239,7 @@ describe('buildFinancialContext', () => {
       'workspaces/ws1/accounts': [],
     });
 
-    const context = await buildFinancialContext(db, 'ws1');
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
     expect(context).toContain('Netflix');
     expect(context).toContain('Despesas fixas');
     expect(context).toMatch(/R\$\s*39[,.]90/);
@@ -237,7 +248,7 @@ describe('buildFinancialContext', () => {
   it('includes total comprometido', async () => {
     const tomorrow = makeDateFuture(1);
     const nextWeek = makeDateFuture(7);
-    const db = mockDb({
+    const db = mockDb({}, {
       ...emptyCollections,
       'workspaces/ws1/categories': [],
       'workspaces/ws1/transactions': [],
@@ -260,7 +271,7 @@ describe('buildFinancialContext', () => {
       ],
     });
 
-    const context = await buildFinancialContext(db, 'ws1');
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
 
     // Should show the committed total: 120000 + 3990 = 123990
     expect(context).toContain('Total comprometido');
@@ -268,7 +279,7 @@ describe('buildFinancialContext', () => {
   });
 
   it('includes account balances', async () => {
-    const db = mockDb({
+    const db = mockDb({}, {
       ...emptyCollections,
       'workspaces/ws1/categories': [],
       'workspaces/ws1/transactions': [
@@ -284,7 +295,7 @@ describe('buildFinancialContext', () => {
       ],
     });
 
-    const context = await buildFinancialContext(db, 'ws1');
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
 
     // Balance = 50000 - 3000 = 47000
     expect(context).toContain('Carteira');
@@ -292,7 +303,7 @@ describe('buildFinancialContext', () => {
   });
 
   it('handles empty workspace gracefully', async () => {
-    const db = mockDb({
+    const db = mockDb({}, {
       ...emptyCollections,
       'workspaces/ws1/categories': [],
       'workspaces/ws1/transactions': [],
@@ -300,13 +311,13 @@ describe('buildFinancialContext', () => {
       'workspaces/ws1/accounts': [],
     });
 
-    const context = await buildFinancialContext(db, 'ws1');
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
     expect(context).toContain('RESUMO');
     expect(context).toContain('COMPROMETIDO');
   });
 
   it('skips bills with null dueDate instead of crashing', async () => {
-    const db = mockDb({
+    const db = mockDb({}, {
       ...emptyCollections,
       'workspaces/ws1/categories': [],
       'workspaces/ws1/transactions': [],
@@ -323,8 +334,149 @@ describe('buildFinancialContext', () => {
       'workspaces/ws1/accounts': [],
     });
 
-    const context = await buildFinancialContext(db, 'ws1');
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
     expect(context).toContain('Conta com data');
     expect(context).not.toContain('Conta sem data');
+  });
+
+  it('includes payday info from user profile', async () => {
+    const db = mockDb(
+      { 'users/user1': { payday: { type: 'fixed_day', day: 5 }, availableMode: 'until_payday', committedWindowDays: 30 } },
+      {
+        ...emptyCollections,
+        'workspaces/ws1/categories': [],
+        'workspaces/ws1/transactions': [],
+        'workspaces/ws1/bills': [],
+        'workspaces/ws1/accounts': [],
+      },
+    );
+
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
+    expect(context).toContain('SEU CICLO');
+    expect(context).toContain('Recebe dia 5');
+  });
+
+  it('handles missing user profile gracefully', async () => {
+    const db = mockDb({}, {
+      ...emptyCollections,
+      'workspaces/ws1/categories': [],
+      'workspaces/ws1/transactions': [],
+      'workspaces/ws1/bills': [],
+      'workspaces/ws1/accounts': [],
+    });
+
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
+    expect(context).toContain('RESUMO');
+    expect(context).not.toContain('SEU CICLO');
+  });
+
+  it('includes budget progress with percentage', async () => {
+    const db = mockDb({}, {
+      ...emptyCollections,
+      'workspaces/ws1/categories': [
+        fakeDoc('cat_mercado', { id: 'cat_mercado', name: 'Mercado', isActive: true }),
+      ],
+      'workspaces/ws1/transactions': [
+        fakeDoc('txn1', {
+          type: 'expense', amountCents: 40000, accountId: 'acct1',
+          categoryId: 'cat_mercado', competenceMonth: currentMonth,
+          date: Timestamp.fromDate(makeDate(1)),
+        }),
+      ],
+      'workspaces/ws1/budgets': [
+        fakeDoc('cat_mercado', { id: 'cat_mercado', categoryId: 'cat_mercado', limitCents: 100000, isActive: true }),
+      ],
+      'workspaces/ws1/bills': [],
+      'workspaces/ws1/accounts': [
+        fakeDoc('acct1', { id: 'acct1', name: 'Carteira', type: 'wallet', isActive: true, openingBalanceCents: 100000 }),
+      ],
+    });
+
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
+    expect(context).toContain('ORCAMENTOS');
+    expect(context).toContain('Mercado');
+    expect(context).toContain('40%');
+  });
+
+  it('includes goals with progress', async () => {
+    const db = mockDb({}, {
+      ...emptyCollections,
+      'workspaces/ws1/categories': [],
+      'workspaces/ws1/transactions': [],
+      'workspaces/ws1/goals': [
+        fakeDoc('goal1', { id: 'goal1', name: 'Viagem', kind: 'save', targetCents: 300000, savedCents: 150000, isActive: true }),
+      ],
+      'workspaces/ws1/bills': [],
+      'workspaces/ws1/accounts': [],
+    });
+
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
+    expect(context).toContain('METAS');
+    expect(context).toContain('Viagem');
+    expect(context).toContain('50%');
+  });
+
+  it('includes 6-month trend when data exists', async () => {
+    const db = mockDb({}, {
+      ...emptyCollections,
+      'workspaces/ws1/categories': [
+        fakeDoc('cat_alimentacao', { id: 'cat_alimentacao', name: 'Alimentacao', isActive: true }),
+      ],
+      'workspaces/ws1/transactions': [
+        fakeDoc('txn1', {
+          type: 'expense', amountCents: 5000, accountId: 'acct1',
+          categoryId: 'cat_alimentacao', competenceMonth: currentMonth,
+          date: Timestamp.fromDate(makeDate(1)),
+        }),
+        fakeDoc('txn2', {
+          type: 'expense', amountCents: 3000, accountId: 'acct1',
+          categoryId: 'cat_alimentacao', competenceMonth: prevMonth,
+          date: Timestamp.fromDate(makeDate(35)),
+        }),
+      ],
+      'workspaces/ws1/bills': [],
+      'workspaces/ws1/accounts': [
+        fakeDoc('acct1', { id: 'acct1', name: 'Carteira', type: 'wallet', isActive: true, openingBalanceCents: 50000 }),
+      ],
+    });
+
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
+    expect(context).toContain('TENDENCIA');
+  });
+
+  it('includes couple goals when couple workspace exists', async () => {
+    const db = mockDb({}, {
+      ...emptyCollections,
+      'workspaces/ws1/categories': [],
+      'workspaces/ws1/transactions': [],
+      'workspaces/ws1/bills': [],
+      'workspaces/ws1/goals': [],
+      'workspaces/ws1/accounts': [],
+      'users/user1/workspaceRefs': [
+        fakeDoc('couple_ws', { status: 'active', type: 'couple' }),
+      ],
+      'workspaces/couple_ws/goals': [
+        fakeDoc('goal_couple', { id: 'goal_couple', name: 'Casa nova', kind: 'save', targetCents: 5000000, savedCents: 1250000, isActive: true }),
+      ],
+    });
+
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
+    expect(context).toContain('CASAL');
+    expect(context).toContain('Casa nova');
+    expect(context).toContain('25%');
+  });
+
+  it('does not include couple section when no couple workspace', async () => {
+    const db = mockDb({}, {
+      ...emptyCollections,
+      'workspaces/ws1/categories': [],
+      'workspaces/ws1/transactions': [],
+      'workspaces/ws1/bills': [],
+      'workspaces/ws1/accounts': [],
+      'users/user1/workspaceRefs': [],
+    });
+
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
+    expect(context).not.toContain('CASAL');
   });
 });

@@ -49,7 +49,7 @@ Grazi é a assistente de IA do Granativa. Ela responde perguntas sobre os gastos
 
 ### Contexto financeiro (`buildFinancialContext`)
 
-O contexto é dividido em 3 seções:
+O contexto é dividido em até 10 seções (algumas só aparecem quando há dados). Assinatura: `buildFinancialContext(db, workspaceId, uid)` — precisa do `uid` desde 2026-07-14 para ler perfil e espaço do casal. Limite de contexto: 5000 caracteres.
 
 **=== RESUMO ===**
 - Mês atual e anterior (`yyyy-MM`)
