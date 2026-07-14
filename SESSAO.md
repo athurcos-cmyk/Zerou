@@ -4,7 +4,7 @@
 
 SaaS/PWA financeiro mobile-first (React 19 + Firebase Firestore + Vercel). Duas frentes: controle individual e organização a dois (casal). App em **lançamento gratuito** — sem cobrança, checkout ou página de planos ativa. O projeto Firebase está no **Blaze**, mas o produto segue gratuito e sem Cloud Functions no fluxo principal. Produção: https://granativa.com.br (domínio próprio comprado no registro.br, DNS configurado no Vercel — `zerou-five.vercel.app` continua ativa como URL legada). Trabalho direto na `main`.
 
-**Assistente de IA — Grazi** (`/app/assistant`, 2026-07-13): chat com IA via DeepSeek que responde perguntas sobre os gastos do usuário com dados reais do workspace. Cloud Function `financialAssistantChat` em `functions/src/ai/`, rate limit 60 msgs/dia. Contexto financeiro completo (transações, despesas fixas, faturas de cartão, contas, bills). Documentação canônica em `docs/ai/GRAZI.md`. WhatsApp (Fase 2) ainda pendente — depende de conta Meta.
+**Assistente de IA — Grazi** (`/app/assistant`, expandida 2026-07-14): chat com IA via DeepSeek, rate limit 60 msgs/dia. Contexto cobre 9 seções: SEU CICLO (payday), TENDENCIA (6 meses), GASTOS POR CATEGORIA, ORCAMENTOS (limites com %), METAS (progresso), COMPROMETIDO (contas+fixas+faturas), CASAL (cofrinhos do parceiro), RESUMO e saldo de contas. Cloud Function `financialAssistantChat` em `functions/src/ai/`. Documentação canônica em `docs/ai/GRAZI.md`. WhatsApp (Fase 2) pendente — depende de conta Meta. Suporte a **negrito** nas respostas desde 2026-07-14.
 
 **Nav mobile com avatar** (2026-07-13): slot "Mais" (3 pontinhos) trocado por avatar do usuário (foto ou iniciais) com label "Menu". "Recorrências" renomeado para "Despesas Fixas" nos textos de UI.
 

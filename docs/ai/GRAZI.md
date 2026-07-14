@@ -18,7 +18,7 @@ Grazi é a assistente de IA do Granativa. Ela responde perguntas sobre os gastos
 | `functions/src/ai/buildFinancialContext.ts` | Agrega dados do workspace (transações 90 dias, bills, contas, budgets, goals, perfil) em string de texto ≤ 5000 chars para o prompt. Lê também perfil do usuário e espaço do casal. Usa BRT (`nowInBRT()`), conta `expense` + `card_purchase`, trata null/undefined/vazio defensivamente. |
 | `functions/src/ai/verifyWorkspaceMembership.ts` | Verifica `workspaces/{id}/members/{uid}` com `status == 'active'`. |
 | `functions/src/ai/financialAssistant.ts` | Cloud Function `onCall` principal. Fluxo: auth → membership → rate limit pre-check → contexto → DeepSeek → rate limit increment. |
-| `functions/src/ai/buildFinancialContext.test.ts` | 7 testes: gastos com categoria, card_purchase, fallback string vazia, deletados, bills, null dueDate, workspace vazio. |
+| `functions/src/ai/buildFinancialContext.test.ts` | 17 testes: gastos com categoria, card_purchase, fallback string vazia, deletados, bills, null dueDate, workspace vazio, payday, missing profile, budgets, goals, trend, couple goals, couple sem workspace. |
 | `functions/src/ai/verifyWorkspaceMembership.test.ts` | 4 testes: ativo, inexistente, removido, dados nulos. |
 | `src/pages/AssistantPage.tsx` | UI do chat. Bolhas (usuário laranja direita, Grazi cinza esquerda), sugestões iniciais, loading "Pensando...", erros amigáveis. |
 | `src/styles/global.css` | Estilos `.assistant-*` (~140 linhas no final do arquivo). Cores só com `var(--*)`. |
@@ -149,7 +149,7 @@ O cliente (`AssistantPage.tsx`) converte `**negrito**` → `<strong>` e `*itáli
 npm --prefix functions run test
 ```
 
-7 testes em `buildFinancialContext.test.ts`:
+17 testes em `buildFinancialContext.test.ts`:
 - Gastos com categorias (expense normal)
 - `card_purchase` conta como gasto
 - Fallback `||` para `competenceMonth`/`categoryId` vazios
@@ -157,6 +157,17 @@ npm --prefix functions run test
 - Bills nos próximos 7 dias aparecem
 - Bills com `dueDate: null` não derrubam o contexto
 - Workspace vazio não crasha
+- Bills vencidas aparecem como VENCIDA
+- Despesas fixas (recorrentes)
+- Total comprometido
+- Saldo das contas
+- Payday do perfil do usuário
+- Perfil ausente não quebra
+- Orçamentos com porcentagem
+- Metas com progresso
+- Tendência de 6 meses
+- Cofrinho do casal
+- Casal sem workspace não mostra seção
 
 4 testes em `verifyWorkspaceMembership.test.ts`:
 - Membro ativo → resolve

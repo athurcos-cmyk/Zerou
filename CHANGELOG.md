@@ -2,6 +2,15 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-14 — Grazi expandida: 6 novos contextos + auditoria
+
+- **Contexto expandido de 3 para 9 seções**: SEU CICLO (payday/availableMode), TENDENCIA (6 meses), ORCAMENTOS (limites com %), METAS (progresso), CASAL (cofrinhos do parceiro). GASTOS POR LUGAR considerado e removido (campo merchant escondido em "Mais detalhes", sem normalização = inútil).
+- **Performance**: 2 queries por conta eliminadas (filtro em memória reaproveitando transações), `limit(2000)` na query de transações.
+- **Bugs corrigidos**: `sanitize(undefined)` crash se doc sem nome, `amountCents` podia virar NaN, `savedCents` undefined produzia NaN%, `createdAt` sobrescrito no rate limit (agora `updatedAt`), `Timestamp` import não usado, `GoalData.dueDate` não usado removido.
+- **System prompt**: de 9 para 11 regras, limite de contexto 3000 → 5000 chars.
+- **Testes**: 8 novos (payday, budgets, goals, trend, couple, missing profile, missing couple, couple sem workspace). 35 funções + 276 app + 49 rules = 360 passando.
+- Auditoria completa com agente: zero vulnerabilidades de segurança, regras do Firestore já cobrem todas as novas leituras. Detalhes em `docs/history/2026-07.md`.
+
 ## 2026-07-14 — App 100% offline (auditoria + correção de 11 funções)
 
 - **Auditoria completa de offline-first**: todos os `await` em escritas no Firestore, `getDocs`/`getDoc` que falham sem cache, componentes com "Carregando..." que nunca resolvem offline. 2 agentes fizeram a auditoria e revisaram as decisões.
