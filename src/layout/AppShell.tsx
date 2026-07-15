@@ -12,9 +12,9 @@ import {
   Palette,
   Plus,
   ReceiptText,
-  Repeat,
   Shield,
   Target,
+  TrendingUp,
   Users,
   WalletCards,
   X
@@ -82,6 +82,9 @@ export function AppShell() {
           <NavLink className={getNavClass} to="/app/accounts">
             <WalletCards size={19} aria-hidden="true" /> Contas
           </NavLink>
+          <NavLink className={getNavClass} to="/app/net-worth">
+            <TrendingUp size={19} aria-hidden="true" /> Patrimônio
+          </NavLink>
           <NavLink className={getNavClass} to="/app/cards">
             <CreditCardIcon /> Cartões
           </NavLink>
@@ -89,13 +92,10 @@ export function AppShell() {
             <ReceiptText size={19} aria-hidden="true" /> Transações
           </NavLink>
           <NavLink className={getNavClass} to="/app/bills">
-            <CalendarClock size={19} aria-hidden="true" /> Compromissos
+            <CalendarClock size={19} aria-hidden="true" /> Contas a Pagar
           </NavLink>
           <NavLink className={getNavClass} to="/app/goals">
             <Target size={19} aria-hidden="true" /> Metas
-          </NavLink>
-          <NavLink className={getNavClass} to="/app/recurring">
-            <Repeat size={19} aria-hidden="true" /> Despesas Fixas
           </NavLink>
           <NavLink className={getNavClass} to="/app/search">
             <BarChart2 size={19} aria-hidden="true" /> Análise
@@ -155,17 +155,17 @@ export function AppShell() {
               <NavLink className={getNavClass} to="/app/accounts" onClick={() => setMobileMenuOpen(false)}>
                 <WalletCards size={19} aria-hidden="true" /> Contas
               </NavLink>
+              <NavLink className={getNavClass} to="/app/net-worth" onClick={() => setMobileMenuOpen(false)}>
+                <TrendingUp size={19} aria-hidden="true" /> Patrimônio
+              </NavLink>
               <NavLink className={getNavClass} to="/app/shared" onClick={() => setMobileMenuOpen(false)}>
                 <Users size={19} aria-hidden="true" /> Compartilhado
               </NavLink>
               <NavLink className={getNavClass} to="/app/bills" onClick={() => setMobileMenuOpen(false)}>
-                <CalendarClock size={19} aria-hidden="true" /> Compromissos
+                <CalendarClock size={19} aria-hidden="true" /> Contas a Pagar
               </NavLink>
               <NavLink className={getNavClass} to="/app/goals" onClick={() => setMobileMenuOpen(false)}>
                 <Target size={19} aria-hidden="true" /> Metas
-              </NavLink>
-              <NavLink className={getNavClass} to="/app/recurring" onClick={() => setMobileMenuOpen(false)}>
-                <Repeat size={19} aria-hidden="true" /> Despesas Fixas
               </NavLink>
               <NavLink className={getNavClass} to="/app/search" onClick={() => setMobileMenuOpen(false)}>
                 <BarChart2 size={19} aria-hidden="true" /> Análise

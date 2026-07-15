@@ -29,8 +29,8 @@ import { OnboardingPage } from './onboarding/OnboardingPage';
 import { ContactPage, FeaturesPage, HelpPage, SecurityPage } from './pages/PublicPages';
 import { PrivacyPolicyPage, TermsPage } from './pages/LegalPages';
 import { PrivacyCenterPage } from './pages/PrivacyCenterPage';
-import { RecurringPage } from './pages/RecurringPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { NetWorthPage } from './pages/NetWorthPage';
 import { SearchPage } from './pages/SearchPage';
 import { AdminPage } from './pages/AdminPage';
 import { SharedSpacePage } from './pages/SharedSpacePage';
@@ -88,7 +88,7 @@ export function App() {
                 <Route path="cards/:cardId/invoices/:invoiceId" element={<InvoicePage />} />
                 <Route path="bills" element={<BillsPage />} />
                 <Route path="goals" element={<GoalsPage />} />
-                <Route path="recurring" element={<RecurringPage />} />
+                <Route path="net-worth" element={<NetWorthPage />} />
                 <Route path="search" element={<SearchPage />} />
                 <Route path="shared" element={<SharedSpacePage />} />
                 <Route path="assistant" element={<AssistantPage />} />

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Download, Minus, Plus, Search, Target, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Download, Minus, Plus, Search, Target, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
 import {
   PieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from 'recharts';
 import { useAuth } from '../auth/AuthContext';
+import { AnnualSummarySheet } from '../components/AnnualSummarySheet';
 import { BottomSheet } from '../components/BottomSheet';
 import { EmptyState } from '../components/EmptyState';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
@@ -146,6 +147,7 @@ export function SearchPage() {
   const [selectedCatIndex, setSelectedCatIndex] = useState<number | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [budgetOpen, setBudgetOpen] = useState(false);
+  const [annualOpen, setAnnualOpen] = useState(false);
   const [budgetValues, setBudgetValues] = useState<Record<string, string>>({});
 
   const expenseCategories = useMemo(
@@ -155,6 +157,7 @@ export function SearchPage() {
 
   const currentMonth = new Date().toISOString().slice(0, 7);
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  const [comparisonMode, setComparisonMode] = useState<'previous_month' | 'last_year'>('previous_month');
   const last6Months = useMemo(() => getLastNMonths(6), []);
 
   const normalizedQuery = query.trim().toLocaleLowerCase('pt-BR');
@@ -294,20 +297,22 @@ export function SearchPage() {
 
   const hasMonthlyData = monthlyData.some((m) => m.incomeCents > 0 || m.expenseCents > 0);
 
-  // ── variação vs. mês anterior ao selecionado ───────────────────────────────
-  const prevMonth = shiftMonth(selectedMonth, -1);
-  const prevExpense = useMemo(
+  // ── variação vs. período de comparação ─────────────────────────────────────
+  const comparisonMonth = comparisonMode === 'last_year'
+    ? shiftMonth(selectedMonth, -12)
+    : shiftMonth(selectedMonth, -1);
+  const comparisonExpense = useMemo(
     () =>
       sumPositive(
-        spendingByCategoryForMonth(prevMonth, finance.transactions, invoicesForSpending, (id) =>
+        spendingByCategoryForMonth(comparisonMonth, finance.transactions, invoicesForSpending, (id) =>
           id ? txnCategoryById.get(id) : undefined
         )
       ),
-    [finance.transactions, invoicesForSpending, txnCategoryById, prevMonth]
+    [finance.transactions, invoicesForSpending, txnCategoryById, comparisonMonth]
   );
   // Comparação só faz sentido entre meses realizados; mês futuro é comprometido, não gasto.
-  const variation = !isFutureMonth && prevExpense > 0
-    ? Math.round(((totalSpent - prevExpense) / prevExpense) * 100)
+  const variation = !isFutureMonth && comparisonExpense > 0
+    ? Math.round(((totalSpent - comparisonExpense) / comparisonExpense) * 100)
     : null;
 
   // ── compras parceladas ainda em andamento (visibilidade do valor cheio) ─────
@@ -394,6 +399,9 @@ export function SearchPage() {
           <h1 className="page-title page-title--compact">Seus gastos</h1>
         </div>
         <div style={{ display: 'flex', gap: '0.25rem' }}>
+          <button className="icon-button" type="button" aria-label="Resumo anual" title="Resumo anual" onClick={() => setAnnualOpen(true)}>
+            <Calendar size={18} aria-hidden="true" />
+          </button>
           <button className="icon-button" type="button" aria-label="Definir limite de gasto por categoria" title="Limite por categoria" onClick={() => setBudgetOpen(true)}>
             <Target size={18} aria-hidden="true" />
           </button>
@@ -417,6 +425,26 @@ export function SearchPage() {
         </button>
       </div>
 
+      {/* ── Comparação toggle ───────────────────────────────────────────────── */}
+      {!isFutureMonth && (
+        <div className="segmented" role="group" aria-label="Modo de comparação" style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.75rem' }}>
+          <button
+            type="button"
+            className={`chip${comparisonMode === 'previous_month' ? ' chip--active' : ''}`}
+            onClick={() => setComparisonMode('previous_month')}
+          >
+            vs. mês anterior
+          </button>
+          <button
+            type="button"
+            className={`chip${comparisonMode === 'last_year' ? ' chip--active' : ''}`}
+            onClick={() => setComparisonMode('last_year')}
+          >
+            vs. ano passado
+          </button>
+        </div>
+      )}
+
       {/* ── KPI strip ──────────────────────────────────────────────────────── */}
       <div className="metric-strip">
         <MetricCard
@@ -432,13 +460,13 @@ export function SearchPage() {
         />
         {isFutureMonth ? (
           <MetricCard
-            label="Despesas Fixas"
+            label="Contas recorrentes"
             value={recurringTotalCents > 0 ? `~${formatMoney(recurringTotalCents)}` : 'R$ 0'}
             sub="estimativa do mês"
           />
         ) : (
           <MetricCard
-            label="vs. mês anterior"
+            label={comparisonMode === 'last_year' ? 'vs. mesmo mês ano passado' : 'vs. mês anterior'}
             value={variation !== null ? `${variation > 0 ? '+' : ''}${variation}%` : '—'}
             sub={variation !== null ? (variation > 0 ? 'gastou mais' : variation < 0 ? 'gastou menos' : 'igual') : 'sem dados'}
             icon={
@@ -642,7 +670,7 @@ export function SearchPage() {
         <article className="surface surface-pad" style={{ marginTop: '0.75rem' }}>
           <div className="section-heading">
             <div>
-              <p className="eyebrow">Despesas Fixas previstas</p>
+              <p className="eyebrow">Contas recorrentes previstas</p>
               <h2>{monthTitle}</h2>
             </div>
           </div>
@@ -846,6 +874,15 @@ export function SearchPage() {
           )}
         </div>
       </BottomSheet>
+
+      <AnnualSummarySheet
+        open={annualOpen}
+        onClose={() => setAnnualOpen(false)}
+        transactions={finance.transactions}
+        invoices={invoicesForSpending}
+        categories={expenseCategories}
+        currentYear={new Date().getFullYear()}
+      />
     </section>
   );
 }

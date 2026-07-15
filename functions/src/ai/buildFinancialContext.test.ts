@@ -221,7 +221,7 @@ describe('buildFinancialContext', () => {
     expect(context).toContain('VENCIDA');
   });
 
-  it('includes recurring rules as despesas fixas', async () => {
+  it('includes recurring rules in contas a pagar', async () => {
     const nextWeek = makeDateFuture(7);
     const db = mockDb({}, {
       ...emptyCollections,
@@ -241,7 +241,7 @@ describe('buildFinancialContext', () => {
 
     const context = await buildFinancialContext(db, 'ws1', 'user1');
     expect(context).toContain('Netflix');
-    expect(context).toContain('Despesas fixas');
+    expect(context).toContain('se repete');
     expect(context).toMatch(/R\$\s*39[,.]90/);
   });
 

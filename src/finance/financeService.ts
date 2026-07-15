@@ -824,3 +824,23 @@ export function subscribeRecurringRules(
     onError
   );
 }
+
+export function updateRecurringRule(
+  workspaceId: string,
+  ruleId: string,
+  patch: { description?: string; amountCents?: number; frequency?: 'weekly' | 'monthly' | 'yearly'; nextOccurrenceAt?: Date; accountId?: string; categoryId?: string; isActive?: boolean }
+) {
+  const updates: Record<string, unknown> = { updatedAt: serverTimestamp() };
+  if (patch.description !== undefined) updates.description = patch.description;
+  if (patch.amountCents !== undefined) updates.amountCents = patch.amountCents;
+  if (patch.frequency !== undefined) updates.frequency = patch.frequency;
+  if (patch.nextOccurrenceAt !== undefined) updates.nextOccurrenceAt = Timestamp.fromDate(patch.nextOccurrenceAt);
+  if (patch.accountId !== undefined) updates.accountId = patch.accountId;
+  if (patch.categoryId !== undefined) updates.categoryId = patch.categoryId;
+  if (patch.isActive !== undefined) updates.isActive = patch.isActive;
+  fireWrite(updateDoc(documentRef(workspaceId, 'recurring', ruleId), updates));
+}
+
+export function deleteRecurringRule(workspaceId: string, ruleId: string) {
+  fireWrite(updateDoc(documentRef(workspaceId, 'recurring', ruleId), { isActive: false, updatedAt: serverTimestamp() }));
+}

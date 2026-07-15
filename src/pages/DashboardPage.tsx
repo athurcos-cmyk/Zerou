@@ -19,6 +19,10 @@ import { CategoryMark } from '../components/categoryIcons';
 import { defaultCategoryColors } from '../theme/palette';
 import { InstallPromptSheet } from '../pwa/InstallPromptSheet';
 import { useWelcomeTour } from '../onboarding/welcomeTour.store';
+import { projectDailyBalance } from '../finance/cashFlowProjection';
+import { CashFlowChart } from '../components/CashFlowChart';
+import { ProjectionTimeline } from '../components/ProjectionTimeline';
+import { BudgetAlertBanner } from '../components/BudgetAlertBanner';
 
 import { EmptyState } from '../components/EmptyState';
 
@@ -39,6 +43,7 @@ export function DashboardPage() {
   const welcomeTourSeen = useWelcomeTour((state) => state.seen);
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [tutorialDismissed, setTutorialDismissed] = useState(false);
+  const [cashFlowHorizon, setCashFlowHorizon] = useState(30);
   const dashboard = calculateDashboardSummary({
     accounts: finance.accounts,
     transactions: finance.transactions,
@@ -142,6 +147,22 @@ export function DashboardPage() {
   const maxSpendingCents = Math.max(...spendingRows.map(([, amount]) => amount), 1);
   const hasStarted = finance.accounts.length > 0 || finance.transactions.length > 0 || cardsData.cards.length > 0;
 
+  const cashFlowProjection = useMemo(
+    () =>
+      hasStarted && !isCommittedLoading
+        ? projectDailyBalance(
+            cashFlowHorizon,
+            finance.accounts,
+            finance.transactions,
+            finance.bills,
+            finance.recurringRules,
+            cardsData.invoices,
+            profile?.payday,
+          )
+        : null,
+    [hasStarted, isCommittedLoading, cashFlowHorizon, finance.accounts, finance.transactions, finance.bills, finance.recurringRules, cardsData.invoices, profile?.payday],
+  );
+
   return (
     <section className="page-content">
       <InstallPromptSheet />
@@ -154,6 +175,8 @@ export function DashboardPage() {
       </div>
 
       {finance.error || cardsData.error ? <div className="notice notice--danger">{finance.error ?? cardsData.error}</div> : null}
+
+      <BudgetAlertBanner />
 
       <div className="dash-summary">
         <article className="surface surface-pad dash-balance dash-hero">
@@ -294,19 +317,17 @@ export function DashboardPage() {
           {isCommittedLoading ? null : dashboard.upcomingCommitments.length > 0 ? (
             <div className="item-list">
               {dashboard.upcomingCommitments.map((commitment) => {
-                // Fatura leva pra fatura do cartao; conta a pagar pros Compromissos; despesa fixa pras Despesas Fixas.
+                // Fatura leva pra fatura do cartao; conta (avulsa ou recorrente) vai pra Contas a Pagar.
                 const href =
                   commitment.kind === 'invoice' && commitment.cardId
                     ? `/app/cards/${commitment.cardId}/invoices/${commitment.id}`
-                    : commitment.kind === 'recurring'
-                    ? '/app/recurring'
                     : '/app/bills';
                 return (
                   <Link className="list-row list-row--link" to={href} key={`${commitment.kind}-${commitment.id}`}>
                     <div>
                       <strong>{commitment.description}</strong>
                       <span className="text-secondary">
-                        {commitment.kind === 'bill' ? 'Conta a pagar' : commitment.kind === 'invoice' ? 'Fatura' : 'Despesa Fixa'} ·{' '}
+                        {commitment.kind === 'bill' || commitment.kind === 'recurring' ? 'Conta' : 'Fatura'} ·{' '}
                         {formatFriendlyDate(commitment.dueAt)}
                       </span>
                     </div>
@@ -378,6 +399,31 @@ export function DashboardPage() {
           ) : null}
         </article>
       </div>
+
+      {hasStarted && cashFlowProjection && cashFlowProjection.length > 0 ? (
+        <article className="surface surface-pad cash-flow-section" style={{ marginTop: '1.5rem' }}>
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Projeção de fluxo</p>
+              <h2 style={{ fontSize: '1.05rem', margin: 0 }}>Saldo nos próximos dias</h2>
+            </div>
+            <div className="segmented" role="group" aria-label="Horizonte da projeção">
+              {[30, 60, 90].map((days) => (
+                <button
+                  key={days}
+                  type="button"
+                  className={`chip${cashFlowHorizon === days ? ' chip--active' : ''}`}
+                  onClick={() => setCashFlowHorizon(days)}
+                >
+                  {days}d
+                </button>
+              ))}
+            </div>
+          </div>
+          <CashFlowChart projections={cashFlowProjection} />
+          <ProjectionTimeline projections={cashFlowProjection} />
+        </article>
+      ) : null}
     </section>
   );
 }

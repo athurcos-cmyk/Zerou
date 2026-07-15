@@ -30,7 +30,7 @@ const slides: Slide[] = [
   {
     icon: <CalendarClock size={26} aria-hidden="true" />,
     title: 'Nunca perca um vencimento',
-    text: 'Compromissos sao contas com uma data (o IPTU, uma conta pontual). Despesas Fixas se repetem sozinhas (aluguel, Netflix). O app lembra das duas.'
+    text: 'Contas a Pagar reune o que voce deve: contas avulsas (IPTU, uma conta pontual) e recorrentes (aluguel, Netflix) — tudo na mesma tela.'
   },
   {
     icon: <Wallet size={26} aria-hidden="true" />,

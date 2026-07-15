@@ -1,4 +1,4 @@
-import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
+import { type DocumentReference, FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { logger } from 'firebase-functions';
@@ -184,12 +184,46 @@ export const generateRecurrences = onSchedule(
         anchorDay?: number;
       };
 
-      // Sem valor ou conta definida não há como criar a transação
-      if (!rule.amountCents || !rule.accountId) continue;
-
       const occurrenceAt = rule.nextOccurrenceAt.toDate();
-      const txnId = recurringOccurrenceTransactionId(ruleDoc.id, occurrenceAt);
       const nextDate = nextOccurrenceDate(occurrenceAt, rule.frequency, rule.anchorDay);
+
+      // Sem valor: cria um compromisso (Bill) pendente pra pessoa preencher quando chegar.
+      if (!rule.amountCents) {
+        const billId = recurringOccurrenceTransactionId(ruleDoc.id, occurrenceAt);
+        const billRef = db.doc(`workspaces/${rule.workspaceId}/bills/${billId}`);
+        const alreadyCreatedBill = (await billRef.get()).exists;
+
+        if (!alreadyCreatedBill) {
+          await billRef.set({
+            id: billId,
+            workspaceId: rule.workspaceId,
+            description: rule.description,
+            amountCents: 0,
+            dueDate: Timestamp.fromDate(occurrenceAt),
+            status: 'pending',
+            categoryId: rule.categoryId ?? '',
+            accountId: rule.accountId ?? '',
+            recurringId: ruleDoc.id,
+            createdBy: rule.createdBy,
+            createdAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+          generated++;
+        } else {
+          skipped++;
+        }
+
+        await ruleDoc.ref.update({
+          nextOccurrenceAt: Timestamp.fromDate(nextDate),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        continue;
+      }
+
+      // Sem conta definida não há como criar a transação
+      if (!rule.accountId) continue;
+
+      const txnId = recurringOccurrenceTransactionId(ruleDoc.id, occurrenceAt);
       const txnRef = db.doc(`workspaces/${rule.workspaceId}/transactions/${txnId}`);
 
       // A pessoa pode ter clicado "Registrar" nesta mesma ocorrência antes das 6h. O id
@@ -243,7 +277,7 @@ export const generateRecurrences = onSchedule(
 
       await sendPushToUser(
         rule.createdBy,
-        `Despesa Fixa: ${rule.description}`,
+        `Conta recorrente: ${rule.description}`,
         `${formatBRL(rule.amountCents)} registrado automaticamente.`
       ).catch(() => {});
     }
@@ -301,41 +335,108 @@ export const sendDueReminders = onSchedule(
 );
 
 // ─── sendDailyLogReminder ─────────────────────────────────────────────────────
-// Roda todo dia às 20h (BRT). Envia push para todos os usuários com token FCM
-// lembrando de registrar os gastos do dia antes de dormir.
+// Roda todo dia às 20h (BRT). Envia push personalizado com o nome do usuário,
+// usando um pool de mensagens variadas pra não ficar repetitivo. Stale tokens
+// são limpos por usuário (mesmo padrão do sendPushToUser).
+const DAILY_REMINDER_MESSAGES: string[] = [
+  'Como foi o dia, {name}? Não esquece de registrar seus gastos.',
+  '{name}, passou um café hoje? Registra aí!',
+  'Boa noite, {name}! Dá 2 minutinhos pro seu dinheiro?',
+  '{name}, todo centavo registrado é um centavo sob controle.',
+  'Fechou as contas do dia, {name}? Passa a régua aí.',
+  'Seu futuro eu agradece, {name}. Registra os gastos de hoje!',
+  '{name}, o pix, o docinho, o busão… deu pra anotar tudo?',
+  'Antes de dormir, {name}: já registrou o que gastou hoje?',
+  '{name}, 2 minutinhos agora = zero surpresa no fim do mês.',
+  'O dinheiro some se você não der nome pra ele, {name}. Bora registrar!',
+  'Não deixa pra amanhã o registro que você pode fazer hoje, {name}.',
+  '{name}, seu Granativa tá te esperando. Registra os gastos de hoje?',
+];
+
+function pickDailyMessage(name: string): string {
+  const template = DAILY_REMINDER_MESSAGES[Math.floor(Math.random() * DAILY_REMINDER_MESSAGES.length)];
+  return template.replace('{name}', name);
+}
+
+function extractUserIdFromTokenPath(docPath: string): string | null {
+  const parts = docPath.split('/');
+  return parts[1] ?? null;
+}
+
 export const sendDailyLogReminder = onSchedule(
   { schedule: '0 20 * * *', timeZone: 'America/Sao_Paulo', region, maxInstances: 1 },
   async () => {
     const db = getFirestore();
+
+    // Agrupa tokens por usuário em vez de mandar tudo num multicast cego.
     const tokensSnap = await db.collectionGroup('fcmTokens').get();
     if (tokensSnap.empty) return;
 
-    const tokens = tokensSnap.docs
-      .map((d) => d.data().token as string)
-      .filter(Boolean);
+    const byUser = new Map<string, { token: string; ref: DocumentReference }[]>();
+    const userIds = new Set<string>();
 
-    if (tokens.length === 0) return;
+    for (const doc of tokensSnap.docs) {
+      const userId = extractUserIdFromTokenPath(doc.ref.path);
+      const token = doc.data().token as string | undefined;
+      if (!userId || !token) continue;
 
-    const CHUNK = 500;
-    let sent = 0;
+      if (!byUser.has(userId)) byUser.set(userId, []);
+      byUser.get(userId)!.push({ token, ref: doc.ref });
+      userIds.add(userId);
+    }
 
-    for (let i = 0; i < tokens.length; i += CHUNK) {
-      const chunk = tokens.slice(i, i + CHUNK);
-      await getMessaging().sendEachForMulticast({
-        tokens: chunk,
+    if (userIds.size === 0) return;
+
+    // Lê nomes de perfil em batch (até 1 leitura por usuário).
+    const profileSnaps = await db.getAll(
+      ...[...userIds].map((uid) => db.doc(`users/${uid}`))
+    );
+    const nameByUser = new Map<string, string>();
+    for (const snap of profileSnaps) {
+      if (!snap.exists) continue;
+      const data = snap.data() as { name?: string; displayName?: string };
+      nameByUser.set(snap.id, data?.name || data?.displayName || '');
+    }
+
+    const DEFAULT_NAME = '';
+    const messaging = getMessaging();
+    let sentUsers = 0;
+    let staleRemoved = 0;
+
+    for (const [userId, entries] of byUser) {
+      const displayName = nameByUser.get(userId) ?? DEFAULT_NAME;
+      const name = displayName || 'você';
+      const body = pickDailyMessage(name);
+
+      const tokens = entries.map((e) => e.token);
+
+      const response = await messaging.sendEachForMulticast({
+        tokens,
         webpush: {
           notification: {
-            title: 'Como foi o dia?',
-            body: 'Registre seus gastos antes de dormir.',
+            title: 'Hora de registrar!',
+            body,
             icon: '/brand/zerou-app-icon-192.png',
             badge: '/brand/zerou-app-icon-192.png',
           },
           fcmOptions: { link: 'https://granativa.com.br/app/transactions/new' },
         },
       });
-      sent += chunk.length;
+
+      // Limpa tokens stale (dispositivo desinstalado/revogado) — mesmo padrão do push.ts.
+      const staleRefs = response.responses
+        .map((r, i) => ({ ok: r.success, entry: entries[i] }))
+        .filter(({ ok }) => !ok)
+        .map(({ entry }) => entry.ref);
+
+      if (staleRefs.length > 0) {
+        await Promise.all(staleRefs.map((ref) => ref.delete()));
+        staleRemoved += staleRefs.length;
+      }
+
+      sentUsers++;
     }
 
-    logger.info('daily_log_reminder_finished', { sent });
+    logger.info('daily_log_reminder_finished', { sentUsers, staleRemoved });
   }
 );

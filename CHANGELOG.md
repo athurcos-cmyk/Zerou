@@ -2,6 +2,34 @@
 
 Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
 
+## 2026-07-14 — Renomeação Contas a Pagar + auditoria Grazi + push diário reescrito
+
+- **"Contas" → "Contas a Pagar"**: renomeação nos labels de UI (sidebar, mobile, título da página, tour, Análise) pra evitar ambiguidade com contas bancárias. Termo "Despesas Fixas" substituído por "Contas recorrentes" nos labels da Análise.
+- **Auditoria Grazi pós-unificação**: system prompt e context builder atualizados pra tratar contas avulsas e recorrentes como um grupo só (não mais 2 separados). Lista unificada com anotação "(se repete)". Rules de segurança, documentação e testes atualizados.
+- **`sendDailyLogReminder` reescrito**: em vez de multicast cego pra todos os tokens, agora agrupa por usuário, personaliza com nome do perfil (batch `getAll`), sorteia entre 12 mensagens diferentes e limpa tokens stale por usuário (mesmo padrão do `sendPushToUser`).
+- **`generateRecurrences`**: push title "Despesa Fixa" → "Conta recorrente".
+- Duas auditorias de offline-first com agentes confirmaram zero violações nas 6 novas features e na unificação.
+- `sendDueReminders` pendente pra deploy (push de lembrete de vencimento).
+
+## 2026-07-14 — Unificação Compromissos + Despesas Fixas → "Contas a Pagar"
+
+- **Tela unificada**: "Compromissos" e "Despesas Fixas" viram uma tela só — **Contas a Pagar** (`/app/bills`). Cada conta pode ser avulsa ou recorrente (toggle "Se repete"), com valor fixo ou variável (campo opcional).
+- **Valor variável**: se a conta recorrente não tem valor definido (ex.: luz, água), a Cloud Function `generateRecurrences` agora cria um Bill pendente em vez de pular — o usuário preenche o valor quando chegar.
+- **Novas funções**: `updateRecurringRule()` e `deleteRecurringRule()` (soft-delete via `isActive: false`) no `financeService.ts`.
+- **Navegação**: link "Despesas Fixas" removido da sidebar e menu mobile. Rota `/app/recurring` removida.
+- **Dashboard**: label unificado — ambos os tipos viram "Conta".
+- **Deploy**: `functions` redeployado com a branch nova no `generateRecurrences`.
+
+## 2026-07-14 — 5 novas features: Patrimônio, Fluxo de Caixa, YoY, Resumo Anual e Alertas de Orçamento
+
+- **Patrimônio Líquido** (`/app/net-worth`): nova página com hero card, KPI strip (ativos/passivos), breakdown por tipo de conta, gráfico de linha com 12 meses de histórico. Cálculo = saldo das contas − faturas em aberto − contas a pagar.
+- **Projeção de Fluxo de Caixa**: nova seção no Dashboard com saldo previsto dia a dia (30/60/90 dias), gráfico de linha e timeline de eventos colapsável. Projeta contas, recorrências, faturas e recebimento (via payday).
+- **Comparação Ano contra Ano**: toggle na Análise alterna entre "vs. mês anterior" e "vs. mesmo mês ano passado".
+- **Resumo Anual**: BottomSheet acessível pela Análise (ícone calendário) com taxa de poupança, KPI strip (entradas/saídas), melhor/pior mês, top 5 categorias, gráfico de barras mensal e year picker.
+- **Alertas de Orçamento**: banner no Dashboard avisa quando categoria atinge 80% (amarelo) ou 100%+ (vermelho) do limite. Dismiss por localStorage. Cloud Function `sendBudgetAlerts` (10h BRT) envia push notification com os mesmos thresholds, usando subcoleção `budgetAlertState` pra não repetir alerta no mesmo mês.
+- **Navegação**: link "Patrimônio" (TrendingUp) adicionado à sidebar e menu mobile.
+- 307 testes (eram 276; +31), typecheck e build limpos.
+
 ## 2026-07-14 — 12 temas do Plantao + FAB adaptativo + avatares offline
 
 - **12 temas portados do Plantao**: 6 claros (Paper, Pérola, Floresta, Lavanda, Rosa, Areia) e 6 escuros (Noturno, Carbono, Cobalto, Ametista, Grafite, Vinho). Substituem Sakura, Obsidian, Midnight, Aurora e Rose Gold.

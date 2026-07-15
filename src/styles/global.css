@@ -5441,3 +5441,15 @@ span.service-mark--brand {
     grid-template-columns: repeat(3, 1fr);
   }
 }
+
+/* ── Cash Flow Projection ─────────────────────────────── */
+
+.cash-flow-section .segmented {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.cash-flow-section .segmented .chip {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.78rem;
+}

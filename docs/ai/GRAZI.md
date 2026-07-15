@@ -56,7 +56,7 @@ O contexto é dividido em até 10 seções (algumas só aparecem quando há dado
 - Gasto total no mês atual vs. anterior (com variação %)
 - Receitas no mês atual
 - Saldo total em contas (abertura ± transações)
-- Total comprometido (contas + despesas fixas + faturas)
+- Total comprometido (contas + faturas)
 - Livre para gastar (saldo - comprometido)
 
 **=== GASTOS POR CATEGORIA ===**
@@ -64,10 +64,9 @@ O contexto é dividido em até 10 seções (algumas só aparecem quando há dado
 - Conta `expense` + `card_purchase`, excluindo `deletedAt`
 
 **=== COMPROMETIDO (próximos 30 dias) ===**
-- **Contas a pagar**: `bills` com status `pending` ou `overdue`, vencimento em até 30 dias ou já vencidas. Ordenadas por status (VENCIDA primeiro) depois data.
-- **Despesas fixas**: regras `recurring` ativas com `amountCents > 0` e `nextOccurrenceAt` nos próximos 30 dias ou já passada
+- **Contas a pagar**: unifica `bills` (status `pending`/`overdue`, vencimento em até 30 dias ou já vencidas) + `recurring` ativas com `amountCents > 0` e `nextOccurrenceAt` nos próximos 30 dias ou já passada. Recorrentes são anotadas com "(se repete)". Ordenadas: VENCIDAS primeiro, depois avulsas por data, depois recorrentes.
 - **Faturas de cartão**: `invoices` com status `open`/`closed`/`overdue`/`partial` e saldo devedor > 0. Saldo estimado como `outstandingBalanceCents || purchasesTotalCents - paymentsTotalCents`
-- Total comprometido quebrado por tipo (contas + fixas + faturas)
+- Total comprometido quebrado por tipo (contas + faturas)
 
 **Coleções consultadas**: `categories`, `transactions`, `bills`, `recurring`, `cards` + `cards/*/invoices`, `accounts`
 
@@ -158,7 +157,7 @@ npm --prefix functions run test
 - Bills com `dueDate: null` não derrubam o contexto
 - Workspace vazio não crasha
 - Bills vencidas aparecem como VENCIDA
-- Despesas fixas (recorrentes)
+- Contas a pagar recorrentes
 - Total comprometido
 - Saldo das contas
 - Payday do perfil do usuário

@@ -229,7 +229,7 @@ export async function buildFinancialContext(
     return a.dueDate.localeCompare(b.dueDate);
   });
 
-  // ── Recurring rules (despesas fixas) ──────────────────────────────────────
+  // ── Recurring rules ───────────────────────────────────────────────────────
   const recurringSnap = await db
     .collection(`workspaces/${workspaceId}/recurring`)
     .where('isActive', '==', true)
@@ -467,7 +467,7 @@ export async function buildFinancialContext(
     }
   }
   lines.push(`Saldo total em contas: ${formatBRL(totalBalance)}.`);
-  lines.push(`Total comprometido (contas + despesas fixas + faturas): ${formatBRL(totalCommitted)}.`);
+  lines.push(`Total comprometido (contas + faturas): ${formatBRL(totalCommitted)}.`);
   lines.push(`Livre para gastar: ${formatBRL(freeToSpend)}.`);
   lines.push('');
 
@@ -508,26 +508,21 @@ export async function buildFinancialContext(
     lines.push('');
   }
 
-  // COMPROMETIDO
+  // COMPROMETIDO — Contas a Pagar (avulsas + recorrentes) + Faturas
+  const totalBills = upcomingBills.length + upcomingRecurring.length;
   lines.push('=== COMPROMETIDO (proximos 30 dias) ===');
 
-  if (upcomingBills.length > 0) {
-    lines.push(`Contas a pagar (${upcomingBills.length}):`);
+  if (totalBills > 0) {
+    lines.push(`Contas a pagar (${totalBills}):`);
     for (const bill of upcomingBills) {
       const prefix = bill.overdue ? 'VENCIDA' : `Vence ${bill.dueDate}`;
       lines.push(`- ${bill.description}: ${formatBRL(bill.amountCents)} (${prefix})`);
     }
-  } else {
-    lines.push('Nenhuma conta a pagar.');
-  }
-
-  if (upcomingRecurring.length > 0) {
-    lines.push(`Despesas fixas (${upcomingRecurring.length}):`);
     for (const rec of upcomingRecurring) {
-      lines.push(`- ${rec.description}: ${formatBRL(rec.amountCents)} (prox. ${rec.nextDate})`);
+      lines.push(`- ${rec.description}: ${formatBRL(rec.amountCents)} (prox. ${rec.nextDate}, se repete)`);
     }
   } else {
-    lines.push('Nenhuma despesa fixa nos proximos 30 dias.');
+    lines.push('Nenhuma conta a pagar nos proximos 30 dias.');
   }
 
   if (activeInvoices.length > 0) {
@@ -538,7 +533,7 @@ export async function buildFinancialContext(
   }
 
   lines.push('');
-  lines.push(`Total comprometido: ${formatBRL(totalCommitted)} (contas: ${formatBRL(billsCommitted)} + fixas: ${formatBRL(recurringCommitted)} + faturas: ${formatBRL(invoiceCommitted)}).`);
+  lines.push(`Total comprometido: ${formatBRL(totalCommitted)} (contas: ${formatBRL(billsCommitted + recurringCommitted)} + faturas: ${formatBRL(invoiceCommitted)}).`);
 
   // CASAL
   if (coupleGoalLines.length > 0) {

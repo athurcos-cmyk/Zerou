@@ -34,13 +34,17 @@ Use este arquivo como mapa antes de abrir documentos grandes. Regra: leia o meno
 | Serviço financeiro | `src/finance/financeService.ts` |
 | Dashboard (resumo, Disponível/Comprometido) | `src/pages/DashboardPage.tsx`, `src/finance/financeCalculations.ts` |
 | Transações (criar/editar/listar/filtrar) | `src/pages/NewTransactionPage.tsx`, `src/pages/EditTransactionPage.tsx`, `src/pages/TransactionsPage.tsx`, `src/components/TagInput.tsx` |
-| Compromissos (contas a pagar) | `src/pages/BillsPage.tsx` (`markOverdueBills` em `financeService.ts` marca atraso sozinho) |
+| Contas (tela unificada: compromissos + despesas fixas) | `src/pages/BillsPage.tsx` — lista + formulário com toggle "Se repete". `createBill`/`payBill`/`updateBillStatus`/`createRecurringRule`/`recordRecurringPayment`/`deleteRecurringRule` em `financeService.ts` |
 | Orçamento por categoria | `createBudget`/`updateBudgetLimit`/`deleteBudget`/`subscribeBudgets` (`financeService.ts`), UI em `src/pages/SearchPage.tsx` (sheet "Orçamentos") |
 | Exportar CSV | `src/finance/csvExport.ts` |
 | Cartões / faturas | `src/cards/` |
 | Espaço do casal + cofrinho | `src/pages/SharedSpacePage.tsx` (orquestrador), `src/pages/shared/` (convite/modo/cofrinho/despesas), `src/shared/` (serviço/hooks) |
 | Análise / gráficos / busca | `src/pages/SearchPage.tsx` (UI); `src/finance/spendingAnalysis.ts` (gasto por mês/categoria em regime de caixa — cartão pela parcela da fatura, não pela transação) |
 | Metas (pessoais) | `src/pages/GoalsPage.tsx`, `src/finance/useGoalsData.ts` |
+| Patrimônio Líquido | `src/pages/NetWorthPage.tsx`, `src/finance/netWorthCalculations.ts` |
+| Fluxo de Caixa (projeção) | `src/components/CashFlowChart.tsx`, `src/components/ProjectionTimeline.tsx`, `src/finance/cashFlowProjection.ts` |
+| Resumo Anual | `src/components/AnnualSummarySheet.tsx`, `src/finance/annualSummaryCalculations.ts` |
+| Alertas de Orçamento | `src/components/BudgetAlertBanner.tsx`, `src/finance/budgetAlertCache.ts` (banner cliente); `functions/src/budgetAlerts.ts` (Cloud Function push) |
 | Tokens de cor / temas | `src/styles/themes.css` |
 | CSS global | `src/styles/global.css` |
 | Landing pública | `src/landing/` (`LandingCss`, `LandingSections`, `LandingShell`, `AppMockup`, `landing.css`) |

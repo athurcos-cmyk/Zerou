@@ -12,6 +12,7 @@ import { safeReturnUrl } from './billing/urlSafety.js';
 
 // ─── Automação server-side ────────────────────────────────────────────────────
 export { closeInvoicesDue, generateRecurrences, sendDueReminders, sendDailyLogReminder } from './automation.js';
+export { sendBudgetAlerts } from './budgetAlerts.js';
 
 // ─── Assistente de IA ─────────────────────────────────────────────────────────
 export { financialAssistantChat } from './ai/financialAssistant.js';
