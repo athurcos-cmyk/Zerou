@@ -3,28 +3,29 @@ import { Download, Share, SquarePlus } from 'lucide-react';
 import { BottomSheet } from '../components/BottomSheet';
 import {
   consumeDeferredInstallPrompt,
-  dismissInstallPromptPermanently,
   getDeferredInstallPrompt,
-  isInstallPromptDismissed,
   isIOSDevice,
   isRunningStandalone,
   onInstallPromptChange
 } from './installPrompt';
 
+// Fecha o sheet só na sessão atual — no próximo reload do app ele reaparece.
+let dismissedThisSession = false;
+
 export function InstallPromptSheet() {
-  const [dismissed, setDismissed] = useState(isInstallPromptDismissed);
   const [deferredPrompt, setDeferredPrompt] = useState(getDeferredInstallPrompt);
   const [installing, setInstalling] = useState(false);
+  const [visible, setVisible] = useState(true);
   const standalone = isRunningStandalone();
   const iOS = isIOSDevice();
 
   useEffect(() => onInstallPromptChange(() => setDeferredPrompt(getDeferredInstallPrompt())), []);
 
-  const open = !standalone && !dismissed && (iOS || Boolean(deferredPrompt));
+  const open = visible && !standalone && !dismissedThisSession && (iOS || Boolean(deferredPrompt));
 
   function close() {
-    dismissInstallPromptPermanently();
-    setDismissed(true);
+    dismissedThisSession = true;
+    setVisible(false);
   }
 
   async function handleInstallClick() {
@@ -80,7 +81,7 @@ export function InstallPromptSheet() {
         )}
 
         <button className="button button--ghost" type="button" onClick={close}>
-          Agora não
+          Depois
         </button>
       </div>
     </BottomSheet>
