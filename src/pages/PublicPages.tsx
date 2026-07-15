@@ -111,10 +111,10 @@ export function ContactPage() {
         </div>
         <div className="contact-list">
           <p>
-            <Mail size={18} aria-hidden="true" /> Suporte: <a className="inline-link" href="mailto:suporte@Granativa.app">suporte@Granativa.app</a>
+            <Mail size={18} aria-hidden="true" /> Suporte: <a className="inline-link" href="mailto:suporte@granativa.com.br">suporte@granativa.com.br</a>
           </p>
           <p>
-            <Mail size={18} aria-hidden="true" /> Privacidade: <a className="inline-link" href="mailto:privacidade@Granativa.app">privacidade@Granativa.app</a>
+            <Mail size={18} aria-hidden="true" /> Privacidade: <a className="inline-link" href="mailto:privacidade@granativa.com.br">privacidade@granativa.com.br</a>
           </p>
           <Link className="button button--primary" to="/legal/privacy">
             Ver política de privacidade <ArrowRight size={18} aria-hidden="true" />

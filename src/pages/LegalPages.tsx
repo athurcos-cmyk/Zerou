@@ -22,7 +22,7 @@ const documents = {
       ],
       [
         '4. Cadastro, conta e segurança',
-        '4.1. Para usar a Granativa, você precisa criar uma conta fornecendo informações verdadeiras, precisas e atualizadas. 4.2. Você é o único responsável por: (a) manter a confidencialidade de suas credenciais de acesso; (b) todas as atividades realizadas em sua conta; (c) manter seu dispositivo e navegador seguros; (d) não compartilhar sua conta com terceiros. 4.3. Você deve nos notificar imediatamente pelo e-mail suporte@granativa.app em caso de uso não autorizado ou suspeita de violação de segurança. 4.4. A Granativa reserva-se o direito de suspender, bloquear ou encerrar contas que: (a) violem estes Termos; (b) apresentem indícios de fraude, abuso ou atividade ilegal; (c) representem risco à segurança da plataforma ou de outros usuários.'
+        '4.1. Para usar a Granativa, você precisa criar uma conta fornecendo informações verdadeiras, precisas e atualizadas. 4.2. Você é o único responsável por: (a) manter a confidencialidade de suas credenciais de acesso; (b) todas as atividades realizadas em sua conta; (c) manter seu dispositivo e navegador seguros; (d) não compartilhar sua conta com terceiros. 4.3. Você deve nos notificar imediatamente pelo e-mail suporte@granativa.com.br em caso de uso não autorizado ou suspeita de violação de segurança. 4.4. A Granativa reserva-se o direito de suspender, bloquear ou encerrar contas que: (a) violem estes Termos; (b) apresentem indícios de fraude, abuso ou atividade ilegal; (c) representem risco à segurança da plataforma ou de outros usuários.'
       ],
       [
         '5. Responsabilidade pelos dados inseridos',
@@ -78,7 +78,7 @@ const documents = {
       ],
       [
         '18. Contato',
-        'Para suporte técnico, dúvidas sobre o app ou sobre estes Termos: suporte@granativa.app. Para privacidade, proteção de dados e exercício de direitos LGPD: privacidade@granativa.app.'
+        'Para suporte técnico, dúvidas sobre o app ou sobre estes Termos: suporte@granativa.com.br. Para privacidade, proteção de dados e exercício de direitos LGPD: privacidade@granativa.com.br.'
       ]
     ]
   },
@@ -94,7 +94,7 @@ const documents = {
       ],
       [
         '2. Quem é o controlador dos dados',
-        'A Granativa, operada por Arthur Thurcos (CPF sob registro), é a controladora dos dados pessoais tratados por meio da plataforma. Para exercer seus direitos como titular, esclarecer dúvidas sobre privacidade ou relatar incidentes de segurança, entre em contato pelo e-mail privacidade@granativa.app. Responderemos em até 15 (quinze) dias úteis, conforme previsto na LGPD.'
+        'A Granativa, operada por Arthur Thurcos (CPF sob registro), é a controladora dos dados pessoais tratados por meio da plataforma. Para exercer seus direitos como titular, esclarecer dúvidas sobre privacidade ou relatar incidentes de segurança, entre em contato pelo e-mail privacidade@granativa.com.br. Responderemos em até 15 (quinze) dias úteis, conforme previsto na LGPD.'
       ],
       [
         '3. Quais dados coletamos e como',
@@ -126,7 +126,7 @@ const documents = {
       ],
       [
         '10. Seus direitos como titular (LGPD)',
-        'Nos termos do art. 18 da LGPD, você tem direito a: (I) confirmação da existência de tratamento; (II) acesso aos dados; (III) correção de dados incompletos, inexatos ou desatualizados; (IV) anonimização, bloqueio ou eliminação de dados desnecessários, excessivos ou tratados em desconformidade; (V) portabilidade dos dados a outro fornecedor, observados os segredos comercial e industrial; (VI) eliminação de dados tratados com consentimento; (VII) informação sobre compartilhamento de dados com terceiros; (VIII) informação sobre a possibilidade de não fornecer consentimento e consequências; (IX) revogação do consentimento; (X) revisão de decisões automatizadas; (XI) oposição a tratamento baseado em descumprimento da LGPD. Para exercer qualquer desses direitos, envie um e-mail para privacidade@granativa.app com o assunto "LGPD - Direitos do Titular". Antes de atendermos, podemos solicitar informações para confirmar sua identidade.'
+        'Nos termos do art. 18 da LGPD, você tem direito a: (I) confirmação da existência de tratamento; (II) acesso aos dados; (III) correção de dados incompletos, inexatos ou desatualizados; (IV) anonimização, bloqueio ou eliminação de dados desnecessários, excessivos ou tratados em desconformidade; (V) portabilidade dos dados a outro fornecedor, observados os segredos comercial e industrial; (VI) eliminação de dados tratados com consentimento; (VII) informação sobre compartilhamento de dados com terceiros; (VIII) informação sobre a possibilidade de não fornecer consentimento e consequências; (IX) revogação do consentimento; (X) revisão de decisões automatizadas; (XI) oposição a tratamento baseado em descumprimento da LGPD. Para exercer qualquer desses direitos, envie um e-mail para privacidade@granativa.com.br com o assunto "LGPD - Direitos do Titular". Antes de atendermos, podemos solicitar informações para confirmar sua identidade.'
       ],
       [
         '11. Uso por menores de idade',
@@ -146,7 +146,7 @@ const documents = {
       ],
       [
         '15. Contato e encarregado de dados',
-        'Encarregado pelo tratamento de dados pessoais (DPO): Arthur Thurcos. Para exercer seus direitos, esclarecer dúvidas sobre privacidade, relatar incidentes ou fazer reclamações: privacidade@granativa.app. Você também tem o direito de apresentar reclamação à Autoridade Nacional de Proteção de Dados (ANPD) por meio do site www.gov.br/anpd.'
+        'Encarregado pelo tratamento de dados pessoais (DPO): Arthur Thurcos. Para exercer seus direitos, esclarecer dúvidas sobre privacidade, relatar incidentes ou fazer reclamações: privacidade@granativa.com.br. Você também tem o direito de apresentar reclamação à Autoridade Nacional de Proteção de Dados (ANPD) por meio do site www.gov.br/anpd.'
       ]
     ]
   }
