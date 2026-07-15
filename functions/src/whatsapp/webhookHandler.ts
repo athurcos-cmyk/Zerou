@@ -6,6 +6,7 @@ import { sendWhatsAppMessage, getVerifyToken, whatsappAccessToken } from './meta
 import { extractExpense } from './extractExpense.js';
 import { createTransactionFromMessage } from './createTransactionFromMessage.js';
 import { processLinkCode } from './linkAccount.js';
+import { deepseekApiKey } from '../ai/deepseekClient.js';
 
 const region = 'southamerica-east1';
 
@@ -20,9 +21,14 @@ function formatBRL(amountCents: number): string {
  * POST: mensagem recebida
  *
  * Valida X-Hub-Signature-256 (HMAC-SHA256 do corpo com WHATSAPP_APP_SECRET).
+ *
+ * memory 512MiB + cpu:1 e exigencia do Cloud Run pra rodar sem CPU throttling
+ * (gcloud run services update --no-cpu-throttling, aplicado manualmente pos-deploy).
+ * Sem isso o processamento apos o `res.status(200)` roda com CPU cortada e a
+ * confirmacao ao usuario demora dezenas de segundos pra sair.
  */
 export const whatsappWebhook = onRequest(
-  { region, maxInstances: 10 },
+  { region, maxInstances: 10, memory: '512MiB', cpu: 1, secrets: [deepseekApiKey] },
   async (req, res) => {
     // ── GET: webhook verification ───────────────────────────────────────
     if (req.method === 'GET') {

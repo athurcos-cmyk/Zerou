@@ -2,6 +2,12 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-15 — WhatsApp: confirmacao lenta (CPU throttling) + extracao de gastos quebrada (secret faltando)
+
+- **Confirmacao demorava ~1min**: Cloud Run corta CPU da instancia assim que `whatsappWebhook` responde 200 pro Meta, e o processamento (Firestore + envio da confirmacao) roda todo DEPOIS disso — throttled. Corrigido com `memory: 512MiB` + `cpu: 1` no codigo e `gcloud run services update --no-cpu-throttling` (precisa ser reaplicado a cada deploy, ver `docs/whatsapp/WHATSAPP.md`).
+- **Extracao de gastos por mensagem quebrada desde a criacao da feature**: `whatsappWebhook` nunca declarou `secrets: [deepseekApiKey]`, entao toda chamada ao DeepSeek pra extrair "gastei 15 reais..." falhava com "No value found for secret parameter DEEPSEEK_API_KEY". Corrigido.
+- Detalhes completos em `docs/whatsapp/WHATSAPP.md`.
+
 ## 2026-07-15 — WhatsApp: vinculacao de conta corrigida (indice do Firestore faltando)
 
 - **Bug**: "vincular 123456" chegava no bot mas nenhuma resposta voltava — nem sucesso, nem erro. Causa: `processLinkCode()` roda uma query `collectionGroup('whatsappLinkCodes').where('code','==',...)` que precisa de indice explicito em escopo COLLECTION_GROUP; sem ele o Firestore rejeita a query com `FAILED_PRECONDITION`, capturado silenciosamente pelo catch generico do webhook.

@@ -177,6 +177,9 @@ A subcolecao `workspaces/{id}/whatsappLinks/{phone}` e escrita via Admin SDK (se
 # Deploy das funcoes WhatsApp
 npx firebase deploy --only functions:billing:whatsappWebhook,functions:billing:generateWhatsappLinkCode --project zerou-26757
 
+# OBRIGATORIO apos todo deploy do whatsappWebhook — Firebase reseta essa flag do Cloud Run
+gcloud run services update whatsappwebhook --region=southamerica-east1 --no-cpu-throttling --project=zerou-26757
+
 # Atualizar secrets
 printf "VALOR" | npx firebase functions:secrets:set SECRET_NAME --project zerou-26757 --data-file -
 
@@ -231,6 +234,14 @@ Atualmente DESATIVADA (comentada em `webhookHandler.ts`). Para reativar:
 Verificar logs do webhook. Erros 429/503 tem retry automatico. Outros erros resultam em mensagem "Nao consegui entender o valor" para o usuario.
 
 ## Historico
+
+### 2026-07-15 — Confirmacao demorando ~1min (CPU throttling) + DEEPSEEK_API_KEY nao vinculado
+
+- **Sintoma 1**: apos vincular com sucesso, a confirmacao "✅ WhatsApp vinculado..." demorou cerca de 1 minuto pra chegar, quando deveria ser quase instantaneo (so Firestore + 1 chamada HTTP).
+- **Causa raiz**: `whatsappWebhook` responde 200 pro Meta imediatamente (`res.status(200).json(...)`) e so DEPOIS processa (Firestore + `sendWhatsAppMessage`). Isso e necessario — Meta espera resposta rapida — mas por padrao o Cloud Run **corta a CPU da instancia assim que a resposta HTTP e enviada**. Qualquer codigo que continue rodando depois disso (nosso `try {...}` inteiro) fica com CPU throttled, as vezes levando dezenas de segundos pra terminar algo que normalmente leva 1-2s.
+- **Correcao**: `memory: '512MiB'` + `cpu: 1` no codigo (`webhookHandler.ts`) — pre-requisito do Cloud Run pra permitir CPU sempre alocada — e depois `gcloud run services update whatsappwebhook --region=southamerica-east1 --no-cpu-throttling --project=zerou-26757` rodado manualmente. **Esse comando gcloud precisa ser reaplicado toda vez que a funcao for redeployada** (o Firebase CLI nao expoe essa flag e reseta o Cloud Run service a cada deploy).
+- **Sintoma 2 (achado no mesmo log)**: `No value found for secret parameter "DEEPSEEK_API_KEY"` — a extracao de gastos via mensagem (a feature principal do bot) estava quebrada desde a criacao, porque `whatsappWebhook` nunca declarou `secrets: [deepseekApiKey]` nas suas opcoes (so a Grazi, em `financialAssistant.ts`, fazia isso certo). Corrigido adicionando o secret nas opcoes do `onRequest`.
+- **Se acontecer de novo apos um deploy** (mensagens/confirmacoes lentas de novo): rodar de novo o comando `gcloud run services update whatsappwebhook --region=southamerica-east1 --no-cpu-throttling --project=zerou-26757` — o deploy do Firebase reseta essa configuracao.
 
 ### 2026-07-15 — Vinculacao quebrada: faltava indice do Firestore
 
