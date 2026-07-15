@@ -149,6 +149,42 @@ const documents = {
         'Encarregado pelo tratamento de dados pessoais (DPO): Arthur Thurcos. Para exercer seus direitos, esclarecer dúvidas sobre privacidade, relatar incidentes ou fazer reclamações: privacidade@granativa.com.br. Você também tem o direito de apresentar reclamação à Autoridade Nacional de Proteção de Dados (ANPD) por meio do site www.gov.br/anpd.'
       ]
     ]
+  },
+  dataDeletion: {
+    title: 'Solicitação de exclusão de dados',
+    description: 'Instruções para solicitar a exclusão dos seus dados pessoais da Granativa.',
+    path: '/legal/data-deletion',
+    updatedAt: 'Última atualização: 15 de julho de 2026',
+    sections: [
+      [
+        'Como excluir seus dados',
+        'Se você deseja excluir seus dados pessoais da Granativa, pode fazê-lo diretamente pelo aplicativo, sem necessidade de contato com o suporte.'
+      ],
+      [
+        'Exclusão pelo aplicativo (recomendado)',
+        '1. Acesse o app Granativa em https://granativa.com.br. 2. Faça login na sua conta. 3. Toque no ícone do seu perfil (avatar) no canto superior direito. 4. Vá em Configurações > Segurança > Métodos de login. 5. Role até o final e clique em "Excluir conta". 6. Digite "EXCLUIR" (em maiúsculas) no campo de confirmação. 7. Reautentique-se (Google ou e-mail/senha) conforme solicitado pelo Firebase. 8. Confirme a exclusão. Todos os seus dados — perfil, espaços individuais, espaços de casal criados por você, vínculos de WhatsApp e tokens de notificação — serão removidos permanentemente. O processo é irreversível.'
+      ],
+      [
+        'Remoção do vínculo WhatsApp',
+        'Se você quer apenas desvincular seu número de WhatsApp sem excluir a conta: 1. Vá em Configurações > WhatsApp. 2. Toque em "Desvincular". O vínculo é removido na hora e suas mensagens não serão mais processadas pelo bot.'
+      ],
+      [
+        'Solicitação por e-mail',
+        'Se preferir, você pode solicitar a exclusão dos seus dados enviando um e-mail para privacidade@granativa.com.br com o assunto "LGPD - Solicitação de Exclusão". Para sua segurança, confirmaremos sua identidade antes de processar a solicitação. O prazo de resposta é de até 15 (quinze) dias úteis, conforme previsto na LGPD (art. 19, § 2º).'
+      ],
+      [
+        'O que é excluído',
+        'Ao excluir sua conta, são removidos permanentemente: (a) seu perfil de usuário e dados de autenticação; (b) todas as transações, contas, categorias, cartões, faturas, contas a pagar, recorrências, metas e orçamentos do seu espaço individual; (c) todos os espaços de casal dos quais você é o criador e os dados neles contidos; (d) seu vínculo de WhatsApp e número de telefone associado; (e) tokens de push notification; (f) registros de convites pendentes. Dados podem ser mantidos pelo tempo necessário para cumprimento de obrigações legais, segurança, prevenção de fraude, resolução de disputas ou exercício regular de direitos, conforme descrito na nossa Política de Privacidade.'
+      ],
+      [
+        'Prazo',
+        'A exclusão dos dados é iniciada imediatamente após a confirmação. Dados em backups e sistemas de retenção podem levar até 90 (noventa) dias para serem completamente removidos dos sistemas de armazenamento. Registros mantidos por obrigação legal serão conservados pelo prazo legal e excluídos ao final desse período.'
+      ],
+      [
+        'Dúvidas',
+        'Para qualquer dúvida sobre o processo de exclusão ou sobre seus dados, entre em contato: privacidade@granativa.com.br.'
+      ]
+    ]
   }
 } as const;
 
@@ -158,6 +194,10 @@ export function TermsPage() {
 
 export function PrivacyPolicyPage() {
   return <LegalDocument kind="privacy" />;
+}
+
+export function DataDeletionPage() {
+  return <LegalDocument kind="dataDeletion" />;
 }
 
 function LegalDocument({ kind }: { kind: keyof typeof documents }) {

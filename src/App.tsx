@@ -28,7 +28,7 @@ import { PaydaySettingsPage } from './settings/PaydaySettingsPage';
 import { WhatsAppLinkPage } from './settings/WhatsAppLinkPage';
 import { OnboardingPage } from './onboarding/OnboardingPage';
 import { ContactPage, FeaturesPage, HelpPage, SecurityPage } from './pages/PublicPages';
-import { PrivacyPolicyPage, TermsPage } from './pages/LegalPages';
+import { DataDeletionPage, PrivacyPolicyPage, TermsPage } from './pages/LegalPages';
 import { PrivacyCenterPage } from './pages/PrivacyCenterPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { NetWorthPage } from './pages/NetWorthPage';
@@ -61,6 +61,7 @@ export function App() {
         <Route path="/privacy-center" element={<PrivacyCenterPage />} />
         <Route path="/legal/terms" element={<TermsPage />} />
         <Route path="/legal/privacy" element={<PrivacyPolicyPage />} />
+        <Route path="/legal/data-deletion" element={<DataDeletionPage />} />
         <Route path="/legal/cookies" element={<Navigate to="/legal/privacy" replace />} />
         <Route path="/legal/subprocessors" element={<Navigate to="/legal/privacy" replace />} />
         <Route path="/join/:code" element={<JoinInvitePage />} />
