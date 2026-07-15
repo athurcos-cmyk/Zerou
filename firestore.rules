@@ -493,6 +493,7 @@ service cloud.firestore {
           'clientMutationId',
           'syncStatus',
           'version',
+          'source',
           'createdAt',
           'updatedAt'
         ])
@@ -1505,6 +1506,17 @@ service cloud.firestore {
         allow read, write: if isSelf(uid);
         allow delete: if canDeleteUserAccountData(uid);
       }
+
+      match /whatsappLinkCodes/{code} {
+        allow read: if isSelf(uid);
+        allow write: if false; // Admin SDK only
+      }
+    }
+
+    // WhatsApp phone number → workspace index (root collection for fast lookup)
+    match /whatsappPhoneIndex/{phone} {
+      allow read: if request.auth != null;
+      allow write: if false; // Admin SDK only
     }
 
     match /workspaces/{workspaceId} {

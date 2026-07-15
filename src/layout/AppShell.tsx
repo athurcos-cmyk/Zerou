@@ -15,6 +15,7 @@ import {
   Shield,
   Target,
   TrendingUp,
+  MessageCircle,
   Users,
   WalletCards,
   X
@@ -112,6 +113,9 @@ export function AppShell() {
           </NavLink>
           <NavLink className={getNavClass} to="/app/settings/appearance">
             <Palette size={19} aria-hidden="true" /> Aparência
+          </NavLink>
+          <NavLink className={getNavClass} to="/app/settings/whatsapp">
+            <MessageCircle size={19} aria-hidden="true" /> WhatsApp
           </NavLink>
           <NavLink className={getNavClass} to="/app/settings/security/login-methods">
             <Shield size={19} aria-hidden="true" /> Segurança

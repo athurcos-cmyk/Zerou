@@ -17,6 +17,10 @@ export { sendBudgetAlerts } from './budgetAlerts.js';
 // ─── Assistente de IA ─────────────────────────────────────────────────────────
 export { financialAssistantChat } from './ai/financialAssistant.js';
 
+// ─── WhatsApp ─────────────────────────────────────────────────────────────────
+export { whatsappWebhook } from './whatsapp/webhookHandler.js';
+export { generateWhatsappLinkCode } from './whatsapp/linkAccount.js';
+
 // ─── Admin ────────────────────────────────────────────────────────────────────
 // adminDeleteUser NÃO fica aqui — vive isolado em functions-admin/ (codebase
 // "admin"), sem dependência do Stripe, pra poder deployar independente do
