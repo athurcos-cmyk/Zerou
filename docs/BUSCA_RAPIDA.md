@@ -20,7 +20,8 @@ Use este arquivo como mapa antes de abrir documentos grandes. Regra: leia o meno
 | Setup de infra manual | `docs/MANUAL_SETUP_REQUIRED.md` | Passos fora do código |
 | Instruções pra agentes | `CLAUDE.md` | Regra de docs e restrições |
 | Contas de teste (login p/ navegador) | `TEST_ACCOUNTS.local.md` (raiz, local, fora do git) | Só existe se criado na máquina |
-| Assistente de IA (Grazi) | `docs/ai/GRAZI.md` | Documento canônico — tudo sobre a feature |
+| Assistente de IA (Grazi) | `docs/ai/GRAZI.md` | Documento canonico — tudo sobre a feature |
+| WhatsApp (bot de lancamentos) | `docs/whatsapp/WHATSAPP.md` | Documento canonico — URLs, IDs, fluxo, config |
 
 ## Onde está cada coisa no código
 

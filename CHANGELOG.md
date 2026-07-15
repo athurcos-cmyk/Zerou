@@ -1,8 +1,18 @@
 ﻿# Changelog
 
-Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/history/`.
+Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
-## 2026-07-14 — Renomeação Contas a Pagar + auditoria Grazi + push diário reescrito
+## 2026-07-15 — WhatsApp oficial Meta Cloud API + politicas legais completas + Cloudflare DNS
+
+- **WhatsApp integrado via Meta Cloud API v25.0**: Cloud Functions `whatsappWebhook` (webhook publico) + `generateWhatsappLinkCode` (vinculo por codigo 6 digitos) em `functions/src/whatsapp/`. DeepSeek extrai gastos de mensagens em portugues. Pagina de vinculacao `/app/settings/whatsapp`. Numero real +55 11 936192757 registrado no WABA 1431749015518519 com token permanente via System User. Doc canonica: `docs/whatsapp/WHATSAPP.md`.
+- **Politicas legais reescritas**: 3 documentos — Termos de Uso (21 secoes), Politica de Privacidade (16 secoes), Data Deletion (7 secoes). Identificacao completa (Arthur Olimpio Lima, CPF 487.655.288-67). LGPD, CDC, Marco Civil cobertos com artigos citados. WhatsApp, DeepSeek e Grazi explicitamente tratados com consentimento granular. Emails migrados para `@granativa.com.br`. Formatacao de sub-itens com quebra de linha automatica.
+- **Grazi coberta legalmente**: Termos secoes 8-9 (descricao + limitacao de responsabilidade IA), Privacidade secoes 3.5, 4(e), 13.3.
+- **DNS migrado para Cloudflare**: nameservers `kareem.ns.cloudflare.com` + `mia.ns.cloudflare.com`. Email Routing: suporte/contato/privacidade → zerou.contato.net@gmail.com.
+- **App Meta publicado**: categoria "Servicos e produtividade", politicas aprovadas, webhook `messages` subscribed. URL canonica: https://developers.facebook.com/apps/1480907564073971/whatsapp-business/
+- **Deploy**: `whatsappWebhook` + `generateWhatsappLinkCode` atualizadas com token permanente e phone number ID de producao.
+- **Bug pendente**: numero real retorna erro #133010 "Account not registered" ao enviar mensagens — aguardando verificacao SMS da Meta.
+
+## 2026-07-14 — Renomeacao Contas a Pagar + auditoria Grazi + push diario reescrito
 
 - **"Contas" → "Contas a Pagar"**: renomeação nos labels de UI (sidebar, mobile, título da página, tour, Análise) pra evitar ambiguidade com contas bancárias. Termo "Despesas Fixas" substituído por "Contas recorrentes" nos labels da Análise.
 - **Auditoria Grazi pós-unificação**: system prompt e context builder atualizados pra tratar contas avulsas e recorrentes como um grupo só (não mais 2 separados). Lista unificada com anotação "(se repete)". Rules de segurança, documentação e testes atualizados.
