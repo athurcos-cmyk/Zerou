@@ -2,6 +2,12 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-15 — WhatsApp: vinculacao de conta corrigida (indice do Firestore faltando)
+
+- **Bug**: "vincular 123456" chegava no bot mas nenhuma resposta voltava — nem sucesso, nem erro. Causa: `processLinkCode()` roda uma query `collectionGroup('whatsappLinkCodes').where('code','==',...)` que precisa de indice explicito em escopo COLLECTION_GROUP; sem ele o Firestore rejeita a query com `FAILED_PRECONDITION`, capturado silenciosamente pelo catch generico do webhook.
+- **Correcao**: `fieldOverrides` adicionado em `firestore.indexes.json`, deploy via `firebase deploy --only firestore:indexes`. Confirmado com a query real reproduzida via REST API do Firestore.
+- Detalhes completos em `docs/whatsapp/WHATSAPP.md`.
+
 ## 2026-07-15 — WhatsApp: webhook destravado (WABA nao inscrita) + link faltante no menu mobile
 
 - **Causa raiz do #133010 / webhook silencioso**: apos migrar para o numero real, a WABA (1431749015518519) nunca foi inscrita no app via `POST /{WABA_ID}/subscribed_apps` — `GET subscribed_apps` retornava `data: []`. A config de webhook (Callback URL, verify token, campo `messages` subscribed) estava correta, mas sem essa inscricao a Meta nunca entrega POSTs. Corrigido chamando o endpoint manualmente; confirmado com mensagem real (`whatsapp_message_received` nos logs).

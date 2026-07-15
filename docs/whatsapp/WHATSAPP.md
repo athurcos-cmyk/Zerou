@@ -232,6 +232,14 @@ Verificar logs do webhook. Erros 429/503 tem retry automatico. Outros erros resu
 
 ## Historico
 
+### 2026-07-15 — Vinculacao quebrada: faltava indice do Firestore
+
+- **Sintoma**: usuario mandava "vincular 123456" pro bot, a mensagem chegava (confirmado no WhatsApp com check azul), mas nenhuma resposta voltava — nem sucesso, nem erro.
+- **Causa raiz**: `processLinkCode()` (`linkAccount.ts`) roda `db.collectionGroup('whatsappLinkCodes').where('code', '==', code).get()`. Firestore exige indice explicito pra query em escopo `COLLECTION_GROUP` com filtro de igualdade — nao existia. A query lancava `FAILED_PRECONDITION: The query requires a COLLECTION_GROUP_ASC index...`, capturado pelo `catch` generico do `webhookHandler.ts` e logado so como `whatsapp_webhook_error` (sem detalhe, porque o `logger.error(string, objeto)` do Functions v2 nao serializou o `err.message` no stdout/stderr nesse caso). Resultado: falha 100% silenciosa, nenhuma mensagem de erro nem de sucesso ia pro usuario.
+- **Como foi confirmado**: reproduzida a query exata via REST API do Firestore (`documents:runQuery` com token de `gcloud auth print-access-token`), retornando o erro completo com link pra criar o indice.
+- **Correcao**: adicionado `fieldOverrides` em `firestore.indexes.json` habilitando `COLLECTION_GROUP` pro campo `code` de `whatsappLinkCodes`. Deploy via `npx firebase deploy --only firestore:indexes --project zerou-26757`. Indice levou ~3min pra ficar `READY` (build assincrono do Firestore).
+- **Se acontecer de novo** (novo bug de "webhook recebe mas nao responde nada"): suspeitar de indice faltante em qualquer `collectionGroup(...).where(...)` novo. Testar a query direto via REST (`POST .../documents:runQuery`) com token de `gcloud auth print-access-token` reproduz o erro real na hora, sem depender do log (que pode vir truncado).
+
 ### 2026-07-15 — Webhook destravado (WABA nao inscrita) + link faltante no menu mobile
 
 - **Causa raiz encontrada**: `GET /{WABA_ID}/subscribed_apps` retornava `{"data":[]}` — a WABA (1431749015518519) nunca foi inscrita no app apos a migracao pro numero real. A config de webhook a nivel de app (Callback URL, verify token, `messages` Subscribed) estava correta desde o inicio; faltava esse passo separado que o embedded signup faz automaticamente e o setup manual pulou.
