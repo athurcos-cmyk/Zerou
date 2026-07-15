@@ -9,7 +9,8 @@ Resumo das mudanças recentes. O histórico detalhado por mês fica em `docs/his
 - **`sendDailyLogReminder` reescrito**: em vez de multicast cego pra todos os tokens, agora agrupa por usuário, personaliza com nome do perfil (batch `getAll`), sorteia entre 12 mensagens diferentes e limpa tokens stale por usuário (mesmo padrão do `sendPushToUser`).
 - **`generateRecurrences`**: push title "Despesa Fixa" → "Conta recorrente".
 - Duas auditorias de offline-first com agentes confirmaram zero violações nas 6 novas features e na unificação.
-- `sendDueReminders` pendente pra deploy (push de lembrete de vencimento).
+- **`budgetAlerts`**: formatação de dinheiro trocada de manual (`.toFixed(2).replace`) pra `formatBRL`.
+- **Deploy**: 11 functions atualizadas em produção (`closeInvoicesDue`, `generateRecurrences`, `sendDueReminders`, `sendDailyLogReminder`, `sendBudgetAlerts`, `financialAssistantChat` + billing/admin).
 
 ## 2026-07-14 — Unificação Compromissos + Despesas Fixas → "Contas a Pagar"
 

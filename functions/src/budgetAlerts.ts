@@ -22,6 +22,10 @@ function currentMonth(): number {
   return nowInBRT().getMonth() + 1;
 }
 
+function formatBRL(amountCents: number): string {
+  return (amountCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
 export const sendBudgetAlerts = onSchedule(
   {
     schedule: '0 10 * * *',
@@ -115,7 +119,7 @@ export const sendBudgetAlerts = onSchedule(
         await sendPushToUser(
           createdBy,
           `Orçamento estourado: ${catName}`,
-          `Você já gastou R$${(spentCents / 100).toFixed(2).replace('.', ',')} de R$${(limitCents / 100).toFixed(2).replace('.', ',')} em ${catName} este mês (${pct}%).`,
+          `Você já gastou ${formatBRL(spentCents)} de ${formatBRL(limitCents)} em ${catName} este mês (${pct}%).`,
           '/app/search',
         );
         await alertStateRef.update({ notified100: true, updatedAt: new Date() });
@@ -124,7 +128,7 @@ export const sendBudgetAlerts = onSchedule(
         await sendPushToUser(
           createdBy,
           `Limite próximo: ${catName}`,
-          `Você já gastou ${pct}% do orçamento de ${catName} este mês (R$${(spentCents / 100).toFixed(2).replace('.', ',')} de R$${(limitCents / 100).toFixed(2).replace('.', ',')}).`,
+          `Você já gastou ${pct}% do orçamento de ${catName} este mês (${formatBRL(spentCents)} de ${formatBRL(limitCents)}).`,
           '/app/search',
         );
         await alertStateRef.update({ notified80: true, updatedAt: new Date() });
