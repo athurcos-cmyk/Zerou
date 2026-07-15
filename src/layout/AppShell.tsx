@@ -185,6 +185,9 @@ export function AppShell() {
               <NavLink className={getNavClass} to="/app/settings/appearance" onClick={() => setMobileMenuOpen(false)}>
                 <Palette size={17} aria-hidden="true" /> Aparência
               </NavLink>
+              <NavLink className={getNavClass} to="/app/settings/whatsapp" onClick={() => setMobileMenuOpen(false)}>
+                <MessageCircle size={17} aria-hidden="true" /> WhatsApp
+              </NavLink>
               <NavLink className={getNavClass} to="/app/settings/security/login-methods" onClick={() => setMobileMenuOpen(false)}>
                 <Shield size={17} aria-hidden="true" /> Segurança
               </NavLink>
