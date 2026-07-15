@@ -44,17 +44,20 @@ export const whatsappWebhook = onRequest(
       return;
     }
 
-    // Validate signature
-    const appSecret = whatsappAccessToken.value();
-    const signature = req.headers['x-hub-signature-256'] as string;
-    if (appSecret && signature) {
-      const rawBody = JSON.stringify(req.body);
-      const expected = `sha256=${crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex')}`;
-      if (signature !== expected) {
-        res.status(401).json({ error: 'Invalid signature' });
-        return;
-      }
-    }
+    // Signature validation disabled until WHATSAPP_APP_SECRET is configured.
+    // Using the access token (wrong secret) causes HMAC mismatch and Meta stops delivery.
+    // TODO: add WHATSAPP_APP_SECRET secret, then uncomment validation below.
+    //
+    // const appSecret = whatsappAccessToken.value();
+    // const signature = req.headers['x-hub-signature-256'] as string;
+    // if (appSecret && signature) {
+    //   const rawBody = JSON.stringify(req.body);
+    //   const expected = `sha256=${crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex')}`;
+    //   if (signature !== expected) {
+    //     res.status(401).json({ error: 'Invalid signature' });
+    //     return;
+    //   }
+    // }
 
     // Respond 200 immediately — Meta expects fast response
     res.status(200).json({ ok: true });

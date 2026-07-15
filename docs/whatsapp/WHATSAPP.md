@@ -192,14 +192,38 @@ npx firebase functions:log --project zerou-26757
 2. Verificar se `messages` esta **Subscribed**
 3. Testar webhook manualmente: `curl "https://southamerica-east1-zerou-26757.cloudfunctions.net/whatsappWebhook?hub.mode=subscribe&hub.verify_token=granativa-whatsapp-verify-2026&hub.challenge=test123"`
 4. Verificar logs: `npx firebase functions:log --project zerou-26757`
+5. **Causa comum:** validacao de assinatura HMAC com secret errado. O codigo atualmente tem a validacao DESATIVADA. Nao reativar sem configurar `WHATSAPP_APP_SECRET` com o valor correto do painel Meta.
+6. **Outra causa:** webhook pode precisar ser reconfigurado apos adicionar novo numero. Ir em WhatsApp > Configuration e re-submeter Callback URL + Verify token.
 
 ### Erro #133010 "Account not registered"
 
-O numero de telefone nao esta ativo na API. No painel Meta, verificar status do numero em WhatsApp > API Setup. Se "Pending", aguardar SMS de verificacao da Meta. O numero NAO pode estar registrado no WhatsApp Messenger/Business do celular.
+O numero de telefone nao esta registrado na Cloud API. Solucao:
+
+1. **Registrar via API:** `POST https://graph.facebook.com/v25.0/{PHONE_NUMBER_ID}/register` com body `{"messaging_product":"whatsapp","pin":"123456"}`
+2. Se falhar, verificar Business Verification pendente
+3. O numero NAO pode estar registrado no WhatsApp Messenger/Business do celular
+
+### Erro #100 "Invalid parameter" ao enviar mensagem
+
+- Verificar se o numero de destino esta no formato E.164 correto (ex: `5511991492708`)
+- Pode ser necessario o destinatario mandar a primeira mensagem pro bot para abrir a janela de 24h (CSW)
+- Primeira mensagem do bot para um usuario so pode ser template; mensagens de texto livre so funcionam dentro da CSW
 
 ### Token expirado
 
 Gerar novo token em Business Settings > System Users > Granativa API > Generate token. Atualizar secret `WHATSAPP_ACCESS_TOKEN`.
+
+### Numero aparece como "unregistered" no painel
+
+Chamar `POST /{PHONE_NUMBER_ID}/register` via API. Se retornar `{"success":true}`, o numero esta registrado.
+
+### Validacao de assinatura HMAC (X-Hub-Signature-256)
+
+Atualmente DESATIVADA (comentada em `webhookHandler.ts`). Para reativar:
+1. Obter o App Secret em Meta App Settings > Basic > App Secret
+2. Criar secret `WHATSAPP_APP_SECRET` no Firebase
+3. Adicionar `defineString('WHATSAPP_APP_SECRET')` em `metaClient.ts`
+4. Descomentar o bloco de validacao em `webhookHandler.ts` trocando `whatsappAccessToken.value()` por `whatsappAppSecret.value()`
 
 ### DeepSeek falhando na extracao
 
@@ -213,7 +237,11 @@ Verificar logs do webhook. Erros 429/503 tem retry automatico. Outros erros resu
 - **Depois**: numero real +55 11 936192757 (Phone Number ID 1262339823619604, WABA 1431749015518519). Token permanente via System User.
 - **App Meta publicado**: categoria "Servicos e produtividade". Politicas: /legal/privacy, /legal/terms, /legal/data-deletion.
 - **DNS**: Cloudflare (nameservers kareem + mia). Email Routing configurado.
-- **Status atual**: aguardando ativacao do numero real pela Meta (erro #133010 — SMS de verificacao pendente).
+- **Registro do numero**: `POST /register` → `success:true` resolveu erro #133010.
+- **Envio de mensagens**: OK via API (curl). Mensagens entregues ao destinatario.
+- **Proximo passo**: re-submeter webhook em WhatsApp > Configuration para conectar ao novo numero. Depois testar mensagem do usuario → resposta do webhook.
+- **Bug HMAC**: validacao de assinatura X-Hub-Signature-256 usava access token como App Secret (valores diferentes). Validacao desativada temporariamente — precisa configurar `WHATSAPP_APP_SECRET` com o App Secret real do painel Meta.
+- **Status atual**: webhook ainda nao recebe mensagens do Meta (sem log de `whatsapp_message_received`). Possivel causa: webhook config precisa ser re-submetida para o novo numero em WhatsApp > Configuration. Envio de mensagens funciona.
 
 ### 2026-07-15 — Implementacao inicial (numero de teste)
 
