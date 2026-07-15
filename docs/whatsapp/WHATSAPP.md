@@ -188,6 +188,7 @@ npx firebase functions:log --project zerou-26757
 
 ### Mensagens nao chegam (webhook silencioso)
 
+0. **Primeiro de tudo**: `curl -H "Authorization: Bearer $TOKEN" "https://graph.facebook.com/v25.0/{WABA_ID}/subscribed_apps"`. Se vier `{"data":[]}`, a WABA nao esta inscrita no app — `POST` no mesmo endpoint resolve (`{"success":true}`). Isso e separado da config de webhook e nao aparece em lugar nenhum do painel; foi a causa real do incidente de 2026-07-15 mesmo com Callback URL, verify token e `messages` Subscribed todos corretos.
 1. Verificar se webhook URL e verify token estao configurados em WhatsApp > Configuration
 2. Verificar se `messages` esta **Subscribed**
 3. Testar webhook manualmente: `curl "https://southamerica-east1-zerou-26757.cloudfunctions.net/whatsappWebhook?hub.mode=subscribe&hub.verify_token=granativa-whatsapp-verify-2026&hub.challenge=test123"`
@@ -230,6 +231,13 @@ Atualmente DESATIVADA (comentada em `webhookHandler.ts`). Para reativar:
 Verificar logs do webhook. Erros 429/503 tem retry automatico. Outros erros resultam em mensagem "Nao consegui entender o valor" para o usuario.
 
 ## Historico
+
+### 2026-07-15 — Webhook destravado (WABA nao inscrita) + link faltante no menu mobile
+
+- **Causa raiz encontrada**: `GET /{WABA_ID}/subscribed_apps` retornava `{"data":[]}` — a WABA (1431749015518519) nunca foi inscrita no app apos a migracao pro numero real. A config de webhook a nivel de app (Callback URL, verify token, `messages` Subscribed) estava correta desde o inicio; faltava esse passo separado que o embedded signup faz automaticamente e o setup manual pulou.
+- **Correcao**: `POST /{WABA_ID}/subscribed_apps` com o token permanente → `{"success":true}`. Confirmado na hora: mensagem real enviada ao bot gerou log `whatsapp_message_received` (antes so havia logs de deploy/scaling, nunca de mensagem).
+- **Novo bug encontrado**: o menu mobile (`src/layout/AppShell.tsx`, secao `mobile-menu-footer`) nao tinha o link para `/app/settings/whatsapp` — so existia na sidebar desktop (`getNavClass` list principal). Por isso o dono do produto nao conseguia achar a tela de vinculacao pelo celular, mesmo com tudo funcionando no backend. Corrigido adicionando o `NavLink` faltante (mesmo padrao dos outros itens do footer), commit `2f04984`.
+- **Se acontecer de novo** (novo numero, nova WABA, ou webhook silencioso mesmo com tudo "Subscribed" no painel): sempre conferir `GET /{WABA_ID}/subscribed_apps` primeiro — se vier vazio, o problema e esse, nao o webhook em si.
 
 ### 2026-07-15 — Migracao para numero real
 

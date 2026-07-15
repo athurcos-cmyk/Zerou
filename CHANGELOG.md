@@ -2,6 +2,12 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-15 — WhatsApp: webhook destravado (WABA nao inscrita) + link faltante no menu mobile
+
+- **Causa raiz do #133010 / webhook silencioso**: apos migrar para o numero real, a WABA (1431749015518519) nunca foi inscrita no app via `POST /{WABA_ID}/subscribed_apps` — `GET subscribed_apps` retornava `data: []`. A config de webhook (Callback URL, verify token, campo `messages` subscribed) estava correta, mas sem essa inscricao a Meta nunca entrega POSTs. Corrigido chamando o endpoint manualmente; confirmado com mensagem real (`whatsapp_message_received` nos logs).
+- **Bug**: menu mobile (`AppShell.tsx`, `mobile-menu-footer`) nao tinha o link `/app/settings/whatsapp` — so existia na sidebar desktop. Usuario nao conseguia achar a tela de vinculacao pelo celular. Corrigido: link adicionado entre Aparencia e Seguranca, mesmo padrao dos demais.
+- Detalhes completos em `docs/whatsapp/WHATSAPP.md`.
+
 ## 2026-07-15 — WhatsApp oficial Meta Cloud API + politicas legais completas + Cloudflare DNS
 
 - **WhatsApp integrado via Meta Cloud API v25.0**: Cloud Functions `whatsappWebhook` (webhook publico) + `generateWhatsappLinkCode` (vinculo por codigo 6 digitos) em `functions/src/whatsapp/`. DeepSeek extrai gastos de mensagens em portugues. Pagina de vinculacao `/app/settings/whatsapp`. Numero real +55 11 936192757 registrado no WABA 1431749015518519 com token permanente via System User. Doc canonica: `docs/whatsapp/WHATSAPP.md`.
