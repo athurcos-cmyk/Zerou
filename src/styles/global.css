@@ -2360,6 +2360,10 @@ span.service-mark--brand {
   padding: 0.45rem 0.55rem;
 }
 
+.mobile-menu-sheet button.nav-link:focus-visible {
+  outline: none;
+}
+
 .public-marketing-shell {
   display: grid;
   gap: clamp(2.5rem, 7vw, 5rem);
