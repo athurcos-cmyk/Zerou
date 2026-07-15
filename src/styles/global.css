@@ -2348,9 +2348,9 @@ span.service-mark--brand {
 }
 
 .mobile-menu-footer {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem;
   padding-top: 0.5rem;
   border-top: 1px solid var(--border-subtle);
 }
