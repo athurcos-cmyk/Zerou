@@ -158,7 +158,7 @@ export function WhatsAppLinkPage() {
         </article>
 
         <p style={{ textAlign: 'center', marginTop: '1rem' }}>
-          <Link to="/app/settings/appearance" className="inline-link">Voltar para Configurações</Link>
+          <Link to="/app" className="inline-link">Voltar para o início</Link>
         </p>
       </div>
     </div>
