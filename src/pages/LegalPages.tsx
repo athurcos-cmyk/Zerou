@@ -208,6 +208,14 @@ export function DataDeletionPage() {
   return <LegalDocument kind="dataDeletion" />;
 }
 
+function formatBody(text: string): string {
+  return text
+    .replace(/([.;!?])\s+(?=\d+\.\d+\.)/g, '$1\n')
+    .replace(/\(([a-z])\)\s/g, '\n($1) ')
+    .replace(/\(([IVX]+)\)\s/g, '\n($1) ')
+    .replace(/^\n/, '');
+}
+
 function LegalDocument({ kind }: { kind: keyof typeof documents }) {
   const document = documents[kind];
 
@@ -221,7 +229,7 @@ function LegalDocument({ kind }: { kind: keyof typeof documents }) {
         {document.sections.map(([title, body]) => (
           <section className="legal-section" key={title}>
             <h2>{title}</h2>
-            <p>{body}</p>
+            <p style={{ whiteSpace: 'pre-line' }}>{formatBody(body)}</p>
           </section>
         ))}
       </article>
