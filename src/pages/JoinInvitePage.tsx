@@ -32,19 +32,16 @@ export function JoinInvitePage() {
       .finally(() => setLoading(false));
   }, [code, user, hasFoundation, preview, accepted]);
 
-  async function handleAccept() {
+  function handleAccept() {
     if (!user || !code) return;
-    setLoading(true);
     setError(null);
-    try {
-      await acceptCoupleInvite(code, user.uid, profile?.name ?? user.displayName ?? '', true);
-      clearPendingInvite();
-      setAccepted(true);
-    } catch (err) {
-      setError(getUserFacingErrorMessage(err, 'Não foi possível aceitar o convite.'));
-    } finally {
-      setLoading(false);
-    }
+    clearPendingInvite();
+    setAccepted(true);
+    acceptCoupleInvite(code, user.uid, profile?.name ?? user.displayName ?? '', true)
+      .catch((err) => {
+        setAccepted(false);
+        setError(getUserFacingErrorMessage(err, 'Não foi possível aceitar o convite.'));
+      });
   }
 
   if (accepted) {
@@ -124,7 +121,7 @@ export function JoinInvitePage() {
               <br />
               <span>Expira em {preview.expiresAt.toDate().toLocaleString('pt-BR')}</span>
             </div>
-            <button className="button button--primary" type="button" disabled={loading} onClick={() => void handleAccept()}>
+            <button className="button button--primary" type="button" onClick={handleAccept}>
               Entrar no espaço compartilhado
             </button>
             <button className="button button--ghost" type="button" onClick={() => navigate('/app/shared')}>

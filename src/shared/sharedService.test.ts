@@ -32,7 +32,7 @@ vi.mock('../billing/billingService', () => ({
 const { acceptSettlement } = await import('./sharedService');
 
 describe('acceptSettlement', () => {
-  it('propaga a rejeição do batch.commit() pro caller — não fica presa dentro da função', async () => {
+  it('resolve mesmo se o batch.commit() rejeitar — escrita e fire-and-forget (fireWrite), erro nao trava o caller', async () => {
     firestoreMocks.getDoc.mockResolvedValue({
       exists: () => true,
       data: () => ({ version: 1, amountCents: 1000, paidAmountCents: 0, status: 'proposed' })
@@ -40,7 +40,7 @@ describe('acceptSettlement', () => {
     const rejection = Object.assign(new Error('permission-denied'), { code: 'permission-denied' });
     firestoreMocks.batchCommit.mockRejectedValue(rejection);
 
-    await expect(acceptSettlement('ws-1', 'user-1', 'settlement-1')).rejects.toBe(rejection);
+    await expect(acceptSettlement('ws-1', 'user-1', 'settlement-1')).resolves.toBeUndefined();
   });
 
   it('resolve normalmente quando o batch.commit() dá certo', async () => {

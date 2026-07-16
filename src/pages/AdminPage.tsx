@@ -345,7 +345,7 @@ function DeleteConfirmModal({ user, onConfirm, onCancel }: DeleteConfirmProps) {
     try {
       await onConfirm();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao deletar.');
+      setError(getUserFacingErrorMessage(err, 'Erro ao deletar.'));
       setBusy(false);
     }
   }
@@ -421,7 +421,7 @@ function ConfirmModal({ title, body, confirmLabel, danger, onConfirm, onCancel }
     try {
       await onConfirm();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível concluir a ação.');
+      setError(getUserFacingErrorMessage(err, 'Não foi possível concluir a ação.'));
       setBusy(false);
     }
   }
@@ -1057,7 +1057,7 @@ export function AdminPage() {
       setInvitesCursor(i.cursor);
       setInvitesHasMore(i.hasMore);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao carregar dados.');
+      setError(getUserFacingErrorMessage(err, 'Erro ao carregar dados.'));
     } finally {
       setLoading(false);
     }
@@ -1127,14 +1127,11 @@ export function AdminPage() {
   async function handleRevokeConfirm() {
     if (!pendingRevoke || !user) return;
     const target = pendingRevoke;
-    try {
-      await revokeCoupleInvite(target.workspaceId, target.id, user.uid);
-    } catch (err) {
-      throw new Error(getUserFacingErrorMessage(err, 'Não foi possível revogar o convite agora.'));
-    }
     setInvites((prev) => prev.filter((i) => i.id !== target.id));
     setPendingRevoke(null);
-    showToast(`Convite de "${target.workspaceName}" revogado.`);
+    revokeCoupleInvite(target.workspaceId, target.id, user.uid)
+      .then(() => showToast(`Convite de "${target.workspaceName}" revogado.`))
+      .catch((err) => showToast(getUserFacingErrorMessage(err, 'Não foi possível revogar o convite agora.')));
   }
 
   function showToast(message: string) {
