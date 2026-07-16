@@ -4,7 +4,9 @@
 
 ## Visao geral
 
-Integracao oficial com a Meta Cloud API v25.0 para controle financeiro completo por mensagem de WhatsApp — paridade com a Grazi do app, e mais. O usuario vincula seu numero e pode: lancar despesa ("gastei 15 reais no mercado"), lancar receita ("recebi 200 de freela"), criar categoria sob pedido explicito ("cria uma categoria chamada Pet") e fazer perguntas financeiras ("quanto gastei esse mes?", igual a Grazi do app). Uma unica chamada DeepSeek classifica a intencao da mensagem e ja extrai os dados (`interpretMessage.ts`).
+Integracao oficial com a Meta Cloud API v25.0 para controle financeiro completo por mensagem de WhatsApp — paridade com a Grazi do app, e mais. O usuario vincula seu numero e pode: lancar despesa ("gastei 15 reais no mercado"), lancar receita ("recebi 200 de freela"), lancar compra no cartao a vista ou parcelada ("gastei 300 no cartao em 3x"), criar categoria sob pedido explicito ("cria uma categoria chamada Pet") e fazer perguntas financeiras ("quanto gastei esse mes?", igual a Grazi do app). Uma unica chamada DeepSeek classifica a intencao da mensagem e ja extrai os dados (`interpretMessage.ts`).
+
+**Cartao**: cobre so compra nova (a vista ou parcelada). Se o usuario tem mais de um cartao ativo, o bot pergunta qual usar (lista numerada) e espera a resposta por ate 3 minutos antes de descartar. Pedidos mais avancados — parcela que ja estava em andamento antes de usar o WhatsApp, antecipar parcela/fatura, renegociar — sao redirecionados pro app, nao executados pelo bot.
 
 **Importante**: a Grazi do app (`financialAssistantChat`) e so leitura/conversa — nunca cria dados. O bot do WhatsApp faz mais que ela: alem de responder perguntas (reusando o mesmo contexto e persona), tambem cria categorias e lanca transacoes.
 
@@ -41,6 +43,9 @@ Integracao oficial com a Meta Cloud API v25.0 para controle financeiro completo 
 | `functions/src/whatsapp/categoryPalette.ts` | Espelha `src/components/categoryIcons.tsx` e `src/theme/palette.ts` (Cloud Functions nao importa `src/` do app cliente — pacotes separados). Mantenha em sincronia manualmente. |
 | `functions/src/whatsapp/answerFinancialQuestion.ts` | Perguntas financeiras via WhatsApp — reusa `buildFinancialContext` + a mesma persona/regras da Grazi (`financialAssistant.ts`), com o negrito adaptado pro WhatsApp (`*um asterisco*`, nao `**dois**`). Rate limit compartilhado com a Grazi do app (`aiRateLimit.ts`, mesmo contador `workspaces/{id}/aiUsage/{data}`, 60/dia). |
 | `functions/src/whatsapp/createTransactionFromMessage.ts` | Cria transacao no Firestore via Admin SDK (bypassa regras) — despesa ou receita (`type` recebido, nao mais fixo em `'expense'`). Mantenha em sincronia com `src/finance/financeService.ts:createTransaction()`. |
+| `functions/src/whatsapp/createCardPurchaseFromMessage.ts` | Cria compra no cartao (a vista ou parcelada) via Admin SDK — porta `cardService.createCardPurchase()`: divide o total em parcelas, grava um `ledger` entry por parcela nas faturas certas (criando as que faltarem) e um doc de transacao `type:'card_purchase'`. Mantenha em sincronia com `src/cards/cardService.ts:createCardPurchase()`. |
+| `functions/src/cards/cardDates.ts` | Porta de `src/cards/cardDates.ts` (`resolveInstallmentCycle`, `invoiceIdFor`) — Cloud Functions nao importa `src/` do app, mantenha em sincronia manualmente. |
+| `functions/src/whatsapp/pendingCardAction.ts` | Pergunta pendente "qual cartao usar?" quando ha mais de um cartao ativo — doc unico por telefone em `whatsappPendingActions/{phone}`, TTL 3 min. `resolveCardSelection` aceita numero da lista ou nome do cartao (substring). Se a proxima mensagem nao resolver, a pendencia e descartada e a mensagem e tratada normalmente (bot nunca trava esperando resposta). |
 | `functions/src/whatsapp/linkAccount.ts` | `generateWhatsappLinkCode` (onCall): bloqueia se o workspace ja tiver um numero vinculado (`already-exists`), limpa codigos antigos nao usados do mesmo usuario, gera codigo 6 digitos em `users/{uid}/whatsappLinkCodes/{code}`, retorna link `wa.me`. `processLinkCode`: chamado pelo webhook quando usuario manda "vincular XXXXXX", grava vinculo em `whatsappPhoneIndex/{phone}` e `workspaces/{id}/whatsappLinks/{phone}`. |
 | `functions/src/whatsapp/unlinkWhatsapp.ts` | `unlinkWhatsapp` (onCall): apaga `whatsappPhoneIndex/{phone}` + `workspaces/{id}/whatsappLinks/{phone}`, varre codigos residuais, avisa o numero desvinculado via WhatsApp (best-effort). Fecha o vinculo ja prometido em `src/pages/LegalPages.tsx` (Termos §7.4, Data Deletion). |
 | `functions/src/ai/deepseekClient.ts` | Cliente HTTP compartilhado para API DeepSeek. Usado por `interpretMessage.ts`, `answerFinancialQuestion.ts` e pela Grazi (`financialAssistant.ts`). |
@@ -158,6 +163,7 @@ A subcolecao `workspaces/{id}/whatsappLinks/{phone}` e escrita via Admin SDK (se
 | `users/{uid}/whatsappLinkCodes/{code}` | Codigo de vinculo temporario (TTL 10min) | `generateWhatsappLinkCode` (onCall) |
 | `whatsappPhoneIndex/{phone}` | Indice phone → workspaceId + uid | `processLinkCode` (webhook) |
 | `workspaces/{id}/whatsappLinks/{phone}` | Registro de vinculo no workspace | `processLinkCode` (webhook) |
+| `whatsappPendingActions/{phone}` | Pergunta pendente "qual cartao usar?" (TTL 3min). Nunca lida/escrita pelo cliente. | `setPendingCardPurchase`/`getPendingCardPurchase`/`clearPendingCardPurchase` (webhook) |
 
 ## Parametros ajustaveis (codigo)
 
@@ -246,6 +252,15 @@ Atualmente DESATIVADA (comentada em `webhookHandler.ts`). Para reativar:
 Verificar logs do webhook. Erros 429/503 tem retry automatico. Outros erros resultam em mensagem "Nao consegui entender o valor" para o usuario.
 
 ## Historico
+
+### 2026-07-15 — Compra no cartao (a vista ou parcelada) via WhatsApp
+
+- **Novos intents** em `interpretMessage.ts`: `card_purchase` (compra no cartao, com campo `installments` extraido de "em Nx"/"N vezes", default 1) e `advanced_card_action` (parcela ja em andamento, antecipar parcela/fatura, renegociar — redirecionado pro app, nunca executado).
+- **`createCardPurchaseFromMessage.ts`** (novo) porta `cardService.createCardPurchase()` pro Admin SDK: divide o total em parcelas (`installmentAmounts`), calcula o ciclo de cada parcela via `resolveInstallmentCycle` (portado em `functions/src/cards/cardDates.ts`), cria as faturas que faltarem e grava um `ledger` entry por parcela + um doc de transacao `type:'card_purchase'`.
+- **Escolha de cartao quando ha mais de um**: nova coleção `whatsappPendingActions/{phone}` (Admin-SDK only, TTL 3 min) guarda o rascunho da compra enquanto o bot pergunta "1 - Itau / 2 - Nubank". A proxima mensagem e resolvida por numero ou nome (`resolveCardSelection`, `pendingCardAction.ts`) antes mesmo de rodar `interpretMessage` de novo (evita gastar uma chamada DeepSeek numa resposta tipo "2"). Se a resposta nao bater com nenhum cartao, a pendencia e descartada silenciosamente e a mensagem e tratada como nova — o bot nunca fica travado esperando.
+- **Refatoracao**: logica de resolver/criar categoria (matching mais especifico + criar se nomeada explicitamente) extraida pra `resolveOrCreateCategory()` dentro de `webhookHandler.ts`, compartilhada entre despesa/receita/compra no cartao.
+- **Regra do Firestore**: bloco de negacao explicita pra `whatsappPendingActions/{phone}` (`allow read, write: if false`), mesmo estilo de `whatsappPhoneIndex`. Nenhuma outra mudanca de regra — payload de `createCardPurchaseFromMessage` e identico ao que o app ja produz.
+- **Fora do escopo, de proposito**: compra ja em andamento antes do WhatsApp, antecipar parcela/fatura, renegociar — o bot direciona pro app em vez de tentar.
 
 ### 2026-07-15 — Categoria nomeada explicitamente dentro do lancamento agora e criada
 

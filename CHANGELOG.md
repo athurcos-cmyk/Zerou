@@ -2,6 +2,13 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-15 — WhatsApp: compra no cartão (à vista ou parcelada)
+
+- **Compra no cartão via mensagem**: "gastei 300 no cartão em 3x" cria a transação `card_purchase` + as parcelas nas faturas certas, portando a mesma lógica de `cardService.createCardPurchase()` do app.
+- **Mais de um cartão cadastrado**: o bot pergunta qual usar (lista numerada, "1 - Itaú / 2 - Nubank") e espera até 3 minutos pela resposta — sem memória de conversa geral, só essa pergunta pontual. Resposta que não bate com nenhum cartão descarta a pergunta e trata a mensagem normalmente, sem travar o bot.
+- **Fora do escopo, de propósito**: parcela que já estava em andamento antes de usar o WhatsApp, antecipar parcela/fatura, renegociar — o bot direciona pro app em vez de tentar.
+- Detalhes completos em `docs/whatsapp/WHATSAPP.md`.
+
 ## 2026-07-15 — WhatsApp: paridade com a Grazi (categorias, receita, perguntas) + vinculo unico/desvinculo
 
 - **Roteamento de intencao**: uma unica chamada DeepSeek classifica cada mensagem em despesa/receita/criar categoria/pergunta/nao entendi, ao inves de assumir sempre despesa (`interpretMessage.ts`, substitui `extractExpense.ts`).

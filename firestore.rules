@@ -1519,6 +1519,12 @@ service cloud.firestore {
       allow write: if false; // Admin SDK only
     }
 
+    // Pergunta pendente do bot WhatsApp (ex: "qual cartão usar?"), TTL curto. Nunca lida
+    // nem escrita pelo cliente — so o webhook (Admin SDK) le/escreve/apaga.
+    match /whatsappPendingActions/{phone} {
+      allow read, write: if false;
+    }
+
     match /workspaces/{workspaceId} {
       allow read: if isActiveMember(workspaceId) || isAdmin();
       allow create: if validWorkspaceFoundationCreate(workspaceId) || validCoupleWorkspaceCreate(workspaceId);

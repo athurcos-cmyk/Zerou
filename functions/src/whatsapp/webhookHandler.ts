@@ -1,13 +1,20 @@
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { onRequest } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions';
 import crypto from 'crypto';
 import { sendWhatsAppMessage, getVerifyToken, whatsappAccessToken } from './metaClient.js';
-import { interpretMessage, type CategoryOption } from './interpretMessage.js';
+import { interpretMessage, type CategoryOption, type MessageInterpretation } from './interpretMessage.js';
 import { createTransactionFromMessage } from './createTransactionFromMessage.js';
 import { createCategoryFromMessage } from './createCategoryFromMessage.js';
+import { createCardPurchaseFromMessage } from './createCardPurchaseFromMessage.js';
 import { answerFinancialQuestion } from './answerFinancialQuestion.js';
 import { processLinkCode } from './linkAccount.js';
+import {
+  getPendingCardPurchase,
+  setPendingCardPurchase,
+  clearPendingCardPurchase,
+  resolveCardSelection,
+} from './pendingCardAction.js';
 import { deepseekApiKey } from '../ai/deepseekClient.js';
 import { checkAiUsageNotExceeded, incrementAiUsage } from '../ai/aiRateLimit.js';
 
@@ -15,6 +22,44 @@ const region = 'southamerica-east1';
 
 function formatBRL(amountCents: number): string {
   return (amountCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+/**
+ * Resolve a categoria de um lancamento: prioriza a mais especifica entre as existentes
+ * (compativel com o tipo da intencao), e cria uma nova SE o usuario a nomeou
+ * explicitamente e ela ainda nao existe. Compartilhado entre expense/income/card_purchase.
+ */
+async function resolveOrCreateCategory(
+  workspaceId: string,
+  userId: string,
+  intent: 'expense' | 'income' | 'card_purchase',
+  interpretation: MessageInterpretation,
+  categories: CategoryOption[],
+): Promise<string | null> {
+  const expectedType = intent === 'income' ? 'income' : 'expense';
+
+  let categoryId = interpretation.categoryId;
+  if (categoryId) {
+    const matched = categories.find((c) => c.id === categoryId);
+    const typeMatches = matched && (matched.type === expectedType || matched.type === 'both');
+    if (!typeMatches) categoryId = null;
+  }
+
+  // Usuario nomeou explicitamente uma categoria que ainda nao existe dentro do proprio
+  // lancamento (ex.: "gastei 50 no mercado, coloca na categoria trabalho") — cria na hora
+  // e usa nesse mesmo lancamento (diferente de criar sem lancamento junto).
+  if (!categoryId && interpretation.newCategoryName) {
+    const newCategory = await createCategoryFromMessage({
+      workspaceId,
+      userId,
+      name: interpretation.newCategoryName,
+      type: interpretation.newCategoryType ?? expectedType,
+      icon: interpretation.newCategoryIcon,
+    });
+    categoryId = newCategory.id;
+  }
+
+  return categoryId;
 }
 
 /**
@@ -105,7 +150,7 @@ export const whatsappWebhook = onRequest(
       }
 
       // ── Look up workspace by phone number ───────────────────────────
-      const db = getFirestore();
+      const db: Firestore = getFirestore();
       const indexDoc = await db.doc(`whatsappPhoneIndex/${phone}`).get();
       if (!indexDoc.exists) {
         await sendWhatsAppMessage(
@@ -121,6 +166,35 @@ export const whatsappWebhook = onRequest(
       };
       const { workspaceId, linkedByUid } = link;
       if (!workspaceId || !linkedByUid) return;
+
+      // ── Pergunta pendente: usuario tinha mais de um cartao e o bot perguntou qual ──
+      const pending = await getPendingCardPurchase(db, phone);
+      if (pending) {
+        const resolvedCardId = resolveCardSelection(cleanText, pending.candidates);
+        await clearPendingCardPurchase(db, phone);
+
+        if (resolvedCardId) {
+          const result = await createCardPurchaseFromMessage({
+            workspaceId: pending.workspaceId,
+            userId: pending.userId,
+            cardId: resolvedCardId,
+            amountCents: pending.amountCents,
+            description: pending.description,
+            categoryId: pending.categoryId,
+            installments: pending.installments,
+            purchaseDate: new Date(),
+          });
+
+          const catSuffix = result.categoryName ? ` (${result.categoryName})` : '';
+          const installmentSuffix = pending.installments > 1 ? ` em ${pending.installments}x` : '';
+          await sendWhatsAppMessage(
+            phone,
+            `✅ Compra registrada no ${result.cardName}${installmentSuffix}: ${formatBRL(result.amountCents)} — ${result.description}${catSuffix}`,
+          );
+          return;
+        }
+        // Nao resolveu -> descarta a pendencia e segue o fluxo normal com esta mesma mensagem.
+      }
 
       // ── Load categories (todas — expense/income/both — a intencao decide qual usar) ──
       const catsSnap = await db
@@ -140,7 +214,16 @@ export const whatsappWebhook = onRequest(
       if (!interpretation || interpretation.intent === 'unclear') {
         await sendWhatsAppMessage(
           phone,
-          'Não entendi. Você pode:\n- Registrar um gasto: "gastei 15 reais no mercado"\n- Registrar uma receita: "recebi 200 reais de freela"\n- Criar categoria: "cria uma categoria chamada Pet"\n- Perguntar sobre suas finanças: "quanto gastei esse mês?"',
+          'Não entendi. Você pode:\n- Registrar um gasto: "gastei 15 reais no mercado"\n- Registrar uma receita: "recebi 200 reais de freela"\n- Registrar compra no cartão: "gastei 300 no cartão em 3x"\n- Criar categoria: "cria uma categoria chamada Pet"\n- Perguntar sobre suas finanças: "quanto gastei esse mês?"',
+        );
+        return;
+      }
+
+      // ── Acao avancada de cartao (parcela em andamento, antecipar, renegociar) ──
+      if (interpretation.intent === 'advanced_card_action') {
+        await sendWhatsAppMessage(
+          phone,
+          'Isso aqui é mais avançado — dá uma olhada em Cartões no app pra fazer isso (parcela que já estava em andamento, antecipar parcela/fatura, renegociar).',
         );
         return;
       }
@@ -188,6 +271,70 @@ export const whatsappWebhook = onRequest(
         return;
       }
 
+      // ── Compra no cartao (a vista ou parcelada) ─────────────────────
+      if (interpretation.intent === 'card_purchase') {
+        if (interpretation.confidence === 'low' || interpretation.amountCents <= 0) {
+          await sendWhatsAppMessage(
+            phone,
+            'Não consegui entender o valor. Pode reformular? Ex: "gastei 300 no cartão em 3x"',
+          );
+          return;
+        }
+
+        const categoryId = await resolveOrCreateCategory(workspaceId, linkedByUid, 'card_purchase', interpretation, categories);
+
+        const cardsSnap = await db.collection(`workspaces/${workspaceId}/cards`).get();
+        // Mesmo padrao de useCardsData.ts: isActive ausente conta como ativo, so exclui isActive === false.
+        const activeCards = cardsSnap.docs
+          .filter((d) => d.data().isActive !== false)
+          .map((d) => ({ id: d.id, label: d.data().name as string }));
+
+        if (activeCards.length === 0) {
+          await sendWhatsAppMessage(phone, 'Você ainda não tem cartão cadastrado. Cadastre um no app primeiro.');
+          return;
+        }
+
+        const description = interpretation.description || cleanText.slice(0, 80);
+
+        if (activeCards.length === 1) {
+          const result = await createCardPurchaseFromMessage({
+            workspaceId,
+            userId: linkedByUid,
+            cardId: activeCards[0].id,
+            amountCents: interpretation.amountCents,
+            description,
+            categoryId,
+            installments: interpretation.installments,
+            purchaseDate: new Date(),
+          });
+
+          const catSuffix = result.categoryName ? ` (${result.categoryName})` : '';
+          const installmentSuffix = interpretation.installments > 1 ? ` em ${interpretation.installments}x` : '';
+          await sendWhatsAppMessage(
+            phone,
+            `✅ Compra registrada no ${result.cardName}${installmentSuffix}: ${formatBRL(result.amountCents)} — ${result.description}${catSuffix}`,
+          );
+          return;
+        }
+
+        await setPendingCardPurchase(db, phone, {
+          workspaceId,
+          userId: linkedByUid,
+          amountCents: interpretation.amountCents,
+          description,
+          installments: interpretation.installments,
+          categoryId,
+          candidates: activeCards,
+        });
+
+        const list = activeCards.map((c, i) => `${i + 1} - ${c.label}`).join('\n');
+        await sendWhatsAppMessage(
+          phone,
+          `Você tem mais de um cartão. Qual usar?\n${list}\n\nResponda com o número em até 3 minutos.`,
+        );
+        return;
+      }
+
       // ── Despesa ou receita — daqui pra baixo intent e 'expense' | 'income' ──
       if (interpretation.confidence === 'low' || interpretation.amountCents <= 0) {
         await sendWhatsAppMessage(
@@ -212,29 +359,7 @@ export const whatsappWebhook = onRequest(
         return;
       }
 
-      // Rede de seguranca: como a query de categorias nao filtra mais por tipo,
-      // confere aqui que a categoria escolhida bate com a intencao antes de usar.
-      let categoryId = interpretation.categoryId;
-      if (categoryId) {
-        const matchedCategory = categories.find((c) => c.id === categoryId);
-        const typeMatches = matchedCategory
-          && (matchedCategory.type === interpretation.intent || matchedCategory.type === 'both');
-        if (!typeMatches) categoryId = null;
-      }
-
-      // Usuario nomeou explicitamente uma categoria que ainda nao existe dentro do
-      // proprio lancamento (ex.: "gastei 50 no mercado, coloca na categoria trabalho")
-      // — cria na hora e usa nesse mesmo lancamento (diferente de criar sem lancamento junto).
-      if (!categoryId && interpretation.newCategoryName) {
-        const newCategory = await createCategoryFromMessage({
-          workspaceId,
-          userId: linkedByUid,
-          name: interpretation.newCategoryName,
-          type: interpretation.newCategoryType ?? interpretation.intent,
-          icon: interpretation.newCategoryIcon,
-        });
-        categoryId = newCategory.id;
-      }
+      const categoryId = await resolveOrCreateCategory(workspaceId, linkedByUid, interpretation.intent, interpretation, categories);
 
       const result = await createTransactionFromMessage({
         workspaceId,
