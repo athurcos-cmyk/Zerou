@@ -50,6 +50,11 @@ com o intent detectado (expense usa tipo "expense" ou "both"; income usa "income
 Ex.: se existem "Farmacia" (expense) e "Saude" (expense) e a mensagem fala de remedio, prefira "Farmacia".
 Retorne categoryId null SE E SOMENTE SE nenhuma categoria existente combinar — nunca sugira criar uma.
 
+Se o usuario mencionar EXPLICITAMENTE em qual categoria colocar o lancamento (ex.: "coloca na categoria
+Mercado", "categoria: Lazer", "classifica como Transporte", "bota em Casa"), use EXATAMENTE essa categoria
+se ela existir na lista — mesmo que outra categoria pareca semanticamente mais obvia pro assunto da
+mensagem. O pedido explicito do usuario sempre vence a escolha automatica por assunto.
+
 Regras de create_category: newCategoryName = nome pedido, capitalizado. newCategoryType = "income" se
 mencionar receita/renda, senao "expense" (padrao quando ambiguo). newCategoryIcon = chave mais adequada
 da lista, ou null. amountCents deve ser 0 e categoryId null — criar categoria NUNCA cria uma transacao
