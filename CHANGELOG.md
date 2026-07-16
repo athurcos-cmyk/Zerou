@@ -2,6 +2,10 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-16 — Banner "não foi possível preparar categorias padrão" corrigido
+
+Reportado pelo dono: refresh do app (mesmo instalado) às vezes mostrava tudo piscando por alguns segundos + banner vermelho de erro no topo. Causa: `ensureDefaultCategories()` rodava uma leitura única do Firestore em *todo* refresh, mesmo com as categorias padrão já existindo há muito tempo — se essa leitura falhasse de forma transitória (rede instável logo após o refresh), tentava de novo por ~8s e aí mostrava o erro. A UI já mostra as categorias padrão via merge local independente dessa escrita ter sucesso, então a falha virou silenciosa (log só em DEV) e o "já preparado" passou a persistir em `localStorage`, não rodando mais essa leitura redundante a cada refresh. `src/finance/useFinanceData.ts`.
+
 ## 2026-07-16 — Auditoria CLAUDE.md: 2 travamentos offline-first + erro técnico exposto
 
 Auditoria completa (3 frentes em paralelo: offline-first, sincronia payload↔firestore.rules, pontos sensíveis). O código do WhatsApp/cartão desta semana passou limpo em tudo. Achados reais, todos pré-existentes:
