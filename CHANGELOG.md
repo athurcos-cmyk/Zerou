@@ -2,6 +2,14 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-16 — Auditoria CLAUDE.md: 2 travamentos offline-first + erro técnico exposto
+
+Auditoria completa (3 frentes em paralelo: offline-first, sincronia payload↔firestore.rules, pontos sensíveis). O código do WhatsApp/cartão desta semana passou limpo em tudo. Achados reais, todos pré-existentes:
+
+- **`JoinInvitePage.tsx`**: aceitar convite de casal travava a tela esperando o servidor (`await` bloqueante). Corrigido pra fire-and-forget, igual ao padrão já usado em `SharedSpacePage.tsx`.
+- **`AdminPage.tsx`**: revogar convite tinha o mesmo travamento; corrigido. Também corrigidos 3 lugares que mostravam erro técnico cru (`err.message`) em vez de mensagem amigável.
+- **`sharedService.ts`**: 5 funções de acerto de contas do casal (claims/settlements) reimplementavam o padrão fire-and-forget na mão em vez de usar o `fireWrite()` do projeto — um `await` futuro nelas travaria de verdade. Padronizado.
+
 ## 2026-07-15 — WhatsApp: compra no cartão (à vista ou parcelada)
 
 - **Compra no cartão via mensagem**: "gastei 300 no cartão em 3x" cria a transação `card_purchase` + as parcelas nas faturas certas, portando a mesma lógica de `cardService.createCardPurchase()` do app.
