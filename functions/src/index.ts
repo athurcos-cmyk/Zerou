@@ -22,6 +22,10 @@ export { whatsappWebhook } from './whatsapp/webhookHandler.js';
 export { generateWhatsappLinkCode } from './whatsapp/linkAccount.js';
 export { unlinkWhatsapp } from './whatsapp/unlinkWhatsapp.js';
 
+// ─── Cartões: totais de fatura mantidos incrementalmente ──────────────────────
+export { onInvoiceLedgerEntryCreated } from './cards/invoiceLedgerEntryTrigger.js';
+export { reverseCardPurchaseOnDelete } from './cards/reverseCardPurchaseOnDelete.js';
+
 // ─── Admin ────────────────────────────────────────────────────────────────────
 // adminDeleteUser NÃO fica aqui — vive isolado em functions-admin/ (codebase
 // "admin"), sem dependência do Stripe, pra poder deployar independente do

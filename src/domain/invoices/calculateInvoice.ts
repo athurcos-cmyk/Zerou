@@ -1,4 +1,5 @@
 import type { InvoiceLedgerInput, InvoiceCalculation, InvoiceMutationResult } from './invoiceTypes';
+import type { InvoiceStatus } from '../../types/contracts';
 
 const debitTypes = new Set(['purchase', 'manual_debit']);
 const feeTypes = new Set(['interest', 'fine', 'iof', 'fee']);
@@ -93,7 +94,8 @@ export function calculateInvoice(entries: InvoiceLedgerInput[], lifecycle: 'open
   };
 }
 
-function resolveInvoiceStatus(input: {
+/** Exportado à parte: `useCardsData` calcula o status a partir dos totais já persistidos, sem recomputar o ledger inteiro. */
+export function resolveInvoiceStatus(input: {
   lifecycle: 'open' | 'closed';
   outstandingBalanceCents: number;
   overpaidCreditCents: number;
@@ -101,7 +103,7 @@ function resolveInvoiceStatus(input: {
   purchasesTotalCents: number;
   feesTotalCents: number;
   dueDate?: Date;
-}) {
+}): InvoiceStatus {
   if (input.overpaidCreditCents > 0) {
     return 'overpaid';
   }

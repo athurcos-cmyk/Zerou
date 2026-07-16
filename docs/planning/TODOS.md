@@ -31,6 +31,7 @@ Itens acionáveis. Fechou? Mova para "Concluído" ou remova. Detalhe histórico 
 - [ ] Billing real (Stripe) — só com decisão explícita de produto (hoje 100% gratuito).
 
 ## Concluído (recente)
+- [x] **Saldo de conta e total de fatura mantidos incrementalmente** (2026-07-16): corrigido bug de correção financeira (saldo de conta podia ficar errado silenciosamente em contas com 300+ transações) e bug ativo (Grazi/WhatsApp sempre reportava fatura em aberto como R$ 0,00). `Account.currentBalanceCents` e os totais de `Invoice` deixam de ser recalculados do zero (histórico de transações / ledger inteiro) e passam a ser mantidos incrementalmente. `useCardsData.ts` parou de carregar o ledger de toda fatura no boot global — sob demanda agora (`useInvoiceLedger.ts`). Backfill rodado em produção, checkpoint de verificação conferido manualmente. Ver `docs/history/2026-07.md`.
 - [x] **Avatares cartoon estão feios** (2026-07-14): trocados por 24 retratos recortados de um
   asset comprado no Adobe Stock (licença comercial confirmada pelo dono; grid 16×6 detectado
   por análise de pixel, ver `public/avatars/SOURCES.md`), JPEGs estáticos em `public/avatars/`,

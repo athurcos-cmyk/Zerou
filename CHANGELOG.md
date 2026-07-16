@@ -2,6 +2,16 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-16 — Saldo de conta e total de fatura: correção financeira + custo de leitura
+
+Dois bugs de correção financeira corrigidos, pedido explícito do dono ("não tem como um aplicativo de finanças ter o saldo errado"):
+
+- **Saldo de conta**: podia ficar errado silenciosamente em contas com 300+ transações (a janela de leitura nunca cobria o histórico inteiro). Agora mantido incrementalmente (`Account.currentBalanceCents`, `increment()` no mesmo batch da transação — mesmo padrão de `goals.savedCents`).
+- **Total de fatura de cartão**: nunca era persistido de verdade (nascia 0), causando um bug ativo onde a Grazi/WhatsApp sempre reportava fatura em aberto como R$ 0,00, e forçando o app a resomar o ledger inteiro de toda fatura em todo boot (até 1.500+ leituras por reabertura). Agora mantido incrementalmente por Cloud Function (`invoiceLedgerEntryTrigger.ts`), com correção nova pra compra excluída no cartão (`purchase_reversal` + `reverseCardPurchaseOnDelete.ts`).
+- `useCardsData.ts` parou de carregar o ledger de toda fatura no boot global — agora é sob demanda (`useInvoiceLedger.ts`), só quando a tela que precisa dele (cartão/fatura/análise) abre.
+- Backfill rodado em produção (contas: 100% batendo com o cálculo antigo; faturas: 9 reversões retroativas encontradas de compras já excluídas antes da correção existir).
+- Detalhes completos, riscos residuais e sequenciamento em `docs/history/2026-07.md`.
+
 ## 2026-07-16 — Banner "não foi possível preparar categorias padrão" corrigido
 
 Reportado pelo dono: refresh do app (mesmo instalado) às vezes mostrava tudo piscando por alguns segundos + banner vermelho de erro no topo. Causa: `ensureDefaultCategories()` rodava uma leitura única do Firestore em *todo* refresh, mesmo com as categorias padrão já existindo há muito tempo — se essa leitura falhasse de forma transitória (rede instável logo após o refresh), tentava de novo por ~8s e aí mostrava o erro. A UI já mostra as categorias padrão via merge local independente dessa escrita ter sucesso, então a falha virou silenciosa (log só em DEV) e o "já preparado" passou a persistir em `localStorage`, não rodando mais essa leitura redundante a cada refresh. `src/finance/useFinanceData.ts`.

@@ -1,5 +1,6 @@
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import crypto from 'crypto';
+import { transactionAccountEffects } from '../shared/accountEffects.js';
 
 /**
  * Cria transação via Admin SDK com o MESMO payload que `financeService.createTransaction`
@@ -64,7 +65,15 @@ export async function createTransactionFromMessage(
     payload.categoryId = input.categoryId;
   }
 
-  await db.doc(`workspaces/${input.workspaceId}/transactions/${id}`).set(payload);
+  const batch = db.batch();
+  batch.set(db.doc(`workspaces/${input.workspaceId}/transactions/${id}`), payload);
+  for (const effect of transactionAccountEffects(input)) {
+    batch.update(db.doc(`workspaces/${input.workspaceId}/accounts/${effect.accountId}`), {
+      currentBalanceCents: FieldValue.increment(effect.deltaCents),
+      updatedAt: now,
+    });
+  }
+  await batch.commit();
 
   // Resolve category name for the confirmation message
   let categoryName: string | undefined;

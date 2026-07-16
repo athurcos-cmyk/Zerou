@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsData } from '../cards/useCardsData';
 import { useFinanceData } from './useFinanceData';
@@ -12,18 +12,7 @@ export function FinanceDataProvider({ children }: { children: ReactNode }) {
   const { user, profile } = useAuth();
   const workspaceId = profile?.defaultWorkspaceId;
   const finance = useFinanceData(workspaceId, user?.uid);
-  // Transações excluídas no Extrato (soft delete) precisam propagar pro cálculo da
-  // fatura: uma compra no cartão excluída deve parar de contar no saldo/lista da fatura.
-  // `knownIds` vai junto porque `subscribeTransactions` só traz as 300 mais recentes — o
-  // hook precisa saber o que essa janela NÃO cobre pra ir buscar (ver `useCardsData`).
-  const transactionIndex = useMemo(
-    () => ({
-      knownIds: new Set(finance.transactions.map((t) => t.id)),
-      deletedIds: new Set(finance.transactions.filter((t) => t.deletedAt).map((t) => t.id))
-    }),
-    [finance.transactions]
-  );
-  const cards = useCardsData(workspaceId, transactionIndex);
+  const cards = useCardsData(workspaceId);
   const goals = useGoalsData(workspaceId);
 
   return (

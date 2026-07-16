@@ -1,6 +1,6 @@
 import { addDays, isAfter, isBefore, isEqual, isSameDay, startOfDay } from 'date-fns';
 import { toDate } from './financeDates';
-import { calculateTotalBalance } from './financeCalculations';
+import { currentTotalBalance } from './financeCalculations';
 import { nextOccurrenceDate } from './financeService';
 import { nextPaydayFrom } from './payday';
 import type { Account, Bill, Invoice, PaydayRule, RecurringRule, Transaction } from '../types/contracts';
@@ -97,7 +97,7 @@ export function projectDailyBalance(
   payday?: PaydayRule,
   now: Date = new Date(),
 ): DailyProjection[] {
-  const startBalance = calculateTotalBalance(accounts, transactions);
+  const startBalance = currentTotalBalance(accounts);
   const horizonEnd = addDays(now, horizonDays);
   const todayStart = startOfDay(now);
   const estimatedIncome = estimateMonthlyIncome(transactions);

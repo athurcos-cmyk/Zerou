@@ -47,10 +47,9 @@ describe('projectDailyBalance', () => {
     expect(result[0].balanceCents).toBe(200000);
   });
 
-  it('deve incluir income transactions no cálculo do saldo inicial', () => {
-    const accounts = [makeAccount({ openingBalanceCents: 0 })];
-    const transactions = [makeTransaction({ amountCents: 300000 })];
-    const result = projectDailyBalance(1, accounts, transactions, [], [], [], undefined, NOW);
+  it('saldo inicial usa currentBalanceCents quando disponível', () => {
+    const accounts = [makeAccount({ openingBalanceCents: 0, currentBalanceCents: 300000 })];
+    const result = projectDailyBalance(1, accounts, [], [], [], [], undefined, NOW);
     expect(result[0].balanceCents).toBe(300000);
   });
 

@@ -5,7 +5,7 @@ import { categoryColors } from '../../components/categoryIcons';
 import { ACCENT_FOREGROUND } from '../../theme/palette';
 import { EmptyState } from '../../components/EmptyState';
 import { coupleGoalDeposit, coupleGoalWithdraw, createGoal, deleteGoal } from '../../finance/financeService';
-import { calculateAccountBalances } from '../../finance/financeCalculations';
+import { currentAccountBalances } from '../../finance/financeCalculations';
 import { formatMoney, parseMoneyToCents } from '../../finance/money';
 import { getUserFacingErrorMessage } from '../../utils/userFacingError';
 import type { useFinanceContext } from '../../finance/FinanceDataContext';
@@ -77,7 +77,7 @@ export function CoupleSavingsSection({
     }
 
     if (guardarSign === 1 && guardarFromAccount) {
-      const balances = calculateAccountBalances(personalFinance.accounts, personalFinance.transactions);
+      const balances = currentAccountBalances(personalFinance.accounts);
       const acct = balances.find((a) => a.id === guardarFromAccount);
       if (acct && amountCents > acct.balanceCents) {
         onMessage(`Saldo insuficiente. Disponível na conta: ${formatMoney(acct.balanceCents)}`);

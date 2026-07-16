@@ -74,8 +74,8 @@ export function NetWorthPage() {
 
   const breakdown = useMemo<NetWorthBreakdown | null>(() => {
     if (accounts.length === 0) return null;
-    return calculateNetWorth(accounts, finance.transactions, invoices, finance.bills);
-  }, [accounts, finance.transactions, finance.bills, invoices]);
+    return calculateNetWorth(accounts, invoices, finance.bills);
+  }, [accounts, finance.bills, invoices]);
 
   const last12Months = useMemo(() => getLastNMonths(12), []);
 

@@ -10,6 +10,7 @@ import { AnnualSummarySheet } from '../components/AnnualSummarySheet';
 import { BottomSheet } from '../components/BottomSheet';
 import { EmptyState } from '../components/EmptyState';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
+import { mergeInvoicesWithLedger, useInvoiceLedger } from '../cards/useInvoiceLedger';
 import { formatFriendlyDate, toDate } from '../finance/financeDates';
 import { nextOccurrenceDate } from '../finance/financeService';
 import { billStatusLabels, transactionTypeLabels } from '../finance/financeLabels';
@@ -162,10 +163,22 @@ export function SearchPage() {
 
   const normalizedQuery = query.trim().toLocaleLowerCase('pt-BR');
 
+  // SearchPage é a única tela que precisa do ledger de TODAS as faturas de TODOS os cartões
+  // (análise de gasto por mês/categoria cruza tudo) — carregado sob demanda só quando esta
+  // página abre, ao contrário do boot global (`useCardsData`, que não assina ledger nenhum).
+  const invoiceRefs = useMemo(
+    () => cardsData.invoices.map((inv) => ({ id: inv.id, cardId: inv.cardId })),
+    [cardsData.invoices]
+  );
+  const ledgerEntries = useInvoiceLedger(workspaceId, invoiceRefs, finance.transactionIndex);
   // Faturas reduzidas ao que a Análise precisa (referenceMonth + ledger por parcela).
   const invoicesForSpending = useMemo<InvoiceForSpending[]>(
-    () => cardsData.invoices.map((inv) => ({ referenceMonth: inv.referenceMonth, ledgerEntries: inv.ledgerEntries })),
-    [cardsData.invoices]
+    () =>
+      mergeInvoicesWithLedger(cardsData.invoices, ledgerEntries).map((inv) => ({
+        referenceMonth: inv.referenceMonth,
+        ledgerEntries: inv.ledgerEntries
+      })),
+    [cardsData.invoices, ledgerEntries]
   );
   // Cartão entra na Análise pela parcela; a categoria/descrição de cada parcela vem da transação-mãe.
   const txnCategoryById = useMemo(

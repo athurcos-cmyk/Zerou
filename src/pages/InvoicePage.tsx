@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -16,6 +16,7 @@ import {
   recordInvoiceFee,
   recordInvoicePayment
 } from '../cards/cardService';
+import { mergeInvoicesWithLedger, useInvoiceLedger } from '../cards/useInvoiceLedger';
 
 import { formatFriendlyDate, fromDateInputValue, todayInputValue } from '../finance/financeDates';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
@@ -36,7 +37,11 @@ export function InvoicePage() {
   const cardsData = useCardsContext();
   const finance = useFinanceContext();
   const card = cardsData.cards.find((item) => item.id === cardId);
-  const invoice = cardsData.invoices.find((item) => item.cardId === cardId && item.id === invoiceId);
+  const cardInvoices = useMemo(() => cardsData.invoices.filter((item) => item.cardId === cardId), [cardsData.invoices, cardId]);
+  const invoiceRefs = useMemo(() => cardInvoices.map((item) => ({ id: item.id, cardId: item.cardId })), [cardInvoices]);
+  const ledgerEntries = useInvoiceLedger(workspaceId, invoiceRefs, finance.transactionIndex);
+  const cardInvoicesWithLedger = useMemo(() => mergeInvoicesWithLedger(cardInvoices, ledgerEntries), [cardInvoices, ledgerEntries]);
+  const invoice = cardInvoicesWithLedger.find((item) => item.id === invoiceId);
   const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [paySheetOpen, setPaySheetOpen] = useState(false);
@@ -59,7 +64,7 @@ export function InvoicePage() {
   );
 
   const anticipatableGroups = invoice
-    ? groupAnticipatablePurchases(cardsData.invoices, invoice).map((group) => ({
+    ? groupAnticipatablePurchases(cardInvoicesWithLedger, invoice).map((group) => ({
         ...group,
         description: txnDescriptions.get(group.sourceTransactionId) ?? 'Compra parcelada'
       }))

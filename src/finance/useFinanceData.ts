@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { buildDefaultCategory, defaultCategories } from './defaultCategories';
-import { calculateAccountBalances } from './financeCalculations';
+import { currentAccountBalances } from './financeCalculations';
 import {
   ensureDefaultCategories,
   markOverdueBills,
@@ -41,6 +41,16 @@ function markDefaultCategoriesPrepared(workspaceId: string) {
   } catch {
     // Sem localStorage (aba privada bloqueada): só perde a memória entre sessões.
   }
+}
+
+/**
+ * O que o app sabe sobre as transações a partir da janela de `subscribeTransactions`
+ * (as 300 mais recentes). `knownIds` é o que essa janela cobre; tudo fora dela precisa ser
+ * consultado antes de o ledger de fatura poder ser filtrado com segurança (ver `useInvoiceLedger`).
+ */
+export interface TransactionDeletionIndex {
+  knownIds: ReadonlySet<string>;
+  deletedIds: ReadonlySet<string>;
 }
 
 interface FinanceDataState {
@@ -263,8 +273,8 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
   const activeAccounts = useMemo(() => state.accounts.filter((account) => account.isActive), [state.accounts]);
 
   const accountBalances = useMemo(
-    () => calculateAccountBalances(activeAccounts, state.transactions),
-    [activeAccounts, state.transactions]
+    () => currentAccountBalances(activeAccounts),
+    [activeAccounts]
   );
 
   const pendingWrites = useMemo(
@@ -275,11 +285,24 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
     [state.accounts, state.bills, state.budgets, state.categories, state.recurringRules, state.transactions]
   );
 
+  // Transações excluídas no Extrato (soft delete) precisam propagar pro cálculo da fatura:
+  // uma compra no cartão excluída deve parar de contar no saldo/lista da fatura. `knownIds`
+  // vai junto porque `subscribeTransactions` só traz as 300 mais recentes — quem consome isso
+  // (`useInvoiceLedger`) precisa saber o que essa janela NÃO cobre pra ir buscar no servidor.
+  const transactionIndex = useMemo<TransactionDeletionIndex>(
+    () => ({
+      knownIds: new Set(state.transactions.map((t) => t.id)),
+      deletedIds: new Set(state.transactions.filter((t) => t.deletedAt).map((t) => t.id))
+    }),
+    [state.transactions]
+  );
+
   return {
     ...state,
     accounts: activeAccounts,
     categories: categoriesWithDefaults,
     accountBalances,
+    transactionIndex,
     pendingWrites
   };
 }

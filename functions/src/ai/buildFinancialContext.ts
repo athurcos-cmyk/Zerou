@@ -280,12 +280,9 @@ export async function buildFinancialContext(
     for (const invDoc of invoicesSnap.docs) {
       const inv = invDoc.data() as InvoiceData;
 
-      // outstandingBalanceCents no Firestore nasce 0. Se nao foi calculado,
-      // estimamos com purchasesTotalCents - paymentsTotalCents.
-      let outstanding = inv.outstandingBalanceCents ?? 0;
-      if (outstanding === 0) {
-        outstanding = (inv.purchasesTotalCents ?? 0) - (inv.paymentsTotalCents ?? 0);
-      }
+      // outstandingBalanceCents e mantido incrementalmente por
+      // invoiceLedgerEntryTrigger.ts a cada lancamento novo no ledger.
+      const outstanding = inv.outstandingBalanceCents ?? 0;
       if (outstanding <= 0) continue;
 
       const dueDate = inv.dueDate.toDate();
@@ -312,49 +309,14 @@ export async function buildFinancialContext(
   let totalBalance = 0;
   const accountLines: string[] = [];
 
-  // Pre-index transactions by account for balance calculation (avoids N*2 extra queries)
-  const debitsByAccount = new Map<string, Array<{ type: string; amount: number; deleted: boolean }>>();
-  const creditsByAccount = new Map<string, Array<{ type: string; amount: number; deleted: boolean }>>();
-
-  for (const doc of txnSnap.docs) {
-    const t = doc.data();
-    const entry = {
-      type: (t.type as string) ?? '',
-      amount: (t.amountCents as number) ?? 0,
-      deleted: Boolean(t.deletedAt),
-    };
-    const acctId = t.accountId as string | undefined;
-    if (acctId) {
-      const list = debitsByAccount.get(acctId) ?? [];
-      list.push(entry);
-      debitsByAccount.set(acctId, list);
-    }
-    const destId = t.destinationAccountId as string | undefined;
-    if (destId) {
-      const list = creditsByAccount.get(destId) ?? [];
-      list.push(entry);
-      creditsByAccount.set(destId, list);
-    }
-  }
-
   for (const doc of accountsSnap.docs) {
     const acct = doc.data();
     const name = sanitize((acct.name as string) ?? '');
     if (!name) continue;
 
-    const openingBalance = (acct.openingBalanceCents as number) ?? 0;
-    let balance = openingBalance;
-
-    for (const t of debitsByAccount.get(doc.id) ?? []) {
-      if (t.deleted) continue;
-      if (t.type === 'expense' || t.type === 'transfer' || t.type === 'card_purchase') balance -= t.amount;
-      else if (t.type === 'income') balance += t.amount;
-    }
-
-    for (const t of creditsByAccount.get(doc.id) ?? []) {
-      if (t.deleted) continue;
-      if (t.type === 'transfer') balance += t.amount;
-    }
+    // currentBalanceCents e mantido incrementalmente a cada transacao (ver
+    // src/finance/financeService.ts). Cai pro saldo de abertura em conta anterior ao backfill.
+    const balance = (acct.currentBalanceCents as number | undefined) ?? (acct.openingBalanceCents as number) ?? 0;
 
     totalBalance += balance;
     accountLines.push(`${name}: ${formatBRL(balance)}`);

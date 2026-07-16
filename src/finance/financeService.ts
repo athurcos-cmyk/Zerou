@@ -26,6 +26,7 @@ import { readSnapshotData, readSnapshotDoc } from '../firebase/snapshotData';
 import { startOfDay } from 'date-fns';
 import { buildDefaultCategory, defaultCategories } from './defaultCategories';
 import { monthKeyFromDate } from './financeDates';
+import { mergeAccountEffects, invertAccountEffects, transactionAccountEffects, type AccountEffect } from './financeCalculations';
 import {
   createAccountSchema,
   createBillSchema,
@@ -55,6 +56,21 @@ function collectionRef(workspaceId: string, collectionName: FinancialCollectionN
 
 function documentRef(workspaceId: string, collectionName: FinancialCollectionName, id: string) {
   return doc(getFirebaseDb(), 'workspaces', workspaceId, collectionName, id);
+}
+
+/** Aplica os deltas de saldo (ver `transactionAccountEffects`) num batch já existente —
+ * `increment()` é atômico no servidor, funciona offline igual o resto do batch. */
+export function applyAccountEffectsToBatch(
+  batch: ReturnType<typeof writeBatch>,
+  workspaceId: string,
+  effects: AccountEffect[]
+) {
+  for (const effect of effects) {
+    batch.update(documentRef(workspaceId, 'accounts', effect.accountId), {
+      currentBalanceCents: increment(effect.deltaCents),
+      updatedAt: serverTimestamp()
+    });
+  }
 }
 
 function omitUndefined<T extends Record<string, unknown>>(value: T) {
@@ -102,6 +118,7 @@ export async function createAccount(workspaceId: string, userId: string, input: 
     name: parsed.name,
     type: parsed.type,
     openingBalanceCents: parsed.openingBalanceCents,
+    currentBalanceCents: parsed.openingBalanceCents,
     isActive: true,
     createdBy: userId,
     createdAt: now,
@@ -151,7 +168,8 @@ export async function createTransaction(workspaceId: string, userId: string, inp
   const date = Timestamp.fromDate(parsed.date);
   const monthKey = monthKeyFromDate(parsed.date);
 
-  fireWrite(setDoc(documentRef(workspaceId, 'transactions', id), omitUndefined({
+  const batch = writeBatch(getFirebaseDb());
+  batch.set(documentRef(workspaceId, 'transactions', id), omitUndefined({
     id,
     workspaceId,
     createdBy: userId,
@@ -174,7 +192,9 @@ export async function createTransaction(workspaceId: string, userId: string, inp
     version: 1,
     createdAt: now,
     updatedAt: now
-  })));
+  }));
+  applyAccountEffectsToBatch(batch, workspaceId, transactionAccountEffects(parsed));
+  fireWrite(batch.commit());
 
   return id;
 }
@@ -307,6 +327,11 @@ export async function coupleGoalDeposit(
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     }));
+    applyAccountEffectsToBatch(
+      batch,
+      personalWorkspaceId,
+      transactionAccountEffects({ type: 'expense', amountCents, accountId: opts.accountId })
+    );
   }
   fireWrite(batch.commit());
 }
@@ -364,6 +389,11 @@ export async function coupleGoalWithdraw(
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     }));
+    applyAccountEffectsToBatch(
+      batch,
+      personalWorkspaceId,
+      transactionAccountEffects({ type: 'income', amountCents, accountId: opts.accountId })
+    );
   }
   fireWrite(batch.commit());
 }
@@ -387,26 +417,40 @@ export async function deleteGoal(workspaceId: string, goalId: string) {
   fireWrite(deleteDoc(documentRef(workspaceId, 'goals', goalId)));
 }
 
-export async function softDeleteTransaction(workspaceId: string, userId: string, transactionId: string) {
-  fireWrite(updateDoc(documentRef(workspaceId, 'transactions', transactionId), {
+export async function softDeleteTransaction(
+  workspaceId: string,
+  userId: string,
+  transactionId: string,
+  transaction: Pick<Transaction, 'type' | 'amountCents' | 'accountId' | 'destinationAccountId' | 'deletedAt'>
+) {
+  if (transaction.deletedAt) {
+    return;
+  }
+
+  const batch = writeBatch(getFirebaseDb());
+  batch.update(documentRef(workspaceId, 'transactions', transactionId), {
     updatedBy: userId,
     deletedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     version: increment(1)
-  }));
+  });
+  applyAccountEffectsToBatch(batch, workspaceId, invertAccountEffects(transactionAccountEffects(transaction)));
+  fireWrite(batch.commit());
 }
 
 export async function updateTransaction(
   workspaceId: string,
   userId: string,
   transactionId: string,
+  previous: Pick<Transaction, 'type' | 'amountCents' | 'accountId' | 'destinationAccountId'>,
   input: CreateTransactionInput
 ) {
   const parsed = createTransactionSchema.parse(input);
   const date = Timestamp.fromDate(parsed.date);
   const monthKey = monthKeyFromDate(parsed.date);
 
-  fireWrite(updateDoc(
+  const batch = writeBatch(getFirebaseDb());
+  batch.update(
     documentRef(workspaceId, 'transactions', transactionId),
     omitUndefined({
       updatedBy: userId,
@@ -427,7 +471,13 @@ export async function updateTransaction(
       version: increment(1),
       updatedAt: serverTimestamp()
     })
-  ));
+  );
+  applyAccountEffectsToBatch(
+    batch,
+    workspaceId,
+    mergeAccountEffects(invertAccountEffects(transactionAccountEffects(previous)), transactionAccountEffects(parsed))
+  );
+  fireWrite(batch.commit());
 }// ─── toggleTransactionReconciled ───────────────────────────────────────────────
 
 export function toggleTransactionReconciled(
@@ -693,6 +743,7 @@ export function payBill(
       tags: ['bill'], isRecurring: false, clientMutationId: id,
       syncStatus: 'synced', version: 1, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
     }));
+    applyAccountEffectsToBatch(batch, workspaceId, transactionAccountEffects({ type: 'expense', amountCents: amount, accountId: acctId }));
   }
   fireWrite(batch.commit());
 }
@@ -778,6 +829,7 @@ export function recordRecurringPayment(
       tags: ['recorrente'], isRecurring: true, recurringId: rule.id, clientMutationId: id,
       syncStatus: 'synced', version: 1, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
     }));
+    applyAccountEffectsToBatch(batch, workspaceId, transactionAccountEffects({ type: 'expense', amountCents: amount, accountId: acctId }));
   }
   fireWrite(batch.commit());
 }
@@ -808,6 +860,7 @@ export function contributeToGoalWithTransaction(
       tags: ['meta'], isRecurring: false, clientMutationId: id,
       syncStatus: 'synced', version: 1, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
     }));
+    applyAccountEffectsToBatch(batch, workspaceId, transactionAccountEffects({ type: 'expense', amountCents, accountId }));
   }
   fireWrite(batch.commit());
 }

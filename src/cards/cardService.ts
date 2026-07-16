@@ -20,6 +20,8 @@ import { getFirebaseDb } from '../firebase/config';
 import { fireWrite } from '../firebase/fireWrite';
 import { readSnapshotData, readSnapshotDoc } from '../firebase/snapshotData';
 import { monthKeyFromDate } from '../finance/financeDates';
+import { applyAccountEffectsToBatch } from '../finance/financeService';
+import { transactionAccountEffects } from '../finance/financeCalculations';
 import {
   anticipateInstallmentsSchema,
   createCardPurchaseSchema,
@@ -121,6 +123,7 @@ function invoicePayload(workspaceId: string, cardId: string, invoiceId: string, 
     feesTotalCents: 0,
     outstandingBalanceCents: 0,
     overpaidCreditCents: 0,
+    processedLedgerEntryIds: [],
     version: 1,
     createdAt: now,
     updatedAt: now
@@ -468,6 +471,11 @@ export async function recordInvoicePayment(workspaceId: string, userId: string, 
     createdAt: now,
     updatedAt: now
   });
+  applyAccountEffectsToBatch(
+    batch,
+    workspaceId,
+    transactionAccountEffects({ type: 'card_payment', amountCents: parsed.amountCents, accountId: parsed.accountId })
+  );
 
   fireWrite(batch.commit());
   return transactionId;

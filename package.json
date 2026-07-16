@@ -17,6 +17,8 @@
     "test:e2e": "playwright test",
     "generate:bank-logos": "node scripts/generate-bank-logos.mjs",
     "generate:service-logos": "node scripts/generate-service-logos.mjs",
+    "backfill:invoice-totals": "node scripts/backfillInvoiceTotals.mjs",
+    "backfill:account-balances": "node scripts/backfillAccountBalances.mjs",
     "functions:build": "npm --prefix functions run build",
     "emulators": "node scripts/with-java.mjs firebase emulators:start --only auth,firestore,storage,functions,hosting"
   },
@@ -55,6 +57,7 @@
     "eslint": "^10.5.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
+    "firebase-admin": "^13.10.0",
     "firebase-tools": "^15.20.0",
     "globals": "^17.6.0",
     "jsdom": "^29.1.1",

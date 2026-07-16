@@ -3,6 +3,7 @@ import { getMessaging } from 'firebase-admin/messaging';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { logger } from 'firebase-functions';
 import { sendPushToUser } from './push.js';
+import { transactionAccountEffects } from './shared/accountEffects.js';
 
 const region = 'southamerica-east1';
 
@@ -57,41 +58,6 @@ function formatBRL(amountCents: number): string {
   return (amountCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-// Espelha calculateInvoice (src/domain/invoices/calculateInvoice.ts). O campo
-// `outstandingBalanceCents` do doc da fatura NUNCA é atualizado pelo cliente — nasce 0
-// em invoicePayload e todos os totais são derivados do ledger no client (useCardsData).
-// Ler o campo cru aqui fazia o push de "fatura fechada" anunciar sempre R$ 0,00.
-const LEDGER_DEBIT_TYPES = new Set(['purchase', 'manual_debit', 'installment_anticipation']);
-const LEDGER_FEE_TYPES = new Set(['interest', 'fine', 'iof', 'fee']);
-const LEDGER_PAYMENT_TYPES = new Set(['payment', 'advance_payment']);
-const LEDGER_CREDIT_TYPES = new Set([
-  'refund_credit',
-  'chargeback_credit',
-  'manual_credit',
-  'installment_anticipation_credit',
-]);
-
-async function invoiceOutstandingCents(ledgerPath: string): Promise<number> {
-  const ledgerSnap = await getFirestore().collection(ledgerPath).get();
-  const seen = new Set<string>();
-  let balance = 0;
-
-  for (const entryDoc of ledgerSnap.docs) {
-    const entry = entryDoc.data() as { type?: string; amountCents?: number; idempotencyKey?: string };
-    const key = entry.idempotencyKey ?? entryDoc.id;
-    if (seen.has(key)) continue;
-    seen.add(key);
-
-    const amount = entry.amountCents ?? 0;
-    const type = entry.type ?? '';
-
-    if (LEDGER_DEBIT_TYPES.has(type) || LEDGER_FEE_TYPES.has(type)) balance += amount;
-    else if (LEDGER_PAYMENT_TYPES.has(type) || LEDGER_CREDIT_TYPES.has(type)) balance -= amount;
-  }
-
-  return Math.max(balance, 0);
-}
-
 // ─── closeInvoicesDue ─────────────────────────────────────────────────────────
 // Roda todo dia à meia-noite (BRT). Fecha as faturas de cartões cujo
 // dia de fechamento é hoje. Sem isso, o fechamento depende do usuário
@@ -133,9 +99,9 @@ export const closeInvoicesDue = onSchedule(
         closed++;
 
         if (ownerUserId) {
-          const outstandingCents = await invoiceOutstandingCents(
-            `workspaces/${workspaceId}/cards/${cardId}/invoices/${invoiceDoc.id}/ledger`
-          ).catch(() => 0);
+          // outstandingBalanceCents e mantido incrementalmente por
+          // invoiceLedgerEntryTrigger.ts — não precisa mais resomar o ledger aqui.
+          const outstandingCents = (invoiceDoc.data().outstandingBalanceCents as number | undefined) ?? 0;
 
           await sendPushToUser(
             ownerUserId,
@@ -272,6 +238,12 @@ export const generateRecurrences = onSchedule(
         nextOccurrenceAt: Timestamp.fromDate(nextDate),
         updatedAt: FieldValue.serverTimestamp(),
       });
+      for (const effect of transactionAccountEffects({ type: 'expense', amountCents: rule.amountCents, accountId: rule.accountId })) {
+        batch.update(db.doc(`workspaces/${rule.workspaceId}/accounts/${effect.accountId}`), {
+          currentBalanceCents: FieldValue.increment(effect.deltaCents),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
       await batch.commit();
       generated++;
 

@@ -93,13 +93,18 @@ export function EditTransactionPage() {
     event.preventDefault();
     setMessage(null);
 
-    if (!workspaceId || !user || !transactionId) {
+    if (!workspaceId || !user || !transactionId || !transaction) {
       setMessage('Não foi possível localizar a transação.');
       return;
     }
 
     try {
       updateTransaction(workspaceId, user.uid, transactionId, {
+        type: transaction.type,
+        amountCents: transaction.amountCents,
+        accountId: transaction.accountId,
+        destinationAccountId: transaction.destinationAccountId
+      }, {
         type,
         amountCents: parseMoneyToCents(amount),
         description,

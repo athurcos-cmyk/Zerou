@@ -278,17 +278,31 @@ describe('buildFinancialContext', () => {
     expect(context).toMatch(/R\$\s*1[.]?239[,.]90/);
   });
 
-  it('includes account balances', async () => {
+  it('includes account balances lidos de currentBalanceCents (mantido incrementalmente)', async () => {
     const db = mockDb({}, {
       ...emptyCollections,
       'workspaces/ws1/categories': [],
-      'workspaces/ws1/transactions': [
-        fakeDoc('txn1', {
-          type: 'expense', amountCents: 3000, accountId: 'acct1',
-          categoryId: undefined, competenceMonth: currentMonth,
-          date: Timestamp.fromDate(makeDate(1)),
+      'workspaces/ws1/transactions': [],
+      'workspaces/ws1/bills': [],
+      'workspaces/ws1/accounts': [
+        fakeDoc('acct1', {
+          id: 'acct1', name: 'Carteira', type: 'wallet', isActive: true,
+          openingBalanceCents: 50000, currentBalanceCents: 47000,
         }),
       ],
+    });
+
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
+
+    expect(context).toContain('Carteira');
+    expect(context).toMatch(/R\$\s*470[,.]00/);
+  });
+
+  it('cai pro openingBalanceCents quando currentBalanceCents ainda não existe (pré-backfill)', async () => {
+    const db = mockDb({}, {
+      ...emptyCollections,
+      'workspaces/ws1/categories': [],
+      'workspaces/ws1/transactions': [],
       'workspaces/ws1/bills': [],
       'workspaces/ws1/accounts': [
         fakeDoc('acct1', { id: 'acct1', name: 'Carteira', type: 'wallet', isActive: true, openingBalanceCents: 50000 }),
@@ -297,9 +311,8 @@ describe('buildFinancialContext', () => {
 
     const context = await buildFinancialContext(db, 'ws1', 'user1');
 
-    // Balance = 50000 - 3000 = 47000
     expect(context).toContain('Carteira');
-    expect(context).toMatch(/R\$\s*470[,.]00/);
+    expect(context).toMatch(/R\$\s*500[,.]00/);
   });
 
   it('handles empty workspace gracefully', async () => {

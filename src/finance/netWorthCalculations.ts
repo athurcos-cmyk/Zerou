@@ -1,5 +1,5 @@
 import { toDate } from './financeDates';
-import { calculateAccountBalances } from './financeCalculations';
+import { calculateAccountBalances, currentAccountBalances } from './financeCalculations';
 import type { Account, AccountType, Bill, Invoice } from '../types/contracts';
 
 export interface NetWorthBreakdown {
@@ -29,11 +29,10 @@ const ASSET_TYPE_LABELS: Record<AccountType, string> = {
 
 export function calculateNetWorth(
   accounts: Account[],
-  transactions: import('../types/contracts').Transaction[],
   invoices: Invoice[],
   bills: Bill[],
 ): NetWorthBreakdown {
-  const balances = calculateAccountBalances(accounts, transactions);
+  const balances = currentAccountBalances(accounts);
   const totalAssetsCents = balances.reduce((sum, a) => sum + a.balanceCents, 0);
 
   const byType = new Map<AccountType, number>();

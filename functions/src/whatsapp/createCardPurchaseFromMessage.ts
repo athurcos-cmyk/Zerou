@@ -79,6 +79,7 @@ export async function createCardPurchaseFromMessage(
           feesTotalCents: 0,
           outstandingBalanceCents: 0,
           overpaidCreditCents: 0,
+          processedLedgerEntryIds: [],
           version: 1,
           createdAt: now,
           updatedAt: now,

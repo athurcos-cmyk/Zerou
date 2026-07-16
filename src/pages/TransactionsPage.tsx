@@ -13,6 +13,7 @@ import { transactionTypeLabels } from '../finance/financeLabels';
 import { softDeleteTransaction, toggleTransactionReconciled } from '../finance/financeService';
 import { formatMoney } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
+import type { Transaction } from '../types/contracts';
 
 export function TransactionsPage() {
   const { user, profile } = useAuth();
@@ -88,11 +89,12 @@ export function TransactionsPage() {
     { key: 'transfer', label: 'Transferências' }
   ];
 
-  async function handleDelete(transactionId: string, isCardPurchase: boolean) {
+  async function handleDelete(transaction: Transaction) {
     if (!workspaceId || !user) {
       return;
     }
 
+    const isCardPurchase = transaction.type === 'card_purchase';
     const ok = await confirm({
       title: 'Excluir transação?',
       message: isCardPurchase
@@ -106,7 +108,13 @@ export function TransactionsPage() {
       return;
     }
 
-    softDeleteTransaction(workspaceId, user.uid, transactionId);
+    softDeleteTransaction(workspaceId, user.uid, transaction.id, {
+      type: transaction.type,
+      amountCents: transaction.amountCents,
+      accountId: transaction.accountId,
+      destinationAccountId: transaction.destinationAccountId,
+      deletedAt: transaction.deletedAt
+    });
   }
 
   return (
@@ -248,7 +256,7 @@ export function TransactionsPage() {
                       className="icon-button"
                       type="button"
                       aria-label="Excluir transação"
-                      onClick={() => void handleDelete(transaction.id, transaction.type === 'card_purchase')}
+                      onClick={() => void handleDelete(transaction)}
                     >
                       <Trash2 size={17} aria-hidden="true" />
                     </button>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { CalendarClock, CreditCard, Layers, Trash2 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
@@ -11,6 +11,7 @@ import { FormMessage } from '../components/FormMessage';
 import { invoiceStatusLabels } from '../cards/cardLabels';
 import { deleteCard, recordInvoicePayment } from '../cards/cardService';
 import { pickCurrentInvoice } from '../cards/cardDates';
+import { mergeInvoicesWithLedger, useInvoiceLedger } from '../cards/useInvoiceLedger';
 
 import { formatFriendlyDate } from '../finance/financeDates';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
@@ -26,10 +27,13 @@ export function CardDetailPage() {
   const finance = useFinanceContext();
   const card = cardsData.cards.find((item) => item.id === cardId);
   const invoices = cardsData.invoices.filter((invoice) => invoice.cardId === cardId);
+  const invoiceRefs = useMemo(() => invoices.map((invoice) => ({ id: invoice.id, cardId: invoice.cardId })), [invoices]);
+  const ledgerEntries = useInvoiceLedger(workspaceId, invoiceRefs, finance.transactionIndex);
+  const invoicesWithLedger = useMemo(() => mergeInvoicesWithLedger(invoices, ledgerEntries), [invoices, ledgerEntries]);
   // Uma fatura futura cuja única parcela foi antecipada pra cá some do histórico — igual sumiu
   // da própria tela dela (`anticipatedAwayEntryIds`). Se uma compra nova cair nela depois, ela
   // deixa de ficar vazia e reaparece sozinha (não é um estado gravado, é sempre recalculado).
-  const visibleInvoices = invoices.filter((invoice) => invoiceHasVisibleActivity(invoice.ledgerEntries));
+  const visibleInvoices = invoicesWithLedger.filter((invoice) => invoiceHasVisibleActivity(invoice.ledgerEntries));
   const [message, setMessage] = useState<string | null>(null);
   const { confirm, dialog: confirmDialog } = useConfirm();
 

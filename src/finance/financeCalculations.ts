@@ -315,7 +315,7 @@ export function calculateDashboardSummary(input: {
     availableMode: input.availableMode,
     now
   });
-  const totalBalanceCents = calculateTotalBalance(input.accounts, input.transactions);
+  const totalBalanceCents = currentTotalBalance(input.accounts);
   const commitments = buildUpcomingCommitments(input.bills, input.recurringRules, cutoff, input.invoices ?? []);
   const committedCents = commitments.reduce((total, commitment) => total + commitment.amountCents, 0);
   const recentTransactions = input.transactions
