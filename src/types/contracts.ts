@@ -38,7 +38,8 @@ export type InvoiceLedgerEntryType =
   | 'iof'
   | 'fee'
   | 'installment_anticipation'
-  | 'installment_anticipation_credit';
+  | 'installment_anticipation_credit'
+  | 'purchase_reversal';
 
 // Quando a pessoa recebe (salário/renda) — usado pra saber até quando "Comprometido"
 // deve olhar sem precisar que ela lance uma receita futura manualmente.
@@ -167,6 +168,9 @@ export interface Account {
   name: string;
   type: AccountType;
   openingBalanceCents: MoneyCents;
+  /** Saldo corrente, mantido incrementalmente (increment() a cada lançamento) —
+   * ausente em contas criadas antes do backfill; consumidores usam `?? openingBalanceCents`. */
+  currentBalanceCents?: MoneyCents;
   isActive: boolean;
   createdBy: string;
   createdAt?: Timestamp;
@@ -294,6 +298,9 @@ export interface Invoice {
   feesTotalCents: MoneyCents;
   outstandingBalanceCents: MoneyCents;
   overpaidCreditCents: MoneyCents;
+  /** Idempotência da Cloud Function que mantém os totais incrementalmente — ids de
+   * ledger entries já contabilizados. Interno; o client nunca escreve nele. */
+  processedLedgerEntryIds?: string[];
   version: number;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;

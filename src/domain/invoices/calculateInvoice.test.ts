@@ -40,6 +40,14 @@ describe('invoice ledger calculations', () => {
     expect(invoice.status).toBe('overpaid');
   });
 
+  it('applies purchase_reversal as a credit, cancelling a deleted card purchase', () => {
+    const invoice = calculateInvoice([purchase(30000, 'p-1'), ledgerEntry('purchase_reversal', 30000, 'reversal-1')]);
+
+    expect(invoice.purchasesTotalCents).toBe(30000);
+    expect(invoice.creditsTotalCents).toBe(30000);
+    expect(invoice.outstandingBalanceCents).toBe(0);
+  });
+
   it('applies refunds before and after closing as credits', () => {
     const open = calculateInvoice([purchase(100000, 'p-1'), ledgerEntry('refund_credit', 25000, 'refund-before')]);
     const closed = calculateInvoice([...open.appliedEntries, ledgerEntry('refund_credit', 25000, 'refund-after')], 'closed');

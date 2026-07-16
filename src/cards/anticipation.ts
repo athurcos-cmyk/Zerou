@@ -159,13 +159,18 @@ export interface NettableLedgerEntry {
  * simplesmente SOME da fatura futura, não fica lá riscada. Casa por (sourceTransactionId,
  * amountCents); cada crédito anula exatamente uma parcela.
  *
+ * Mesmo tratamento pra `purchase_reversal` — o estorno gerado quando uma compra no cartão é
+ * excluída no Extrato (ver `reverseCardPurchaseOnDelete`) anula a parcela original do mesmo
+ * jeito; esconder o par evita o mesmo ruído contábil de uma compra que já não existe mais.
+ *
  * Não confundir com `installment_anticipation` (o débito que pousa na fatura ATUAL/origem
  * quando se antecipa): esse é visível de propósito — é dinheiro pesando agora, correto.
  */
 export function anticipatedAwayEntryIds(entries: NettableLedgerEntry[]): Set<string> {
   const availableCredits = new Map<string, string[]>();
   for (const entry of entries) {
-    if (entry.type !== 'installment_anticipation_credit' || !entry.sourceTransactionId) continue;
+    const isCancellingCredit = entry.type === 'installment_anticipation_credit' || entry.type === 'purchase_reversal';
+    if (!isCancellingCredit || !entry.sourceTransactionId) continue;
     const key = `${entry.sourceTransactionId}_${entry.amountCents}`;
     const list = availableCredits.get(key) ?? [];
     list.push(entry.id);

@@ -27,6 +27,10 @@ function anticipationCredit(id: string, amountCents: number, sourceTransactionId
   return { id, type: 'installment_anticipation_credit', amountCents, sourceTransactionId };
 }
 
+function purchaseReversal(id: string, amountCents: number, sourceTransactionId = 'txn-1') {
+  return { id, type: 'purchase_reversal', amountCents, sourceTransactionId };
+}
+
 function invoice(overrides: Partial<AnticipatableInvoice>): AnticipatableInvoice {
   return {
     id: overrides.id ?? 'card-1_2026-08',
@@ -191,6 +195,13 @@ describe('anticipatedAwayEntryIds', () => {
     const entries = [purchase('p1', 30000), { id: 'r1', type: 'refund_credit', amountCents: 30000, sourceTransactionId: 'txn-1' }];
     expect(anticipatedAwayEntryIds(entries)).toEqual(new Set());
   });
+
+  it('esconde a parcela e o estorno quando a compra no cartão é excluída (purchase_reversal)', () => {
+    const entries = [purchase('p1', 30000), purchaseReversal('r1', 30000)];
+    const hidden = anticipatedAwayEntryIds(entries);
+    expect(hidden.has('p1')).toBe(true);
+    expect(hidden.has('r1')).toBe(true);
+  });
 });
 
 describe('invoiceHasVisibleActivity', () => {
@@ -201,6 +212,11 @@ describe('invoiceHasVisibleActivity', () => {
 
   it('fatura sem nenhum lançamento fica vazia', () => {
     expect(invoiceHasVisibleActivity([])).toBe(false);
+  });
+
+  it('fatura só com o par compra excluída + estorno fica vazia', () => {
+    const entries = [purchase('p1', 30000), purchaseReversal('r1', 30000)];
+    expect(invoiceHasVisibleActivity(entries)).toBe(false);
   });
 
   it('fatura com uma compra nova (não casada) continua visível', () => {

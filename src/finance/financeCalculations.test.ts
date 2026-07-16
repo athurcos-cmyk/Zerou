@@ -5,7 +5,12 @@ import {
   calculateAccountBalances,
   calculateDashboardSummary,
   calculateTotalBalance,
-  findNextIncomeDate
+  currentAccountBalances,
+  currentTotalBalance,
+  findNextIncomeDate,
+  invertAccountEffects,
+  mergeAccountEffects,
+  transactionAccountEffects
 } from './financeCalculations';
 import type { Account, Bill, Invoice, RecurringRule, Transaction } from '../types/contracts';
 
@@ -258,6 +263,133 @@ describe('financial calculations — movimentação de saldo', () => {
     );
 
     expect(total).toBe(10000);
+  });
+});
+
+describe('transactionAccountEffects / mergeAccountEffects / invertAccountEffects', () => {
+  it('returns the effect for each transaction type', () => {
+    expect(transactionAccountEffects(transaction({ type: 'income', amountCents: 500, accountId: 'checking' })))
+      .toEqual([{ accountId: 'checking', deltaCents: 500 }]);
+    expect(transactionAccountEffects(transaction({ type: 'refund', amountCents: 500, accountId: 'checking' })))
+      .toEqual([{ accountId: 'checking', deltaCents: 500 }]);
+    expect(transactionAccountEffects(transaction({ type: 'reimbursement', amountCents: 500, accountId: 'checking' })))
+      .toEqual([{ accountId: 'checking', deltaCents: 500 }]);
+    expect(transactionAccountEffects(transaction({ type: 'expense', amountCents: 500, accountId: 'checking' })))
+      .toEqual([{ accountId: 'checking', deltaCents: -500 }]);
+    expect(transactionAccountEffects(transaction({ type: 'card_payment', amountCents: 500, accountId: 'checking' })))
+      .toEqual([{ accountId: 'checking', deltaCents: -500 }]);
+    expect(transactionAccountEffects(transaction({ type: 'adjustment', amountCents: -300, accountId: 'checking' })))
+      .toEqual([{ accountId: 'checking', deltaCents: -300 }]);
+    expect(transactionAccountEffects(transaction({ type: 'card_purchase', amountCents: 500, accountId: undefined })))
+      .toEqual([]);
+  });
+
+  it('returns both sides for a transfer', () => {
+    expect(
+      transactionAccountEffects(
+        transaction({ type: 'transfer', amountCents: 500, accountId: 'checking', destinationAccountId: 'wallet' })
+      )
+    ).toEqual([
+      { accountId: 'checking', deltaCents: -500 },
+      { accountId: 'wallet', deltaCents: 500 }
+    ]);
+  });
+
+  it('returns nothing for a deleted transaction, regardless of type', () => {
+    expect(
+      transactionAccountEffects(
+        transaction({ type: 'income', amountCents: 500, accountId: 'checking', deletedAt: Timestamp.now() })
+      )
+    ).toEqual([]);
+  });
+
+  it('returns nothing when there is no accountId (defensive)', () => {
+    expect(transactionAccountEffects(transaction({ type: 'income', amountCents: 500, accountId: undefined }))).toEqual([]);
+  });
+
+  it('merges effects across groups and drops entries that net to zero', () => {
+    const merged = mergeAccountEffects(
+      [{ accountId: 'checking', deltaCents: 500 }],
+      [{ accountId: 'checking', deltaCents: -500 }, { accountId: 'wallet', deltaCents: 200 }]
+    );
+    expect(merged).toEqual([{ accountId: 'wallet', deltaCents: 200 }]);
+  });
+
+  it('inverts every effect', () => {
+    expect(invertAccountEffects([{ accountId: 'checking', deltaCents: 500 }])).toEqual([
+      { accountId: 'checking', deltaCents: -500 }
+    ]);
+  });
+
+  it('edit: changing the amount keeps the same account (delta = new - old)', () => {
+    const previous = transaction({ type: 'expense', amountCents: 100, accountId: 'checking' });
+    const next = transaction({ type: 'expense', amountCents: 150, accountId: 'checking' });
+    const delta = mergeAccountEffects(invertAccountEffects(transactionAccountEffects(previous)), transactionAccountEffects(next));
+    expect(delta).toEqual([{ accountId: 'checking', deltaCents: -50 }]);
+  });
+
+  it('edit: changing the account moves the full effect between the two', () => {
+    const previous = transaction({ type: 'expense', amountCents: 100, accountId: 'checking' });
+    const next = transaction({ type: 'expense', amountCents: 100, accountId: 'wallet' });
+    const delta = mergeAccountEffects(invertAccountEffects(transactionAccountEffects(previous)), transactionAccountEffects(next));
+    expect(delta).toEqual(
+      expect.arrayContaining([
+        { accountId: 'checking', deltaCents: 100 },
+        { accountId: 'wallet', deltaCents: -100 }
+      ])
+    );
+  });
+
+  it('edit: changing the type (expense -> income) doubles the effect on the same account', () => {
+    const previous = transaction({ type: 'expense', amountCents: 100, accountId: 'checking' });
+    const next = transaction({ type: 'income', amountCents: 100, accountId: 'checking' });
+    const delta = mergeAccountEffects(invertAccountEffects(transactionAccountEffects(previous)), transactionAccountEffects(next));
+    expect(delta).toEqual([{ accountId: 'checking', deltaCents: 200 }]);
+  });
+
+  it('edit: flipping the sides of a transfer reverts both accounts and reapplies inverted', () => {
+    const previous = transaction({ type: 'transfer', amountCents: 100, accountId: 'checking', destinationAccountId: 'wallet' });
+    const next = transaction({ type: 'transfer', amountCents: 100, accountId: 'wallet', destinationAccountId: 'checking' });
+    const delta = mergeAccountEffects(invertAccountEffects(transactionAccountEffects(previous)), transactionAccountEffects(next));
+    expect(delta).toEqual(
+      expect.arrayContaining([
+        { accountId: 'checking', deltaCents: 200 },
+        { accountId: 'wallet', deltaCents: -200 }
+      ])
+    );
+  });
+
+  it('delete: reverting each type undoes exactly its own effect', () => {
+    const expense = transaction({ type: 'expense', amountCents: 100, accountId: 'checking' });
+    expect(invertAccountEffects(transactionAccountEffects(expense))).toEqual([{ accountId: 'checking', deltaCents: 100 }]);
+
+    const transfer = transaction({ type: 'transfer', amountCents: 100, accountId: 'checking', destinationAccountId: 'wallet' });
+    expect(invertAccountEffects(transactionAccountEffects(transfer))).toEqual(
+      expect.arrayContaining([
+        { accountId: 'checking', deltaCents: 100 },
+        { accountId: 'wallet', deltaCents: -100 }
+      ])
+    );
+  });
+});
+
+describe('currentAccountBalances / currentTotalBalance', () => {
+  it('uses currentBalanceCents when present', () => {
+    const balances = currentAccountBalances([account('checking', 1000, { currentBalanceCents: 4200 })]);
+    expect(balances[0].balanceCents).toBe(4200);
+  });
+
+  it('falls back to openingBalanceCents when currentBalanceCents is absent (pre-backfill)', () => {
+    const balances = currentAccountBalances([account('checking', 1000)]);
+    expect(balances[0].balanceCents).toBe(1000);
+  });
+
+  it('sums across accounts', () => {
+    const total = currentTotalBalance([
+      account('checking', 0, { currentBalanceCents: 1000 }),
+      account('wallet', 0, { currentBalanceCents: 500 })
+    ]);
+    expect(total).toBe(1500);
   });
 });
 

@@ -3,7 +3,7 @@ import type { InvoiceLedgerInput, InvoiceCalculation, InvoiceMutationResult } fr
 const debitTypes = new Set(['purchase', 'manual_debit']);
 const feeTypes = new Set(['interest', 'fine', 'iof', 'fee']);
 const paymentTypes = new Set(['payment', 'advance_payment']);
-const creditTypes = new Set(['refund_credit', 'chargeback_credit', 'manual_credit']);
+const creditTypes = new Set(['refund_credit', 'chargeback_credit', 'manual_credit', 'purchase_reversal']);
 
 function uniqueEntries(entries: InvoiceLedgerInput[]) {
   const seen = new Set<string>();

@@ -42,50 +42,98 @@ function isOnOrBefore(left: Date, right: Date) {
   return isBefore(left, right) || isEqual(left, right);
 }
 
-function applyTransactionToBalances(
-  balances: Map<string, number>,
-  transaction: Transaction,
-  accountIds: Set<string>
-) {
-  if (!isActiveTransaction(transaction)) {
-    return;
+export interface AccountEffect {
+  accountId: string;
+  deltaCents: number;
+}
+
+/**
+ * Delta de saldo que uma transação aplica, por conta afetada — fonte única de
+ * verdade pro sinal de cada tipo, usada tanto pelo cálculo histórico
+ * (`applyTransactionToBalances`, abaixo) quanto pelo saldo incremental
+ * (`currentBalanceCents`, mantido via `increment()` no mesmo batch da escrita).
+ */
+export function transactionAccountEffects(
+  transaction: Pick<Transaction, 'type' | 'amountCents' | 'accountId' | 'destinationAccountId' | 'deletedAt'>
+): AccountEffect[] {
+  if (transaction.deletedAt) {
+    return [];
   }
 
   const sourceId = transaction.accountId;
   const destinationId = transaction.destinationAccountId;
 
   if (transaction.type === 'income' || transaction.type === 'refund' || transaction.type === 'reimbursement') {
-    if (sourceId && accountIds.has(sourceId)) {
-      balances.set(sourceId, (balances.get(sourceId) ?? 0) + transaction.amountCents);
-    }
-    return;
+    return sourceId ? [{ accountId: sourceId, deltaCents: transaction.amountCents }] : [];
   }
 
   if (transaction.type === 'expense' || transaction.type === 'card_payment') {
-    if (sourceId && accountIds.has(sourceId)) {
-      balances.set(sourceId, (balances.get(sourceId) ?? 0) - transaction.amountCents);
-    }
-    return;
+    return sourceId ? [{ accountId: sourceId, deltaCents: -transaction.amountCents }] : [];
   }
 
   if (transaction.type === 'card_purchase') {
-    return;
+    return [];
   }
 
   if (transaction.type === 'transfer') {
-    if (sourceId && accountIds.has(sourceId)) {
-      balances.set(sourceId, (balances.get(sourceId) ?? 0) - transaction.amountCents);
-    }
-
-    if (destinationId && accountIds.has(destinationId)) {
-      balances.set(destinationId, (balances.get(destinationId) ?? 0) + transaction.amountCents);
-    }
-    return;
+    const effects: AccountEffect[] = [];
+    if (sourceId) effects.push({ accountId: sourceId, deltaCents: -transaction.amountCents });
+    if (destinationId) effects.push({ accountId: destinationId, deltaCents: transaction.amountCents });
+    return effects;
   }
 
   if (transaction.type === 'adjustment') {
-    if (sourceId && accountIds.has(sourceId)) {
-      balances.set(sourceId, (balances.get(sourceId) ?? 0) + transaction.amountCents);
+    return sourceId ? [{ accountId: sourceId, deltaCents: transaction.amountCents }] : [];
+  }
+
+  return [];
+}
+
+/**
+ * Soma deltas por conta vindos de múltiplos grupos (ex.: reverter o efeito antigo +
+ * aplicar o novo numa edição) e descarta entradas cujo delta líquido ficou zero —
+ * evita um `increment(0)` inútil no batch.
+ */
+export function mergeAccountEffects(...groups: AccountEffect[][]): AccountEffect[] {
+  const totals = new Map<string, number>();
+  for (const group of groups) {
+    for (const effect of group) {
+      totals.set(effect.accountId, (totals.get(effect.accountId) ?? 0) + effect.deltaCents);
+    }
+  }
+  return [...totals.entries()]
+    .filter(([, deltaCents]) => deltaCents !== 0)
+    .map(([accountId, deltaCents]) => ({ accountId, deltaCents }));
+}
+
+export function invertAccountEffects(effects: AccountEffect[]): AccountEffect[] {
+  return effects.map((effect) => ({ accountId: effect.accountId, deltaCents: -effect.deltaCents }));
+}
+
+/**
+ * Saldo atual (agora), lido direto do campo mantido incrementalmente — nunca precisa
+ * reler o histórico de transações. Fallback pro saldo de abertura em contas criadas
+ * antes do backfill (`currentBalanceCents` ainda ausente).
+ */
+export function currentAccountBalances(accounts: Account[]): AccountBalance[] {
+  return accounts.map((account) => ({
+    ...account,
+    balanceCents: account.currentBalanceCents ?? account.openingBalanceCents
+  }));
+}
+
+export function currentTotalBalance(accounts: Account[]): number {
+  return currentAccountBalances(accounts).reduce((total, account) => total + account.balanceCents, 0);
+}
+
+function applyTransactionToBalances(
+  balances: Map<string, number>,
+  transaction: Transaction,
+  accountIds: Set<string>
+) {
+  for (const effect of transactionAccountEffects(transaction)) {
+    if (accountIds.has(effect.accountId)) {
+      balances.set(effect.accountId, (balances.get(effect.accountId) ?? 0) + effect.deltaCents);
     }
   }
 }
