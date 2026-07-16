@@ -28,8 +28,8 @@ Retorne SOMENTE um JSON com este formato:
   "amountCents": inteiro em centavos (0 se nao aplicavel),
   "description": descricao curta (max 80 chars, "" se nao aplicavel),
   "categoryId": id da categoria EXISTENTE mais especifica que combina, ou null,
-  "newCategoryName": nome pedido pelo usuario (so para create_category), ou null,
-  "newCategoryType": "income" | "expense" | "both" (so para create_category), ou null,
+  "newCategoryName": nome de categoria pedido pelo usuario que NAO existe na lista, ou null,
+  "newCategoryType": "income" | "expense" | "both" (junto com newCategoryName), ou null,
   "newCategoryIcon": uma destas chaves EXATAS — [${categoryIconKeys.join(', ')}] — ou null,
   "confidence": "high" | "low"
 }
@@ -51,14 +51,20 @@ Ex.: se existem "Farmacia" (expense) e "Saude" (expense) e a mensagem fala de re
 Retorne categoryId null SE E SOMENTE SE nenhuma categoria existente combinar — nunca sugira criar uma.
 
 Se o usuario mencionar EXPLICITAMENTE em qual categoria colocar o lancamento (ex.: "coloca na categoria
-Mercado", "categoria: Lazer", "classifica como Transporte", "bota em Casa"), use EXATAMENTE essa categoria
-se ela existir na lista — mesmo que outra categoria pareca semanticamente mais obvia pro assunto da
-mensagem. O pedido explicito do usuario sempre vence a escolha automatica por assunto.
+Mercado", "categoria: Lazer", "classifica como Transporte", "bota em Casa"):
+- Se essa categoria EXISTIR na lista, use EXATAMENTE ela em categoryId — mesmo que outra categoria pareca
+  semanticamente mais obvia pro assunto da mensagem. O pedido explicito do usuario sempre vence a escolha
+  automatica por assunto.
+- Se essa categoria NAO EXISTIR na lista, preencha newCategoryName (nome pedido, capitalizado),
+  newCategoryType (mesmo tipo do intent: "expense" para expense, "income" para income) e newCategoryIcon
+  (chave mais adequada da lista, ou null). Deixe categoryId null. O intent continua "expense"/"income"
+  normalmente (NAO vire "create_category") — a categoria nova pedida explicitamente sera criada e usada
+  no mesmo lancamento.
 
-Regras de create_category: newCategoryName = nome pedido, capitalizado. newCategoryType = "income" se
-mencionar receita/renda, senao "expense" (padrao quando ambiguo). newCategoryIcon = chave mais adequada
-da lista, ou null. amountCents deve ser 0 e categoryId null — criar categoria NUNCA cria uma transacao
-junto, mesmo que a mensagem tambem cite um valor.`;
+Regras de create_category (pedido AVULSO de categoria, sem lancamento junto): newCategoryName = nome
+pedido, capitalizado. newCategoryType = "income" se mencionar receita/renda, senao "expense" (padrao
+quando ambiguo). newCategoryIcon = chave mais adequada da lista, ou null. amountCents deve ser 0 e
+categoryId null — esse intent NUNCA cria uma transacao junto, mesmo que a mensagem tambem cite um valor.`;
 }
 
 export async function interpretMessage(

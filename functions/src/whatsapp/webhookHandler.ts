@@ -222,6 +222,20 @@ export const whatsappWebhook = onRequest(
         if (!typeMatches) categoryId = null;
       }
 
+      // Usuario nomeou explicitamente uma categoria que ainda nao existe dentro do
+      // proprio lancamento (ex.: "gastei 50 no mercado, coloca na categoria trabalho")
+      // — cria na hora e usa nesse mesmo lancamento (diferente de criar sem lancamento junto).
+      if (!categoryId && interpretation.newCategoryName) {
+        const newCategory = await createCategoryFromMessage({
+          workspaceId,
+          userId: linkedByUid,
+          name: interpretation.newCategoryName,
+          type: interpretation.newCategoryType ?? interpretation.intent,
+          icon: interpretation.newCategoryIcon,
+        });
+        categoryId = newCategory.id;
+      }
+
       const result = await createTransactionFromMessage({
         workspaceId,
         userId: linkedByUid,

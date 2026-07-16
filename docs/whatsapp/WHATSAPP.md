@@ -37,7 +37,7 @@ Integracao oficial com a Meta Cloud API v25.0 para controle financeiro completo 
 | `functions/src/whatsapp/metaClient.ts` | Cliente HTTP para Meta Cloud API v25.0. Envia mensagens (`sendWhatsAppMessage`), define secrets (`WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN`, `GRANATIVA_WHATSAPP_NUMBER`). |
 | `functions/src/whatsapp/webhookHandler.ts` | Cloud Function `onRequest`. GET: verificacao de webhook. POST: le a mensagem, resolve `vincular XXXXXX` via regex (`processLinkCode`) ou chama `interpretMessage` e roteia por intencao: `create_category` → `createCategoryFromMessage`; `question` → `answerFinancialQuestion`; `expense`/`income` → `createTransactionFromMessage`; `unclear` → mensagem de ajuda. |
 | `functions/src/whatsapp/interpretMessage.ts` | Uma chamada DeepSeek (JSON mode) classifica a mensagem em `expense`/`income`/`create_category`/`question`/`unclear` e ja extrai valor, descricao, categoria (a mais especifica entre as existentes) e dados de categoria nova, tudo numa chamada so. Substitui o antigo `extractExpense.ts` (so cobria despesa). |
-| `functions/src/whatsapp/createCategoryFromMessage.ts` | Cria categoria via Admin SDK quando o usuario pede explicitamente ("cria uma categoria X"). Dedupe por nome (case-insensitive), icone validado contra `categoryPalette.ts` (fallback `sliders`), cor escolhida por rotacao na paleta Sol — nunca inventada pela IA. Payload identico a `financeService.createCategory()`. |
+| `functions/src/whatsapp/createCategoryFromMessage.ts` | Cria categoria via Admin SDK. Dois gatilhos: (1) pedido avulso explicito ("cria uma categoria X", intent `create_category`, sem transacao); (2) categoria nomeada explicitamente DENTRO de um lancamento que ainda nao existe ("gastei 50 no mercado, coloca na categoria trabalho" — cria "Trabalho" e ja usa nesse mesmo lancamento). Dedupe por nome (case-insensitive), icone validado contra `categoryPalette.ts` (fallback `sliders`), cor escolhida por rotacao na paleta Sol — nunca inventada pela IA. Payload identico a `financeService.createCategory()`. |
 | `functions/src/whatsapp/categoryPalette.ts` | Espelha `src/components/categoryIcons.tsx` e `src/theme/palette.ts` (Cloud Functions nao importa `src/` do app cliente — pacotes separados). Mantenha em sincronia manualmente. |
 | `functions/src/whatsapp/answerFinancialQuestion.ts` | Perguntas financeiras via WhatsApp — reusa `buildFinancialContext` + a mesma persona/regras da Grazi (`financialAssistant.ts`), com o negrito adaptado pro WhatsApp (`*um asterisco*`, nao `**dois**`). Rate limit compartilhado com a Grazi do app (`aiRateLimit.ts`, mesmo contador `workspaces/{id}/aiUsage/{data}`, 60/dia). |
 | `functions/src/whatsapp/createTransactionFromMessage.ts` | Cria transacao no Firestore via Admin SDK (bypassa regras) — despesa ou receita (`type` recebido, nao mais fixo em `'expense'`). Mantenha em sincronia com `src/finance/financeService.ts:createTransaction()`. |
@@ -246,6 +246,13 @@ Atualmente DESATIVADA (comentada em `webhookHandler.ts`). Para reativar:
 Verificar logs do webhook. Erros 429/503 tem retry automatico. Outros erros resultam em mensagem "Nao consegui entender o valor" para o usuario.
 
 ## Historico
+
+### 2026-07-15 — Categoria nomeada explicitamente dentro do lancamento agora e criada
+
+- **Antes**: "gastei 50 no mercado, coloca na categoria trabalho" — se "Trabalho" nao existisse, o lancamento ficava sem categoria (regra de "so cria com pedido explicito avulso" era estrita demais aqui).
+- **Depois**: nomear uma categoria explicitamente DENTRO de um lancamento de despesa/receita ("coloca na categoria X", "categoria: X") agora cria "X" na hora se ela nao existir, e ja usa nesse mesmo lancamento. Continua sem criar nada quando a IA so *escolhe* uma categoria por semelhanca semantica (ex.: "gastei na farmacia" sem categoria "Farmacia" cadastrada continua ficando sem categoria) — a criacao so acontece quando o nome da categoria vem explicito na mensagem.
+- Tambem corrigido: pedido explicito de categoria ("coloca na categoria Mercado") agora sempre vence a escolha automatica por assunto, mesmo quando outra categoria pareceria mais obvia.
+- Arquivos: `interpretMessage.ts` (prompt), `webhookHandler.ts` (chama `createCategoryFromMessage` antes de `createTransactionFromMessage` quando aplicavel).
 
 ### 2026-07-15 — Paridade com a Grazi: categorias, receita, perguntas + vinculo unico/desvinculo
 
