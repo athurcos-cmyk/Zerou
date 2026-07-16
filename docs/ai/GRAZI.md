@@ -55,7 +55,7 @@ O contexto é dividido em até 10 seções (algumas só aparecem quando há dado
 - Mês atual e anterior (`yyyy-MM`)
 - Gasto total no mês atual vs. anterior (com variação %)
 - Receitas no mês atual
-- Saldo total em contas (abertura ± transações)
+- Saldo total em contas (lido de `account.currentBalanceCents`, mantido incrementalmente — nunca mais recalculado só com os últimos 90 dias, ver "Bugs corrigidos")
 - Total comprometido (contas + faturas)
 - Livre para gastar (saldo - comprometido)
 
@@ -65,7 +65,7 @@ O contexto é dividido em até 10 seções (algumas só aparecem quando há dado
 
 **=== COMPROMETIDO (próximos 30 dias) ===**
 - **Contas a pagar**: unifica `bills` (status `pending`/`overdue`, vencimento em até 30 dias ou já vencidas) + `recurring` ativas com `amountCents > 0` e `nextOccurrenceAt` nos próximos 30 dias ou já passada. Recorrentes são anotadas com "(se repete)". Ordenadas: VENCIDAS primeiro, depois avulsas por data, depois recorrentes.
-- **Faturas de cartão**: `invoices` com status `open`/`closed`/`overdue`/`partial` e saldo devedor > 0. Saldo estimado como `outstandingBalanceCents || purchasesTotalCents - paymentsTotalCents`
+- **Faturas de cartão**: `invoices` com status `open`/`closed`/`overdue`/`partial` e saldo devedor > 0. Lê `outstandingBalanceCents` direto — esse campo é mantido incrementalmente por `invoiceLedgerEntryTrigger.ts` a cada lançamento novo no ledger (ver "Bugs corrigidos")
 - Total comprometido quebrado por tipo (contas + faturas)
 
 **Coleções consultadas**: `categories`, `transactions`, `bills`, `recurring`, `cards` + `cards/*/invoices`, `accounts`
@@ -132,6 +132,9 @@ O cliente (`AssistantPage.tsx`) converte `**negrito**` → `<strong>` e `*itáli
 | 2026-07-13 | Null `dueDate` derrubava contexto | `(bill.dueDate as Timestamp).toDate()` sem checagem | Guard `!dueDateTs \|\| !dueDateTs.toDate \|\| isNaN` |
 | 2026-07-13 | API key undefined = erro confuso | Sem validação antes do fetch | `getApiKey()` com `HttpsError('failed-precondition')` |
 | 2026-07-13 | Contador sub-contado em corrida | `if/else` baseado em `usageDoc.exists` obsoleto (lido antes do DeepSeek); dois requests simultâneos no primeiro uso faziam `.set({count:1})` e o 2º sobrescrevia o 1º | `set({ count: increment(1) }, { merge: true })` incondicional |
+| 2026-07-16 | Fatura em aberto sempre reportada como R$ 0,00 | `outstandingBalanceCents` nunca era persistido de verdade no documento da fatura (nascia 0, só o client recalculava do ledger); `buildFinancialContext` lia o campo cru | `outstandingBalanceCents` passou a ser mantido incrementalmente por `invoiceLedgerEntryTrigger.ts`; `buildFinancialContext` lê o campo direto, sem heurística |
+| 2026-07-16 | Saldo de conta às vezes errado (mesma classe do bug acima) | Saldo recalculado somando só as transações dos **últimos 90 dias** — conta com movimentação antes disso ficava sub/sobre-contada | Lê `account.currentBalanceCents` (mantido incrementalmente a cada transação, sem limite de janela) |
+| 2026-07-16 | Correção acima ficou fora do ar por horas depois de commitada | `git push` não reimplanta Cloud Functions — precisa de `firebase deploy` manual, e o deploy anterior tinha rodado ANTES da correção existir | Deploy manual rodado; ver aviso permanente em `docs/RUNBOOK.md` sobre isso não ser automático |
 
 ### Comportamentos esperados (não são bugs)
 
@@ -148,7 +151,7 @@ O cliente (`AssistantPage.tsx`) converte `**negrito**` → `<strong>` e `*itáli
 npm --prefix functions run test
 ```
 
-17 testes em `buildFinancialContext.test.ts`:
+19 testes em `buildFinancialContext.test.ts`:
 - Gastos com categorias (expense normal)
 - `card_purchase` conta como gasto
 - Fallback `||` para `competenceMonth`/`categoryId` vazios
@@ -159,7 +162,7 @@ npm --prefix functions run test
 - Bills vencidas aparecem como VENCIDA
 - Contas a pagar recorrentes
 - Total comprometido
-- Saldo das contas
+- Saldo das contas (lê `currentBalanceCents` quando presente, cai pro saldo de abertura antes do backfill)
 - Payday do perfil do usuário
 - Perfil ausente não quebra
 - Orçamentos com porcentagem

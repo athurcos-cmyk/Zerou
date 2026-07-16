@@ -228,6 +228,15 @@ export const whatsappWebhook = onRequest(
         return;
       }
 
+      // ── Editar/excluir algo ja lancado (transacao, conta, meta, recorrencia) ──
+      if (interpretation.intent === 'unsupported_action') {
+        await sendWhatsAppMessage(
+          phone,
+          'Editar ou excluir algo que você já lançou é melhor fazer direto pelo app — evita eu mexer na coisa errada sem querer. Por aqui eu só crio lançamentos novos e respondo perguntas.',
+        );
+        return;
+      }
+
       // ── Criar categoria (pedido explicito, nunca cria transacao junto) ──
       if (interpretation.intent === 'create_category') {
         if (!interpretation.newCategoryName) {

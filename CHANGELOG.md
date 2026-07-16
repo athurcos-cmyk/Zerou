@@ -2,6 +2,15 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-16 — Contas a Pagar reorganizada + Grazi/WhatsApp corrigidas + achado operacional importante
+
+- **Contas a Pagar redesenhada**: recorrentes e compromissos avulsos agora em seções separadas (antes misturados numa lista só); corrigido bug real onde a data da próxima recorrência aparecia trocada pelo valor em dinheiro; agora dá pra editar valor/frequência/categoria de uma recorrência (antes só dava pra criar); layout revisado pra celular de verdade (achado e corrigido um bug de sobreposição de texto em telas de 375px, junto com a mesma correção nas listas do Dashboard e Transações).
+- **Filtros de Transações consolidados**: de 7 chips soltos (tipo + tags + conciliação) pra 4 chips de tipo + 1 botão "Filtros" com os secundários numa folha — sem perder nenhum filtro.
+- **Removida a conciliação manual** ("marcar como conferido") — feature pouco usada, sem ligação com nada financeiro, removida junto com o filtro que dependia dela.
+- **Tag interna "bill" (inglês) trocada por "conta"** — aparecia crua pro usuário no filtro de tags; corrigida no código e com backfill nas transações já existentes.
+- **Grazi/WhatsApp**: a correção do bug "fatura sempre R$ 0,00" (ver entrada abaixo) tinha sido commitada mas nunca chegou a ser implantada — corrigido, com um aviso permanente novo em `docs/RUNBOOK.md` (`git push` não reimplanta Cloud Functions). Também adicionado: pedidos de editar/excluir algo já lançado via WhatsApp ("exclui essa transação") agora recebem orientação pra usar o app, em vez de cair no "não entendi" genérico.
+- Detalhes completos em `docs/history/2026-07.md`, `docs/ai/GRAZI.md`, `docs/whatsapp/WHATSAPP.md`.
+
 ## 2026-07-16 — Saldo de conta e total de fatura: correção financeira + custo de leitura
 
 Dois bugs de correção financeira corrigidos, pedido explícito do dono ("não tem como um aplicativo de finanças ter o saldo errado"):

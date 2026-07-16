@@ -15,22 +15,21 @@ Itens acionáveis. Fechou? Mova para "Concluído" ou remova. Detalhe histórico 
 - [ ] Emails oficiais de suporte/privacidade.
 - [ ] `recordRecurringPayment` (`financeService.ts`) usa `opts.accountId || rule.accountId` — mesmo padrão que foi corrigido pra `??` em `payBill` (2026-07-12, ver `docs/CORRECAO_BUGS_2026-07-12.md`), mas o gêmeo ficou pra trás. Inofensivo hoje (único caller já normaliza `''` pra `undefined`); trocar por `??` quando mexer nessa função de novo.
 
-### Lançamento via WhatsApp (Fase 2 — pendente)
-- [ ] Arthur criar conta no Meta for Developers / WhatsApp Business e configurar secrets (`WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`).
-- [ ] Implementar vínculo de conta WhatsApp ↔ workspace (`linkAccount.ts`, `WhatsappLinkSection.tsx`, novas coleções + regras).
-- [ ] Webhook de recebimento (`webhookHandler.ts` — validação de assinatura HMAC-SHA256, responder 200 rápido).
-- [ ] Extração de gasto via DeepSeek + criação de transação server-side (`extractExpense.ts`, `createTransactionFromMessage.ts`).
-- [ ] Resposta de confirmação via Meta Send API.
-- [ ] Teste manual E2E: mandar msg real, criar transação, conferir no app.
+### WhatsApp — Fase 2 (funcionalidades avançadas, fora do escopo atual)
+- [ ] Parcela de compra que já estava em andamento antes de usar o WhatsApp, antecipar parcela/fatura, renegociar — hoje o bot (`webhookHandler.ts`, intent `advanced_card_action`) redireciona pro app em vez de executar. Decisão de produto, não implementar sem pedido explícito.
+- [ ] Editar/excluir lançamento por mensagem (intent `unsupported_action`, 2026-07-16) — hoje só orienta a usar o app. Se decidir implementar no futuro, ver `docs/whatsapp/WHATSAPP.md` pro fluxo de intenção já existente.
 
-### Automação server-side (futuro — exige worker/Functions)
-- [ ] Fechar fatura automaticamente, gerar recorrências e lembretes sem depender do app aberto. Decidir entre Cloud Run (perto do Firestore) e Railway. Hoje só roda quando o usuário abre o app.
+> A Fase 1 (vínculo de conta, extração de gasto/receita via DeepSeek, criação de categoria, perguntas financeiras, compra no cartão parcelada) já está em produção desde 2026-07-15/16 — ver `docs/whatsapp/WHATSAPP.md` (documento canônico) e `docs/history/2026-07.md`. Este item ficou desatualizado por um tempo listando como "pendente" trabalho que já tinha sido entregue — corrigido em 2026-07-16.
+
+### Automação server-side
+- [x] ~~Fechar fatura automaticamente, gerar recorrências e lembretes sem depender do app aberto~~ — já implementado via `onSchedule` (`functions/src/automation.ts`: `closeInvoicesDue`, `generateRecurrences`, `sendDueReminders`, `sendDailyLogReminder`) e `functions/src/budgetAlerts.ts` (`sendBudgetAlerts`), todos rodando em Cloud Functions agendadas, sem depender do app estar aberto. Este item também ficou desatualizado — corrigido em 2026-07-16.
 
 ### Negócio / legal
 - [ ] Revisão jurídica antes de escala pública maior.
 - [ ] Billing real (Stripe) — só com decisão explícita de produto (hoje 100% gratuito).
 
 ## Concluído (recente)
+- [x] **Contas a Pagar redesenhada + Grazi/WhatsApp corrigidas** (2026-07-16): recorrentes e compromissos avulsos separados em seções (com contador e edição de recorrência, antes só criação); bug real de data trocada por valor corrigido; sobreposição de texto em telas de 375px corrigida (`.list-row--with-icon`, beneficia Dashboard/Transações/Contas a Pagar); filtros de Transações consolidados (7 chips soltos → 4 chips + botão "Filtros"); conciliação manual removida (sem uso real); tag interna `'bill'` renomeada pra `'conta'` (com backfill). Achado importante: a correção do bug "Grazi sempre R$0,00" (linha abaixo) tinha sido commitada mas nunca implantada — `git push` não reimplanta Cloud Functions, aviso permanente adicionado em `docs/RUNBOOK.md`. Novo intent `unsupported_action` no bot do WhatsApp orienta pedidos de editar/excluir pelo app. Ver `docs/history/2026-07.md`.
 - [x] **Saldo de conta e total de fatura mantidos incrementalmente** (2026-07-16): corrigido bug de correção financeira (saldo de conta podia ficar errado silenciosamente em contas com 300+ transações) e bug ativo (Grazi/WhatsApp sempre reportava fatura em aberto como R$ 0,00). `Account.currentBalanceCents` e os totais de `Invoice` deixam de ser recalculados do zero (histórico de transações / ledger inteiro) e passam a ser mantidos incrementalmente. `useCardsData.ts` parou de carregar o ledger de toda fatura no boot global — sob demanda agora (`useInvoiceLedger.ts`). Backfill rodado em produção, checkpoint de verificação conferido manualmente. Ver `docs/history/2026-07.md`.
 - [x] **Avatares cartoon estão feios** (2026-07-14): trocados por 24 retratos recortados de um
   asset comprado no Adobe Stock (licença comercial confirmada pelo dono; grid 16×6 detectado

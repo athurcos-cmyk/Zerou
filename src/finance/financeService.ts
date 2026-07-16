@@ -478,19 +478,6 @@ export async function updateTransaction(
     mergeAccountEffects(invertAccountEffects(transactionAccountEffects(previous)), transactionAccountEffects(parsed))
   );
   fireWrite(batch.commit());
-}// ─── toggleTransactionReconciled ───────────────────────────────────────────────
-
-export function toggleTransactionReconciled(
-  workspaceId: string,
-  transactionId: string,
-  reconciled: boolean
-) {
-  fireWrite(
-    updateDoc(documentRef(workspaceId, 'transactions', transactionId), {
-      reconciledAt: reconciled ? serverTimestamp() : deleteField(),
-      updatedAt: serverTimestamp()
-    })
-  );
 }
 
 export async function createBill(workspaceId: string, userId: string, input: CreateBillInput) {
@@ -740,7 +727,7 @@ export function payBill(
       type: 'expense', amountCents: amount, description: desc,
       categoryId: catId, accountId: acctId,
       date: Timestamp.fromDate(now), competenceMonth: monthKeyFromDate(now), cashMonth: monthKeyFromDate(now),
-      tags: ['bill'], isRecurring: false, clientMutationId: id,
+      tags: ['conta'], isRecurring: false, clientMutationId: id,
       syncStatus: 'synced', version: 1, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
     }));
     applyAccountEffectsToBatch(batch, workspaceId, transactionAccountEffects({ type: 'expense', amountCents: amount, accountId: acctId }));

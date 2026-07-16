@@ -12,6 +12,7 @@ export type MessageIntent =
   | 'income'
   | 'card_purchase'
   | 'advanced_card_action'
+  | 'unsupported_action'
   | 'create_category'
   | 'question'
   | 'unclear';
@@ -32,7 +33,7 @@ function buildSystemPrompt(): string {
   return `Voce interpreta mensagens em portugues brasileiro enviadas ao bot financeiro Granativa via WhatsApp.
 Retorne SOMENTE um JSON com este formato:
 {
-  "intent": "expense" | "income" | "card_purchase" | "advanced_card_action" | "create_category" | "question" | "unclear",
+  "intent": "expense" | "income" | "card_purchase" | "advanced_card_action" | "unsupported_action" | "create_category" | "question" | "unclear",
   "amountCents": inteiro em centavos (0 se nao aplicavel),
   "description": descricao curta (max 80 chars, "" se nao aplicavel),
   "installments": numero de parcelas (1 se nao mencionado ou compra a vista, so relevante pra card_purchase),
@@ -53,6 +54,11 @@ Como classificar intent:
   JA ESTAVA EM ANDAMENTO antes de usar o WhatsApp ("ja estou pagando", "parcela X de Y", "proxima parcela e
   a Z"), antecipar parcela, antecipar fatura, renegociar fatura. Esses pedidos NUNCA devem ser executados
   como card_purchase — classifique como advanced_card_action pra serem redirecionados ao app.
+- unsupported_action: pedido pra EDITAR, EXCLUIR, APAGAR ou CORRIGIR algo que ja foi lancado antes (uma
+  transacao, conta a pagar, meta, recorrencia, cartao) — o bot NAO faz isso por mensagem, so cria
+  lancamentos novos. Ex.: "exclui essa transacao", "apaga o gasto de mercado", "corrige o valor pra 50",
+  "muda a categoria daquela despesa", "remove a conta de luz". Diferente de advanced_card_action (que e
+  so sobre fatura/parcela de cartao) — este cobre qualquer edicao/exclusao de algo ja existente.
 - create_category: PEDIDO EXPLICITO para criar categoria (verbos "cria"/"criar"/"adiciona" + a palavra "categoria").
   NUNCA use create_category so porque a categoria ideal nao existe — nesse caso e expense/income/card_purchase
   com categoryId null.
@@ -120,7 +126,7 @@ export async function interpretMessage(
     };
 
     const validIntents: MessageIntent[] = [
-      'expense', 'income', 'card_purchase', 'advanced_card_action', 'create_category', 'question', 'unclear',
+      'expense', 'income', 'card_purchase', 'advanced_card_action', 'unsupported_action', 'create_category', 'question', 'unclear',
     ];
     const intent: MessageIntent = validIntents.includes(parsed.intent as MessageIntent)
       ? (parsed.intent as MessageIntent)

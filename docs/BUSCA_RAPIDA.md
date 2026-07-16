@@ -33,12 +33,14 @@ Use este arquivo como mapa antes de abrir documentos grandes. Regra: leia o meno
 | Componentes-base de UX | `src/components/` (`BottomSheet`, `SelectField`, `CategoryField`, `ConfirmDialog`, `EmptyState`) |
 | Ícones + cores de categoria | `src/components/categoryIcons.tsx`, `src/theme/palette.ts` |
 | Serviço financeiro | `src/finance/financeService.ts` |
+| Saldo de conta (mantido incrementalmente) | `Account.currentBalanceCents`, `applyAccountEffectsToBatch` (`financeService.ts`), sinal por tipo de transação em `transactionAccountEffects` (`src/finance/financeCalculations.ts`, porta Admin SDK em `functions/src/shared/accountEffects.ts`) |
 | Dashboard (resumo, Disponível/Comprometido) | `src/pages/DashboardPage.tsx`, `src/finance/financeCalculations.ts` |
 | Transações (criar/editar/listar/filtrar) | `src/pages/NewTransactionPage.tsx`, `src/pages/EditTransactionPage.tsx`, `src/pages/TransactionsPage.tsx`, `src/components/TagInput.tsx` |
-| Contas (tela unificada: compromissos + despesas fixas) | `src/pages/BillsPage.tsx` — lista + formulário com toggle "Se repete". `createBill`/`payBill`/`updateBillStatus`/`createRecurringRule`/`recordRecurringPayment`/`deleteRecurringRule` em `financeService.ts` |
+| Contas a Pagar (recorrentes + compromissos avulsos, seções separadas) | `src/pages/BillsPage.tsx` — seção "Recorrentes" (editar via `updateRecurringRule`) + seção "Compromissos" (filtro "Em aberto"/Vencidas/Pagas/Todas). `createBill`/`payBill`/`updateBillStatus`/`createRecurringRule`/`updateRecurringRule`/`recordRecurringPayment`/`deleteRecurringRule` em `financeService.ts` |
 | Orçamento por categoria | `createBudget`/`updateBudgetLimit`/`deleteBudget`/`subscribeBudgets` (`financeService.ts`), UI em `src/pages/SearchPage.tsx` (sheet "Orçamentos") |
 | Exportar CSV | `src/finance/csvExport.ts` |
-| Cartões / faturas | `src/cards/` |
+| Cartões / faturas | `src/cards/`. Totais da fatura mantidos incrementalmente por Cloud Function (`functions/src/cards/invoiceLedgerEntryTrigger.ts`, reversão de compra excluída em `reverseCardPurchaseOnDelete.ts`) — nunca mais recalculados do zero. Ledger detalhado carregado sob demanda via `src/cards/useInvoiceLedger.ts` (não mais no boot global, `useCardsData.ts` só usa os totais já persistidos) |
+| Scripts de backfill (uso único) | `scripts/backfillAccountBalances.mjs`, `scripts/backfillInvoiceTotals.mjs`, `scripts/backfillBillTag.mjs` — precisam de `serviceAccountKey.json` na raiz (gerar em Firebase Console > Contas de serviço, apagar depois de usar) |
 | Espaço do casal + cofrinho | `src/pages/SharedSpacePage.tsx` (orquestrador), `src/pages/shared/` (convite/modo/cofrinho/despesas), `src/shared/` (serviço/hooks) |
 | Análise / gráficos / busca | `src/pages/SearchPage.tsx` (UI); `src/finance/spendingAnalysis.ts` (gasto por mês/categoria em regime de caixa — cartão pela parcela da fatura, não pela transação) |
 | Metas (pessoais) | `src/pages/GoalsPage.tsx`, `src/finance/useGoalsData.ts` |

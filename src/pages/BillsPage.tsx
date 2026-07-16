@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { CalendarClock, ChevronDown } from 'lucide-react';
+import { CalendarClock, ChevronDown, Pencil, Repeat, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useFinanceContext } from '../finance/FinanceDataContext';
 import { CategoryField } from '../components/CategoryField';
@@ -9,6 +9,7 @@ import { SelectField } from '../components/SelectField';
 import { BottomSheet } from '../components/BottomSheet';
 import { EmptyState } from '../components/EmptyState';
 import { FormMessage } from '../components/FormMessage';
+import { useConfirm } from '../components/ConfirmDialog';
 import { formatFriendlyDate, fromDateInputValue, todayInputValue } from '../finance/financeDates';
 import { billStatusLabels, recurringFrequencyLabels } from '../finance/financeLabels';
 import {
@@ -24,6 +25,7 @@ import {
   recordRecurringPayment,
   updateBillStatus,
   updateCategory,
+  updateRecurringRule,
 } from '../finance/financeService';
 import { recurringFrequencies, type CreateRecurringRuleInput } from '../finance/financeSchemas';
 import { centsToInputValue, formatMoney, parseMoneyToCents } from '../finance/money';
@@ -33,28 +35,22 @@ import { getUserFacingErrorMessage } from '../utils/userFacingError';
 
 type PayTarget = { kind: 'bill'; item: Bill } | { kind: 'recurring'; item: RecurringRule };
 
-type FilterKey = 'all' | 'pending' | 'overdue' | 'paid';
+type BillFilterKey = 'open' | 'overdue' | 'paid' | 'all';
 
-interface UnifiedItem {
-  id: string;
-  kind: 'bill' | 'recurring';
-  description: string;
-  amountCents: number;
-  dueDisplay: string;
-  dueDate: Date;
-  status: string;
-  raw: Bill | RecurringRule;
-}
-
-function statusOf(bill: Bill) { return bill.status; }
-function statusOfRule() { return 'active' as const; }
+const billFilterChips: Array<{ key: BillFilterKey; label: string }> = [
+  { key: 'open', label: 'Em aberto' },
+  { key: 'overdue', label: 'Vencidas' },
+  { key: 'paid', label: 'Pagas' },
+  { key: 'all', label: 'Todas' },
+];
 
 export function BillsPage() {
   const { user, profile } = useAuth();
   const workspaceId = profile?.defaultWorkspaceId;
   const finance = useFinanceContext();
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
-  // ── form state ──
+  // ── form state (nova conta) ──
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [dueDate, setDueDate] = useState(todayInputValue());
@@ -72,55 +68,32 @@ export function BillsPage() {
   const [payDescription, setPayDescription] = useState('');
   const [payCategoryId, setPayCategoryId] = useState('');
 
-  // ── filter ──
-  const [statusFilter, setStatusFilter] = useState<FilterKey>('all');
+  // ── edit recorrência sheet state ──
+  const [editingRule, setEditingRule] = useState<RecurringRule | null>(null);
+  const [editDescription, setEditDescription] = useState('');
+  const [editAmount, setEditAmount] = useState('');
+  const [editFrequency, setEditFrequency] = useState<CreateRecurringRuleInput['frequency']>('monthly');
+  const [editAccountId, setEditAccountId] = useState('');
+  const [editCategoryId, setEditCategoryId] = useState('');
 
-  const filterChips: Array<{ key: FilterKey; label: string }> = [
-    { key: 'all', label: 'Todas' },
-    { key: 'pending', label: 'Pendentes' },
-    { key: 'overdue', label: 'Vencidas' },
-    { key: 'paid', label: 'Pagas' },
-  ];
+  // ── filtro de compromissos ──
+  const [billFilter, setBillFilter] = useState<BillFilterKey>('open');
 
-  // ── unified list ──
-  const unifiedItems = useMemo<UnifiedItem[]>(() => {
-    const bills: UnifiedItem[] = finance.bills.map((b) => ({
-      id: b.id,
-      kind: 'bill' as const,
-      description: b.description,
-      amountCents: b.amountCents,
-      dueDisplay: formatFriendlyDate(b.dueDate),
-      dueDate: b.dueDate.toDate(),
-      status: b.status,
-      raw: b,
-    }));
+  const recurringItems = useMemo(
+    () =>
+      finance.recurringRules
+        .filter((r) => r.isActive)
+        .slice()
+        .sort((a, b) => a.nextOccurrenceAt.toMillis() - b.nextOccurrenceAt.toMillis()),
+    [finance.recurringRules]
+  );
 
-    const recurring: UnifiedItem[] = finance.recurringRules
-      .filter((r) => r.isActive)
-      .map((r) => ({
-        id: r.id,
-        kind: 'recurring' as const,
-        description: r.description,
-        amountCents: r.amountCents ?? 0,
-        dueDisplay: r.amountCents ? formatMoney(r.amountCents) : 'a preencher',
-        dueDate: r.nextOccurrenceAt.toDate(),
-        status: 'active',
-        raw: r,
-      }));
-
-    const all = [...bills, ...recurring];
-    all.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
-    return all;
-  }, [finance.bills, finance.recurringRules]);
-
-  const visibleItems = useMemo(() => {
-    if (statusFilter === 'all') return unifiedItems;
-    if (statusFilter === 'paid') return unifiedItems.filter((item) => item.kind === 'bill' && (item.raw as Bill).status === 'paid');
-    return unifiedItems.filter((item) => {
-      if (item.kind === 'recurring') return statusFilter === 'pending';
-      return (item.raw as Bill).status === statusFilter;
-    });
-  }, [unifiedItems, statusFilter]);
+  const visibleBills = useMemo(() => {
+    const sorted = finance.bills.slice().sort((a, b) => a.dueDate.toMillis() - b.dueDate.toMillis());
+    if (billFilter === 'all') return sorted;
+    if (billFilter === 'open') return sorted.filter((b) => b.status === 'pending' || b.status === 'overdue');
+    return sorted.filter((b) => b.status === billFilter);
+  }, [finance.bills, billFilter]);
 
   const serviceSuggestions = searchSubscriptionServices(description);
 
@@ -178,12 +151,41 @@ export function BillsPage() {
     );
   }
 
-  function handleDeleteRecurring(ruleId: string) {
+  async function handleDeleteRecurring(rule: RecurringRule) {
     if (!workspaceId) return;
-    deleteRecurringRule(workspaceId, ruleId);
+    const ok = await confirm({
+      title: 'Desativar recorrência?',
+      message: `"${rule.description}" para de gerar novas cobranças. O histórico já lançado continua no Extrato.`,
+      confirmLabel: 'Desativar',
+      danger: true,
+    });
+    if (!ok) return;
+    deleteRecurringRule(workspaceId, rule.id);
   }
 
-  // ── submit form ──
+  // ── editar recorrência ──
+  function handleOpenEditRule(rule: RecurringRule) {
+    setEditingRule(rule);
+    setEditDescription(rule.description);
+    setEditAmount(rule.amountCents ? centsToInputValue(rule.amountCents) : '');
+    setEditFrequency(rule.frequency);
+    setEditAccountId(rule.accountId ?? '');
+    setEditCategoryId(rule.categoryId ?? '');
+  }
+
+  function handleSaveEditRule() {
+    if (!workspaceId || !editingRule) return;
+    updateRecurringRule(workspaceId, editingRule.id, {
+      description: editDescription.trim() || editingRule.description,
+      amountCents: editAmount.trim() ? parseMoneyToCents(editAmount) : undefined,
+      frequency: editFrequency,
+      accountId: editAccountId || undefined,
+      categoryId: editCategoryId || undefined,
+    });
+    setEditingRule(null);
+  }
+
+  // ── submit form (nova conta) ──
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage(null);
@@ -211,7 +213,7 @@ export function BillsPage() {
         categoryId: categoryId || undefined,
       }).catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar a conta recorrente.')));
 
-      // Also create the first bill immediately if it has an amount
+      // Também cria a primeira conta já se tiver valor definido.
       if (amountCents && amountCents > 0) {
         createBill(workspaceId, user.uid, {
           description,
@@ -234,9 +236,11 @@ export function BillsPage() {
     setAccountId('');
     setIsRecurring(false);
     setFrequency('monthly');
+    setFormOpen(false);
   }
 
-  const hasItems = unifiedItems.length > 0;
+  const hasBills = finance.bills.length > 0;
+  const hasRecurring = recurringItems.length > 0;
 
   return (
     <section className="page-content">
@@ -268,7 +272,7 @@ export function BillsPage() {
 
             <label className="field">
               <span>Descrição</span>
-              <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Energia, Aluguel, Internet" />
+              <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Energia, Aluguel, Internet" autoFocus />
             </label>
 
             {serviceSuggestions.length > 0 && (
@@ -295,8 +299,8 @@ export function BillsPage() {
             <div className="field">
               <span className="field-label">Se repete?</span>
               <div className="chip-row">
-                <button type="button" className={`chip${!isRecurring ? ' chip--active' : ''}`} onClick={() => setIsRecurring(false)}>Não</button>
-                <button type="button" className={`chip${isRecurring ? ' chip--active' : ''}`} onClick={() => setIsRecurring(true)}>Sim</button>
+                <button type="button" className={`chip${!isRecurring ? ' chip--active' : ''}`} onClick={() => setIsRecurring(false)}>Não, é avulsa</button>
+                <button type="button" className={`chip${isRecurring ? ' chip--active' : ''}`} onClick={() => setIsRecurring(true)}>Sim, recorrente</button>
               </div>
             </div>
 
@@ -348,71 +352,112 @@ export function BillsPage() {
           </>)}
         </form>
 
-        {/* ── List ── */}
+        {/* ── Recorrentes ── */}
         <article className="surface surface-pad">
-          <p className="eyebrow">Lista</p>
-          {hasItems && (
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Assinaturas e contas fixas</p>
+              <h2>Recorrentes{hasRecurring ? ` · ${recurringItems.length}` : ''}</h2>
+            </div>
+            <Repeat size={22} aria-hidden="true" style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+          </div>
+
+          {hasRecurring ? (
+            <div className="item-list">
+              {recurringItems.map((rule) => {
+                const due = isRecurrenceDue(rule.nextOccurrenceAt.toDate());
+                const canPayEarly = canRegisterRecurrence(rule.nextOccurrenceAt.toDate());
+                const actionLabel = due ? 'Registrar' : canPayEarly ? 'Pagar adiantado' : null;
+                const dateClassName = due ? 'amount--expense' : 'text-secondary';
+
+                return (
+                  <div className="list-row list-row--with-icon" key={rule.id}>
+                    <ServiceMark service={findSubscriptionService(rule.description)} />
+                    <div className="list-row-body">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                        <strong>{rule.description}</strong>
+                        <span className="pill pill--accent">{recurringFrequencyLabels[rule.frequency]}</span>
+                      </div>
+                      <span className={dateClassName}>
+                        {due ? 'Vence' : 'Próximo vencimento'}: {formatFriendlyDate(rule.nextOccurrenceAt)}
+                      </span>
+                    </div>
+                    <div className="list-row-end">
+                      <strong>{rule.amountCents ? formatMoney(rule.amountCents) : 'valor variável'}</strong>
+                      <SyncStatusBadge status={rule.localSyncStatus} />
+                      <div style={{ display: 'flex', gap: '0.35rem' }}>
+                        {actionLabel ? (
+                          <button className="button button--subtle button--compact" type="button" onClick={() => handleOpenPay({ kind: 'recurring', item: rule })}>
+                            {actionLabel}
+                          </button>
+                        ) : (
+                          <span className="text-muted" style={{ fontSize: '0.78rem', alignSelf: 'center' }}>Em dia</span>
+                        )}
+                        <button className="icon-button" type="button" aria-label={`Editar ${rule.description}`} onClick={() => handleOpenEditRule(rule)}>
+                          <Pencil size={16} aria-hidden="true" />
+                        </button>
+                        <button className="icon-button" type="button" aria-label={`Desativar ${rule.description}`} onClick={() => void handleDeleteRecurring(rule)}>
+                          <X size={16} aria-hidden="true" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <EmptyState
+              illustration="bills"
+              compact
+              title="Nenhuma assinatura ou conta fixa"
+              description="Aluguel, internet, streaming — cadastre como recorrente e o Granativa lembra sozinho todo ciclo."
+            />
+          )}
+        </article>
+
+        {/* ── Compromissos ── */}
+        <article className="surface surface-pad">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Contas avulsas</p>
+              <h2>Compromissos{hasBills ? ` · ${visibleBills.length}` : ''}</h2>
+            </div>
+            <CalendarClock size={22} aria-hidden="true" style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+          </div>
+
+          {hasBills && (
             <div className="chip-row">
-              {filterChips.map((chip) => (
-                <button key={chip.key} type="button" className={`chip${statusFilter === chip.key ? ' chip--active' : ''}`} onClick={() => setStatusFilter(chip.key)}>
+              {billFilterChips.map((chip) => (
+                <button key={chip.key} type="button" className={`chip${billFilter === chip.key ? ' chip--active' : ''}`} onClick={() => setBillFilter(chip.key)}>
                   {chip.label}
                 </button>
               ))}
             </div>
           )}
-          {hasItems ? (
-            visibleItems.length > 0 ? (
-              <div className="item-list">
-                {visibleItems.map((item) => {
-                  const isBill = item.kind === 'bill';
-                  const billStatus = isBill ? (item.raw as Bill).status : 'active';
-                  const isPending = billStatus === 'pending' || billStatus === 'overdue' || billStatus === 'active';
-                  const dueLabel = isBill
-                    ? `${billStatusLabels[billStatus as keyof typeof billStatusLabels]} · ${item.dueDisplay}`
-                    : `${recurringFrequencyLabels[(item.raw as RecurringRule).frequency]} · próx. ${item.dueDisplay}`;
 
-                  // Recurring action button
-                  let actionLabel: string | null = null;
-                  if (item.kind === 'recurring') {
-                    const rule = item.raw as RecurringRule;
-                    const due = isRecurrenceDue(rule.nextOccurrenceAt.toDate());
-                    const can = canRegisterRecurrence(rule.nextOccurrenceAt.toDate());
-                    if (due) actionLabel = 'Registrar';
-                    else if (can) actionLabel = 'Pagar adiantado';
-                  }
+          {hasBills ? (
+            visibleBills.length > 0 ? (
+              <div className="item-list">
+                {visibleBills.map((bill) => {
+                  const isPending = bill.status === 'pending' || bill.status === 'overdue';
+                  const dateClassName = bill.status === 'overdue' ? 'amount--expense' : bill.status === 'paid' ? 'text-muted' : 'text-secondary';
 
                   return (
-                    <div className="list-row list-row--with-icon" key={`${item.kind}-${item.id}`}>
-                      <ServiceMark service={findSubscriptionService(item.description)} />
+                    <div className="list-row list-row--with-icon" key={bill.id}>
+                      <ServiceMark service={findSubscriptionService(bill.description)} />
                       <div className="list-row-body">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                          <strong>{item.description}</strong>
-                          {item.kind === 'recurring' && (
-                            <span style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--action-primary)', background: 'var(--action-primary-soft)', borderRadius: '999px', padding: '0.1rem 0.45rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                              Recorrente
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-secondary">{dueLabel}</span>
+                        <strong>{bill.description}</strong>
+                        <span className={dateClassName}>
+                          {billStatusLabels[bill.status]} · {formatFriendlyDate(bill.dueDate)}
+                        </span>
                       </div>
                       <div className="list-row-end">
-                        <strong>{item.kind === 'recurring' && !(item.raw as RecurringRule).amountCents ? 'a preencher' : formatMoney(item.amountCents)}</strong>
-                        <SyncStatusBadge status={(item.raw as any).localSyncStatus} />
-                        {isBill && isPending ? (
+                        <strong>{formatMoney(bill.amountCents)}</strong>
+                        <SyncStatusBadge status={bill.localSyncStatus} />
+                        {isPending ? (
                           <>
-                            <button className="button button--subtle button--compact" type="button" onClick={() => handleOpenPay({ kind: 'bill', item: item.raw as Bill })}>Pago</button>
-                            <button className="button button--ghost button--compact" type="button" onClick={() => handleCancelBill(item.id)}>Cancelar</button>
-                          </>
-                        ) : null}
-                        {item.kind === 'recurring' && isPending && actionLabel ? (
-                          <button className="button button--subtle button--compact" type="button" onClick={() => handleOpenPay({ kind: 'recurring', item: item.raw as RecurringRule })}>
-                            {actionLabel}
-                          </button>
-                        ) : null}
-                        {item.kind === 'recurring' && isPending && !actionLabel ? (
-                          <>
-                            <span className="text-muted" style={{ fontSize: '0.78rem' }}>Em dia</span>
-                            <button className="button button--ghost button--compact" type="button" onClick={() => handleDeleteRecurring(item.id)} style={{ fontSize: '0.72rem' }}>Desativar</button>
+                            <button className="button button--subtle button--compact" type="button" onClick={() => handleOpenPay({ kind: 'bill', item: bill })}>Pago</button>
+                            <button className="button button--ghost button--compact" type="button" onClick={() => handleCancelBill(bill.id)}>Cancelar</button>
                           </>
                         ) : null}
                       </div>
@@ -421,13 +466,13 @@ export function BillsPage() {
                 })}
               </div>
             ) : (
-              <EmptyState illustration="bills" compact title="Nenhum resultado" description="Nenhuma conta nesse filtro." />
+              <EmptyState illustration="bills" compact title="Nada por aqui" description="Nenhuma conta nesse filtro." />
             )
           ) : (
             <EmptyState
               illustration="bills"
-              title="Nenhuma conta ainda"
-              description="Cadastre contas a pagar — avulsas ou recorrentes — e seja lembrado antes do vencimento."
+              title="Nenhuma conta avulsa ainda"
+              description="Cadastre uma conta pontual — sem repetição — e seja lembrado antes do vencimento."
             />
           )}
         </article>
@@ -499,6 +544,59 @@ export function BillsPage() {
           </div>
         </div>
       </BottomSheet>
+
+      {/* ── Editar recorrência BottomSheet ── */}
+      <BottomSheet
+        open={Boolean(editingRule)}
+        onClose={() => setEditingRule(null)}
+        title="Editar recorrência"
+        subtitle={editingRule?.description}
+      >
+        <div className="form-stack">
+          <label className="field">
+            <span>Descrição</span>
+            <input className="input" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
+          </label>
+          <label className="field">
+            <span>Valor</span>
+            <input className="input input--money" inputMode="decimal" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} placeholder="0,00" />
+            <span className="field-hint">Deixe em branco se o valor varia todo mês.</span>
+          </label>
+          <SelectField
+            label="Frequência"
+            value={editFrequency}
+            onChange={(v) => setEditFrequency(v as CreateRecurringRuleInput['frequency'])}
+            options={recurringFrequencies.map((f) => ({ value: f, label: recurringFrequencyLabels[f] }))}
+          />
+          <CategoryField
+            value={editCategoryId}
+            onChange={setEditCategoryId}
+            categories={finance.categories}
+            filterType="expense"
+            onCreateCategory={async (name, icon, type, color) => {
+              if (!workspaceId || !user) return;
+              const id = await createCategory(workspaceId, user.uid, { name, icon, type, color });
+              setEditCategoryId(id);
+            }}
+            onUpdateCategory={async (id, patch) => { if (!workspaceId) return; await updateCategory(workspaceId, id, patch); }}
+            onDeleteCategory={async (id) => { if (!workspaceId) return; await deleteCategory(workspaceId, id); }}
+          />
+          <SelectField
+            label="Conta de pagamento"
+            value={editAccountId}
+            onChange={setEditAccountId}
+            options={finance.accounts.map((a) => ({ value: a.id, label: a.name }))}
+            placeholder="Definir depois"
+          />
+          <div className="sheet-actions">
+            <button className="button button--primary" type="button" onClick={handleSaveEditRule}>
+              Salvar alterações
+            </button>
+          </div>
+        </div>
+      </BottomSheet>
+
+      {confirmDialog}
     </section>
   );
 }

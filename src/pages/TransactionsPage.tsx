@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Check, Plus, Search, Trash2 } from 'lucide-react';
+import { Plus, Search, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
+import { BottomSheet } from '../components/BottomSheet';
 import { EmptyState } from '../components/EmptyState';
 import { CategoryMark } from '../components/categoryIcons';
 import { SelectField } from '../components/SelectField';
@@ -10,7 +11,7 @@ import { useConfirm } from '../components/ConfirmDialog';
 import { defaultCategoryColors } from '../theme/palette';
 import { formatFriendlyDate } from '../finance/financeDates';
 import { transactionTypeLabels } from '../finance/financeLabels';
-import { softDeleteTransaction, toggleTransactionReconciled } from '../finance/financeService';
+import { softDeleteTransaction } from '../finance/financeService';
 import { formatMoney } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
 import type { Transaction } from '../types/contracts';
@@ -25,7 +26,7 @@ export function TransactionsPage() {
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense' | 'transfer'>('all');
   const [cardFilter, setCardFilter] = useState('');
   const [tagFilter, setTagFilter] = useState<Set<string>>(new Set());
-  const [showUnreconciledOnly, setShowUnreconciledOnly] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const categoryMap = useMemo(() => new Map(finance.categories.map((c) => [c.id, c])), [finance.categories]);
   const cardOptions = useMemo(
@@ -71,7 +72,6 @@ export function TransactionsPage() {
         const txTags = t.tags ?? [];
         if (!txTags.some((tag) => tagFilter.has(tag))) return false;
       }
-      if (showUnreconciledOnly && t.reconciledAt) return false;
       if (!normalizedQuery) return true;
       const categoryName = t.categoryId ? (categoryMap.get(t.categoryId)?.name ?? '') : '';
       const haystack = [t.description, t.merchant, t.tags?.join(' '), categoryName]
@@ -80,7 +80,7 @@ export function TransactionsPage() {
         .toLocaleLowerCase('pt-BR');
       return haystack.includes(normalizedQuery);
     });
-  }, [activeTransactions, cardFilter, typeFilter, tagFilter, showUnreconciledOnly, normalizedQuery, categoryMap]);
+  }, [activeTransactions, cardFilter, typeFilter, tagFilter, normalizedQuery, categoryMap]);
 
   const typeChips: Array<{ key: typeof typeFilter; label: string }> = [
     { key: 'all', label: 'Tudo' },
@@ -88,6 +88,16 @@ export function TransactionsPage() {
     { key: 'income', label: 'Receitas' },
     { key: 'transfer', label: 'Transferências' }
   ];
+
+  // Filtros secundários (tag, cartão) ficam escondidos atrás de um botão "Filtros" —
+  // mostrar os grupos soltos na tela, além do tipo, virava uma parede de chips no
+  // celular (7+ chips empilhados, achado real testando em 375px).
+  const activeSecondaryFilterCount = (tagFilter.size > 0 ? 1 : 0) + (cardFilter ? 1 : 0);
+
+  function clearSecondaryFilters() {
+    setTagFilter(new Set());
+    setCardFilter('');
+  }
 
   async function handleDelete(transaction: Transaction) {
     if (!workspaceId || !user) {
@@ -152,30 +162,42 @@ export function TransactionsPage() {
                 {chip.label}
               </button>
             ))}
-          </div>
-          {availableTags.length > 0 && (
-            <div className="chip-row">
-              {availableTags.map((tag) => (
-                <button
-                  key={tag}
-                  type="button"
-                  className={`chip${tagFilter.has(tag) ? ' chip--active' : ''}`}
-                  onClick={() => toggleTagFilter(tag)}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="chip-row">
             <button
               type="button"
-              className={`chip${showUnreconciledOnly ? ' chip--active' : ''}`}
-              onClick={() => setShowUnreconciledOnly((v) => !v)}
+              className={`chip${activeSecondaryFilterCount > 0 ? ' chip--active' : ''}`}
+              onClick={() => setFiltersOpen(true)}
             >
-              <Check size={13} aria-hidden="true" /> Não conferidos
+              <SlidersHorizontal size={13} aria-hidden="true" /> Filtros{activeSecondaryFilterCount > 0 ? ` · ${activeSecondaryFilterCount}` : ''}
             </button>
           </div>
+        </div>
+      )}
+
+      <BottomSheet
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        title="Filtros"
+        subtitle="Tag e cartão"
+      >
+        <div className="form-stack">
+          {availableTags.length > 0 && (
+            <div className="field">
+              <span className="field-label">Tags</span>
+              <div className="chip-row">
+                {availableTags.map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    className={`chip${tagFilter.has(tag) ? ' chip--active' : ''}`}
+                    onClick={() => toggleTagFilter(tag)}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {cardsData.cards.length > 0 && (
             <SelectField
               label="Cartão"
@@ -186,8 +208,19 @@ export function TransactionsPage() {
               sheetSubtitle="Ver só as compras de um cartão"
             />
           )}
+
+          <div className="sheet-actions">
+            {activeSecondaryFilterCount > 0 && (
+              <button className="button button--ghost" type="button" onClick={clearSecondaryFilters}>
+                Limpar filtros
+              </button>
+            )}
+            <button className="button button--primary" type="button" onClick={() => setFiltersOpen(false)}>
+              Aplicar
+            </button>
+          </div>
         </div>
-      )}
+      </BottomSheet>
 
       <article className="surface surface-pad">
         {activeTransactions.length === 0 ? (
@@ -234,19 +267,6 @@ export function TransactionsPage() {
                       {isIncome ? '+' : isExpense ? '−' : ''}{formatMoney(transaction.amountCents)}
                     </strong>
                     <SyncStatusBadge status={transaction.localSyncStatus} />
-                    <button
-                      className="icon-button"
-                      type="button"
-                      aria-label={transaction.reconciledAt ? 'Desmarcar como conferido' : 'Marcar como conferido'}
-                      title={transaction.reconciledAt ? 'Conferido' : 'Marcar como conferido'}
-                      style={transaction.reconciledAt ? { color: 'var(--success)' } : undefined}
-                      onClick={() => {
-                        if (!workspaceId) return;
-                        toggleTransactionReconciled(workspaceId, transaction.id, !transaction.reconciledAt);
-                      }}
-                    >
-                      <Check size={16} aria-hidden="true" />
-                    </button>
                     {transaction.type !== 'card_purchase' ? (
                       <Link className="button button--subtle button--compact" to={`/app/transactions/${transaction.id}/edit`}>
                         Editar

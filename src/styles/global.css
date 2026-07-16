@@ -1865,6 +1865,33 @@ span.service-mark--brand {
   padding: 0.5rem;
 }
 
+.pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.pill--accent {
+  background: var(--action-primary-soft);
+  color: var(--action-primary);
+}
+
+.pill--danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.pill--warning {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
 .sync-badge {
   display: inline-flex;
   align-items: center;
@@ -5340,6 +5367,19 @@ span.service-mark--brand {
 @media (max-width: 480px) {
   .assistant-bubble {
     max-width: 90%;
+  }
+
+  /* Ícone + descrição + valor + botões de ação espremidos numa linha só (BillsPage,
+     DashboardPage, TransactionsPage) sobrepunham texto em telas de celular estreitas
+     (375px, iPhone SE) — sem `flex-wrap` no pai, `.list-row-end` não tinha pra onde ir e
+     ficava por cima do corpo da linha em vez de quebrar pra baixo. */
+  .list-row--with-icon {
+    flex-wrap: wrap;
+  }
+
+  .list-row--with-icon .list-row-end {
+    width: 100%;
+    padding-left: calc(2.15rem + 0.75rem);
   }
 }
 
