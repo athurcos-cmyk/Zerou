@@ -2,6 +2,16 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-15 — WhatsApp: paridade com a Grazi (categorias, receita, perguntas) + vinculo unico/desvinculo
+
+- **Roteamento de intencao**: uma unica chamada DeepSeek classifica cada mensagem em despesa/receita/criar categoria/pergunta/nao entendi, ao inves de assumir sempre despesa (`interpretMessage.ts`, substitui `extractExpense.ts`).
+- **Categoria nova so por pedido explicito** ("cria uma categoria X") — lancamento sem categoria clara continua ficando sem categoria, nunca cria sozinha; a IA prioriza a categoria existente mais especifica.
+- **Receita pelo WhatsApp**: "recebi 200 de freela" agora cria uma transacao `income` de verdade (antes so despesa era suportada).
+- **Perguntas financeiras via WhatsApp**: mesma persona e dados da Grazi do app, rate limit compartilhado (60/dia por workspace).
+- **Vinculo unico por workspace**: gerar codigo novo enquanto ja tem numero vinculado agora e bloqueado; codigos antigos nao usados sao limpos automaticamente.
+- **Botao Desvincular**: novo em Configuracoes > WhatsApp — fecha um gap real de compliance (Termos e pagina de exclusao de dados ja prometiam essa opcao, que nao existia).
+- Detalhes completos em `docs/whatsapp/WHATSAPP.md`.
+
 ## 2026-07-15 — WhatsApp: confirmacao lenta (CPU throttling) + extracao de gastos quebrada (secret faltando)
 
 - **Confirmacao demorava ~1min**: Cloud Run corta CPU da instancia assim que `whatsappWebhook` responde 200 pro Meta, e o processamento (Firestore + envio da confirmacao) roda todo DEPOIS disso — throttled. Corrigido com `memory: 512MiB` + `cpu: 1` no codigo e `gcloud run services update --no-cpu-throttling` (precisa ser reaplicado a cada deploy, ver `docs/whatsapp/WHATSAPP.md`).

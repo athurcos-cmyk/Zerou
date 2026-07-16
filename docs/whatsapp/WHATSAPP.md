@@ -4,7 +4,9 @@
 
 ## Visao geral
 
-Integracao oficial com a Meta Cloud API v25.0 para lancamento de transacoes financeiras por mensagem de WhatsApp. O usuario vincula seu numero, manda mensagem como "gastei 15 reais no mercado" e a IA (DeepSeek) extrai valor, descricao e categoria, criando a transacao automaticamente no Granativa.
+Integracao oficial com a Meta Cloud API v25.0 para controle financeiro completo por mensagem de WhatsApp — paridade com a Grazi do app, e mais. O usuario vincula seu numero e pode: lancar despesa ("gastei 15 reais no mercado"), lancar receita ("recebi 200 de freela"), criar categoria sob pedido explicito ("cria uma categoria chamada Pet") e fazer perguntas financeiras ("quanto gastei esse mes?", igual a Grazi do app). Uma unica chamada DeepSeek classifica a intencao da mensagem e ja extrai os dados (`interpretMessage.ts`).
+
+**Importante**: a Grazi do app (`financialAssistantChat`) e so leitura/conversa — nunca cria dados. O bot do WhatsApp faz mais que ela: alem de responder perguntas (reusando o mesmo contexto e persona), tambem cria categorias e lanca transacoes.
 
 **Nome no WhatsApp**: Grazi (a assistente de IA do Granativa)
 
@@ -33,16 +35,21 @@ Integracao oficial com a Meta Cloud API v25.0 para lancamento de transacoes fina
 | Arquivo | Funcao |
 |---|---|
 | `functions/src/whatsapp/metaClient.ts` | Cliente HTTP para Meta Cloud API v25.0. Envia mensagens (`sendWhatsAppMessage`), define secrets (`WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN`, `GRANATIVA_WHATSAPP_NUMBER`). |
-| `functions/src/whatsapp/webhookHandler.ts` | Cloud Function `onRequest`. GET: verificacao de webhook (hub.mode + hub.verify_token + hub.challenge). POST: valida `X-Hub-Signature-256`, extrai mensagem, chama `processLinkCode` ou `extractExpense` → `createTransactionFromMessage` → `sendWhatsAppMessage`. |
-| `functions/src/whatsapp/extractExpense.ts` | Chama DeepSeek com prompt de extracao de gastos (JSON mode). Recebe texto + lista de categorias, retorna `{ amountCents, description, categoryId, confidence }`. |
-| `functions/src/whatsapp/createTransactionFromMessage.ts` | Cria transacao no Firestore via Admin SDK (bypassa regras). Mantenha em sincronia com `src/finance/financeService.ts:createTransaction()`. |
-| `functions/src/whatsapp/linkAccount.ts` | `generateWhatsappLinkCode` (onCall): gera codigo 6 digitos, salva em `users/{uid}/whatsappLinkCodes/{code}`, retorna link `wa.me`. `processLinkCode`: chamado pelo webhook quando usuario manda "vincular XXXXXX", grava vinculo em `whatsappPhoneIndex/{phone}` e `workspaces/{id}/whatsappLinks/{phone}`. |
-| `functions/src/ai/deepseekClient.ts` | Cliente HTTP compartilhado para API DeepSeek. Usado tanto pelo WhatsApp (`extractExpense.ts`) quanto pela Grazi (`financialAssistant.ts`). |
-| `src/settings/WhatsAppLinkPage.tsx` | UI de vinculacao. Botao "Vincular WhatsApp" → chama `generateWhatsappLinkCode` → exibe codigo 6 digitos + link wa.me. |
+| `functions/src/whatsapp/webhookHandler.ts` | Cloud Function `onRequest`. GET: verificacao de webhook. POST: le a mensagem, resolve `vincular XXXXXX` via regex (`processLinkCode`) ou chama `interpretMessage` e roteia por intencao: `create_category` → `createCategoryFromMessage`; `question` → `answerFinancialQuestion`; `expense`/`income` → `createTransactionFromMessage`; `unclear` → mensagem de ajuda. |
+| `functions/src/whatsapp/interpretMessage.ts` | Uma chamada DeepSeek (JSON mode) classifica a mensagem em `expense`/`income`/`create_category`/`question`/`unclear` e ja extrai valor, descricao, categoria (a mais especifica entre as existentes) e dados de categoria nova, tudo numa chamada so. Substitui o antigo `extractExpense.ts` (so cobria despesa). |
+| `functions/src/whatsapp/createCategoryFromMessage.ts` | Cria categoria via Admin SDK quando o usuario pede explicitamente ("cria uma categoria X"). Dedupe por nome (case-insensitive), icone validado contra `categoryPalette.ts` (fallback `sliders`), cor escolhida por rotacao na paleta Sol — nunca inventada pela IA. Payload identico a `financeService.createCategory()`. |
+| `functions/src/whatsapp/categoryPalette.ts` | Espelha `src/components/categoryIcons.tsx` e `src/theme/palette.ts` (Cloud Functions nao importa `src/` do app cliente — pacotes separados). Mantenha em sincronia manualmente. |
+| `functions/src/whatsapp/answerFinancialQuestion.ts` | Perguntas financeiras via WhatsApp — reusa `buildFinancialContext` + a mesma persona/regras da Grazi (`financialAssistant.ts`), com o negrito adaptado pro WhatsApp (`*um asterisco*`, nao `**dois**`). Rate limit compartilhado com a Grazi do app (`aiRateLimit.ts`, mesmo contador `workspaces/{id}/aiUsage/{data}`, 60/dia). |
+| `functions/src/whatsapp/createTransactionFromMessage.ts` | Cria transacao no Firestore via Admin SDK (bypassa regras) — despesa ou receita (`type` recebido, nao mais fixo em `'expense'`). Mantenha em sincronia com `src/finance/financeService.ts:createTransaction()`. |
+| `functions/src/whatsapp/linkAccount.ts` | `generateWhatsappLinkCode` (onCall): bloqueia se o workspace ja tiver um numero vinculado (`already-exists`), limpa codigos antigos nao usados do mesmo usuario, gera codigo 6 digitos em `users/{uid}/whatsappLinkCodes/{code}`, retorna link `wa.me`. `processLinkCode`: chamado pelo webhook quando usuario manda "vincular XXXXXX", grava vinculo em `whatsappPhoneIndex/{phone}` e `workspaces/{id}/whatsappLinks/{phone}`. |
+| `functions/src/whatsapp/unlinkWhatsapp.ts` | `unlinkWhatsapp` (onCall): apaga `whatsappPhoneIndex/{phone}` + `workspaces/{id}/whatsappLinks/{phone}`, varre codigos residuais, avisa o numero desvinculado via WhatsApp (best-effort). Fecha o vinculo ja prometido em `src/pages/LegalPages.tsx` (Termos §7.4, Data Deletion). |
+| `functions/src/ai/deepseekClient.ts` | Cliente HTTP compartilhado para API DeepSeek. Usado por `interpretMessage.ts`, `answerFinancialQuestion.ts` e pela Grazi (`financialAssistant.ts`). |
+| `functions/src/ai/aiRateLimit.ts` | Rate limit de IA (60 msgs/dia por workspace, `workspaces/{id}/aiUsage/{data BRT}`) — extraido de `financialAssistant.ts`, compartilhado entre Grazi do app e perguntas via WhatsApp. |
+| `src/settings/WhatsAppLinkPage.tsx` | UI de vinculacao. Le `workspaces/{id}/whatsappLinks` no mount pra mostrar "Vinculado: `<numero>`" + botao Desvincular (via `unlinkWhatsapp`), ou o fluxo de gerar codigo se ainda nao vinculado. |
 | `src/App.tsx` | Rota `/app/settings/whatsapp`. |
-| `src/layout/AppShell.tsx` | Link "WhatsApp" (icone `MessageCircle`) na sidebar e menu mobile. |
-| `functions/src/index.ts` | Export `whatsappWebhook` e `generateWhatsappLinkCode`. |
-| `firestore.rules` | Regras para `whatsappLinkCodes/{code}` (read: self, write: false) e `whatsappPhoneIndex/{phone}` (read: auth, write: false). |
+| `src/layout/AppShell.tsx` | Link "WhatsApp" (icone `MessageCircle`) na sidebar desktop e na grade principal do menu mobile (logo apos Analise). |
+| `functions/src/index.ts` | Export `whatsappWebhook`, `generateWhatsappLinkCode`, `unlinkWhatsapp`. |
+| `firestore.rules` | Regras para `whatsappLinkCodes/{code}` (read: self, write: false) e `whatsappPhoneIndex/{phone}` (read: auth, write: false). `workspaces/{id}/whatsappLinks/{phone}` nao tem regra propria mas e coberta pelo catch-all `match /{document=**}` do workspace (read: membro ativo) — cliente ja pode ler sem mudanca de regra. |
 
 ## Fluxo completo
 
@@ -62,20 +69,24 @@ Integracao oficial com a Meta Cloud API v25.0 para lancamento de transacoes fina
 11. processLinkCode: deleta codigo usado, envia confirmacao via sendWhatsAppMessage()
 ```
 
-### Lancamento de transacao
+### Mensagem financeira (despesa, receita, categoria, pergunta)
 
 ```
-1. Usuario: envia "gastei 15 reais no mercado" para o bot pelo WhatsApp
+1. Usuario: envia qualquer mensagem financeira pelo WhatsApp (nao "vincular XXXXXX")
 2. Meta: POST no webhook com a mensagem
 3. webhookHandler: valida X-Hub-Signature-256 (se WHATSAPP_APP_SECRET configurado)
 4. webhookHandler: responde 200 imediatamente (Meta espera resposta rapida)
 5. webhookHandler: parseia body → object=whatsapp_business_account → entry[0].changes[0].value.messages[0]
 6. webhookHandler: extrai phone (msg.from) e text (msg.text.body)
 7. webhookHandler: consulta whatsappPhoneIndex/{phone} → workspaceId + linkedByUid
-8. webhookHandler: carrega categorias ativas (type expense/both) + primeira conta ativa
-9. webhookHandler: extractExpense(texto, categorias) → DeepSeek
-10. webhookHandler: createTransactionFromMessage({ workspaceId, userId, amountCents, ... })
-11. webhookHandler: sendWhatsAppMessage(phone, confirmacao formatada)
+8. webhookHandler: carrega TODAS as categorias ativas (sem filtro de tipo)
+9. webhookHandler: interpretMessage(texto, categorias) → DeepSeek, uma chamada, retorna intent + dados
+10. Roteamento por intent:
+    - create_category: createCategoryFromMessage() → confirma criacao (ou dedupe)
+    - question: checkAiUsageNotExceeded() → answerFinancialQuestion() → incrementAiUsage()
+    - expense/income: carrega conta padrao → createTransactionFromMessage({ type, ... })
+    - unclear: mensagem de ajuda explicando o que o bot faz
+11. webhookHandler: sendWhatsAppMessage(phone, confirmacao/resposta formatada)
 ```
 
 ### Envio de mensagem (outbound)
@@ -174,8 +185,9 @@ A subcolecao `workspaces/{id}/whatsappLinks/{phone}` e escrita via Admin SDK (se
 ## Deploy
 
 ```bash
-# Deploy das funcoes WhatsApp
-npx firebase deploy --only functions:billing:whatsappWebhook,functions:billing:generateWhatsappLinkCode --project zerou-26757
+# Deploy das funcoes WhatsApp (inclui unlinkWhatsapp e financialAssistantChat quando o
+# rate limit compartilhado ou o aiRateLimit.ts mudar)
+npx firebase deploy --only functions:billing:whatsappWebhook,functions:billing:generateWhatsappLinkCode,functions:billing:unlinkWhatsapp,functions:billing:financialAssistantChat --project zerou-26757
 
 # OBRIGATORIO apos todo deploy do whatsappWebhook — Firebase reseta essa flag do Cloud Run
 gcloud run services update whatsappwebhook --region=southamerica-east1 --no-cpu-throttling --project=zerou-26757
@@ -234,6 +246,17 @@ Atualmente DESATIVADA (comentada em `webhookHandler.ts`). Para reativar:
 Verificar logs do webhook. Erros 429/503 tem retry automatico. Outros erros resultam em mensagem "Nao consegui entender o valor" para o usuario.
 
 ## Historico
+
+### 2026-07-15 — Paridade com a Grazi: categorias, receita, perguntas + vinculo unico/desvinculo
+
+- **Roteamento de intencao**: `interpretMessage.ts` substitui `extractExpense.ts` — uma unica chamada DeepSeek (JSON mode) classifica a mensagem em `expense`/`income`/`create_category`/`question`/`unclear` e ja extrai os dados, ao inves de assumir sempre despesa.
+- **Categoria nova so por pedido explicito**: "cria uma categoria chamada X" cria via `createCategoryFromMessage.ts` (dedupe por nome, icone/cor validados contra `categoryPalette.ts`). Lancamento de despesa/receita sem categoria clara continua ficando sem categoria — a IA nunca cria uma sozinha durante um lancamento, so casa com a mais especifica entre as existentes (ex.: "remedio" vai pra "Farmacia" se existir, senao "Saude").
+- **Receita**: `createTransactionFromMessage.ts` recebe `type` em vez de fixar `'expense'`. "recebi 200 de freela" agora cria uma transacao `income` de verdade.
+- **Perguntas financeiras**: `answerFinancialQuestion.ts` reusa `buildFinancialContext` + a mesma persona/regras da Grazi do app, com o negrito adaptado pro WhatsApp. Rate limit compartilhado com a Grazi (`aiRateLimit.ts`, mesmo orcamento de 60/dia por workspace — extraido de `financialAssistant.ts` sem mudar comportamento).
+- **Vinculo unico**: `generateWhatsappLinkCode` agora rejeita gerar codigo novo se o workspace ja tiver um numero vinculado (`already-exists`), e limpa codigos antigos nao usados antes de gravar um novo (evitava acumulo sem fim).
+- **Desvincular**: nova function `unlinkWhatsapp` (onCall) + botao "Desvincular" em `WhatsAppLinkPage.tsx` — fecha o gap que os Termos (secao 7.4) e a pagina de exclusao de dados ja prometiam mas nao existia.
+- **UI de status**: a tela de vinculacao agora le `workspaces/{id}/whatsappLinks` no mount e mostra "Vinculado: `<numero>`" em vez de sempre oferecer "Vincular" (cliente ja podia ler essa colecao, regra catch-all confirmada — sem mudanca de `firestore.rules`).
+- **Testes**: 2 casos novos de emulador cobrindo `type:'income'` (categoria e transacao) — gap pre-existente no `tests/firestore.rules.test.ts`, fechado no mesmo commit.
 
 ### 2026-07-15 — Confirmacao demorando ~1min (CPU throttling) + DEEPSEEK_API_KEY nao vinculado
 
