@@ -318,7 +318,8 @@ service cloud.firestore {
         'iof',
         'fee',
         'installment_anticipation',
-        'installment_anticipation_credit'
+        'installment_anticipation_credit',
+        'purchase_reversal'
       ];
     }
 
@@ -342,6 +343,7 @@ service cloud.firestore {
           'name',
           'type',
           'openingBalanceCents',
+          'currentBalanceCents',
           'isActive',
           'createdBy',
           'createdAt',
@@ -352,6 +354,7 @@ service cloud.firestore {
         && validShortText(request.resource.data.name, 2, 80)
         && request.resource.data.type in ['checking', 'savings', 'wallet', 'investment', 'digital_wallet', 'cash', 'shared']
         && validSignedMoneyCents(request.resource.data.openingBalanceCents)
+        && request.resource.data.currentBalanceCents == request.resource.data.openingBalanceCents
         && request.resource.data.isActive is bool
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.createdAt == request.time
@@ -365,9 +368,10 @@ service cloud.firestore {
         && request.resource.data.createdBy == resource.data.createdBy
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.openingBalanceCents == resource.data.openingBalanceCents
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'type', 'isActive', 'updatedAt'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'type', 'isActive', 'updatedAt', 'currentBalanceCents'])
         && validShortText(request.resource.data.name, 2, 80)
         && request.resource.data.type in ['checking', 'savings', 'wallet', 'investment', 'digital_wallet', 'cash', 'shared']
+        && validSignedMoneyCents(request.resource.data.currentBalanceCents)
         && request.resource.data.isActive is bool
         && request.resource.data.updatedAt == request.time;
     }
@@ -916,6 +920,7 @@ service cloud.firestore {
           'feesTotalCents',
           'outstandingBalanceCents',
           'overpaidCreditCents',
+          'processedLedgerEntryIds',
           'version',
           'createdAt',
           'updatedAt'
@@ -932,6 +937,7 @@ service cloud.firestore {
         && request.resource.data.feesTotalCents == 0
         && request.resource.data.outstandingBalanceCents == 0
         && request.resource.data.overpaidCreditCents == 0
+        && request.resource.data.processedLedgerEntryIds == []
         && request.resource.data.version == 1
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time;
