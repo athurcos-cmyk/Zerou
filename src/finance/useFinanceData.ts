@@ -18,7 +18,30 @@ const FINANCE_BOOT_RETRY_DELAYS_MS = [600, 1200, 2400, 4000];
 // Se um listener onSnapshot não disparar em 2.5s (cache vazio + offline), assume []
 // para destravar o loading. Quando a rede voltar, o listener entrega os dados reais.
 const SLICE_BOOT_TIMEOUT_MS = 2500;
-const preparedDefaultCategoryWorkspaces = new Set<string>();
+// Persistido (não só em memória) pra não repetir esse getDocs a cada refresh do app —
+// era a causa de um banner de erro assustador aparecendo à toa em rede instável logo
+// após o refresh, mesmo com as categorias padrão já existindo há muito tempo.
+const PREPARED_DEFAULT_CATEGORIES_KEY = 'zerou.defaultCategoriesPrepared';
+
+function readPreparedDefaultCategoryWorkspaces(): Set<string> {
+  try {
+    const raw = window.localStorage.getItem(PREPARED_DEFAULT_CATEGORIES_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+const preparedDefaultCategoryWorkspaces = readPreparedDefaultCategoryWorkspaces();
+
+function markDefaultCategoriesPrepared(workspaceId: string) {
+  preparedDefaultCategoryWorkspaces.add(workspaceId);
+  try {
+    window.localStorage.setItem(PREPARED_DEFAULT_CATEGORIES_KEY, JSON.stringify([...preparedDefaultCategoryWorkspaces]));
+  } catch {
+    // Sem localStorage (aba privada bloqueada): só perde a memória entre sessões.
+  }
+}
 
 interface FinanceDataState {
   accounts: Array<LocalSynced<Account>>;
@@ -103,13 +126,17 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
       timers.push(timer);
     };
 
+    // Backfill não-crítico: `categoriesWithDefaults` (abaixo) já mostra as categorias
+    // padrão na hora via merge local, mesmo que esta escrita nunca chegue a acontecer —
+    // então uma falha aqui nunca deve virar erro pro usuário (mesma filosofia do
+    // fireWrite: silencioso em produção, visível só no console em dev).
     function prepareDefaultCategories(attempt = 0) {
       if (!userId || preparedDefaultCategoryWorkspaces.has(activeWorkspaceId)) {
         return;
       }
 
       ensureDefaultCategories(activeWorkspaceId).then(() => {
-        preparedDefaultCategoryWorkspaces.add(activeWorkspaceId);
+        markDefaultCategoriesPrepared(activeWorkspaceId);
       }).catch((error) => {
         if (cancelled) {
           return;
@@ -120,11 +147,9 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
           return;
         }
 
-        setState((current) => ({
-          ...current,
-          loading: false,
-          error: 'Não foi possível preparar as categorias padrão agora.'
-        }));
+        if (import.meta.env.DEV) {
+          console.error('[prepareDefaultCategories] falhou apos todas as tentativas', error);
+        }
       });
     }
 
