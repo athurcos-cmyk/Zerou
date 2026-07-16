@@ -2,7 +2,7 @@ import { addDays, compareAsc, endOfDay, isAfter, isBefore, isEqual } from 'date-
 import { toDate } from './financeDates';
 import { defaultAvailableMode } from './availableMode';
 import { defaultCommittedWindowDays, nextPaydayFrom } from './payday';
-import type { Account, AvailableMode, Bill, Invoice, PaydayRule, RecurringRule, Transaction } from '../types/contracts';
+import type { Account, AvailableMode, Bill, CreditCard, Invoice, PaydayRule, RecurringRule, Transaction } from '../types/contracts';
 
 export interface AccountBalance extends Account {
   balanceCents: number;
@@ -177,9 +177,11 @@ export function buildUpcomingCommitments(
   bills: Bill[],
   recurringRules: RecurringRule[],
   cutoff: Date | null,
-  invoices: Invoice[] = []
+  invoices: Invoice[] = [],
+  cards: CreditCard[] = []
 ): UpcomingCommitment[] {
   const withinCutoff = (dueAt: Date) => cutoff === null || isOnOrBefore(dueAt, cutoff);
+  const cardNameById = new Map(cards.map((card) => [card.id, card.name]));
 
   const billCommitments = bills
     .filter((bill) => bill.status === 'pending' || bill.status === 'overdue')
@@ -228,17 +230,21 @@ export function buildUpcomingCommitments(
         invoice.outstandingBalanceCents > 0 &&
         (invoice.status === 'closed' || withinCutoff(toDate(invoice.dueDate)))
     )
-    .map(
-      (invoice) =>
-        ({
-          id: invoice.id,
-          kind: 'invoice',
-          description: `Fatura ${invoice.referenceMonth}`,
-          amountCents: invoice.outstandingBalanceCents,
-          dueAt: toDate(invoice.dueDate),
-          cardId: invoice.cardId
-        }) satisfies UpcomingCommitment
-    );
+    .map((invoice) => {
+      const cardName = cardNameById.get(invoice.cardId);
+      // Sem prefixo "Fatura"/mês de referência: a linha já mostra "Fatura · <data>"
+      // embaixo (mesmo padrão de bill.description/rule.description, que também são só
+      // o nome, sem repetir o tipo). Fallback mantém o texto antigo se o cartão sumiu
+      // (excluído) ou não foi passado pro caller.
+      return {
+        id: invoice.id,
+        kind: 'invoice',
+        description: cardName ?? `Fatura ${invoice.referenceMonth}`,
+        amountCents: invoice.outstandingBalanceCents,
+        dueAt: toDate(invoice.dueDate),
+        cardId: invoice.cardId
+      } satisfies UpcomingCommitment;
+    });
 
   return [...billCommitments, ...recurringCommitments, ...invoiceCommitments].sort((left, right) =>
     compareAsc(left.dueAt, right.dueAt)
@@ -302,6 +308,7 @@ export function calculateDashboardSummary(input: {
   bills: Bill[];
   recurringRules: RecurringRule[];
   invoices?: Invoice[];
+  cards?: CreditCard[];
   payday?: PaydayRule;
   committedWindowDays?: number;
   availableMode?: AvailableMode;
@@ -316,7 +323,7 @@ export function calculateDashboardSummary(input: {
     now
   });
   const totalBalanceCents = currentTotalBalance(input.accounts);
-  const commitments = buildUpcomingCommitments(input.bills, input.recurringRules, cutoff, input.invoices ?? []);
+  const commitments = buildUpcomingCommitments(input.bills, input.recurringRules, cutoff, input.invoices ?? [], input.cards ?? []);
   const committedCents = commitments.reduce((total, commitment) => total + commitment.amountCents, 0);
   const recentTransactions = input.transactions
     .filter(isActiveTransaction)

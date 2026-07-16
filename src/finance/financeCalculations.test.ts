@@ -12,7 +12,7 @@ import {
   mergeAccountEffects,
   transactionAccountEffects
 } from './financeCalculations';
-import type { Account, Bill, Invoice, RecurringRule, Transaction } from '../types/contracts';
+import type { Account, Bill, CreditCard, Invoice, RecurringRule, Transaction } from '../types/contracts';
 
 function account(id: string, openingBalanceCents = 0, overrides: Partial<Account> = {}): Account {
   return {
@@ -93,6 +93,22 @@ function invoice(overrides: Partial<Invoice> = {}): Invoice {
     createdBy: 'alice',
     ...overrides
   } as Invoice;
+}
+
+function card(overrides: Partial<CreditCard> = {}): CreditCard {
+  return {
+    id: overrides.id ?? 'card-1',
+    workspaceId: 'workspaceA',
+    name: overrides.name ?? 'Cartão',
+    lastFour: '1234',
+    brand: 'visa',
+    limitCents: 500000,
+    closingDay: 3,
+    dueDay: 10,
+    colorToken: 'default',
+    isActive: true,
+    ...overrides
+  };
 }
 
 describe('financial calculations — movimentação de saldo', () => {
@@ -552,6 +568,33 @@ describe('buildUpcomingCommitments', () => {
     );
 
     expect(commitments.map((c) => c.id)).toEqual(['r-1', 'inv-1', 'b-1']);
+  });
+
+  // Regressão: com mais de um cartão, todas as faturas do mesmo mês de referência
+  // mostravam o mesmo texto ("Fatura 2026-07"), sem indicar de qual cartão era cada
+  // uma — só dava pra saber clicando. Achado pelo dono ao vivo em 2026-07-16.
+  it('includes the card name in the invoice description when the card is known', () => {
+    const commitments = buildUpcomingCommitments(
+      [],
+      [],
+      cutoff,
+      [invoice({ id: 'inv-1', status: 'closed', referenceMonth: '2026-06', cardId: 'card-nubank' })],
+      [card({ id: 'card-nubank', name: 'Nubank' })]
+    );
+
+    expect(commitments[0].description).toBe('Nubank');
+  });
+
+  it('falls back to the plain reference month when the card is missing or not provided', () => {
+    const commitments = buildUpcomingCommitments(
+      [],
+      [],
+      cutoff,
+      [invoice({ id: 'inv-1', status: 'closed', referenceMonth: '2026-06', cardId: 'card-deleted' })],
+      [card({ id: 'card-nubank', name: 'Nubank' })]
+    );
+
+    expect(commitments[0].description).toBe('Fatura 2026-06');
   });
 });
 

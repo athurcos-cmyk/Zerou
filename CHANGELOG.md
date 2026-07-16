@@ -2,6 +2,15 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-16 — Nome do cartão nas faturas do Dashboard/Projeção + "Ver todos" enganoso removido
+
+Achado pelo dono ao vivo: com mais de um cartão, "Próximos compromissos" mostrava várias faturas com o texto idêntico "Fatura 2026-07" (o mês de referência), só distinguíveis clicando.
+
+- `buildUpcomingCommitments`/`calculateDashboardSummary` (`financeCalculations.ts`) e `projectDailyBalance` (`cashFlowProjection.ts`) agora recebem a lista de cartões e trocam o nome do cartão pela descrição da fatura — com fallback pro texto antigo (`Fatura ${referenceMonth}`) se o cartão não for encontrado (ex.: já excluído). 2 testes novos.
+- Ajuste de UI logo em seguida (pedido do dono, achou o texto "não bonito"): a descrição no Dashboard virou só o nome do cartão (ex.: "Cartão Nubank"), sem repetir "Fatura" nem o mês de referência técnico — a linha de baixo já mostra "Fatura · 10 jul". Mesmo padrão que bills/recorrências já usavam (descrição = só o nome). Na Projeção de Fluxo (sem esse rótulo separado) manteve o prefixo "Fatura" mas sem o mês de referência, já que cada evento aparece sob o cabeçalho do próprio dia.
+- Removido o link "Ver todos" de "Próximos compromissos" — levava pra Contas a Pagar, que não lista faturas de cartão, então prometia mostrar tudo sem entregar quando a lista incluía fatura.
+- Sem mudança de regra/backend.
+
 ## 2026-07-16 — Patrimônio Líquido desativado (temporariamente, a pedido do dono)
 
 Feature "Patrimônio Líquido" desativada por pedido explícito ("talvez no futuro faremos, mas no momento pode desativar"). **Só desconectada da navegação, código intacto** — nenhum arquivo apagado, pra religar rápido se um dia voltar a ser prioridade:

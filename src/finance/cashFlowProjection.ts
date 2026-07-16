@@ -3,7 +3,7 @@ import { toDate } from './financeDates';
 import { currentTotalBalance } from './financeCalculations';
 import { nextOccurrenceDate } from './financeService';
 import { nextPaydayFrom } from './payday';
-import type { Account, Bill, Invoice, PaydayRule, RecurringRule, Transaction } from '../types/contracts';
+import type { Account, Bill, CreditCard, Invoice, PaydayRule, RecurringRule, Transaction } from '../types/contracts';
 
 export interface ProjectionEvent {
   id: string;
@@ -96,8 +96,10 @@ export function projectDailyBalance(
   invoices: Invoice[],
   payday?: PaydayRule,
   now: Date = new Date(),
+  cards: CreditCard[] = [],
 ): DailyProjection[] {
   const startBalance = currentTotalBalance(accounts);
+  const cardNameById = new Map(cards.map((card) => [card.id, card.name]));
   const horizonEnd = addDays(now, horizonDays);
   const todayStart = startOfDay(now);
   const estimatedIncome = estimateMonthlyIncome(transactions);
@@ -121,13 +123,18 @@ export function projectDailyBalance(
   // Invoices: open/closed/partial/overdue with dueDate in horizon and outstanding balance > 0
   const invoiceEvents = invoices
     .filter((inv) => inv.status !== 'paid' && inv.status !== 'overpaid' && inv.outstandingBalanceCents > 0)
-    .map((inv) => ({
-      date: toDate(inv.dueDate),
-      description: `Fatura ${inv.referenceMonth}`,
-      amountCents: inv.outstandingBalanceCents,
-      id: inv.id,
-      kind: 'invoice' as const,
-    }))
+    .map((inv) => {
+      const cardName = cardNameById.get(inv.cardId);
+      // Sem mês de referência aqui: cada evento já aparece sob o cabeçalho do próprio
+      // dia (ProjectionTimeline), então a data já está implícita.
+      return {
+        date: toDate(inv.dueDate),
+        description: cardName ? `Fatura ${cardName}` : `Fatura ${inv.referenceMonth}`,
+        amountCents: inv.outstandingBalanceCents,
+        id: inv.id,
+        kind: 'invoice' as const,
+      };
+    })
     .filter((e) => isAfter(e.date, todayStart) && (isBefore(e.date, horizonEnd) || isEqual(e.date, horizonEnd)));
 
   // Income events

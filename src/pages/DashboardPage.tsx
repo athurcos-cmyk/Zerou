@@ -50,6 +50,7 @@ export function DashboardPage() {
     bills: finance.bills,
     recurringRules: finance.recurringRules,
     invoices: cardsData.invoices,
+    cards: cardsData.cards,
     payday: profile?.payday,
     committedWindowDays: profile?.committedWindowDays,
     availableMode: profile?.availableMode
@@ -158,9 +159,11 @@ export function DashboardPage() {
             finance.recurringRules,
             cardsData.invoices,
             profile?.payday,
+            undefined,
+            cardsData.cards,
           )
         : null,
-    [hasStarted, isCommittedLoading, cashFlowHorizon, finance.accounts, finance.transactions, finance.bills, finance.recurringRules, cardsData.invoices, profile?.payday],
+    [hasStarted, isCommittedLoading, cashFlowHorizon, finance.accounts, finance.transactions, finance.bills, finance.recurringRules, cardsData.invoices, profile?.payday, cardsData.cards],
   );
 
   return (
@@ -310,9 +313,6 @@ export function DashboardPage() {
               <p className="eyebrow">Próximos compromissos</p>
               <h2>O que vence primeiro</h2>
             </div>
-            <Link className="inline-link" to="/app/bills">
-              Ver todos
-            </Link>
           </div>
           {isCommittedLoading ? null : dashboard.upcomingCommitments.length > 0 ? (
             <div className="item-list">
