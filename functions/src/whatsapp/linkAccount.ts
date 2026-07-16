@@ -23,10 +23,27 @@ export const generateWhatsappLinkCode = onCall(
     const { workspaceId } = (request.data ?? {}) as { workspaceId?: string };
     if (!workspaceId) throw new HttpsError('invalid-argument', 'workspaceId é obrigatório.');
 
-    await verifyWorkspaceMembership(getFirestore(), workspaceId, uid);
+    const db = getFirestore();
+    await verifyWorkspaceMembership(db, workspaceId, uid);
+
+    // Um numero ativo por vez por workspace — precisa desvincular antes de trocar.
+    const existingLinks = await db.collection(`workspaces/${workspaceId}/whatsappLinks`).limit(1).get();
+    if (!existingLinks.empty) {
+      throw new HttpsError(
+        'already-exists',
+        'Este espaço já está vinculado a um WhatsApp. Desvincule primeiro em Configurações > WhatsApp.',
+      );
+    }
+
+    // Limpa codigos antigos nao usados antes de gerar um novo — evita acumulo sem fim.
+    const oldCodes = await db.collection(`users/${uid}/whatsappLinkCodes`).get();
+    if (!oldCodes.empty) {
+      const cleanupBatch = db.batch();
+      oldCodes.docs.forEach((d) => cleanupBatch.delete(d.ref));
+      await cleanupBatch.commit();
+    }
 
     const code = generateCode();
-    const db = getFirestore();
     const expiresAt = new Date(Date.now() + CODE_TTL_MINUTES * 60_000);
 
     await db.doc(`users/${uid}/whatsappLinkCodes/${code}`).set({

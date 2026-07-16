@@ -3,10 +3,13 @@ import { onRequest } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions';
 import crypto from 'crypto';
 import { sendWhatsAppMessage, getVerifyToken, whatsappAccessToken } from './metaClient.js';
-import { extractExpense } from './extractExpense.js';
+import { interpretMessage, type CategoryOption } from './interpretMessage.js';
 import { createTransactionFromMessage } from './createTransactionFromMessage.js';
+import { createCategoryFromMessage } from './createCategoryFromMessage.js';
+import { answerFinancialQuestion } from './answerFinancialQuestion.js';
 import { processLinkCode } from './linkAccount.js';
 import { deepseekApiKey } from '../ai/deepseekClient.js';
+import { checkAiUsageNotExceeded, incrementAiUsage } from '../ai/aiRateLimit.js';
 
 const region = 'southamerica-east1';
 
@@ -119,19 +122,81 @@ export const whatsappWebhook = onRequest(
       const { workspaceId, linkedByUid } = link;
       if (!workspaceId || !linkedByUid) return;
 
-      // ── Load categories ─────────────────────────────────────────────
+      // ── Load categories (todas — expense/income/both — a intencao decide qual usar) ──
       const catsSnap = await db
         .collection(`workspaces/${workspaceId}/categories`)
         .where('isActive', '==', true)
-        .where('type', 'in', ['expense', 'both'])
         .get();
 
-      const categories = catsSnap.docs.map((d) => ({
+      const categories: CategoryOption[] = catsSnap.docs.map((d) => ({
         id: d.id,
         name: d.data().name as string,
+        type: d.data().type as 'income' | 'expense' | 'both',
       }));
 
-      // ── Get default account ─────────────────────────────────────────
+      // ── Interpretar a mensagem (intencao + extracao, uma unica chamada) ──
+      const interpretation = await interpretMessage(cleanText, categories);
+
+      if (!interpretation || interpretation.intent === 'unclear') {
+        await sendWhatsAppMessage(
+          phone,
+          'Não entendi. Você pode:\n- Registrar um gasto: "gastei 15 reais no mercado"\n- Registrar uma receita: "recebi 200 reais de freela"\n- Criar categoria: "cria uma categoria chamada Pet"\n- Perguntar sobre suas finanças: "quanto gastei esse mês?"',
+        );
+        return;
+      }
+
+      // ── Criar categoria (pedido explicito, nunca cria transacao junto) ──
+      if (interpretation.intent === 'create_category') {
+        if (!interpretation.newCategoryName) {
+          await sendWhatsAppMessage(phone, 'Não entendi o nome da categoria. Ex: "cria uma categoria chamada Pet".');
+          return;
+        }
+
+        const result = await createCategoryFromMessage({
+          workspaceId,
+          userId: linkedByUid,
+          name: interpretation.newCategoryName,
+          type: interpretation.newCategoryType ?? 'expense',
+          icon: interpretation.newCategoryIcon,
+        });
+
+        await sendWhatsAppMessage(
+          phone,
+          result.created
+            ? `✅ Categoria "${result.name}" criada.`
+            : `Você já tem uma categoria chamada "${result.name}".`,
+        );
+        return;
+      }
+
+      // ── Pergunta financeira (paridade com a Grazi do app) ───────────
+      if (interpretation.intent === 'question') {
+        let usageRef;
+        try {
+          ({ usageRef } = await checkAiUsageNotExceeded(db, workspaceId));
+        } catch {
+          await sendWhatsAppMessage(
+            phone,
+            'Você atingiu o limite diário de perguntas para a Grazi. Volte amanhã ou pergunte pelo app.',
+          );
+          return;
+        }
+
+        const answer = await answerFinancialQuestion(db, workspaceId, linkedByUid, cleanText);
+        await sendWhatsAppMessage(phone, answer);
+        await incrementAiUsage(usageRef);
+        return;
+      }
+
+      // ── Despesa ou receita — daqui pra baixo intent e 'expense' | 'income' ──
+      if (interpretation.confidence === 'low' || interpretation.amountCents <= 0) {
+        await sendWhatsAppMessage(
+          phone,
+          'Não consegui entender o valor. Pode reformular? Ex: "gastei 15 reais no mercado"',
+        );
+        return;
+      }
+
       const accountsSnap = await db
         .collection(`workspaces/${workspaceId}/accounts`)
         .where('isActive', '==', true)
@@ -147,40 +212,40 @@ export const whatsappWebhook = onRequest(
         return;
       }
 
-      // ── Extract expense with DeepSeek ───────────────────────────────
-      const extraction = await extractExpense(cleanText, categories);
-
-      if (!extraction || extraction.confidence === 'low') {
-        await sendWhatsAppMessage(
-          phone,
-          'Não consegui entender o valor. Pode reformular? Ex: "gastei 15 reais no mercado"',
-        );
-        return;
+      // Rede de seguranca: como a query de categorias nao filtra mais por tipo,
+      // confere aqui que a categoria escolhida bate com a intencao antes de usar.
+      let categoryId = interpretation.categoryId;
+      if (categoryId) {
+        const matchedCategory = categories.find((c) => c.id === categoryId);
+        const typeMatches = matchedCategory
+          && (matchedCategory.type === interpretation.intent || matchedCategory.type === 'both');
+        if (!typeMatches) categoryId = null;
       }
 
-      // ── Create transaction ──────────────────────────────────────────
       const result = await createTransactionFromMessage({
         workspaceId,
         userId: linkedByUid,
-        amountCents: extraction.amountCents,
-        description: extraction.description,
-        categoryId: extraction.categoryId,
+        type: interpretation.intent,
+        amountCents: interpretation.amountCents,
+        description: interpretation.description || cleanText.slice(0, 80),
+        categoryId,
         accountId: defaultAccountId,
         date: new Date(),
         source: 'whatsapp',
       });
 
-      // ── Confirm ─────────────────────────────────────────────────────
       const catSuffix = result.categoryName ? ` (${result.categoryName})` : '';
-      await sendWhatsAppMessage(
-        phone,
-        `✅ Registrado: ${formatBRL(result.amountCents)} — ${result.description}${catSuffix}`,
-      );
+      const confirmation = interpretation.intent === 'income'
+        ? `💰 Receita registrada: ${formatBRL(result.amountCents)} — ${result.description}${catSuffix}`
+        : `✅ Registrado: ${formatBRL(result.amountCents)} — ${result.description}${catSuffix}`;
+
+      await sendWhatsAppMessage(phone, confirmation);
 
       logger.info('whatsapp_transaction_created', {
         phone,
         workspaceId,
         transactionId: result.id,
+        type: interpretation.intent,
         amountCents: result.amountCents,
       });
     } catch (err) {

@@ -1,19 +1,50 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MessageCircle, Copy, Check, ExternalLink } from 'lucide-react';
 import { httpsCallable } from 'firebase/functions';
+import { collection, getDocs } from 'firebase/firestore';
 import { useAuth } from '../auth/AuthContext';
-import { getFirebaseFunctions } from '../firebase/config';
+import { getFirebaseFunctions, getFirebaseDb } from '../firebase/config';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
+import { useConfirm } from '../components/ConfirmDialog';
 
 export function WhatsAppLinkPage() {
   const { user } = useAuth();
+  const { confirm, dialog: confirmDialog } = useConfirm();
+  const workspaceId = user?.uid ? `personal_${user.uid}` : null;
+
+  const [checkingLink, setCheckingLink] = useState(true);
+  const [linkedPhone, setLinkedPhone] = useState<string | null>(null);
+  const [unlinking, setUnlinking] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [code, setCode] = useState<string | null>(null);
   const [waLink, setWaLink] = useState<string | null>(null);
   const [expiresIn, setExpiresIn] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!workspaceId) {
+      setCheckingLink(false);
+      return;
+    }
+
+    let cancelled = false;
+    getDocs(collection(getFirebaseDb(), 'workspaces', workspaceId, 'whatsappLinks'))
+      .then((snap) => {
+        if (cancelled) return;
+        setLinkedPhone(snap.docs[0]?.id ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setLinkedPhone(null);
+      })
+      .finally(() => {
+        if (!cancelled) setCheckingLink(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [workspaceId]);
 
   async function handleGenerate() {
     setLoading(true);
@@ -22,8 +53,7 @@ export function WhatsAppLinkPage() {
     setWaLink(null);
 
     try {
-      const workspaceId = `personal_${user?.uid}`;
-      if (!user?.uid) {
+      if (!workspaceId) {
         setError('Você precisa estar logado para vincular o WhatsApp.');
         setLoading(false);
         return;
@@ -43,6 +73,34 @@ export function WhatsAppLinkPage() {
       setError(getUserFacingErrorMessage(err, 'Não foi possível gerar o código. Tente de novo.'));
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleUnlink() {
+    if (!workspaceId) return;
+    const ok = await confirm({
+      title: 'Desvincular WhatsApp?',
+      message: 'Você para de conseguir lançar gastos e receitas pelo WhatsApp até vincular de novo.',
+      confirmLabel: 'Desvincular',
+      danger: true,
+    });
+    if (!ok) return;
+
+    setUnlinking(true);
+    setError(null);
+    try {
+      const fn = httpsCallable<{ workspaceId: string }, { unlinkedPhone: string }>(
+        getFirebaseFunctions(),
+        'unlinkWhatsapp',
+      );
+      await fn({ workspaceId });
+      setLinkedPhone(null);
+      setCode(null);
+      setWaLink(null);
+    } catch (err) {
+      setError(getUserFacingErrorMessage(err, 'Não foi possível desvincular. Tente de novo.'));
+    } finally {
+      setUnlinking(false);
     }
   }
 
@@ -82,7 +140,26 @@ export function WhatsAppLinkPage() {
             <p className="form-message form-message--error" style={{ marginBottom: '1rem' }}>{error}</p>
           ) : null}
 
-          {!code ? (
+          {checkingLink ? (
+            <p className="text-secondary" style={{ fontSize: '0.86rem' }}>Carregando...</p>
+          ) : linkedPhone ? (
+            <div style={{ textAlign: 'center' }}>
+              <p className="text-secondary" style={{ marginBottom: '0.25rem', fontSize: '0.86rem' }}>
+                Vinculado
+              </p>
+              <strong style={{ fontSize: '1.25rem', display: 'block', marginBottom: '1rem' }}>
+                +{linkedPhone}
+              </strong>
+              <button
+                className="button button--ghost"
+                type="button"
+                disabled={unlinking}
+                onClick={() => void handleUnlink()}
+              >
+                {unlinking ? 'Desvinculando...' : 'Desvincular'}
+              </button>
+            </div>
+          ) : !code ? (
             <button
               className="button button--primary button--block"
               type="button"
@@ -161,6 +238,8 @@ export function WhatsAppLinkPage() {
           <Link to="/app" className="inline-link">Voltar para o início</Link>
         </p>
       </div>
+
+      {confirmDialog}
     </div>
   );
 }

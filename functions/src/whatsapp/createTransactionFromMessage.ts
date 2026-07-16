@@ -20,6 +20,7 @@ function monthKeyFromDate(d: Date): string {
 export interface CreateFromMessageInput {
   workspaceId: string;
   userId: string;
+  type: 'income' | 'expense';
   amountCents: number;
   description: string;
   categoryId?: string | null;
@@ -42,7 +43,7 @@ export async function createTransactionFromMessage(
     workspaceId: input.workspaceId,
     createdBy: input.userId,
     updatedBy: input.userId,
-    type: 'expense',
+    type: input.type,
     amountCents: input.amountCents,
     description: input.description,
     accountId: input.accountId,

@@ -20,6 +20,7 @@ export { financialAssistantChat } from './ai/financialAssistant.js';
 // ─── WhatsApp ─────────────────────────────────────────────────────────────────
 export { whatsappWebhook } from './whatsapp/webhookHandler.js';
 export { generateWhatsappLinkCode } from './whatsapp/linkAccount.js';
+export { unlinkWhatsapp } from './whatsapp/unlinkWhatsapp.js';
 
 // ─── Admin ────────────────────────────────────────────────────────────────────
 // adminDeleteUser NÃO fica aqui — vive isolado em functions-admin/ (codebase

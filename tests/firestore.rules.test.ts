@@ -918,6 +918,15 @@ describe('firestore security rules', () => {
     await assertSucceeds(updateDoc(categoryReference, { color: '#37A24A', updatedAt: serverTimestamp() }));
   });
 
+  it('allows an active member to create an income category', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    const categoryReference = doc(aliceDb, 'workspaces/workspaceA/categories/categoryIncome');
+
+    await assertSucceeds(
+      setDoc(categoryReference, categoryPayload('workspaceA', 'categoryIncome', 'alice', { type: 'income' }))
+    );
+  });
+
   it('allows seeding a default category without createdBy, but not a custom category', async () => {
     const aliceDb = testEnv.authenticatedContext('alice').firestore();
 
@@ -962,6 +971,20 @@ describe('firestore security rules', () => {
       setDoc(
         doc(aliceDb, 'workspaces/workspaceA/transactions/txnA'),
         transactionPayload('workspaceA', 'txnA', 'alice', 'accountA')
+      )
+    );
+  });
+
+  it('allows a member to create an income transaction', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(
+      setDoc(doc(aliceDb, 'workspaces/workspaceA/accounts/accountA'), accountPayload('workspaceA', 'accountA', 'alice'))
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/transactions/txnIncome'),
+        transactionPayload('workspaceA', 'txnIncome', 'alice', 'accountA', { type: 'income' })
       )
     );
   });

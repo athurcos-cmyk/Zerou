@@ -1,18 +1,13 @@
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getFirestore } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions';
 import { callDeepSeek, deepseekApiKey } from './deepseekClient.js';
 import { buildFinancialContext } from './buildFinancialContext.js';
 import { verifyWorkspaceMembership } from './verifyWorkspaceMembership.js';
+import { checkAiUsageNotExceeded, incrementAiUsage } from './aiRateLimit.js';
 
 const REGION = 'southamerica-east1';
-const DAILY_LIMIT = 60;
 const MAX_HISTORY_CONTENT_LENGTH = 4000;
-
-function todayKey(): string {
-  const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
 
 const SYSTEM_PROMPT = `Voce e a Grazi, assistente financeira do Granativa, um app brasileiro de controle de gastos pessoais. Voce se apresenta como Grazi quando perguntarem seu nome. Voce recebe um resumo dos dados financeiros reais do usuario com estas secoes:
 
@@ -104,18 +99,7 @@ export const financialAssistantChat = onCall(
     await verifyWorkspaceMembership(db, workspaceId, uid);
 
     // ── Rate limit: pre-check only (nao incrementa ainda) ────────────────────
-    const key = todayKey();
-    const usageRef = db.doc(`workspaces/${workspaceId}/aiUsage/${key}`);
-
-    const usageDoc = await usageRef.get();
-    const currentCount = usageDoc.exists ? ((usageDoc.data()?.count as number) ?? 0) : 0;
-
-    if (currentCount >= DAILY_LIMIT) {
-      throw new HttpsError(
-        'resource-exhausted',
-        'Limite diario de mensagens do assistente atingido. Volte amanha!',
-      );
-    }
+    const { usageRef } = await checkAiUsageNotExceeded(db, workspaceId);
 
     // ── Financial context ────────────────────────────────────────────────────
     let context: string;
@@ -147,17 +131,7 @@ export const financialAssistantChat = onCall(
     }
 
     // ── Rate limit: increment AFTER successful call ──────────────────────────
-    // set + merge:true + increment(1) é atômico e funciona tanto para criar
-    // quanto para atualizar — sem race condition entre if/else com exists obsoleto.
-    try {
-      await usageRef.set(
-        { count: FieldValue.increment(1), updatedAt: FieldValue.serverTimestamp() },
-        { merge: true },
-      );
-    } catch (err) {
-      // Non-critical: the message was already served. Log and continue.
-      logger.warn('ai_rate_limit_increment_failed', { workspaceId, error: String(err) });
-    }
+    await incrementAiUsage(usageRef);
 
     return { reply };
   },
