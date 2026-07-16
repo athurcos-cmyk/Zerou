@@ -44,7 +44,7 @@ Use este arquivo como mapa antes de abrir documentos grandes. Regra: leia o meno
 | Espaço do casal + cofrinho | `src/pages/SharedSpacePage.tsx` (orquestrador), `src/pages/shared/` (convite/modo/cofrinho/despesas), `src/shared/` (serviço/hooks) |
 | Análise / gráficos / busca | `src/pages/SearchPage.tsx` (UI); `src/finance/spendingAnalysis.ts` (gasto por mês/categoria em regime de caixa — cartão pela parcela da fatura, não pela transação) |
 | Metas (pessoais) | `src/pages/GoalsPage.tsx`, `src/finance/useGoalsData.ts` |
-| Patrimônio Líquido | `src/pages/NetWorthPage.tsx`, `src/finance/netWorthCalculations.ts` |
+| Patrimônio Líquido (desativado 2026-07-16, código intacto — ver `docs/planning/TODOS.md` pra religar) | `src/pages/NetWorthPage.tsx`, `src/finance/netWorthCalculations.ts` |
 | Fluxo de Caixa (projeção) | `src/components/CashFlowChart.tsx`, `src/components/ProjectionTimeline.tsx`, `src/finance/cashFlowProjection.ts` |
 | Resumo Anual | `src/components/AnnualSummarySheet.tsx`, `src/finance/annualSummaryCalculations.ts` |
 | Alertas de Orçamento | `src/components/BudgetAlertBanner.tsx`, `src/finance/budgetAlertCache.ts` (banner cliente); `functions/src/budgetAlerts.ts` (Cloud Function push) |

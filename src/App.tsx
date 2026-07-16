@@ -31,7 +31,8 @@ import { ContactPage, FeaturesPage, HelpPage, SecurityPage } from './pages/Publi
 import { DataDeletionPage, PrivacyPolicyPage, TermsPage } from './pages/LegalPages';
 import { PrivacyCenterPage } from './pages/PrivacyCenterPage';
 import { RegisterPage } from './pages/RegisterPage';
-import { NetWorthPage } from './pages/NetWorthPage';
+// Patrimônio Líquido desativado (2026-07-16, pedido do dono) — ver docs/planning/TODOS.md.
+// import { NetWorthPage } from './pages/NetWorthPage';
 import { SearchPage } from './pages/SearchPage';
 import { AdminPage } from './pages/AdminPage';
 import { SharedSpacePage } from './pages/SharedSpacePage';
@@ -90,7 +91,8 @@ export function App() {
                 <Route path="cards/:cardId/invoices/:invoiceId" element={<InvoicePage />} />
                 <Route path="bills" element={<BillsPage />} />
                 <Route path="goals" element={<GoalsPage />} />
-                <Route path="net-worth" element={<NetWorthPage />} />
+                {/* Patrimônio Líquido desativado (2026-07-16) — redireciona em vez de remover, pra não deixar link morto se alguém tiver a URL salva/favoritada. */}
+                <Route path="net-worth" element={<Navigate to="/app/dashboard" replace />} />
                 <Route path="search" element={<SearchPage />} />
                 <Route path="shared" element={<SharedSpacePage />} />
                 <Route path="assistant" element={<AssistantPage />} />

@@ -14,7 +14,6 @@ import {
   ReceiptText,
   Shield,
   Target,
-  TrendingUp,
   MessageCircle,
   Users,
   WalletCards,
@@ -83,9 +82,7 @@ export function AppShell() {
           <NavLink className={getNavClass} to="/app/accounts">
             <WalletCards size={19} aria-hidden="true" /> Contas
           </NavLink>
-          <NavLink className={getNavClass} to="/app/net-worth">
-            <TrendingUp size={19} aria-hidden="true" /> Patrimônio
-          </NavLink>
+          {/* Patrimônio Líquido desativado (2026-07-16, pedido do dono) — ver docs/planning/TODOS.md. Página/cálculo intactos, só sem entrada de navegação. */}
           <NavLink className={getNavClass} to="/app/cards">
             <CreditCardIcon /> Cartões
           </NavLink>
@@ -159,9 +156,7 @@ export function AppShell() {
               <NavLink className={getNavClass} to="/app/accounts" onClick={() => setMobileMenuOpen(false)}>
                 <WalletCards size={19} aria-hidden="true" /> Contas
               </NavLink>
-              <NavLink className={getNavClass} to="/app/net-worth" onClick={() => setMobileMenuOpen(false)}>
-                <TrendingUp size={19} aria-hidden="true" /> Patrimônio
-              </NavLink>
+              {/* Patrimônio Líquido desativado (2026-07-16, pedido do dono) — ver docs/planning/TODOS.md. */}
               <NavLink className={getNavClass} to="/app/shared" onClick={() => setMobileMenuOpen(false)}>
                 <Users size={19} aria-hidden="true" /> Compartilhado
               </NavLink>

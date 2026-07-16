@@ -2,6 +2,14 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-16 — Patrimônio Líquido desativado (temporariamente, a pedido do dono)
+
+Feature "Patrimônio Líquido" desativada por pedido explícito ("talvez no futuro faremos, mas no momento pode desativar"). **Só desconectada da navegação, código intacto** — nenhum arquivo apagado, pra religar rápido se um dia voltar a ser prioridade:
+
+- Removida a entrada "Patrimônio" da sidebar desktop e do menu mobile (`src/layout/AppShell.tsx`).
+- Rota `/app/net-worth` trocada de `<NetWorthPage />` por um redirect pro dashboard (`src/App.tsx`) — protege quem tiver a URL salva/favoritada de cair numa tela morta.
+- `src/pages/NetWorthPage.tsx` e `src/finance/netWorthCalculations.ts` continuam existindo, intocados, prontos pra religar (bastaria reverter os 2 arquivos acima). Ver `docs/planning/TODOS.md` pra reativar.
+
 ## 2026-07-16 — Contas a Pagar reorganizada + Grazi/WhatsApp corrigidas + achado operacional importante
 
 - **Contas a Pagar redesenhada**: recorrentes e compromissos avulsos agora em seções separadas (antes misturados numa lista só); corrigido bug real onde a data da próxima recorrência aparecia trocada pelo valor em dinheiro; agora dá pra editar valor/frequência/categoria de uma recorrência (antes só dava pra criar); layout revisado pra celular de verdade (achado e corrigido um bug de sobreposição de texto em telas de 375px, junto com a mesma correção nas listas do Dashboard e Transações).
