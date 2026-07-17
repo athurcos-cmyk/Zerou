@@ -63,11 +63,28 @@ async function collectCardTree(workspaceId: string): Promise<DocumentReference[]
   return refs;
 }
 
+// Fecha o mesmo gap achado na auto-exclusão (accountDeletionService.ts, 2026-07-17): o
+// número de WhatsApp ficava vinculado depois da conta excluída, porque nem a exclusão do
+// próprio usuário nem a do admin nunca tocavam nessas coleções.
+async function collectWhatsappRefs(workspaceId: string): Promise<DocumentReference[]> {
+  const db = getFirestore();
+  const refs: DocumentReference[] = [];
+  const linksSnap = await db.collection(`workspaces/${workspaceId}/whatsappLinks`).get();
+
+  for (const linkDoc of linksSnap.docs) {
+    refs.push(linkDoc.ref);
+    refs.push(db.doc(`whatsappPhoneIndex/${linkDoc.id}`));
+  }
+
+  return refs;
+}
+
 async function collectWorkspaceTree(workspaceId: string): Promise<DocumentReference[]> {
   const db = getFirestore();
   const refs: DocumentReference[] = [];
 
   refs.push(...(await collectCardTree(workspaceId)));
+  refs.push(...(await collectWhatsappRefs(workspaceId)));
 
   for (const col of WORKSPACE_COLLECTIONS) {
     refs.push(...(await collectSubcollection(`workspaces/${workspaceId}/${col}`)));
@@ -101,6 +118,7 @@ export const adminDeleteUser = onCall(
     refs.push(...(await collectWorkspaceTree(personalWorkspaceId)));
 
     refs.push(...(await collectSubcollection(`users/${userId}/fcmTokens`)));
+    refs.push(...(await collectSubcollection(`users/${userId}/whatsappLinkCodes`)));
 
     const workspaceRefsSnap = await db.collection(`users/${userId}/workspaceRefs`).get();
 

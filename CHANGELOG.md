@@ -2,6 +2,15 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-17 — Exclusão de conta: WhatsApp não desvinculava + race condition mandava pro onboarding
+
+Relato ao vivo do dono: excluiu a própria conta (login Google), o WhatsApp continuou vinculado e a tela voltou pro onboarding em vez da landing. Duas causas reais, sem relação uma com a outra:
+
+- **WhatsApp nunca era desvinculado**: nem a auto-exclusão (`accountDeletionService.ts`) nem a exclusão via admin (`functions-admin/src/index.ts`, `adminDeleteUser` — já existia, com botão em `AdminPage.tsx`) tocavam em `whatsappPhoneIndex`/`whatsappLinks`/`whatsappLinkCodes`. Corrigido nos dois: self-service chama o `unlinkWhatsapp` que já existia; admin apaga direto (Admin SDK).
+- **Race condition** (a causa real do "voltou pro onboarding"): `deleteAccountData()` apaga `users/{uid}` antes de `deleteAuthenticatedUser()` (ordem deliberada). O `onSnapshot` ao vivo em `AuthContext.tsx` zera o perfil na hora, e o guard de rota `RequireOnboardingComplete` redirecionava pra `/app/onboarding` **no meio da própria exclusão**, parecendo que a conta tinha virado nova. Corrigido com uma flag transiente (`accountDeletion.store.ts`) que suspende esse redirect enquanto a exclusão está rodando.
+- Bônus de UX: aviso antes do popup do Google na tela de exclusão, e mensagem clara se a pessoa confirmar com uma conta Google diferente (`auth/user-mismatch`).
+- Verificado de ponta a ponta com conta descartável: sem flash de onboarding, WhatsApp simulado desvinculado, `functions:admin:adminDeleteUser` deployado e testado (IAM ok, sem repetir o bug de 2026-07-09). Detalhes em `docs/history/2026-07.md`.
+
 ## 2026-07-17 — Objetivo/desafio do onboarding: editável depois + alimenta a Grazi
 
 Achado pelo dono: as respostas de "qual seu objetivo" e "qual desafio" no cadastro não influenciavam nada no app depois, e nunca podiam ser mudadas. Duas mudanças:

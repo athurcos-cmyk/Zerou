@@ -18,6 +18,8 @@
       return 'Este email ja tem uma conta Granativa. Tente entrar ou recuperar a senha.';
     case 'auth/popup-closed-by-user':
       return 'A janela do Google foi fechada antes de concluir.';
+    case 'auth/user-mismatch':
+      return 'Essa é uma conta Google diferente da que você está usando agora. Escolha a mesma conta pra confirmar.';
     case 'auth/provider-already-linked':
       return 'Este metodo ja esta vinculado a sua conta Granativa.';
     case 'auth/credential-already-in-use':

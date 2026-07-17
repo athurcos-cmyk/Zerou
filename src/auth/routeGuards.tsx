@@ -1,5 +1,6 @@
 ﻿import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
+import { useAccountDeletion } from '../settings/accountDeletion.store';
 
 const ADMIN_EMAIL = 'a.thurcos@gmail.com';
 
@@ -20,13 +21,18 @@ export function RequireAuth() {
 
 export function RequireOnboardingComplete() {
   const { profile, profileLoading } = useAuth();
+  const isDeletingAccount = useAccountDeletion((state) => state.isDeleting);
   const location = useLocation();
 
   if (profileLoading) {
     return <div className="public-page">Preparando seu espaço Granativa...</div>;
   }
 
-  if (!profile?.defaultWorkspaceId && location.pathname !== '/app/onboarding') {
+  // Exclusão de conta apaga `users/{uid}` antes de deslogar (ordem deliberada, ver
+  // accountDeletionService.ts) — o `onSnapshot` ao vivo em AuthContext.tsx zera `profile`
+  // na hora, e sem essa guarda a pessoa cairia aqui no meio da própria exclusão, achando
+  // que virou conta nova.
+  if (!profile?.defaultWorkspaceId && location.pathname !== '/app/onboarding' && !isDeletingAccount) {
     return <Navigate to="/app/onboarding" replace />;
   }
 

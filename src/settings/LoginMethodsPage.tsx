@@ -13,6 +13,7 @@ import {
 import { getAuthErrorMessage } from '../auth/authErrors';
 import { FormMessage } from '../components/FormMessage';
 import { deleteAccountData, runAccountDeletion } from './accountDeletionService';
+import { useAccountDeletion } from './accountDeletion.store';
 
 const providerLabels: Record<string, string> = {
   password: 'Email e senha',
@@ -27,6 +28,7 @@ export function LoginMethodsPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [busy, setBusy] = useState(false);
+  const setAccountDeleting = useAccountDeletion((state) => state.setDeleting);
   const providers = useMemo(() => user?.providerData.map((provider) => provider.providerId) ?? [], [user]);
   const hasGoogle = providers.includes('google.com');
   const hasPassword = providers.includes('password');
@@ -79,6 +81,12 @@ export function LoginMethodsPage() {
         throw new Error('Digite EXCLUIR para confirmar.');
       }
 
+      // Precisa estar ligado antes de deleteAccountData() apagar `users/{uid}` — sem isso,
+      // o onSnapshot ao vivo em AuthContext.tsx zera o perfil e o guard de rota manda a
+      // pessoa pro onboarding no meio da própria exclusão (ver accountDeletion.store.ts).
+      // Não desliga no sucesso: window.location.assign('/') já recarrega a página inteira.
+      setAccountDeleting(true);
+
       await runAccountDeletion({
         hasGoogle,
         hasPassword,
@@ -91,6 +99,7 @@ export function LoginMethodsPage() {
       });
       window.location.assign('/');
     } catch (error) {
+      setAccountDeleting(false);
       setMessage(getAuthErrorMessage(error));
     } finally {
       setBusy(false);
@@ -234,6 +243,12 @@ export function LoginMethodsPage() {
           <div>
             <h2 id="delete-account-title">Excluir conta definitivamente</h2>
             <p className="text-secondary">Essa exclusão não pode ser desfeita. Para confirmar, digite EXCLUIR abaixo.</p>
+            {hasGoogle ? (
+              <p className="text-secondary">
+                Como você entra com o Google, vai abrir a janela de escolher conta do Google de novo — é só pra
+                confirmar que é você mesmo. Escolha a <strong>mesma conta</strong> que você já está usando aqui.
+              </p>
+            ) : null}
           </div>
 
           <div className="field">

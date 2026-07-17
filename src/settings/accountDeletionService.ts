@@ -9,7 +9,8 @@ import {
   writeBatch,
   type DocumentReference
 } from 'firebase/firestore';
-import { getFirebaseDb } from '../firebase/config';
+import { httpsCallable } from 'firebase/functions';
+import { getFirebaseDb, getFirebaseFunctions } from '../firebase/config';
 import { getPersonalWorkspaceId } from '../workspaces/workspaceService';
 import type { Workspace, WorkspaceRef } from '../types/contracts';
 
@@ -105,6 +106,27 @@ async function collectBillingRefs(userId: string) {
   ];
 }
 
+/**
+ * Desvincula o WhatsApp do workspace pessoal antes de apagar os dados — sem isso, o
+ * número continuava vinculado depois da conta excluída (achado ao vivo pelo dono,
+ * 2026-07-17). `unlinkWhatsapp` já existe (usado por `WhatsAppLinkPage.tsx`); aqui só
+ * chama se realmente houver vínculo, e nunca deixa essa etapa travar a exclusão em si —
+ * um erro aqui é secundário perto do resto dos dados sendo apagados de qualquer forma.
+ */
+async function unlinkWhatsappIfLinked(workspaceId: string) {
+  try {
+    const linksSnap = await getDocs(collection(getFirebaseDb(), 'workspaces', workspaceId, 'whatsappLinks'));
+    if (linksSnap.empty) {
+      return;
+    }
+
+    const fn = httpsCallable<{ workspaceId: string }, { unlinkedPhone: string }>(getFirebaseFunctions(), 'unlinkWhatsapp');
+    await fn({ workspaceId });
+  } catch {
+    // Best-effort: não bloqueia a exclusão da conta se o desvínculo falhar.
+  }
+}
+
 async function leavePartnerWorkspace(workspaceId: string, userId: string) {
   const db = getFirebaseDb();
   const batch = writeBatch(db);
@@ -183,6 +205,8 @@ export async function deleteAccountData(userId: string) {
   const refs: DocumentReference[] = [];
   const workspaceRefs = await collectUserWorkspaceRefs(userId);
   const personalWorkspaceId = getPersonalWorkspaceId(userId);
+
+  await unlinkWhatsappIfLinked(personalWorkspaceId);
 
   refs.push(...(await collectWorkspaceTree(personalWorkspaceId)));
 
