@@ -6,6 +6,7 @@ import {
   Banknote,
   Bot,
   CalendarClock,
+  Compass,
   HelpCircle,
   Home,
   LogOut,
@@ -108,6 +109,9 @@ export function AppShell() {
           <NavLink className={getNavClass} to="/app/settings/payday">
             <Banknote size={19} aria-hidden="true" /> Recebimento
           </NavLink>
+          <NavLink className={getNavClass} to="/app/settings/onboarding">
+            <Compass size={19} aria-hidden="true" /> Objetivo e desafio
+          </NavLink>
           <NavLink className={getNavClass} to="/app/settings/appearance">
             <Palette size={19} aria-hidden="true" /> Aparência
           </NavLink>
@@ -179,6 +183,9 @@ export function AppShell() {
             <div className="mobile-menu-footer">
               <NavLink className={getNavClass} to="/app/settings/payday" onClick={() => setMobileMenuOpen(false)}>
                 <Banknote size={17} aria-hidden="true" /> Recebimento
+              </NavLink>
+              <NavLink className={getNavClass} to="/app/settings/onboarding" onClick={() => setMobileMenuOpen(false)}>
+                <Compass size={17} aria-hidden="true" /> Objetivo e desafio
               </NavLink>
               <NavLink className={getNavClass} to="/app/settings/appearance" onClick={() => setMobileMenuOpen(false)}>
                 <Palette size={17} aria-hidden="true" /> Aparência

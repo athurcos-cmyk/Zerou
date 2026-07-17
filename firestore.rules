@@ -93,6 +93,10 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['availableMode', 'updatedAt']);
     }
 
+    function onlyOnboardingAnswersChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['onboardingGoal', 'onboardingChallenge', 'updatedAt']);
+    }
+
     function validAvailableMode(value) {
       return value in ['conservative', 'until_payday'];
     }
@@ -1498,6 +1502,11 @@ service cloud.firestore {
           && (!request.resource.data.keys().hasAny(['committedWindowDays']) || validCommittedWindowDays(request.resource.data.committedWindowDays))
         )
         || (onlyAvailableModeChanged() && validAvailableMode(request.resource.data.availableMode))
+        || (
+          onlyOnboardingAnswersChanged()
+          && (!request.resource.data.keys().hasAny(['onboardingGoal']) || request.resource.data.onboardingGoal is string)
+          && (!request.resource.data.keys().hasAny(['onboardingChallenge']) || request.resource.data.onboardingChallenge is string)
+        )
       );
       allow delete: if canDeleteUserAccountData(uid);
 

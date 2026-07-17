@@ -1,8 +1,8 @@
 ﻿import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, ArrowRight, BellRing, CalendarRange, CalendarClock, CheckCircle2, FolderOpen,
-  LineChart, PiggyBank, PieChart, Shuffle, ShieldCheck, Sparkles, TrendingDown, Wallet
+  ArrowLeft, ArrowRight, CalendarRange, CalendarClock, CheckCircle2,
+  Shuffle, Sparkles, Wallet
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { readPendingInvite } from '../auth/pendingInvite';
@@ -18,27 +18,7 @@ import {
 import type { PaydayRule } from '../types/contracts';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
 import { ensurePersonalFoundation } from '../workspaces/workspaceService';
-
-interface Choice {
-  id: string;
-  label: string;
-  icon: ReactNode;
-}
-
-const goals: Choice[] = [
-  { id: 'organizar', label: 'Organizar todos os meus gastos em um só lugar', icon: <FolderOpen size={20} /> },
-  { id: 'metas', label: 'Definir metas para guardar dinheiro', icon: <PiggyBank size={20} /> },
-  { id: 'categorias', label: 'Controlar melhor quanto gasto por categoria', icon: <PieChart size={20} /> },
-  { id: 'dividas', label: 'Criar um plano para sair das dívidas', icon: <ShieldCheck size={20} /> },
-  { id: 'visao', label: 'Ter uma visão clara do meu mês financeiro', icon: <CalendarRange size={20} /> }
-];
-
-const challenges: Choice[] = [
-  { id: 'para-onde', label: 'Quero entender para onde meu dinheiro está indo', icon: <LineChart size={20} /> },
-  { id: 'gastar-menos', label: 'Eu sei com o que gasto, mas quero gastar menos', icon: <TrendingDown size={20} /> },
-  { id: 'guardar', label: 'Não consigo criar o hábito de guardar dinheiro', icon: <PiggyBank size={20} /> },
-  { id: 'prazos', label: 'Esqueço de pagar contas no prazo', icon: <BellRing size={20} /> }
-];
+import { onboardingGoals as goals, onboardingChallenges as challenges, type OnboardingChoice as Choice } from './onboardingOptions';
 
 const TOTAL_STEPS = 4;
 

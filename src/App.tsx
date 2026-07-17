@@ -25,6 +25,7 @@ import { LoginMethodsPage } from './settings/LoginMethodsPage';
 import { LoginPage } from './pages/LoginPage';
 import { NewTransactionPage } from './pages/NewTransactionPage';
 import { PaydaySettingsPage } from './settings/PaydaySettingsPage';
+import { OnboardingAnswersSettingsPage } from './settings/OnboardingAnswersSettingsPage';
 import { WhatsAppLinkPage } from './settings/WhatsAppLinkPage';
 import { OnboardingPage } from './onboarding/OnboardingPage';
 import { ContactPage, FeaturesPage, HelpPage, SecurityPage } from './pages/PublicPages';
@@ -99,6 +100,7 @@ export function App() {
                 <Route path="settings/appearance" element={<AppearanceSettingsPage />} />
                 <Route path="settings/billing" element={<Navigate to="/app/settings/appearance" replace />} />
                 <Route path="settings/payday" element={<PaydaySettingsPage />} />
+                <Route path="settings/onboarding" element={<OnboardingAnswersSettingsPage />} />
                 <Route path="settings/security/login-methods" element={<LoginMethodsPage />} />
                 <Route path="settings/whatsapp" element={<WhatsAppLinkPage />} />
               </Route>

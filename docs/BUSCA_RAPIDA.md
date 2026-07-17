@@ -29,7 +29,7 @@ Use este arquivo como mapa antes de abrir documentos grandes. Regra: leia o meno
 |---|---|
 | Telas autenticadas | `src/pages/` |
 | Shell + nav inferior/FAB | `src/layout/AppShell.tsx` |
-| Onboarding (questionário) | `src/onboarding/OnboardingPage.tsx` |
+| Onboarding (questionário) | `src/onboarding/OnboardingPage.tsx`, opções compartilhadas em `src/onboarding/onboardingOptions.tsx`. Objetivo/desafio editável depois em `/app/settings/onboarding` (`src/settings/OnboardingAnswersSettingsPage.tsx`) — alimenta a Grazi via `functions/src/ai/onboardingLabels.ts` |
 | Componentes-base de UX | `src/components/` (`BottomSheet`, `SelectField`, `CategoryField`, `ConfirmDialog`, `EmptyState`) |
 | Ícones + cores de categoria | `src/components/categoryIcons.tsx`, `src/theme/palette.ts` |
 | Serviço financeiro | `src/finance/financeService.ts` |

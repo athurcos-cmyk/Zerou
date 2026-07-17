@@ -1,5 +1,6 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import { Timestamp } from 'firebase-admin/firestore';
+import { onboardingChallengeLabels, onboardingGoalLabels } from './onboardingLabels.js';
 
 function nowInBRT(): Date {
   return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
@@ -93,8 +94,9 @@ export async function buildFinancialContext(
   const previousMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const previousMonth = monthKey(previousMonthDate);
 
-  // ── User profile (payday, availableMode) ──────────────────────────────────
+  // ── User profile (payday, availableMode, objetivo/desafio do onboarding) ──
   let paydayInfo = '';
+  let onboardingInfo = '';
   try {
     const userDoc = await db.doc(`users/${uid}`).get();
     if (userDoc.exists) {
@@ -113,6 +115,16 @@ export async function buildFinancialContext(
       } else {
         paydayInfo = `Nao informou data de recebimento. Janela de ${windowDays} dias.`;
       }
+
+      // Respostas do onboarding — editaveis depois em Configuracoes > Objetivo e desafio,
+      // por isso podem estar ausentes ou desatualizadas; usar so como tempero de tom, nunca
+      // como fato garantido.
+      const goalLabel = onboardingGoalLabels[(profile.onboardingGoal as string) ?? ''];
+      const challengeLabel = onboardingChallengeLabels[(profile.onboardingChallenge as string) ?? ''];
+      const onboardingLines: string[] = [];
+      if (goalLabel) onboardingLines.push(`Objetivo declarado: ${goalLabel}.`);
+      if (challengeLabel) onboardingLines.push(`Maior desafio declarado: ${challengeLabel}.`);
+      onboardingInfo = onboardingLines.join(' ');
     }
   } catch {
     // Perfil ausente nao quebra o contexto
@@ -403,9 +415,10 @@ export async function buildFinancialContext(
   const lines: string[] = [];
 
   // SEU CICLO
-  if (paydayInfo) {
+  if (paydayInfo || onboardingInfo) {
     lines.push('=== SEU CICLO ===');
-    lines.push(paydayInfo);
+    if (paydayInfo) lines.push(paydayInfo);
+    if (onboardingInfo) lines.push(onboardingInfo);
     lines.push('');
   }
 

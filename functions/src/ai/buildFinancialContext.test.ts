@@ -369,6 +369,41 @@ describe('buildFinancialContext', () => {
     expect(context).toContain('Recebe dia 5');
   });
 
+  it('includes the declared onboarding goal/challenge in SEU CICLO, translated to a readable label', async () => {
+    const db = mockDb(
+      { 'users/user1': { onboardingGoal: 'metas', onboardingChallenge: 'prazos' } },
+      {
+        ...emptyCollections,
+        'workspaces/ws1/categories': [],
+        'workspaces/ws1/transactions': [],
+        'workspaces/ws1/bills': [],
+        'workspaces/ws1/accounts': [],
+      },
+    );
+
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
+    expect(context).toContain('SEU CICLO');
+    expect(context).toContain('Objetivo declarado: definir metas para guardar dinheiro.');
+    expect(context).toContain('Maior desafio declarado: esquecer de pagar contas no prazo.');
+  });
+
+  it('ignores an unknown/stale onboarding answer id instead of leaking the raw id into the context', async () => {
+    const db = mockDb(
+      { 'users/user1': { onboardingGoal: 'algum-id-antigo-removido' } },
+      {
+        ...emptyCollections,
+        'workspaces/ws1/categories': [],
+        'workspaces/ws1/transactions': [],
+        'workspaces/ws1/bills': [],
+        'workspaces/ws1/accounts': [],
+      },
+    );
+
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
+    expect(context).not.toContain('Objetivo declarado');
+    expect(context).not.toContain('algum-id-antigo-removido');
+  });
+
   it('handles missing user profile gracefully', async () => {
     const db = mockDb({}, {
       ...emptyCollections,

@@ -136,6 +136,24 @@ export function updatePaydaySettings(
 }
 
 /**
+ * Grava/edita as respostas do onboarding (objetivo, desafio) depois do cadastro — antes
+ * só eram gravadas uma vez em `ensurePersonalFoundation` e nunca podiam ser mudadas.
+ *
+ * A regra `onlyOnboardingAnswersChanged` em `firestore.rules` aceita este update; se um
+ * campo novo entrar neste payload, ela precisa ser atualizada no MESMO commit.
+ */
+export function updateOnboardingAnswers(uid: string, answers: { goal: string | null; challenge: string | null }) {
+  const db = getFirebaseDb();
+  const userRef = doc(db, 'users', uid);
+
+  fireWrite(updateDoc(userRef, {
+    onboardingGoal: answers.goal ?? deleteField(),
+    onboardingChallenge: answers.challenge ?? deleteField(),
+    updatedAt: serverTimestamp()
+  }));
+}
+
+/**
  * Grava a escolha de como calcular o "Disponível". Escrever o campo (mesmo com o valor
  * default) é o que marca "já passou pelo mini tutorial" — é por isso que dispensar o
  * tutorial também chama esta função, senão ele reabriria em todo boot.

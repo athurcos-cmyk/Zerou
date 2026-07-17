@@ -84,6 +84,20 @@ gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.serv
 
 **Nunca redirecionar output de comando com token/segredo pra arquivo ou printar em texto puro** — `gcloud auth application-default print-access-token` e afins ficam de fora dessas consultas.
 
+## Diagnosticar "WhatsApp parou de funcionar"
+
+Roteiro usado em 2026-07-16/17 (detalhe completo em `docs/whatsapp/WHATSAPP.md`), do sintoma mais provável pro menos provável:
+
+1. **Confirmar se a mensagem chegou no nosso servidor**: procurar `whatsapp_message_received` nos logs (comando acima) pro horário do teste. Se aparece, o problema é depois (extração/categoria/conta) — investigar `whatsapp_webhook_error` no mesmo intervalo. Se não aparece nada, o problema é a Meta nunca ter chamado o nosso webhook — ir pro passo 2.
+2. **Testar o token de acesso direto contra a Graph API**, o mais básico possível:
+   ```bash
+   TOKEN=$(grep WHATSAPP_ACCESS_TOKEN functions/.env.zerou-26757 | cut -d= -f2)
+   curl -s "https://graph.facebook.com/v25.0/me?access_token=${TOKEN}"
+   ```
+   - Responde `{"name":"Granativa API","id":"..."}` → token e conta OK, o problema é outro (WABA não inscrita — ver `subscribed_apps` na seção de Troubleshooting do `WHATSAPP.md`; ou config de webhook resetada).
+   - Responde `{"error":{"message":"API access blocked."...}}` → **bloqueio da conta de desenvolvedor Meta**, não é bug de código. Ver `docs/whatsapp/WHATSAPP.md` (seção "Conta de desenvolvedor Meta bloqueada") — resolução é inteiramente do lado da Meta (o dono confirma identidade no painel), nada pra corrigir no repo.
+3. Depois de qualquer resolução do lado da Meta, reconfirmar com o mesmo curl do passo 2, e então testar uma mensagem real de ponta a ponta antes de considerar resolvido.
+
 ## Rollback
 
 1. Revert or fix forward on `main`.

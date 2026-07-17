@@ -2,6 +2,18 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-17 — Objetivo/desafio do onboarding: editável depois + alimenta a Grazi
+
+Achado pelo dono: as respostas de "qual seu objetivo" e "qual desafio" no cadastro não influenciavam nada no app depois, e nunca podiam ser mudadas. Duas mudanças:
+
+- **Editável**: nova tela `/app/settings/onboarding` ("Objetivo e desafio", link na sidebar/menu mobile) deixa mudar a resposta a qualquer momento — `updateOnboardingAnswers()` (`workspaceService.ts`), nova regra `onlyOnboardingAnswersChanged` no `firestore.rules` (teste de emulador novo cobrindo edição válida, tipo errado, campo contrabandeado e edição por outro usuário). Arrays de opções extraídos de `OnboardingPage.tsx` pra `src/onboarding/onboardingOptions.tsx`, reaproveitados pelas duas telas.
+- **Alimenta a Grazi**: `buildFinancialContext.ts` agora inclui o objetivo/desafio (traduzido pra texto legível via `onboardingLabels.ts`) na seção SEU CICLO, usado tanto pela Grazi do app quanto pelas perguntas via WhatsApp (mesmo `buildFinancialContext`). Instrução nova no prompt: usar como tempero de tom, nunca como fato garantido (a resposta pode estar desatualizada). 2 testes novos.
+- Sem mudança de rota WhatsApp/backend fora do prompt. Detalhes em `docs/ai/GRAZI.md`.
+
+## 2026-07-16/17 — WhatsApp parou de responder: conta de desenvolvedor Meta bloqueada (não era bug)
+
+Uma amiga do dono criou conta e não conseguiu vincular o WhatsApp. Investigação (logs de produção + teste direto do token contra a Graph API) confirmou: a conta de desenvolvedor da Meta foi bloqueada por "atividade incomum" (sistema automático de detecção de fraude, gatilho provável: muitos deploys + testes concentrados no mesmo dia). Nada pra corrigir no código — resolvido pelo dono confirmando identidade no painel da Meta. Testado de ponta a ponta depois: mensagem simples + vínculo novo com outro número, tudo funcionando. Detalhes e roteiro de diagnóstico em `docs/whatsapp/WHATSAPP.md` e `docs/RUNBOOK.md`.
+
 ## 2026-07-16 — Nome do cartão nas faturas do Dashboard/Projeção + "Ver todos" enganoso removido
 
 Achado pelo dono ao vivo: com mais de um cartão, "Próximos compromissos" mostrava várias faturas com o texto idêntico "Fatura 2026-07" (o mês de referência), só distinguíveis clicando.

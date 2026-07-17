@@ -209,6 +209,32 @@ npx firebase functions:log --project zerou-26757
 
 ## Troubleshooting
 
+### Conta de desenvolvedor Meta bloqueada ("API access blocked")
+
+Diferente de todos os outros problemas de webhook listados abaixo (config, indice, WABA nao inscrita) — esse e um bloqueio da propria Meta na conta de desenvolvedor, nao um bug no codigo. Sintomas:
+
+- Mensagens param de chegar (sem `whatsapp_message_received` nos logs) **mesmo num numero que ja estava vinculado e funcionando ha dias**.
+- `curl` em QUALQUER endpoint da Graph API com o token — ate o mais basico, `GET /me` — retorna `{"error":{"message":"API access blocked.","type":"OAuthException","code":200}}`.
+- No painel (`developers.facebook.com`), aparece um banner "Confirmacao da conta necessaria — Detectamos atividade incomum nesta conta de desenvolvedor."
+
+**Diagnostico rapido** (confirma que e isso e nao outra causa):
+```bash
+curl -s "https://graph.facebook.com/v25.0/me?access_token=$WHATSAPP_ACCESS_TOKEN"
+# Se voltar "API access blocked", e isso. Se voltar {"name":"Granativa API","id":"..."}, o acesso esta OK.
+```
+
+**Causa**: sistema automatico de deteccao de fraude/abuso da Meta, generico pra qualquer conta de desenvolvedor — nao especifico do WhatsApp. Reage a padroes de uso que destoam do normal. O gatilho de 2026-07-16 provavelmente foi a combinacao de: varios deploys de Cloud Functions em sequencia + testes manuais rapidos e repetidos pelo dono (varias mensagens seguidas, deletar/recriar categorias) + uma conta nova de um amigo testando ao mesmo tempo de outro numero/IP + as proprias chamadas de diagnostico do agente direto na Graph API. Nada disso e "errado" — e simplesmente incomum pra um app com pouquissimo uso organico ainda, que nao tem volume "normal" suficiente pra servir de camuflagem.
+
+**Resolucao**: e inteiramente do lado da Meta — nao ha nada pra corrigir no codigo. O dono precisa:
+1. Entrar em `developers.facebook.com`, ver o banner de confirmacao de conta.
+2. Completar a verificacao pedida (no incidente de 2026-07-16, foi confirmar email + codigo SMS).
+3. Aguardar — a pagina de confirmacao avisa que pode levar alguns minutos ("Please wait... may take longer"). Evitar recarregar/testar agressivamente enquanto isso, pode parecer mais atividade incomum.
+4. Confirmar reestabelecimento com o mesmo curl acima antes de considerar resolvido.
+
+**Nao precisa reinscrever a WABA depois** — diferente do incidente de 2026-07-15 (`subscribed_apps` vazio), esse bloqueio nao derruba a inscricao; assim que o acesso volta, tudo funciona de novo sem nenhum passo extra (confirmado: webhook recebeu e respondeu normalmente na sequencia, incluindo um vinculo NOVO de outro numero, sem tocar em `subscribed_apps`).
+
+**Se acontecer nesse projeto de novo**: nao e algo pra "consertar" preventivamente no codigo — e um risco inerente de depender da plataforma da Meta. Ver conversa sobre alternativa (PWA proprio de chat com a Grazi, sem depender da Meta) em `docs/history/2026-07.md` — ainda nao decidido, ideia registrada pra o futuro.
+
 ### Mensagens nao chegam (webhook silencioso)
 
 0. **Primeiro de tudo**: `curl -H "Authorization: Bearer $TOKEN" "https://graph.facebook.com/v25.0/{WABA_ID}/subscribed_apps"`. Se vier `{"data":[]}`, a WABA nao esta inscrita no app — `POST` no mesmo endpoint resolve (`{"success":true}`). Isso e separado da config de webhook e nao aparece em lugar nenhum do painel; foi a causa real do incidente de 2026-07-15 mesmo com Callback URL, verify token e `messages` Subscribed todos corretos.
@@ -254,6 +280,14 @@ Atualmente DESATIVADA (comentada em `webhookHandler.ts`). Para reativar:
 Verificar logs do webhook. Erros 429/503 tem retry automatico. Outros erros resultam em mensagem "Nao consegui entender o valor" para o usuario.
 
 ## Historico
+
+### 2026-07-16/17 — Conta de desenvolvedor Meta bloqueada por "atividade incomum" (nao e bug)
+
+- **Relato**: uma amiga do dono criou conta e tentou vincular o WhatsApp — nao funcionou (ela gerou o codigo no app com sucesso, mas nada chegou depois de mandar "vincular XXXXXX"). O dono confirmou que a Grazi dentro do app continuava funcionando normalmente.
+- **Investigacao**: `gcloud logging read` (ver `docs/RUNBOOK.md`) mostrou que o ultimo `whatsapp_message_received` bem-sucedido tinha sido as 12:16 UTC do dia 16 — depois disso, **nenhuma requisicao POST da Meta chegou ao webhook**, nem do numero da amiga nem, mais tarde, do proprio numero de teste do dono. Testando o token de acesso direto contra a Graph API (`GET /me`, o endpoint mais basico possivel), toda chamada retornava `"API access blocked."` — confirmando que o bloqueio era na conta de desenvolvedor inteira, nao um problema de webhook/indice/WABA como nos incidentes anteriores.
+- **Causa**: sistema automatico de deteccao de fraude da Meta reagindo ao volume de atividade incomum do dia (multiplos deploys + testes manuais concentrados + conta nova testando ao mesmo tempo + as proprias chamadas de diagnostico). Nao e um bug de codigo — ver secao de Troubleshooting acima.
+- **Resolucao**: o dono completou a verificacao de identidade pedida pela Meta (email + SMS) no painel `developers.facebook.com`. Confirmado reestabelecido (`GET /me` voltou a responder normalmente) e testado de ponta a ponta: mensagem simples no numero ja vinculado recebeu resposta da Grazi, e um vinculo **novo** com outro numero (simulando a amiga) completou com sucesso (`vincular XXXXXX` → confirmacao → lancamento de receita registrado), tudo sem precisar mexer em `subscribed_apps` ou qualquer config do painel — o bloqueio realmente so afetava o acesso da API, nao a inscricao do webhook.
+- **Ideia levantada pelo dono, nao implementada**: no futuro, um PWA proprio (subdominio tipo `grazi.granativa.com.br`) so de chat com a Grazi, sem depender do WhatsApp/Meta — elimina esse tipo de risco de plataforma por completo, ao custo de reintroduzir um pouco da friccao que o WhatsApp resolve (ter que abrir algo em vez de so mandar mensagem num app que ja fica aberto o dia todo). Maior parte do backend ja existe (`financialAssistant.ts`, `aiRateLimit.ts`, `buildFinancialContext.ts`) — seria principalmente trabalho de empacotamento (manifest/PWA proprio), nao um projeto do zero. Sem decisao de fazer, so registrado aqui pra nao perder o contexto.
 
 ### 2026-07-15 — Compra no cartao (a vista ou parcelada) via WhatsApp
 

@@ -883,6 +883,54 @@ describe('firestore security rules', () => {
     );
   });
 
+  // O payload aqui é exatamente o de `updateOnboardingAnswers` (workspaceService.ts):
+  // `{ onboardingGoal, onboardingChallenge, updatedAt }`, incluindo `deleteField()` pra
+  // limpar uma escolha. Antes essas respostas só eram gravadas uma vez no cadastro; agora
+  // dá pra editar depois em Configurações > Objetivo e desafio.
+  it('allows a user to edit their onboarding goal/challenge answers, and rejects anything else', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        onboardingGoal: 'metas',
+        onboardingChallenge: 'guardar',
+        updatedAt: serverTimestamp()
+      })
+    );
+    // Limpar uma escolha (deleteField) continua sendo só esses dois campos.
+    await assertSucceeds(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        onboardingGoal: deleteField(),
+        onboardingChallenge: 'prazos',
+        updatedAt: serverTimestamp()
+      })
+    );
+
+    // Tipo errado.
+    await assertFails(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        onboardingGoal: 123,
+        updatedAt: serverTimestamp()
+      })
+    );
+    // Valor válido, mas contrabandeando um campo protegido junto.
+    await assertFails(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        onboardingGoal: 'metas',
+        name: 'Forged name',
+        updatedAt: serverTimestamp()
+      })
+    );
+    // Ninguém edita pelos outros.
+    const bobDb = testEnv.authenticatedContext('bob').firestore();
+    await assertFails(
+      updateDoc(doc(bobDb, 'users/alice'), {
+        onboardingGoal: 'metas',
+        updatedAt: serverTimestamp()
+      })
+    );
+  });
+
   it('blocks client writes to owner and role protected fields', async () => {
     const aliceDb = testEnv.authenticatedContext('alice').firestore();
 

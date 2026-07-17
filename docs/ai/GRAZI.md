@@ -15,10 +15,11 @@ Grazi é a assistente de IA do Granativa. Ela responde perguntas sobre os gastos
 | Arquivo | Função |
 |---|---|
 | `functions/src/ai/deepseekClient.ts` | Cliente HTTP para API DeepSeek (`deepseek-chat`). Timeout 45s, retry único para 429/503, validação de API key. |
-| `functions/src/ai/buildFinancialContext.ts` | Agrega dados do workspace (transações 90 dias, bills, contas, budgets, goals, perfil) em string de texto ≤ 5000 chars para o prompt. Lê também perfil do usuário e espaço do casal. Usa BRT (`nowInBRT()`), conta `expense` + `card_purchase`, trata null/undefined/vazio defensivamente. |
+| `functions/src/ai/buildFinancialContext.ts` | Agrega dados do workspace (transações 90 dias, bills, contas, budgets, goals, perfil) em string de texto ≤ 5000 chars para o prompt. Lê também perfil do usuário (payday + objetivo/desafio do onboarding) e espaço do casal. Usa BRT (`nowInBRT()`), conta `expense` + `card_purchase`, trata null/undefined/vazio defensivamente. |
+| `functions/src/ai/onboardingLabels.ts` | Espelha `src/onboarding/onboardingOptions.tsx` (id → label legível, sem ícone) — Cloud Functions não importa `src/` do app cliente. Usado por `buildFinancialContext.ts` pra traduzir `onboardingGoal`/`onboardingChallenge` num texto natural. Manter em sincronia manualmente. |
 | `functions/src/ai/verifyWorkspaceMembership.ts` | Verifica `workspaces/{id}/members/{uid}` com `status == 'active'`. |
 | `functions/src/ai/financialAssistant.ts` | Cloud Function `onCall` principal. Fluxo: auth → membership → rate limit pre-check → contexto → DeepSeek → rate limit increment. |
-| `functions/src/ai/buildFinancialContext.test.ts` | 17 testes: gastos com categoria, card_purchase, fallback string vazia, deletados, bills, null dueDate, workspace vazio, payday, missing profile, budgets, goals, trend, couple goals, couple sem workspace. |
+| `functions/src/ai/buildFinancialContext.test.ts` | 21 testes: gastos com categoria, card_purchase, fallback string vazia, deletados, bills, null dueDate, workspace vazio, payday, missing profile, budgets, goals, trend, couple goals, couple sem workspace, objetivo/desafio declarado (label legível + id desconhecido ignorado). |
 | `functions/src/ai/verifyWorkspaceMembership.test.ts` | 4 testes: ativo, inexistente, removido, dados nulos. |
 | `src/pages/AssistantPage.tsx` | UI do chat. Bolhas (usuário laranja direita, Grazi cinza esquerda), sugestões iniciais, loading "Pensando...", erros amigáveis. |
 | `src/styles/global.css` | Estilos `.assistant-*` (~140 linhas no final do arquivo). Cores só com `var(--*)`. |
@@ -50,6 +51,10 @@ Grazi é a assistente de IA do Granativa. Ela responde perguntas sobre os gastos
 ### Contexto financeiro (`buildFinancialContext`)
 
 O contexto é dividido em até 10 seções (algumas só aparecem quando há dados). Assinatura: `buildFinancialContext(db, workspaceId, uid)` — precisa do `uid` desde 2026-07-14 para ler perfil e espaço do casal. Limite de contexto: 5000 caracteres.
+
+**=== SEU CICLO ===** (2026-07-17)
+- Como o usuário recebe (`payday`/`availableMode`/`committedWindowDays` do perfil).
+- **Objetivo e desafio declarados no onboarding** (`onboardingGoal`/`onboardingChallenge`), traduzidos pra um label legível via `onboardingLabels.ts` (id desconhecido/stale é ignorado silenciosamente, nunca vaza o id cru pro prompt). Editável a qualquer momento em `/app/settings/onboarding` — a Grazi é instruída a usar só como tempero de tom, nunca como fato garantido, já que pode estar desatualizado.
 
 **=== RESUMO ===**
 - Mês atual e anterior (`yyyy-MM`)
@@ -109,7 +114,8 @@ Está em `financialAssistant.ts:16-24` (constante `SYSTEM_PROMPT`). Regras:
 5. Fora de finanças → recusa educadamente
 6. Não sugere produtos financeiros específicos
 7. Tom encorajador, não informal demais
-8. Pode usar `**negrito**` para ênfase e listas com `-` (adicionado 2026-07-14)
+8. Se houver objetivo/desafio declarado (SEU CICLO), deixa influenciar sutilmente o tom/sugestões, sem forçar a menção nem tratar como verdade absoluta (adicionado 2026-07-17)
+9. Pode usar `**negrito**` para ênfase e listas com `-` (adicionado 2026-07-14)
 
 Para alterar o tom/persona: editar `SYSTEM_PROMPT`. Para alterar o nome: editar o prompt + `src/pages/AssistantPage.tsx` (título `<h1>`).
 
@@ -151,7 +157,7 @@ O cliente (`AssistantPage.tsx`) converte `**negrito**` → `<strong>` e `*itáli
 npm --prefix functions run test
 ```
 
-19 testes em `buildFinancialContext.test.ts`:
+21 testes em `buildFinancialContext.test.ts`:
 - Gastos com categorias (expense normal)
 - `card_purchase` conta como gasto
 - Fallback `||` para `competenceMonth`/`categoryId` vazios
@@ -170,6 +176,8 @@ npm --prefix functions run test
 - Tendência de 6 meses
 - Cofrinho do casal
 - Casal sem workspace não mostra seção
+- Objetivo/desafio declarado no onboarding aparece traduzido em SEU CICLO
+- Id de objetivo desconhecido/removido é ignorado, nunca vaza cru pro prompt
 
 4 testes em `verifyWorkspaceMembership.test.ts`:
 - Membro ativo → resolve
