@@ -1199,6 +1199,10 @@ export function AdminPage() {
     setUsers((prev) => prev.filter((u) => u.id !== target.id));
     setCouples((prev) => prev.filter((w) => w.ownerUserId !== target.id));
     setInvites((prev) => prev.filter((i) => i.createdBy !== target.id));
+    // adminDeleteUser já desvincula o WhatsApp do usuário excluído (ver adminDeleteUser em
+    // functions-admin) — sem isso, a linha ficava "fantasma" na aba WhatsApp (dado já
+    // apagado no Firestore, mas ainda na lista carregada uma vez no boot da página).
+    setWhatsappLinks((prev) => prev.filter((l) => l.linkedByUid !== target.id));
     setPendingDelete(null);
     setPendingDetailUser(null);
     showToast(`${target.name || target.email} deletado — ${result.docsDeleted} documentos removidos.`);
@@ -1226,10 +1230,21 @@ export function AdminPage() {
   async function handleUnlinkWhatsappConfirm() {
     if (!pendingUnlinkWhatsapp) return;
     const target = pendingUnlinkWhatsapp;
-    await callAdminUnlinkWhatsapp(target.phone);
+    let alreadyGone = false;
+    try {
+      await callAdminUnlinkWhatsapp(target.phone);
+    } catch (err) {
+      // A lista da aba não tem listener ao vivo — se o número já foi desvinculado por
+      // outra ação nesse meio-tempo (ex.: excluir a conta dona, que já limpa o WhatsApp
+      // sozinha), a linha ainda aparece aqui até um reload. Tratar como sucesso em vez de
+      // erro: o resultado que a pessoa queria (número livre) já está garantido.
+      const code = typeof err === 'object' && err && 'code' in err ? String(err.code) : '';
+      if (code !== 'functions/not-found') throw err;
+      alreadyGone = true;
+    }
     setWhatsappLinks((prev) => prev.filter((l) => l.phone !== target.phone));
     setPendingUnlinkWhatsapp(null);
-    showToast(`Número +${target.phone} desvinculado.`);
+    showToast(alreadyGone ? `Número +${target.phone} já estava desvinculado.` : `Número +${target.phone} desvinculado.`);
   }
 
   function showToast(message: string) {

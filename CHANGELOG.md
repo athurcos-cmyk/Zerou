@@ -2,6 +2,10 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-17 — Aba WhatsApp do admin: linha "fantasma" após excluir a conta dona
+
+Achado pelo dono testando a feature nova de hoje: excluiu uma conta pelo admin (que já desvincula o WhatsApp sozinha) e, ao tentar desvincular esse mesmo número manualmente depois, caiu num erro "não pertence a nenhuma conta" — a lista da aba não se atualiza sozinha após excluir um usuário, então a linha continuava aparecendo mesmo já limpa no banco. `handleDeleteConfirm` agora também remove da lista local qualquer vínculo do usuário excluído; e tentar desvincular algo que já sumiu (corrida entre duas ações) agora é tratado como sucesso, não erro. Também esclarecido um segundo ponto levantado (sem mudança de código): reabrir o app em outro aparelho logo depois de excluir a conta em outro pode mostrar dado antigo por um instante — comportamento esperado de app offline-first + token JWT, não um bug novo. Detalhes em `docs/history/2026-07.md`.
+
 ## 2026-07-17 — Admin ganha aba WhatsApp: desvincular qualquer número, inclusive órfão
 
 Consequência direta do fix de exclusão de conta (entrada abaixo): o dono excluiu a própria conta antes da correção existir, recriou com o mesmo email, e não conseguia mais vincular o mesmo número — preso num vínculo órfão apontando pra uma conta que já não existe. Nova aba **WhatsApp** no painel Admin lista todos os números vinculados (marca "Órfão" quando o dono não é mais encontrado) com botão "Desvincular" — nova Cloud Function `adminUnlinkWhatsappNumber` (`functions-admin`, Admin SDK, funciona mesmo com o workspace já excluído). Deployado e com IAM verificada. Detalhes em `docs/whatsapp/WHATSAPP.md`.
