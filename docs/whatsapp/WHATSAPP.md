@@ -49,7 +49,8 @@ Integracao oficial com a Meta Cloud API v25.0 para controle financeiro completo 
 | `functions/src/cards/cardDates.ts` | Porta de `src/cards/cardDates.ts` (`resolveInstallmentCycle`, `invoiceIdFor`) — Cloud Functions nao importa `src/` do app, mantenha em sincronia manualmente. |
 | `functions/src/whatsapp/pendingCardAction.ts` | Pergunta pendente "qual cartao usar?" quando ha mais de um cartao ativo — doc unico por telefone em `whatsappPendingActions/{phone}`, TTL 3 min. `resolveCardSelection` aceita numero da lista ou nome do cartao (substring). Se a proxima mensagem nao resolver, a pendencia e descartada e a mensagem e tratada normalmente (bot nunca trava esperando resposta). |
 | `functions/src/whatsapp/linkAccount.ts` | `generateWhatsappLinkCode` (onCall): bloqueia se o workspace ja tiver um numero vinculado (`already-exists`), limpa codigos antigos nao usados do mesmo usuario, gera codigo 6 digitos em `users/{uid}/whatsappLinkCodes/{code}`, retorna link `wa.me`. `processLinkCode`: chamado pelo webhook quando usuario manda "vincular XXXXXX", grava vinculo em `whatsappPhoneIndex/{phone}` e `workspaces/{id}/whatsappLinks/{phone}`. |
-| `functions/src/whatsapp/unlinkWhatsapp.ts` | `unlinkWhatsapp` (onCall): apaga `whatsappPhoneIndex/{phone}` + `workspaces/{id}/whatsappLinks/{phone}`, varre codigos residuais, avisa o numero desvinculado via WhatsApp (best-effort). Fecha o vinculo ja prometido em `src/pages/LegalPages.tsx` (Termos §7.4, Data Deletion). |
+| `functions/src/whatsapp/unlinkWhatsapp.ts` | `unlinkWhatsapp` (onCall): apaga `whatsappPhoneIndex/{phone}` + `workspaces/{id}/whatsappLinks/{phone}`, varre codigos residuais, avisa o numero desvinculado via WhatsApp (best-effort). Fecha o vinculo ja prometido em `src/pages/LegalPages.tsx` (Termos §7.4, Data Deletion). Reusado por `accountDeletionService.ts` (auto-exclusao de conta, 2026-07-17). |
+| `functions-admin/src/index.ts` (`adminUnlinkWhatsappNumber`) | Desvincula qualquer numero pelo painel Admin, inclusive orfao (workspace/usuario ja excluido) — Admin SDK, apaga direto, nao depende do workspace existir. Codebase separado (`admin`), deploy: `npx firebase deploy --only functions:admin:adminUnlinkWhatsappNumber`. |
 | `functions/src/ai/deepseekClient.ts` | Cliente HTTP compartilhado para API DeepSeek. Usado por `interpretMessage.ts`, `answerFinancialQuestion.ts` e pela Grazi (`financialAssistant.ts`). |
 | `functions/src/ai/aiRateLimit.ts` | Rate limit de IA (60 msgs/dia por workspace, `workspaces/{id}/aiUsage/{data BRT}`) — extraido de `financialAssistant.ts`, compartilhado entre Grazi do app e perguntas via WhatsApp. |
 | `src/settings/WhatsAppLinkPage.tsx` | UI de vinculacao. Le `workspaces/{id}/whatsappLinks` no mount pra mostrar "Vinculado: `<numero>`" + botao Desvincular (via `unlinkWhatsapp`), ou o fluxo de gerar codigo se ainda nao vinculado. |
@@ -163,8 +164,8 @@ A subcolecao `workspaces/{id}/whatsappLinks/{phone}` e escrita via Admin SDK (se
 | Colecao | Proposito | Escrita por |
 |---|---|---|
 | `users/{uid}/whatsappLinkCodes/{code}` | Codigo de vinculo temporario (TTL 10min) | `generateWhatsappLinkCode` (onCall) |
-| `whatsappPhoneIndex/{phone}` | Indice phone → workspaceId + uid | `processLinkCode` (webhook) |
-| `workspaces/{id}/whatsappLinks/{phone}` | Registro de vinculo no workspace | `processLinkCode` (webhook) |
+| `whatsappPhoneIndex/{phone}` | Indice phone → workspaceId + uid | `processLinkCode` (webhook), apagado por `deleteAccountData`/`adminDeleteUser`/`adminUnlinkWhatsappNumber` |
+| `workspaces/{id}/whatsappLinks/{phone}` | Registro de vinculo no workspace | `processLinkCode` (webhook), apagado por `deleteAccountData`/`adminDeleteUser`/`adminUnlinkWhatsappNumber` |
 | `whatsappPendingActions/{phone}` | Pergunta pendente "qual cartao usar?" (TTL 3min). Nunca lida/escrita pelo cliente. | `setPendingCardPurchase`/`getPendingCardPurchase`/`clearPendingCardPurchase` (webhook) |
 
 ## Parametros ajustaveis (codigo)
@@ -208,6 +209,14 @@ npx firebase functions:log --project zerou-26757
 ```
 
 ## Troubleshooting
+
+### "Este numero ja esta vinculado a uma conta Granativa" numa conta que voce sabe que nao tem vinculo
+
+`processLinkCode` (`linkAccount.ts`) so checa `whatsappPhoneIndex/{phone}.exists()` — nao verifica se o `workspaceId`/`linkedByUid` apontado la dentro ainda existe de verdade. Se a conta dona do vinculo foi excluida ANTES da correcao de 2026-07-17 (quando `deleteAccountData`/`adminDeleteUser` passaram a limpar isso), o indice fica orfao pra sempre e trava qualquer tentativa de vincular esse numero de novo, mesmo numa conta nova com o mesmo email/Google.
+
+**Diagnostico**: confirmar que o `workspaceId` do `whatsappPhoneIndex/{phone}` aponta pra um workspace/usuario que nao existe mais (`GET users/{uid}` retorna 404).
+
+**Correcao**: painel Admin > aba **WhatsApp** > botao "Desvincular" na linha do numero (aparece marcado "Orfao" quando o dono nao e mais encontrado). Usa `adminUnlinkWhatsappNumber` (Admin SDK, apaga `whatsappPhoneIndex` + `workspaces/{id}/whatsappLinks` direto, funciona mesmo com o workspace ja excluido). Depois disso a pessoa consegue gerar um codigo novo e vincular normalmente.
 
 ### Conta de desenvolvedor Meta bloqueada ("API access blocked")
 
@@ -280,6 +289,14 @@ Atualmente DESATIVADA (comentada em `webhookHandler.ts`). Para reativar:
 Verificar logs do webhook. Erros 429/503 tem retry automatico. Outros erros resultam em mensagem "Nao consegui entender o valor" para o usuario.
 
 ## Historico
+
+### 2026-07-17 — Numero preso num vinculo orfao apos exclusao de conta pre-correcao
+
+- **Relato**: o dono excluiu a propria conta (antes da correcao de exclusao de conta ficar pronta, ver `docs/history/2026-07.md`), recriou uma conta com o mesmo email/Google, e nao conseguia mais vincular o mesmo numero — o bot respondia "Este numero ja esta vinculado a uma conta Granativa."
+- **Causa**: `whatsappPhoneIndex/{phone}` continuava apontando pro `workspaceId`/`uid` da conta antiga, ja excluida (confirmado lendo o doc direto via REST — `users/{oldUid}` e `workspaces/personal_{oldUid}` ambos 404). `processLinkCode` so checa `.exists()`, nunca verifica se o vinculo aponta pra algo que ainda existe.
+- **Correcao imediata**: nao foi possivel apagar o doc orfao direto via API neste ambiente (bloqueado pela politica de seguranca do agente pra escrita destrutiva em producao fora de fluxo de teste) — resolvido construindo a ferramenta certa em vez de contornar.
+- **Correcao definitiva**: nova aba **WhatsApp** no painel Admin (`src/pages/AdminPage.tsx`) lista todo `whatsappPhoneIndex`, marca "Orfao" quando o `linkedByUid` nao bate com nenhum usuario carregado, e tem botao "Desvincular" por linha — chama `adminUnlinkWhatsappNumber` (novo, `functions-admin/src/index.ts`), que apaga `whatsappPhoneIndex` + `workspaces/{id}/whatsappLinks` via Admin SDK, funcionando mesmo com o workspace ja excluido.
+- **Ver tambem**: `docs/history/2026-07.md` (entrada da correcao de exclusao de conta, 2026-07-17) — esse achado veio direto de testar a correcao no proprio numero do dono.
 
 ### 2026-07-16/17 — Conta de desenvolvedor Meta bloqueada por "atividade incomum" (nao e bug)
 

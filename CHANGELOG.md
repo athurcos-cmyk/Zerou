@@ -2,6 +2,10 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-17 — Admin ganha aba WhatsApp: desvincular qualquer número, inclusive órfão
+
+Consequência direta do fix de exclusão de conta (entrada abaixo): o dono excluiu a própria conta antes da correção existir, recriou com o mesmo email, e não conseguia mais vincular o mesmo número — preso num vínculo órfão apontando pra uma conta que já não existe. Nova aba **WhatsApp** no painel Admin lista todos os números vinculados (marca "Órfão" quando o dono não é mais encontrado) com botão "Desvincular" — nova Cloud Function `adminUnlinkWhatsappNumber` (`functions-admin`, Admin SDK, funciona mesmo com o workspace já excluído). Deployado e com IAM verificada. Detalhes em `docs/whatsapp/WHATSAPP.md`.
+
 ## 2026-07-17 — Exclusão de conta: WhatsApp não desvinculava + race condition mandava pro onboarding
 
 Relato ao vivo do dono: excluiu a própria conta (login Google), o WhatsApp continuou vinculado e a tela voltou pro onboarding em vez da landing. Duas causas reais, sem relação uma com a outra:

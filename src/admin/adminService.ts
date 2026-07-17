@@ -117,3 +117,29 @@ export async function callAdminForceLogout(userId: string): Promise<void> {
   );
   await fn({ userId });
 }
+
+export interface AdminWhatsappLink {
+  phone: string;
+  workspaceId: string;
+  linkedByUid: string;
+  linkedAt: Timestamp | null;
+}
+
+// Coleção pequena (um doc por número vinculado) — sem paginação por cursor como
+// users/couples/invites, não vale a complexidade pro volume atual.
+export async function getAdminWhatsappLinks(): Promise<AdminWhatsappLink[]> {
+  const snap = await getDocs(collection(getFirebaseDb(), 'whatsappPhoneIndex'));
+  return snap.docs.map((d) => ({ phone: d.id, ...d.data() } as AdminWhatsappLink));
+}
+
+// Desvincula qualquer número, inclusive "órfão" (apontando pra workspace/usuário já
+// excluído) — via Admin SDK, o client não pode escrever em whatsappPhoneIndex/whatsappLinks
+// (firestore.rules: allow write: if false). Achado real: exclusão de conta antes da
+// correção de 2026-07-17 deixava o número preso, sem forma de religar pelo app.
+export async function callAdminUnlinkWhatsapp(phone: string): Promise<void> {
+  const fn = httpsCallable<{ phone: string }, { success: boolean }>(
+    getFirebaseFunctions(),
+    'adminUnlinkWhatsappNumber'
+  );
+  await fn({ phone });
+}

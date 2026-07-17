@@ -8,25 +8,30 @@ import {
   Heart,
   Loader2,
   LogOut,
+  MessageCircle,
   RefreshCw,
   Search,
   Send,
   ShieldCheck,
   Trash2,
   TrendingUp,
+  Unlink,
   Users,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import {
   callAdminDeleteUser,
   callAdminForceLogout,
+  callAdminUnlinkWhatsapp,
   getAdminCoupleWorkspaces,
   getAdminInvites,
   getAdminUsers,
   getAdminUserWorkspaceRefs,
+  getAdminWhatsappLinks,
   getAdminWorkspacesByIds,
   type AdminCursor,
   type AdminInvite,
+  type AdminWhatsappLink,
   type AdminWorkspaceRef,
 } from '../admin/adminService';
 import { revokeCoupleInvite } from '../shared/sharedService';
@@ -35,7 +40,7 @@ import { getUserFacingErrorMessage } from '../utils/userFacingError';
 import type { UserProfile, Workspace } from '../types/contracts';
 import type { Timestamp } from 'firebase/firestore';
 
-type Tab = 'overview' | 'users' | 'couples' | 'invites';
+type Tab = 'overview' | 'users' | 'couples' | 'invites' | 'whatsapp';
 type SortDir = 'asc' | 'desc';
 
 function fmtDate(ts: Timestamp | null | undefined): string {
@@ -1009,6 +1014,85 @@ function InvitesTab({
   );
 }
 
+// Sem paginação por cursor (coleção pequena, um doc por número vinculado) — diferente
+// das outras abas, que já esperam volume maior.
+function WhatsappTab({
+  links,
+  userMap,
+  onUnlink,
+}: {
+  links: AdminWhatsappLink[];
+  userMap: Map<string, UserProfile>;
+  onUnlink: (link: AdminWhatsappLink) => void;
+}) {
+  const orphanCount = links.filter((l) => !userMap.has(l.linkedByUid)).length;
+
+  return (
+    <div className="admin-content">
+      <div className="admin-stats-grid">
+        <StatCard icon={<MessageCircle size={18} />} label="Vinculados" value={links.length} sub="números ativos" />
+        <StatCard icon={<AlertTriangle size={18} />} label="Órfãos" value={orphanCount} sub="conta vinculada não existe mais" />
+      </div>
+
+      <section className="surface">
+        <table className="admin-table admin-table--full">
+          <thead>
+            <tr>
+              <th>Telefone</th>
+              <th>Vinculado por</th>
+              <th>Workspace</th>
+              <th>Vinculado em</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {links.length === 0 ? (
+              <EmptyRow cols={6} />
+            ) : (
+              links.map((link) => {
+                const owner = userMap.get(link.linkedByUid);
+                const isOrphan = !owner;
+                return (
+                  <tr key={link.phone}>
+                    <td>
+                      <strong className="admin-monospace">+{link.phone}</strong>
+                    </td>
+                    <td className="admin-td--muted">
+                      {owner ? owner.name || owner.email : link.linkedByUid.slice(0, 8) + '…'}
+                    </td>
+                    <td className="admin-td--muted">
+                      <span className="admin-uid admin-monospace">{link.workspaceId.slice(0, 24)}…</span>
+                    </td>
+                    <td className="admin-td--muted" title={fmtDateFull(link.linkedAt)}>
+                      {fmtDateRelative(link.linkedAt)}
+                    </td>
+                    <td>
+                      <span className={`admin-pill ${isOrphan ? 'admin-pill--danger' : 'admin-pill--success'}`}>
+                        {isOrphan ? 'Órfão' : 'Ativo'}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="admin-delete-row-btn"
+                        title="Desvincular número"
+                        onClick={() => onUnlink(link)}
+                      >
+                        <Unlink size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </section>
+    </div>
+  );
+}
+
 export function AdminPage() {
   const { user } = useAuth();
   const [tab, setTab] = useState<Tab>('overview');
@@ -1028,12 +1112,15 @@ export function AdminPage() {
   const [invitesHasMore, setInvitesHasMore] = useState(false);
   const [invitesLoadingMore, setInvitesLoadingMore] = useState(false);
 
+  const [whatsappLinks, setWhatsappLinks] = useState<AdminWhatsappLink[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pendingDetailUser, setPendingDetailUser] = useState<UserProfile | null>(null);
   const [pendingDelete, setPendingDelete] = useState<UserProfile | null>(null);
   const [pendingForceLogout, setPendingForceLogout] = useState<UserProfile | null>(null);
   const [pendingRevoke, setPendingRevoke] = useState<AdminInvite | null>(null);
+  const [pendingUnlinkWhatsapp, setPendingUnlinkWhatsapp] = useState<AdminWhatsappLink | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const userMap = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
@@ -1042,10 +1129,11 @@ export function AdminPage() {
     setLoading(true);
     setError(null);
     try {
-      const [u, c, i] = await Promise.all([
+      const [u, c, i, w] = await Promise.all([
         getAdminUsers(),
         getAdminCoupleWorkspaces(),
         getAdminInvites(),
+        getAdminWhatsappLinks(),
       ]);
       setUsers(u.items);
       setUsersCursor(u.cursor);
@@ -1056,6 +1144,7 @@ export function AdminPage() {
       setInvites(i.items);
       setInvitesCursor(i.cursor);
       setInvitesHasMore(i.hasMore);
+      setWhatsappLinks(w);
     } catch (err) {
       setError(getUserFacingErrorMessage(err, 'Erro ao carregar dados.'));
     } finally {
@@ -1134,6 +1223,15 @@ export function AdminPage() {
       .catch((err) => showToast(getUserFacingErrorMessage(err, 'Não foi possível revogar o convite agora.')));
   }
 
+  async function handleUnlinkWhatsappConfirm() {
+    if (!pendingUnlinkWhatsapp) return;
+    const target = pendingUnlinkWhatsapp;
+    await callAdminUnlinkWhatsapp(target.phone);
+    setWhatsappLinks((prev) => prev.filter((l) => l.phone !== target.phone));
+    setPendingUnlinkWhatsapp(null);
+    showToast(`Número +${target.phone} desvinculado.`);
+  }
+
   function showToast(message: string) {
     setToastMessage(message);
     setTimeout(() => setToastMessage(null), 6000);
@@ -1144,6 +1242,7 @@ export function AdminPage() {
     { id: 'users', label: 'Usuários', count: formatCount(users.length, usersHasMore) },
     { id: 'couples', label: 'Casais', count: formatCount(couples.length, couplesHasMore) },
     { id: 'invites', label: 'Convites', count: formatCount(invites.length, invitesHasMore) },
+    { id: 'whatsapp', label: 'WhatsApp', count: formatCount(whatsappLinks.length, false) },
   ];
 
   return (
@@ -1247,6 +1346,13 @@ export function AdminPage() {
                 onRevoke={(inv) => setPendingRevoke(inv)}
               />
             )}
+            {tab === 'whatsapp' && (
+              <WhatsappTab
+                links={whatsappLinks}
+                userMap={userMap}
+                onUnlink={(link) => setPendingUnlinkWhatsapp(link)}
+              />
+            )}
           </>
         )}
       </div>
@@ -1287,6 +1393,17 @@ export function AdminPage() {
           danger
           onConfirm={handleRevokeConfirm}
           onCancel={() => setPendingRevoke(null)}
+        />
+      ) : null}
+
+      {pendingUnlinkWhatsapp ? (
+        <ConfirmModal
+          title="Desvincular este número?"
+          body={`+${pendingUnlinkWhatsapp.phone} para de conseguir lançar gastos/receitas por WhatsApp até vincular de novo pelo app.`}
+          confirmLabel="Desvincular"
+          danger
+          onConfirm={handleUnlinkWhatsappConfirm}
+          onCancel={() => setPendingUnlinkWhatsapp(null)}
         />
       ) : null}
     </div>

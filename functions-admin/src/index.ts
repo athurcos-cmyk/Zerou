@@ -199,3 +199,43 @@ export const adminForceLogout = onCall(
     return { success: true };
   },
 );
+
+// Desvincula qualquer número de WhatsApp, inclusive "órfão" — apontando pra um
+// workspace/usuário já excluído (achado real: exclusão de conta antes da correção de
+// 2026-07-17 deixava o número preso pra sempre, sem forma de religar pelo app, já que
+// o client não pode escrever em whatsappPhoneIndex/whatsappLinks — allow write: if false).
+export const adminUnlinkWhatsappNumber = onCall(
+  { region: REGION, maxInstances: 5 },
+  async (request) => {
+    assertAdmin(request.auth?.token.email);
+
+    const phone = request.data?.phone;
+    if (!phone || typeof phone !== 'string') {
+      throw new HttpsError('invalid-argument', 'phone obrigatório.');
+    }
+
+    const db = getFirestore();
+    const indexRef = db.doc(`whatsappPhoneIndex/${phone}`);
+    const indexSnap = await indexRef.get();
+
+    if (!indexSnap.exists) {
+      throw new HttpsError('not-found', 'Esse número não está vinculado a nenhuma conta.');
+    }
+
+    const { workspaceId } = indexSnap.data() as { workspaceId?: string };
+    const batch = db.batch();
+    batch.delete(indexRef);
+    if (workspaceId) {
+      batch.delete(db.doc(`workspaces/${workspaceId}/whatsappLinks/${phone}`));
+    }
+    await batch.commit();
+
+    logger.info('admin_unlinked_whatsapp', {
+      phone,
+      workspaceId: workspaceId ?? null,
+      actorUserId: request.auth?.uid,
+    });
+
+    return { success: true };
+  },
+);
