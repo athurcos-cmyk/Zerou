@@ -15,6 +15,11 @@ import {
 import type { Account, Bill, Budget, Category, RecurringRule, Transaction } from '../types/contracts';
 
 const FINANCE_BOOT_RETRY_DELAYS_MS = [600, 1200, 2400, 4000];
+// Depois de esgotar o backoff acima, continua tentando neste intervalo pra sempre em vez
+// de desistir de vez — mesma razão do gêmeo em `firebase/firestoreRetry.ts`: a escrita
+// fundacional do onboarding pode demorar mais que 8.2s em rede fraca, e sem isso a tela
+// ficava presa numa mensagem de erro permanente que só um reload manual resolvia.
+const FINANCE_BOOT_SUSTAINED_RETRY_DELAY_MS = 10000;
 // Se um listener onSnapshot não disparar em 2.5s (cache vazio + offline), assume []
 // para destravar o loading. Quando a rede voltar, o listener entrega os dados reais.
 const SLICE_BOOT_TIMEOUT_MS = 2500;
@@ -79,11 +84,8 @@ function getErrorCode(error: unknown) {
   return typeof error === 'object' && error && 'code' in error ? String(error.code) : '';
 }
 
-function canRetryFinanceBoot(error: unknown, attempt: number) {
-  return (
-    attempt < FINANCE_BOOT_RETRY_DELAYS_MS.length
-    && ['permission-denied', 'unavailable', 'deadline-exceeded'].includes(getErrorCode(error))
-  );
+function canRetryFinanceBoot(error: unknown) {
+  return ['permission-denied', 'unavailable', 'deadline-exceeded'].includes(getErrorCode(error));
 }
 
 type FinanceSliceKey = keyof Pick<FinanceDataState, 'accounts' | 'categories' | 'transactions' | 'bills' | 'recurringRules' | 'budgets'>;
@@ -121,6 +123,10 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
     // Caso contrário, o saldo pode piscar R$ 0,00 se `categories`/`bills` resolverem
     // do cache antes de `accounts`.
     const loadedSlices = new Set<FinanceSliceKey>();
+    // Reporta a mensagem de erro fatal no máximo uma vez por boot — depois disso os
+    // slices continuam tentando em segundo plano (ver scheduleRetry) e o sucesso de
+    // qualquer um deles já limpa o erro sozinho via setSlice.
+    let hasReportedFatalError = false;
 
     function markSliceLoaded(key: FinanceSliceKey) {
       loadedSlices.add(key);
@@ -128,11 +134,14 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
     }
 
     const scheduleRetry = (callback: (attempt: number) => void, attempt: number) => {
+      const delay = attempt < FINANCE_BOOT_RETRY_DELAYS_MS.length
+        ? FINANCE_BOOT_RETRY_DELAYS_MS[attempt]
+        : FINANCE_BOOT_SUSTAINED_RETRY_DELAY_MS;
       const timer = window.setTimeout(() => {
         if (!cancelled) {
           callback(attempt + 1);
         }
-      }, FINANCE_BOOT_RETRY_DELAYS_MS[attempt]);
+      }, delay);
       timers.push(timer);
     };
 
@@ -152,7 +161,7 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
           return;
         }
 
-        if (canRetryFinanceBoot(error, attempt)) {
+        if (attempt < FINANCE_BOOT_RETRY_DELAYS_MS.length && canRetryFinanceBoot(error)) {
           scheduleRetry(prepareDefaultCategories, attempt);
           return;
         }
@@ -216,8 +225,15 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
 
         unsubscribe();
 
-        if (canRetryFinanceBoot(error, attempt)) {
+        if (canRetryFinanceBoot(error)) {
+          const withinSchedule = attempt < FINANCE_BOOT_RETRY_DELAYS_MS.length;
           setState((current) => ({ ...current, loading: true, error: null }));
+          // Esgotou o backoff rapido sem resolver — avisa a UI uma vez, mas continua
+          // tentando no intervalo sustentado (scheduleRetry cuida do clamp).
+          if (!withinSchedule && !hasReportedFatalError) {
+            hasReportedFatalError = true;
+            onError();
+          }
           scheduleRetry((nextAttempt) => {
             unsubscribe = subscribeWithBootRetry(subscribe, onNext, nextAttempt);
           }, attempt);

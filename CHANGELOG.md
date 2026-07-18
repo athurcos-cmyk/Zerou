@@ -2,6 +2,45 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-18 — Conta nova ficava presa em "não foi possível carregar cartões" (fix)
+
+Achado pelo dono (`/investigate`): logo depois de criar conta, o app podia ficar preso numa
+mensagem de erro permanente. Raiz: o onboarding libera a UI de propósito antes do servidor
+confirmar a criação do workspace (fix de rede fraca já existente), e o retry que cobria essa
+janela desistia depois de só ~8.2s — curto demais pra rede realmente lenta. Detalhes técnicos
+completos, incluindo verificação de que o teste falha sem a correção, em
+`docs/history/2026-07.md`.
+
+- `src/firebase/firestoreRetry.ts` e `src/finance/useFinanceData.ts`: depois de esgotar o
+  backoff rápido, continuam tentando num intervalo sustentado (10s) em vez de desistir de
+  vez. Erro aparece uma vez; se resolver depois, o próprio sucesso limpa a mensagem sozinho.
+- Corrige automaticamente os 6 hooks que usam esse retry compartilhado (cartões, dados
+  financeiros, metas, cofrinho do casal, espaço compartilhado).
+- 5 testes novos, incluindo verificação de que falham sem a correção. `typecheck`/`test`
+  (330/330)/`build` limpos.
+
+## 2026-07-18 — WhatsApp: conta principal + transferência entre contas
+
+Corrige um problema real relatado pelo dono: com mais de uma conta cadastrada, a Grazi no
+WhatsApp debitava/creditava numa conta escolhida arbitrariamente e não sabia transferir
+entre contas. Detalhes completos em `docs/whatsapp/WHATSAPP.md`.
+
+- Nova **conta principal** (`Account.isPrimary`, botão estrela em Configurações > Contas) —
+  fallback quando a mensagem não deixa clara a conta.
+- `interpretMessage.ts` agora casa o **nome da conta citada na mensagem** ("gastei 30 no
+  mercado itaú") contra a lista de contas do workspace, igual já fazia com categoria.
+- Resolução em 3 níveis (nome citado → conta principal → conta única → bot pergunta),
+  reaproveitando o mesmo padrão de pergunta numerada com TTL já usado pra escolher cartão.
+- Novo intent **`transfer`** ("transfere 100 do nubank pro itaú") — resolve os dois lados
+  independentemente, pergunta só o que faltar (um lado ou os dois).
+- `pendingCardAction.ts` generalizado em `pendingAction.ts` (suporta as 3 perguntas
+  pendentes); achado no processo e corrigido: a comparação de nome não era
+  acento-insensível ("itau" não batia com "Itaú").
+- `firestore.rules` atualizada (`isPrimary` em `accounts`) e testada (`npm run test:rules`,
+  54/54). Suite de functions foi de 48 pra 67 testes.
+- **Deployado em produção** (`firestore.rules` + `whatsappWebhook`, autorizado pelo dono) e
+  verificado ao vivo: marcar conta principal persiste de verdade, sem erro.
+
 ## 2026-07-18 — Mobile com cara de app nativo: extrato por dia, sheet de detalhe, swipe nas sheets, menu novo
 
 Auditoria de UX mobile (375px) com debate entre dois agentes (designer propôs, crítico
