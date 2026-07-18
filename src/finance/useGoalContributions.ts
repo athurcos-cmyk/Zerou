@@ -30,10 +30,11 @@ export function useGoalContributions(workspaceId: string | undefined, goalId: st
     }, 2500);
 
     const unsub = subscribeWithTransientRetry({
-      subscribe: (onError) =>
+      subscribe: (onError, markLoaded) =>
         subscribeGoalContributions(
           workspaceId,
           (items) => {
+            markLoaded();
             const forGoal = items
               .filter((item) => item.goalId === goalId)
               .sort((a, b) => (b.createdAt?.toMillis() ?? Number.MAX_SAFE_INTEGER) - (a.createdAt?.toMillis() ?? Number.MAX_SAFE_INTEGER));

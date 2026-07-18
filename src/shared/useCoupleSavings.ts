@@ -34,10 +34,11 @@ export function useCoupleSavings(workspaceId?: string) {
     }, 2500);
 
     const unsubGoals = subscribeWithTransientRetry({
-      subscribe: (onError) =>
+      subscribe: (onError, markLoaded) =>
         subscribeGoals(
           workspaceId,
           (items) => {
+            markLoaded();
             const goals = items.filter((goal) => goal.isActive !== false);
             setState((current) => ({ ...current, goals, loading: false, error: null }));
           },
@@ -48,10 +49,13 @@ export function useCoupleSavings(workspaceId?: string) {
     });
 
     const unsubContribs = subscribeWithTransientRetry({
-      subscribe: (onError) =>
+      subscribe: (onError, markLoaded) =>
         subscribeGoalContributions(
           workspaceId,
-          (items) => setState((current) => ({ ...current, contributions: items })),
+          (items) => {
+            markLoaded();
+            setState((current) => ({ ...current, contributions: items }));
+          },
           onError
         ),
       onError: () => setState((current) => ({ ...current, error: 'Não foi possível carregar as contribuições dos cofrinhos.' }))

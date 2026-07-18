@@ -18,9 +18,10 @@ desktop), mesmo depois do fix de mais cedo no dia. Causa raiz completa em
   perceber que era inacabada, não descartável.
 - `subscribeWithTransientRetry` ganhou um `markLoaded()` que o consumidor chama ao receber
   o primeiro dado bom — erro depois disso no mesmo listener é ignorado silenciosamente.
-  `useCardsData.ts` atualizado pra usar. **5 outros hooks que usam o mesmo utilitário
-  ainda não foram migrados** (mudança é retrocompatível, nada quebra, mas continuam
-  vulneráveis ao mesmo piscar) — anotado em `docs/planning/TODOS.md`.
+- **Aplicado nos outros 5 hooks no mesmo dia** (pedido do dono, depois de confirmar o fix):
+  `useGoalContributions.ts`, `useInvoiceLedger.ts`, `useCoupleSavings.ts`,
+  `useSharedWorkspaceData.ts`, `useGoalsData.ts` — cobre metas, cofrinho do casal, espaço
+  compartilhado e fatura detalhada, os mesmos 9 pontos de assinatura.
 - 1 teste novo, verificado que falha sem a correção. `typecheck`/`test` (332/332)/`build`
   limpos.
 

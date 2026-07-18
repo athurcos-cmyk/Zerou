@@ -57,16 +57,18 @@ export function useSharedWorkspaceData(userId?: string) {
     }, 2500);
 
     const unsub = subscribeWithTransientRetry({
-      subscribe: (onError) =>
+      subscribe: (onError, markLoaded) =>
         subscribeWorkspaceRefs(
           userId,
-          (workspaceRefs) =>
+          (workspaceRefs) => {
+            markLoaded();
             setState((current) => ({
               ...current,
               workspaceRefs,
               loading: false,
               error: null
-            })),
+            }));
+          },
           onError
         ),
       onRetrying: () => setState((current) => ({ ...current, loading: true, error: null })),
@@ -113,32 +115,47 @@ export function useSharedWorkspaceData(userId?: string) {
 
     const unsubscribers = [
       subscribeWithTransientRetry({
-        subscribe: (handleError) =>
-          subscribeWorkspace(workspaceId, (workspace) => setState((current) => ({ ...current, workspace, loading: false })), handleError),
+        subscribe: (handleError, markLoaded) =>
+          subscribeWorkspace(workspaceId, (workspace) => {
+            markLoaded();
+            setState((current) => ({ ...current, workspace, loading: false }));
+          }, handleError),
         onRetrying,
         onError
       }),
       subscribeWithTransientRetry({
-        subscribe: (handleError) =>
-          subscribeMembers(workspaceId, (members) => setState((current) => ({ ...current, members, loading: false })), handleError),
+        subscribe: (handleError, markLoaded) =>
+          subscribeMembers(workspaceId, (members) => {
+            markLoaded();
+            setState((current) => ({ ...current, members, loading: false }));
+          }, handleError),
         onRetrying,
         onError
       }),
       subscribeWithTransientRetry({
-        subscribe: (handleError) =>
-          subscribeActiveInvites(workspaceId, (invites) => setState((current) => ({ ...current, invites, loading: false })), handleError),
+        subscribe: (handleError, markLoaded) =>
+          subscribeActiveInvites(workspaceId, (invites) => {
+            markLoaded();
+            setState((current) => ({ ...current, invites, loading: false }));
+          }, handleError),
         onRetrying,
         onError
       }),
       subscribeWithTransientRetry({
-        subscribe: (handleError) =>
-          subscribeSharedClaims(workspaceId, (claims) => setState((current) => ({ ...current, claims, loading: false })), handleError),
+        subscribe: (handleError, markLoaded) =>
+          subscribeSharedClaims(workspaceId, (claims) => {
+            markLoaded();
+            setState((current) => ({ ...current, claims, loading: false }));
+          }, handleError),
         onRetrying,
         onError
       }),
       subscribeWithTransientRetry({
-        subscribe: (handleError) =>
-          subscribeSettlements(workspaceId, (settlements) => setState((current) => ({ ...current, settlements, loading: false })), handleError),
+        subscribe: (handleError, markLoaded) =>
+          subscribeSettlements(workspaceId, (settlements) => {
+            markLoaded();
+            setState((current) => ({ ...current, settlements, loading: false }));
+          }, handleError),
         onRetrying,
         onError
       })

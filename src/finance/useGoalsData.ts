@@ -27,10 +27,11 @@ export function useGoalsData(workspaceId?: string) {
     }, 2500);
 
     const unsub = subscribeWithTransientRetry({
-      subscribe: (onError) =>
+      subscribe: (onError, markLoaded) =>
         subscribeGoals(
           workspaceId,
           (goals) => {
+            markLoaded();
             const active = goals
               .filter((goal) => goal.isActive !== false)
               // Mais recentes primeiro; itens pendentes (createdAt nulo offline) vêm no topo.

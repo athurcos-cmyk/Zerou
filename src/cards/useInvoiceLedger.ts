@@ -45,16 +45,18 @@ export function useInvoiceLedger(
 
     const unsubscribers = refs.map((ref) =>
       subscribeWithTransientRetry({
-        subscribe: (onError) =>
+        subscribe: (onError, markLoaded) =>
           subscribeInvoiceLedger(
             workspaceId,
             ref.cardId,
             ref.id,
-            (items) =>
+            (items) => {
+              markLoaded();
               setLedgerEntries((current) => [
                 ...current.filter((entry) => entry.invoiceId !== ref.id || entry.cardId !== ref.cardId),
                 ...items
-              ]),
+              ]);
+            },
             onError
           ),
         onError: () => undefined
