@@ -212,6 +212,16 @@ describe('monthlyTotals', () => {
     const totals = monthlyTotals(['2026-07'], [salario, aluguel], []);
     expect(totals[0]).toMatchObject({ month: '2026-07', incomeCents: 500000, expenseCents: 150000 });
   });
+
+  // Retirada de meta cria uma transação `income` de verdade (pra creditar a conta) — mas
+  // ela não é "receita" pro resumo mensal, senão uma retirada infla Entradas/Saídas do
+  // gráfico de Análise igual um aporte a meta já não infla Despesas.
+  it('retirada de meta (income + tags: meta) não entra como receita do mês', () => {
+    const salario = txn({ id: 's', type: 'income', amountCents: 500000, cashMonth: '2026-07', competenceMonth: '2026-07' });
+    const retirada = txn({ id: 'r', type: 'income', amountCents: 100000, tags: ['meta'], cashMonth: '2026-07', competenceMonth: '2026-07' });
+    const totals = monthlyTotals(['2026-07'], [salario, retirada], []);
+    expect(totals[0]).toMatchObject({ month: '2026-07', incomeCents: 500000, expenseCents: 0 });
+  });
 });
 
 describe('ongoingInstallmentPurchases', () => {

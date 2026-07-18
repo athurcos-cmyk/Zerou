@@ -1277,6 +1277,10 @@ describe('firestore security rules', () => {
     await assertSucceeds(updateDoc(goalReference, { savedCents: 2500, updatedAt: serverTimestamp() }));
     await assertFails(updateDoc(goalReference, { createdBy: 'bob', updatedAt: serverTimestamp() }));
     await assertFails(setDoc(doc(aliceDb, 'workspaces/workspaceA/goals/goalForged'), goalPayload('workspaceA', 'goalForged', 'bob')));
+    // Retirada não pode deixar savedCents negativo (validMoneyCents exige >= 0) — uma
+    // retirada maior que o guardado precisa ser bloqueada no cliente ANTES de chegar
+    // aqui; esta regra é a última linha de defesa.
+    await assertFails(updateDoc(goalReference, { savedCents: -100, updatedAt: serverTimestamp() }));
     await assertSucceeds(
       setDoc(
         doc(aliceDb, 'workspaces/workspaceA/goalContributions/contribA'),
@@ -1287,6 +1291,40 @@ describe('firestore security rules', () => {
       setDoc(
         doc(aliceDb, 'workspaces/workspaceA/goalContributions/contribZero'),
         goalContributionPayload('workspaceA', 'contribZero', 'goalA', 'alice', { amountCents: 0 })
+      )
+    );
+    // Retirada (type: 'withdrawal') e o accountId opcional (liga a contribuição a
+    // uma conta de verdade, distinguindo de uma correção "só registrar" no histórico).
+    await assertSucceeds(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/goalContributions/contribWithdrawal'),
+        goalContributionPayload('workspaceA', 'contribWithdrawal', 'goalA', 'alice', { type: 'withdrawal', accountId: 'accountA' })
+      )
+    );
+    await assertFails(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/goalContributions/contribBadType'),
+        goalContributionPayload('workspaceA', 'contribBadType', 'goalA', 'alice', { type: 'refund' })
+      )
+    );
+  });
+
+  // A retirada de meta cria uma transação `income` marcada com tags: ['meta'] — mesmo
+  // formato que o depósito já usa (`expense` + tags: ['meta']). Sem esse teste, um valor
+  // novo de enum passaria despercebido no cliente e só quebraria em produção (padrão de
+  // bug já documentado no CLAUDE.md).
+  it('accepts an income transaction tagged for a goal withdrawal', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    await assertSucceeds(
+      setDoc(doc(aliceDb, 'workspaces/workspaceA/accounts/goalWithdrawAccount'), accountPayload('workspaceA', 'goalWithdrawAccount', 'alice'))
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/transactions/goalWithdrawTxn'),
+        transactionPayload('workspaceA', 'goalWithdrawTxn', 'alice', 'goalWithdrawAccount', {
+          type: 'income',
+          tags: ['meta']
+        })
       )
     );
   });

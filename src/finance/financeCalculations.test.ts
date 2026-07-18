@@ -449,6 +449,24 @@ describe('findNextIncomeDate', () => {
     expect(next).toBeNull();
   });
 
+  // Retirada de meta/cofrinho cria uma transação `income` de verdade (credita a conta),
+  // mas não é um "recebimento" pro cálculo de Comprometido/Disponível — mesma exclusão
+  // que o lado da despesa já tem. Hoje isso fica inofensivo só porque toda retirada é
+  // datada "agora" (sempre no passado pra esse filtro); este teste trava o comportamento
+  // pro dia em que uma retirada futura ou agendada existir.
+  it('ignores income transactions tagged meta or cofrinho', () => {
+    const next = findNextIncomeDate(
+      [
+        transaction({ type: 'income', date: Timestamp.fromDate(new Date('2026-06-20T12:00:00')), tags: ['meta'] }),
+        transaction({ type: 'income', date: Timestamp.fromDate(new Date('2026-06-21T12:00:00')), tags: ['cofrinho'] }),
+        transaction({ type: 'income', date: Timestamp.fromDate(new Date('2026-06-25T12:00:00')) })
+      ],
+      now
+    );
+
+    expect(next?.toISOString().slice(0, 10)).toBe('2026-06-25');
+  });
+
   // Antes esta função contava uma receita datada de HOJE como "próximo recebimento".
   // Isso tinha dois problemas: a receita de hoje já está somada no saldo (o saldo não
   // filtra por data), então usá-la como corte encolhia o Comprometido pra "só o que
@@ -585,7 +603,7 @@ describe('buildUpcomingCommitments', () => {
     expect(commitments[0].description).toBe('Nubank');
   });
 
-  it('falls back to the plain reference month when the card is missing or not provided', () => {
+  it('falls back to the friendly reference month when the card is missing or not provided', () => {
     const commitments = buildUpcomingCommitments(
       [],
       [],
@@ -594,7 +612,7 @@ describe('buildUpcomingCommitments', () => {
       [card({ id: 'card-nubank', name: 'Nubank' })]
     );
 
-    expect(commitments[0].description).toBe('Fatura 2026-06');
+    expect(commitments[0].description).toBe('Fatura jun 2026');
   });
 });
 

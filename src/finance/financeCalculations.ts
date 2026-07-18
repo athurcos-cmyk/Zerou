@@ -1,5 +1,5 @@
 import { addDays, compareAsc, endOfDay, isAfter, isBefore, isEqual } from 'date-fns';
-import { toDate } from './financeDates';
+import { formatFriendlyMonth, toDate } from './financeDates';
 import { defaultAvailableMode } from './availableMode';
 import { defaultCommittedWindowDays, nextPaydayFrom } from './payday';
 import type { Account, AvailableMode, Bill, CreditCard, Invoice, PaydayRule, RecurringRule, Transaction } from '../types/contracts';
@@ -161,7 +161,15 @@ export function findNextIncomeDate(transactions: Transaction[], now = new Date()
   // mudando o Comprometido conforme a hora em que o app era aberto.
   const todayEnd = endOfDay(now);
   const futureIncomeDates = transactions
-    .filter((transaction) => isActiveTransaction(transaction) && transaction.type === 'income')
+    .filter(
+      (transaction) =>
+        isActiveTransaction(transaction) &&
+        transaction.type === 'income' &&
+        // Retirada de meta/cofrinho é receita na conta, mas não é "próximo recebimento"
+        // pro cálculo de Comprometido — mesma exclusão que já vale do lado da despesa.
+        !transaction.tags?.includes('meta') &&
+        !transaction.tags?.includes('cofrinho')
+    )
     .map((transaction) => toDate(transaction.date))
     .filter((date) => isAfter(date, todayEnd))
     .sort(compareAsc);
@@ -239,7 +247,7 @@ export function buildUpcomingCommitments(
       return {
         id: invoice.id,
         kind: 'invoice',
-        description: cardName ?? `Fatura ${invoice.referenceMonth}`,
+        description: cardName ?? `Fatura ${formatFriendlyMonth(invoice.referenceMonth)}`,
         amountCents: invoice.outstandingBalanceCents,
         dueAt: toDate(invoice.dueDate),
         cardId: invoice.cardId

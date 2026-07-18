@@ -413,8 +413,62 @@ export function subscribeGoalContributions(
   );
 }
 
+/** Apaga a meta e, junto no mesmo batch, todo o histórico de contribuições dela —
+ * senão fica lixo órfão apontando pra uma meta que não existe mais. Seguro: a regra
+ * de exclusão de `goalContributions` já vale pro dono do próprio workspace pessoal,
+ * a mesma que `deleteCard` usa todo dia (não é um gate de "só exclusão de conta inteira"). */
 export async function deleteGoal(workspaceId: string, goalId: string) {
-  fireWrite(deleteDoc(documentRef(workspaceId, 'goals', goalId)));
+  const contributions = await getDocs(query(collectionRef(workspaceId, 'goalContributions'), where('goalId', '==', goalId)));
+  const batch = writeBatch(getFirebaseDb());
+  for (const contribution of contributions.docs) {
+    batch.delete(contribution.ref);
+  }
+  batch.delete(documentRef(workspaceId, 'goals', goalId));
+  fireWrite(batch.commit());
+}
+
+/** Excluir meta devolvendo o valor guardado pra uma conta escolhida (só faz sentido
+ * pra meta de economizar — numa meta de dívida o `savedCents` já foi pago a um credor
+ * de verdade, não tem "guardado" pra voltar). Credita `goal.savedCents` de uma vez só
+ * na conta escolhida, em vez de tentar reverter cada contribuição histórica (que pode
+ * referenciar uma conta já excluída) — e limpa o histórico junto, como `deleteGoal`. */
+export async function deleteGoalWithRefund(
+  workspaceId: string,
+  userId: string,
+  goal: Pick<Goal, 'id' | 'name' | 'savedCents'>,
+  accountId: string
+) {
+  const contributions = await getDocs(query(collectionRef(workspaceId, 'goalContributions'), where('goalId', '==', goal.id)));
+  const batch = writeBatch(getFirebaseDb());
+  const now = new Date();
+  const txnId = createId('txn');
+  const cashMonth = monthKeyFromDate(now);
+  batch.set(documentRef(workspaceId, 'transactions', txnId), omitUndefined({
+    id: txnId,
+    workspaceId,
+    createdBy: userId,
+    updatedBy: userId,
+    type: 'income' as const,
+    amountCents: goal.savedCents,
+    description: `Meta encerrada: ${goal.name}`,
+    accountId,
+    date: Timestamp.fromDate(now),
+    competenceMonth: cashMonth,
+    cashMonth,
+    tags: ['meta'],
+    isRecurring: false,
+    clientMutationId: txnId,
+    syncStatus: 'synced' as const,
+    version: 1,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }));
+  applyAccountEffectsToBatch(batch, workspaceId, transactionAccountEffects({ type: 'income', amountCents: goal.savedCents, accountId }));
+  for (const contribution of contributions.docs) {
+    batch.delete(contribution.ref);
+  }
+  batch.delete(documentRef(workspaceId, 'goals', goal.id));
+  fireWrite(batch.commit());
 }
 
 export async function softDeleteTransaction(
@@ -822,8 +876,11 @@ export function recordRecurringPayment(
 }
 
 // ─── contributeToGoalWithTransaction ─────────────────────────────────────────
-// Atualiza savedCents e, quando conta fornecida e valor positivo, cria despesa.
-// Delta negativo (correção) só ajusta a meta sem criar transação.
+// Simétrica: `amountCents` positivo é depósito (guardei/paguei), negativo é retirada
+// (retirei/estornei). Sempre grava um `goalContributions` (histórico por meta); quando
+// há conta escolhida, também cria a transação de verdade — expense (débito) no depósito,
+// income (crédito) na retirada — e mexe no saldo da conta. Sem conta ("só registrar"),
+// só o progresso da meta muda, nada de dinheiro se move.
 export function contributeToGoalWithTransaction(
   workspaceId: string,
   userId: string,
@@ -832,22 +889,42 @@ export function contributeToGoalWithTransaction(
   accountId?: string
 ) {
   const batch = writeBatch(getFirebaseDb());
+  const now = new Date();
+  const isDeposit = amountCents >= 0;
+  const magnitudeCents = Math.abs(amountCents);
+  const cashMonth = monthKeyFromDate(now);
+  const contribId = createId('contrib');
+
+  batch.set(documentRef(workspaceId, 'goalContributions', contribId), omitUndefined({
+    id: contribId,
+    workspaceId,
+    goalId: goal.id,
+    userId,
+    amountCents: magnitudeCents,
+    type: isDeposit ? ('deposit' as const) : ('withdrawal' as const),
+    accountId,
+    monthKey: cashMonth,
+    createdAt: serverTimestamp()
+  }));
   batch.update(documentRef(workspaceId, 'goals', goal.id), {
     savedCents: increment(amountCents),
     updatedAt: serverTimestamp()
   });
-  if (amountCents > 0 && accountId) {
-    const id = createId('txn');
-    const now = new Date();
-    batch.set(documentRef(workspaceId, 'transactions', id), omitUndefined({
-      id, workspaceId, createdBy: userId, updatedBy: userId,
-      type: 'expense', amountCents, description: `Meta: ${goal.name}`,
+  if (accountId && magnitudeCents > 0) {
+    const txnId = createId('txn');
+    batch.set(documentRef(workspaceId, 'transactions', txnId), omitUndefined({
+      id: txnId, workspaceId, createdBy: userId, updatedBy: userId,
+      type: isDeposit ? ('expense' as const) : ('income' as const),
+      amountCents: magnitudeCents,
+      description: `Meta: ${goal.name}${isDeposit ? '' : ' (retirada)'}`,
       accountId, date: Timestamp.fromDate(now),
-      competenceMonth: monthKeyFromDate(now), cashMonth: monthKeyFromDate(now),
-      tags: ['meta'], isRecurring: false, clientMutationId: id,
+      competenceMonth: cashMonth, cashMonth,
+      tags: ['meta'], isRecurring: false, clientMutationId: txnId,
       syncStatus: 'synced', version: 1, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
     }));
-    applyAccountEffectsToBatch(batch, workspaceId, transactionAccountEffects({ type: 'expense', amountCents, accountId }));
+    applyAccountEffectsToBatch(batch, workspaceId, transactionAccountEffects({
+      type: isDeposit ? 'expense' : 'income', amountCents: magnitudeCents, accountId
+    }));
   }
   fireWrite(batch.commit());
 }

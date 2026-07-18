@@ -18,6 +18,7 @@ import { CardsPage } from './pages/CardsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { EditTransactionPage } from './pages/EditTransactionPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
+import { GoalDetailPage } from './pages/GoalDetailPage';
 import { GoalsPage } from './pages/GoalsPage';
 import { InvoicePage } from './pages/InvoicePage';
 import { JoinInvitePage } from './pages/JoinInvitePage';
@@ -92,6 +93,7 @@ export function App() {
                 <Route path="cards/:cardId/invoices/:invoiceId" element={<InvoicePage />} />
                 <Route path="bills" element={<BillsPage />} />
                 <Route path="goals" element={<GoalsPage />} />
+                <Route path="goals/:goalId" element={<GoalDetailPage />} />
                 {/* Patrimônio Líquido desativado (2026-07-16) — redireciona em vez de remover, pra não deixar link morto se alguém tiver a URL salva/favoritada. */}
                 <Route path="net-worth" element={<Navigate to="/app/dashboard" replace />} />
                 <Route path="search" element={<SearchPage />} />

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
-import { Check, Minus, Plus, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Check, Plus, Trash2 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useGoalsContext } from '../finance/FinanceDataContext';
 import { BottomSheet } from '../components/BottomSheet';
@@ -8,7 +9,9 @@ import { ACCENT_FOREGROUND } from '../theme/palette';
 import { EmptyState } from '../components/EmptyState';
 import { FormMessage } from '../components/FormMessage';
 import { useFinanceContext } from '../finance/FinanceDataContext';
-import { contributeToGoalWithTransaction, createGoal, deleteGoal } from '../finance/financeService';
+import { createGoal } from '../finance/financeService';
+import { GoalContributeSheet } from '../finance/GoalContributeSheet';
+import { GoalDeleteSheet } from '../finance/GoalDeleteSheet';
 import { formatFriendlyDate, fromDateInputValue } from '../finance/financeDates';
 import { differenceInCalendarDays } from 'date-fns';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
@@ -40,9 +43,7 @@ export function GoalsPage() {
   const [color, setColor] = useState(categoryColors[0]);
 
   const [contributeGoal, setContributeGoal] = useState<Goal | null>(null);
-  const [contributeAmount, setContributeAmount] = useState('');
-  const [contributeSign, setContributeSign] = useState<1 | -1>(1);
-  const [contributeAccountId, setContributeAccountId] = useState('');
+  const [deleteCandidate, setDeleteCandidate] = useState<Goal | null>(null);
 
   const hintKey = profile?.onboardingGoal ?? profile?.onboardingChallenge ?? '';
   const hint = goalHints[hintKey];
@@ -74,23 +75,6 @@ export function GoalsPage() {
     }).catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar a meta agora.')));
     resetCreate();
     setCreateOpen(false);
-  }
-
-  function handleContribute(event: FormEvent) {
-    event.preventDefault();
-    if (!workspaceId || !user || !contributeGoal) return;
-    const delta = contributeSign * parseMoneyToCents(contributeAmount);
-    setMessage(null);
-    contributeToGoalWithTransaction(workspaceId, user.uid, contributeGoal, delta, contributeAccountId || undefined);
-    setContributeGoal(null);
-    setContributeAmount('');
-    setContributeSign(1);
-    setContributeAccountId('');
-  }
-
-  async function handleDelete(goalId: string) {
-    if (!workspaceId) return;
-    await deleteGoal(workspaceId, goalId);
   }
 
   return (
@@ -125,42 +109,46 @@ export function GoalsPage() {
             const done = goal.savedCents >= goal.targetCents && goal.targetCents > 0;
             return (
               <article className="surface surface-pad goal-card" key={goal.id}>
-                <div className="goal-card-head">
-                  <span className="goal-mark" style={{ background: goal.color ?? categoryColors[0] }}>
-                    <CategoryIcon icon={goal.icon} size={20} />
-                  </span>
-                  <div className="goal-card-title">
-                    <strong>{goal.name}</strong>
-                    <span className="text-muted">{goal.kind === 'debt' ? 'Quitar dívida' : 'Economizar'}{done ? ' · concluída 🎉' : ''}</span>
-                  </div>
-                  <button className="icon-button" type="button" aria-label={`Excluir ${goal.name}`} onClick={() => void handleDelete(goal.id)}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                  <Link to={`/app/goals/${goal.id}`} style={{ flex: 1, minWidth: 0, display: 'block', color: 'inherit', textDecoration: 'none' }}>
+                    <div className="goal-card-head">
+                      <span className="goal-mark" style={{ background: goal.color ?? categoryColors[0] }}>
+                        <CategoryIcon icon={goal.icon} size={20} />
+                      </span>
+                      <div className="goal-card-title">
+                        <strong>{goal.name}</strong>
+                        <span className="text-muted">{goal.kind === 'debt' ? 'Quitar dívida' : 'Economizar'}{done ? ' · concluída 🎉' : ''}</span>
+                      </div>
+                    </div>
+
+                    <div className="goal-progress-track" aria-hidden="true">
+                      <span className={`goal-progress-fill${done ? ' goal-progress-fill--done' : ''}`} style={{ width: `${Math.max(3, pct)}%`, background: done ? undefined : goal.color }} />
+                    </div>
+
+                    <div className="goal-card-foot">
+                      <span className="display-number goal-amount">{formatMoney(goal.savedCents)}</span>
+                      <span className="text-secondary">de {formatMoney(goal.targetCents)} · {pct}%</span>
+                    </div>
+
+                    {goal.dueDate && !done && (() => {
+                      const daysLeft = differenceInCalendarDays(goal.dueDate!.toDate(), new Date());
+                      const urgent = daysLeft <= 7 && daysLeft >= 0;
+                      const overdue = daysLeft < 0;
+                      return (
+                        <div className="goal-card-due" style={overdue ? { color: 'var(--danger)' } : urgent ? { color: 'var(--warning)' } : undefined}>
+                          {overdue
+                            ? `Atrasada — venceu ${formatFriendlyDate(goal.dueDate!)}`
+                            : `Até ${formatFriendlyDate(goal.dueDate!)}`}
+                        </div>
+                      );
+                    })()}
+                  </Link>
+                  <button className="icon-button" type="button" aria-label={`Excluir ${goal.name}`} onClick={() => setDeleteCandidate(goal)}>
                     <Trash2 size={16} aria-hidden="true" />
                   </button>
                 </div>
 
-                <div className="goal-progress-track" aria-hidden="true">
-                  <span className={`goal-progress-fill${done ? ' goal-progress-fill--done' : ''}`} style={{ width: `${Math.max(3, pct)}%`, background: done ? undefined : goal.color }} />
-                </div>
-
-                <div className="goal-card-foot">
-                  <span className="display-number goal-amount">{formatMoney(goal.savedCents)}</span>
-                  <span className="text-secondary">de {formatMoney(goal.targetCents)} · {pct}%</span>
-                </div>
-
-                {goal.dueDate && !done && (() => {
-                  const daysLeft = differenceInCalendarDays(goal.dueDate!.toDate(), new Date());
-                  const urgent = daysLeft <= 7 && daysLeft >= 0;
-                  const overdue = daysLeft < 0;
-                  return (
-                    <div className="goal-card-due" style={overdue ? { color: 'var(--danger)' } : urgent ? { color: 'var(--warning)' } : undefined}>
-                      {overdue
-                        ? `Atrasada — venceu ${formatFriendlyDate(goal.dueDate!)}`
-                        : `Até ${formatFriendlyDate(goal.dueDate!)}`}
-                    </div>
-                  );
-                })()}
-
-                <button className="button button--subtle button--block" type="button" onClick={() => { setContributeGoal(goal); setContributeSign(1); }}>
+                <button className="button button--subtle button--block" type="button" onClick={() => setContributeGoal(goal)} style={{ marginTop: '0.9rem' }}>
                   {goal.kind === 'debt' ? 'Registrar pagamento' : 'Guardar valor'}
                 </button>
               </article>
@@ -241,42 +229,23 @@ export function GoalsPage() {
         </form>
       </BottomSheet>
 
-      {/* Contribute sheet */}
-      <BottomSheet open={Boolean(contributeGoal)} onClose={() => { setContributeGoal(null); setContributeAccountId(''); }} title={contributeGoal?.name} subtitle={contributeGoal?.kind === 'debt' ? 'Registrar pagamento' : 'Guardar valor'}>
-        <form className="form-stack" onSubmit={(event) => void handleContribute(event)}>
-          <div className="segmented">
-            <button type="button" aria-pressed={contributeSign === 1} onClick={() => setContributeSign(1)}>
-              <Plus size={15} aria-hidden="true" /> {contributeGoal?.kind === 'debt' ? 'Paguei' : 'Guardei'}
-            </button>
-            <button type="button" aria-pressed={contributeSign === -1} onClick={() => setContributeSign(-1)}>
-              <Minus size={15} aria-hidden="true" /> Corrigir
-            </button>
-          </div>
-          <label className="field">
-            <span>Valor</span>
-            <input className="input input--money" inputMode="decimal" value={contributeAmount} onChange={(event) => setContributeAmount(event.target.value)} placeholder="0,00" autoFocus />
-          </label>
-          {contributeSign === 1 && finance.accounts.length > 0 && (
-            <div className="field">
-              <span className="field-label">De qual conta sai?</span>
-              <div className="chip-row">
-                <button type="button" className={`chip${!contributeAccountId ? ' chip--active' : ''}`} onClick={() => setContributeAccountId('')}>Só registrar</button>
-                {finance.accounts.map((account) => (
-                  <button key={account.id} type="button" className={`chip${contributeAccountId === account.id ? ' chip--active' : ''}`} onClick={() => setContributeAccountId(account.id)}>{account.name}</button>
-                ))}
-              </div>
-              <p className="text-muted" style={{ fontSize: '0.8rem', margin: '0.4rem 0 0' }}>
-                {contributeAccountId ? 'Vira uma despesa na sua conta e registra o progresso da meta.' : 'Só registra o progresso — não mexe no saldo das contas.'}
-              </p>
-            </div>
-          )}
-          <div className="sheet-actions">
-            <button className="button button--primary" type="submit" disabled={!contributeAmount}>
-              Confirmar
-            </button>
-          </div>
-        </form>
-      </BottomSheet>
+      <GoalContributeSheet
+        open={Boolean(contributeGoal)}
+        workspaceId={workspaceId}
+        userId={user?.uid}
+        goal={contributeGoal}
+        accounts={finance.accounts}
+        onClose={() => setContributeGoal(null)}
+      />
+
+      <GoalDeleteSheet
+        open={Boolean(deleteCandidate)}
+        workspaceId={workspaceId}
+        userId={user?.uid}
+        goal={deleteCandidate}
+        accounts={finance.accounts}
+        onClose={() => setDeleteCandidate(null)}
+      />
     </section>
   );
 }

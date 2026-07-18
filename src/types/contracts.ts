@@ -117,6 +117,9 @@ export interface GoalContribution {
   // Direção do lançamento — 'deposit' (guardar) ou 'withdrawal' (resgatar). amountCents
   // é sempre a magnitude positiva; ausente = registro legado, tratado como 'deposit'.
   type?: 'deposit' | 'withdrawal';
+  // Conta que recebeu/pagou o valor de verdade. Ausente = "só registrar" (mexeu só no
+  // progresso da meta, sem transação nem saldo de conta associados).
+  accountId?: string;
   monthKey?: string;
   createdAt?: Timestamp;
 }
