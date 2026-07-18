@@ -47,6 +47,7 @@ Grazi é a assistente de IA do Granativa. Ela responde perguntas sobre os gastos
 - **Ordem**: pre-check antes do DeepSeek (nega cedo se estourou), incremento depois do sucesso (não queima cota com falha de API).
 - **Falha no incremento**: log warning, não bloqueia resposta (a mensagem já foi entregue).
 - **Escopo**: por workspace, não por usuário. Dois membros do mesmo workspace compartilham a cota.
+- **Sem limite por minuto/rajada** (esclarecido em 2026-07-18): só existe o teto diário acima — nada impede as 60 mensagens em 1 minuto só. A única coisa que amortece rajada hoje é `maxInstances: 10` (`financialAssistant.ts`), e isso é um limite de escala/custo do Cloud Functions, não um rate limit de propósito — nem rejeita ninguém: acima da 10ª instância simultânea, o pedido extra só fica na fila esperando uma liberar (sem erro pro usuário, só uma resposta um pouco mais lenta). Pra ter rate limit por minuto de verdade, precisaria de um bucket novo (mesmo padrão de `aiRateLimit.ts`, só que com chave por minuto em vez de por dia).
 
 ### Contexto financeiro (`buildFinancialContext`)
 
@@ -221,6 +222,7 @@ npx firebase functions:secrets:list --project zerou-26757
 
 ## Pendências futuras
 
+- [ ] **Rate limit de 60 msgs/dia é generoso de propósito porque o produto é 100% gratuito hoje** (anotado em 2026-07-18): quando (e se) o Granativa tiver um plano pago, revisar essa cota — pode virar benefício exclusivo do plano pago, o gratuito pode ganhar um teto mais restrito, ou pode continuar como está. Não mexer sem decisão explícita de produto — só documentado aqui pra não ser esquecido quando aquele dia chegar. Ver também `docs/planning/TODOS.md`.
 - [ ] **Sugestões proativas** (Fase 1.5 do plano original): job semanal que gera resumo/dica e salva como notificação in-app. Reaproveitar `onSchedule` já existente.
 - [ ] **Cache de contexto**: `buildFinancialContext` é chamado a cada mensagem. Um cache em memória (Map com TTL 30s) por workspace evitaria refazer as mesmas 4 queries para mensagens consecutivas na mesma conversa.
 - [ ] **Circuit breaker**: se DeepSeek ficar fora do ar por horas, um doc no Firestore (`aiStatus/deepseek`) com flag `degraded` evitaria bater na API repetidamente.

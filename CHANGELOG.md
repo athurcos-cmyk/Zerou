@@ -2,6 +2,55 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-18 — Landing: CTA do menu parava de implicar plano pago + "Entrar" sumia no celular
+
+Dois ajustes pontuais na landing, achados numa revisão de design/frontend a pedido do
+dono.
+
+- **Botão do menu "Começar grátis" → "Começar agora"**: o dono notou que "grátis" colado
+  no verbo dá a entender que é grátis só pra começar (like um trial), quando o produto é
+  100% gratuito, sem plano nenhum. Os outros dois CTAs da página (hero e final) já
+  evitavam esse problema com copy orientada a benefício; só o do menu destoava. A
+  reafirmação "Grátis · sem cartão de crédito" continua exatamente onde já estava (nota
+  do hero, nota do CTA final, faixa de stats "R$0 pra sempre").
+- **"Entrar" desaparecia por completo abaixo de 480px** (achado pelo dono testando no
+  próprio celular): a única forma de logar a partir da landing some no mobile — não
+  existe outro link de login em nenhum lugar da página, nem no rodapé. Corrigido
+  encolhendo os dois botões e a logo nesse breakpoint (em vez de esconder "Entrar"),
+  verificado ao vivo em 375px e 320px sem overflow.
+
+## 2026-07-18 — Fatura de cartão travava "Aberta" além do fechamento + parcela única aparecia como antecipável
+
+O dono achou os dois bugs ao vivo, direto na fatura de julho: badge "Aberta" numa fatura
+que já devia estar fechada, e "Restaurante"/"Farmácia" (compras à vista, sem parcela)
+aparecendo na lista de "antecipar parcelas de faturas futuras".
+
+- **Fatura só fechava via Cloud Scheduler diário** (`closeInvoicesDue`), que só roda
+  no dia exato do fechamento de cada cartão — uma compra lançada com data retroativa (ou
+  o scheduler falhando um dia) deixava a fatura presa em `open` por até um mês, com o
+  botão errado ("Antecipar fatura" em vez de "Pagar fatura"). Existia até uma função
+  `closeInvoice` pronta pra corrigir isso, mas sem nenhum lugar que a chamasse. Nova
+  função `markClosedInvoices` fecha isso no cliente — mesmo padrão que `markOverdueBills`
+  já usa pra contas a pagar: roda a cada snapshot de fatura, silenciosa, sem UI.
+- **Compra à vista virando "antecipável"**: o filtro de parcelas futuras (`anticipation.ts`)
+  não checava se a compra realmente tinha mais de uma parcela — qualquer compra que
+  rolasse pra uma fatura futura (por ter sido feita depois do fechamento) entrava na
+  lista. Corrigido: só entra quem tem `installmentTotal > 1` ou aparece mais de uma vez
+  no ledger do cartão (cobre compra parcelada antiga, de antes desse campo existir).
+- `/code-review` no próprio fix achou uma regressão: o fechamento estava ancorado ao
+  meio-dia do dia de fechamento em vez do dia inteiro — uma compra à tarde nesse mesmo
+  dia cairia numa fatura já marcada fechada horas antes da hora. Corrigido pra comparar
+  por dia inteiro.
+- Testado ao vivo o cenário pedido pelo dono: antecipar uma parcela cuja fatura de
+  origem só tinha aquele lançamento faz a fatura de origem sumir do histórico — comportamento
+  por design (`invoiceHasVisibleActivity`), não bug.
+- Achado e **deixado documentado, não corrigido**: `subscribeInvoices` limita a 24
+  faturas por cartão — em teoria uma compra parcelada muito antiga (de antes do campo
+  `installmentTotal` existir) num cartão com 24+ faturas acumuladas poderia ficar de
+  fora da antecipação. Sem impacto hoje (app só existe há ~2 meses, nenhum cartão chega
+  perto de 24 faturas). Ver `docs/planning/TODOS.md`.
+- Detalhes em `docs/history/2026-07.md`.
+
 ## 2026-07-18 — Metas ganham histórico por contribuição, retirada de valor e exclusão com devolução
 
 O dono testou a fundo e trouxe 4 pontos reais sobre Metas: sem histórico por meta, sem
