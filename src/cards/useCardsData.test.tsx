@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { useCardsData } from './useCardsData';
 
@@ -82,6 +82,30 @@ describe('useCardsData', () => {
     const { result } = renderHook(() => useCardsData('ws-1'));
     const inv = result.current.invoices.find((i) => i.id === 'invoice-1');
     expect(inv?.status).toBe('paid');
+  });
+
+  // Regressão: o Dashboard calcula "Disponível"/"Comprometido" descontando o saldo das
+  // faturas — se `loading` virasse false assim que o CARTÃO chegasse (sem esperar a
+  // FATURA), o Dashboard calculava por um instante como se a fatura fosse zero (valor
+  // inflado) e corrigia um instante depois, um "piscar" visível pro usuário.
+  it('mantém loading=true até a fatura de todo cartão ativo chegar, não só o cartão', () => {
+    let deliverInvoice: (() => void) | undefined;
+    cardMocks.subscribeInvoices.mockImplementation((_workspaceId, _cardId, onNext) => {
+      deliverInvoice = () => onNext([invoice()]);
+      return vi.fn();
+    });
+
+    const { result } = renderHook(() => useCardsData('ws-1'));
+
+    // O cartão já chegou (via subscribeCards, síncrono no mock), mas a fatura ainda não.
+    expect(result.current.cards.map((c) => c.id)).toEqual(['card-1']);
+    expect(result.current.loading).toBe(true);
+
+    act(() => {
+      deliverInvoice?.();
+    });
+
+    expect(result.current.loading).toBe(false);
   });
 
   // Regressão: `deleteCard` é soft-delete (isActive: false) e `subscribeCards` não

@@ -18,8 +18,17 @@ const initialState: CardsState = {
   error: null
 };
 
+/** Quanto esperar pela primeira entrega (sucesso OU erro) da fatura de um cartão antes de
+ * considerá-la "resolvida" mesmo sem dado — evita que `loading` fique preso pra sempre
+ * offline com uma fatura que nunca foi cacheada. Mesmo padrão de `SLICE_BOOT_TIMEOUT_MS`
+ * em `useFinanceData.ts`. */
+const INVOICE_BOOT_TIMEOUT_MS = 2500;
+
 export function useCardsData(workspaceId?: string) {
   const [state, setState] = useState<CardsState>(initialState);
+  // Quais cartões já tiveram a fatura resolvida (sucesso, erro ou timeout) pelo menos
+  // uma vez — usado só pra saber quando `loading` pode virar false, não guarda dado.
+  const [loadedInvoiceCardIds, setLoadedInvoiceCardIds] = useState<ReadonlySet<string>>(new Set());
 
   // `deleteCard` é soft-delete (isActive: false) — o listener continua trazendo o doc.
   // Filtrar aqui, e não em cada tela, garante que um cartão excluído suma da lista E
@@ -77,13 +86,29 @@ export function useCardsData(workspaceId?: string) {
     }
 
     const cards = cardsRef.current;
-    const unsubscribers = cards.map((card) =>
-      subscribeWithTransientRetry({
+    const timers: number[] = [];
+
+    function markInvoiceLoaded(cardId: string) {
+      setLoadedInvoiceCardIds((current) => (current.has(cardId) ? current : new Set(current).add(cardId)));
+    }
+
+    const unsubscribers = cards.map((card) => {
+      let resolved = false;
+      const bootTimer = window.setTimeout(() => {
+        resolved = true;
+        markInvoiceLoaded(card.id);
+      }, INVOICE_BOOT_TIMEOUT_MS);
+      timers.push(bootTimer);
+
+      return subscribeWithTransientRetry({
         subscribe: (onError) =>
           subscribeInvoices(
             workspaceId,
             card.id,
             (items) => {
+              resolved = true;
+              window.clearTimeout(bootTimer);
+              markInvoiceLoaded(card.id);
               markClosedInvoices(workspaceId, items, card.closingDay);
               setState((current) => ({
                 ...current,
@@ -92,14 +117,29 @@ export function useCardsData(workspaceId?: string) {
             },
             onError
           ),
-        onError: () => setState((current) => ({ ...current, error: 'Não foi possível carregar faturas.' }))
-      })
-    );
+        onError: () => {
+          if (!resolved) {
+            resolved = true;
+            window.clearTimeout(bootTimer);
+            markInvoiceLoaded(card.id);
+          }
+          setState((current) => ({ ...current, error: 'Não foi possível carregar faturas.' }));
+        }
+      });
+    });
 
     return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
       unsubscribers.forEach((unsubscribe) => unsubscribe());
     };
   }, [cardIds, workspaceId]);
+
+  // "Comprometido"/"Disponível" no Dashboard descontam o saldo das faturas — reportar
+  // loading=false antes delas chegarem mostraria um valor inflado por um instante
+  // (a fatura ainda não foi subtraída) até a fatura chegar e corrigir, um "piscar"
+  // visível pro usuário. Só considera resolvido quando toda conta ativa já tiver
+  // resposta (sucesso, erro ou timeout) da própria fatura.
+  const invoicesLoading = activeCards.some((card) => !loadedInvoiceCardIds.has(card.id));
 
   const calculatedInvoices = useMemo(() => {
     // Faturas de um cartão que acabou de ser excluído continuam em `state.invoices`
@@ -136,6 +176,7 @@ export function useCardsData(workspaceId?: string) {
     ...state,
     cards: activeCards,
     invoices: calculatedInvoices,
+    loading: state.loading || invoicesLoading,
     pendingWrites
   };
 }

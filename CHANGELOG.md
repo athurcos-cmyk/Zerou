@@ -2,6 +2,23 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-18 — "Disponível"/"Comprometido" podiam piscar um valor errado por um instante
+
+Preocupação do dono: o app não pode dar a sensação de estar sempre carregando. Achado
+concreto: `useCardsData.ts` marcava "carreguei" assim que a lista de cartões chegava, sem
+esperar as faturas — que é o dado que efetivamente abate o Disponível. Por um instante o
+Dashboard mostrava um valor inflado (fatura ainda não descontada) e corrigia logo em
+seguida. Detalhes técnicos e verificação em `docs/history/2026-07.md`.
+
+- `src/cards/useCardsData.ts`: `loading` só vira `false` quando cartões e faturas de todo
+  cartão ativo já resolveram (sucesso, erro ou timeout de 2.5s). `DashboardPage.tsx` já
+  usava esse `loading` corretamente — passa a funcionar certo sem mudança lá.
+- Graças ao cache já existente (`dashboardSummaryCache`), quem já tem dados nem percebe
+  diferença: o último número certo continua na tela enquanto isso resolve em segundo
+  plano, geralmente idêntico ao valor final.
+- 1 teste novo, verificado que falha sem a correção. `typecheck`/`test` (331/331)/`build`
+  limpos. Testado ao vivo com conta real com cartão e fatura.
+
 ## 2026-07-18 — Conta nova ficava presa em "não foi possível carregar cartões" (fix)
 
 Achado pelo dono (`/investigate`): logo depois de criar conta, o app podia ficar preso numa
