@@ -57,6 +57,9 @@ const cachedView: CachedDashboardView = {
   totalBalanceCents: 150000,
   freeToSpendCents: 90000,
   committedCents: 60000,
+  availableCaption: 'Livre agora.',
+  committedCaption: 'Considerando os próximos 30 dias',
+  spendingVariationPct: 12,
   spending: [
     { categoryId: 'food', categoryName: 'Alimentação', amountCents: 42000, mark: { id: 'food', icon: 'utensils', color: defaultCategoryColors.expense_food } }
   ],
@@ -103,6 +106,13 @@ describe('DashboardPage — listas do cache no boot', () => {
     // E não cai nos estados vazios enquanto tem cache pra mostrar.
     expect(screen.queryByText('Sem gastos este mês')).not.toBeInTheDocument();
     expect(screen.queryByText('Nenhuma transação ainda')).not.toBeInTheDocument();
+    // Legendas do Disponível/Comprometido e a variação vêm do cache — sem "Carregando…"
+    // nem "Contas e fatura." piscando.
+    expect(screen.getByText('Livre agora.')).toBeInTheDocument();
+    expect(screen.getByText('Considerando os próximos 30 dias')).toBeInTheDocument();
+    expect(screen.getByText(/vs\. mês passado/)).toBeInTheDocument();
+    expect(screen.queryByText('Carregando...')).not.toBeInTheDocument();
+    expect(screen.queryByText('Contas e fatura.')).not.toBeInTheDocument();
   });
 
   it('sem cache e já carregado, mostra os estados vazios (não fica em branco nem inventa dado)', () => {

@@ -21,8 +21,12 @@ maioria vai usar. Detalhes técnicos e risco residual em `docs/history/2026-07.m
 - **Mesma classe de bug no guia "Comece em poucos minutos"** (achado pelo dono ao dar
   refresh): ele era decidido pelo dado ao vivo, que começa vazio no boot, então piscava
   mesmo numa conta já usada. Agora só aparece depois que finanças+cartões resolveram.
+- **Legendas do Disponível/Comprometido e a variação "% vs. mês passado" também no cache**
+  (pedido do dono): a legenda do Comprometido trocava "Contas e fatura." → "Considerando…"
+  e a do Disponível mostrava "Carregando…"; a variação só aparecia depois de carregar.
+  Agora as três vêm resolvidas do cache no boot, sem piscar nem trocar de texto.
 - 2 arquivos de teste novos (round-trip do cache + render do Dashboard). **Verificado que os
-  testes de render falham sem a correção.** `typecheck`/`test` (340/340)/`build` limpos.
+  testes de render falham sem a correção.** `typecheck`/`test` (341/341)/`build` limpos.
 
 ## 2026-07-18 — "Disponível"/"Comprometido" ainda piscavam no celular (causa diferente do fix anterior)
 

@@ -12,6 +12,9 @@ const sampleView: CachedDashboardView = {
   totalBalanceCents: 150000,
   freeToSpendCents: 90000,
   committedCents: 60000,
+  availableCaption: 'Livre agora.',
+  committedCaption: 'Considerando os próximos 30 dias',
+  spendingVariationPct: 12,
   spending: [
     { categoryId: 'food', categoryName: 'Alimentação', amountCents: 42000, mark: { id: 'food', icon: 'utensils', color: defaultCategoryColors.expense_food } },
     { categoryId: 'uncategorized', categoryName: 'Sem categoria', amountCents: 8000, mark: null }
@@ -58,6 +61,14 @@ describe('dashboardViewCache', () => {
     window.localStorage.setItem(
       'zerou.dashboardView.v1.' + workspaceId,
       JSON.stringify({ ...sampleView, totalBalanceCents: 'x' })
+    );
+    expect(readCachedDashboardView(workspaceId)).toBeNull();
+  });
+
+  it('rejeita quando uma legenda (Comprometido/Disponível) não é string', () => {
+    window.localStorage.setItem(
+      'zerou.dashboardView.v1.' + workspaceId,
+      JSON.stringify({ ...sampleView, committedCaption: 42 })
     );
     expect(readCachedDashboardView(workspaceId)).toBeNull();
   });

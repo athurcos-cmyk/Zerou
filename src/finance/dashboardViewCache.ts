@@ -46,6 +46,12 @@ export interface CachedDashboardView {
   totalBalanceCents: number;
   freeToSpendCents: number;
   committedCents: number;
+  /** Legendas já resolvidas do Disponível/Comprometido ("Livre agora.", "≈ R$ X/dia até…",
+   * "Considerando…") e a variação % de gastos — pré-computadas na gravação pra não piscarem
+   * "Carregando…"/"Contas e fatura." nem trocarem de texto durante o boot. */
+  availableCaption: string;
+  committedCaption: string;
+  spendingVariationPct: number | null;
   spending: CachedSpendingRow[];
   commitments: CachedCommitment[];
   recentTransactions: CachedRecentTransaction[];
@@ -164,7 +170,10 @@ export function readCachedDashboardView(workspaceId?: string | null): CachedDash
     if (
       !isFiniteNumber(parsed.totalBalanceCents) ||
       !isFiniteNumber(parsed.freeToSpendCents) ||
-      !isFiniteNumber(parsed.committedCents)
+      !isFiniteNumber(parsed.committedCents) ||
+      typeof parsed.availableCaption !== 'string' ||
+      typeof parsed.committedCaption !== 'string' ||
+      (parsed.spendingVariationPct !== null && !isFiniteNumber(parsed.spendingVariationPct))
     ) {
       return null;
     }
@@ -180,6 +189,9 @@ export function readCachedDashboardView(workspaceId?: string | null): CachedDash
       totalBalanceCents: parsed.totalBalanceCents,
       freeToSpendCents: parsed.freeToSpendCents,
       committedCents: parsed.committedCents,
+      availableCaption: parsed.availableCaption,
+      committedCaption: parsed.committedCaption,
+      spendingVariationPct: parsed.spendingVariationPct as number | null,
       spending,
       commitments,
       recentTransactions

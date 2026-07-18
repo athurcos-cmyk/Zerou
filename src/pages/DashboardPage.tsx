@@ -221,6 +221,19 @@ export function DashboardPage() {
     : liveRecent;
   const maxSpendingCents = Math.max(...effectiveSpending.map((row) => row.amountCents), 1);
 
+  // Legendas do Disponível/Comprometido e a variação de gastos também entram no cache, pra
+  // não piscarem "Carregando…"/"Contas e fatura." nem trocar de texto durante o boot.
+  const liveAvailableCaption =
+    perDayDisplay ?? (dashboard.freeToSpendCents <= 0 ? 'Você já comprometeu tudo que tem disponível.' : 'Livre agora.');
+  const currentMonthSpendCents = [...spendingByCategory.values()].reduce((sum, amount) => sum + amount, 0);
+  const previousMonthSpendCents = finance.transactions
+    .filter((transaction) => isCountableSpend(transaction, previousMonth))
+    .reduce((sum, transaction) => sum + transaction.amountCents, 0);
+  const spendingVariationPct =
+    !isCommittedLoading && previousMonthSpendCents > 0
+      ? Math.round(((currentMonthSpendCents - previousMonthSpendCents) / previousMonthSpendCents) * 100)
+      : null;
+
   useEffect(() => {
     // Só grava depois que cartões e faturas resolveram (senão poderia persistir um
     // "Comprometido" inflado). Nesse ponto `isLoading` (finanças) também já é false, então
@@ -230,6 +243,9 @@ export function DashboardPage() {
       totalBalanceCents: dashboard.totalBalanceCents,
       freeToSpendCents: dashboard.freeToSpendCents,
       committedCents: dashboard.committedCents,
+      availableCaption: liveAvailableCaption,
+      committedCaption,
+      spendingVariationPct,
       spending: liveSpending,
       commitments: dashboard.upcomingCommitments.map((commitment) => ({
         id: commitment.id,
@@ -266,19 +282,24 @@ export function DashboardPage() {
     profile?.committedWindowDays,
     profile?.availableMode
   ]);
-  const currentMonthSpendCents = [...spendingByCategory.values()].reduce((sum, amount) => sum + amount, 0);
-  const previousMonthSpendCents = finance.transactions
-    .filter((transaction) => isCountableSpend(transaction, previousMonth))
-    .reduce((sum, transaction) => sum + transaction.amountCents, 0);
-  const spendingVariationPct =
-    !isCommittedLoading && previousMonthSpendCents > 0
-      ? Math.round(((currentMonthSpendCents - previousMonthSpendCents) / previousMonthSpendCents) * 100)
-      : null;
   const hasStarted = finance.accounts.length > 0 || finance.transactions.length > 0 || cardsData.cards.length > 0;
   // Só decide "conta nova" depois que finanças E cartões resolveram. No boot os arrays
   // começam vazios, então sem esse guard o guia "Comece em poucos minutos" piscava mesmo
   // numa conta já usada (achado pelo dono ao dar refresh).
   const showStartGuide = !hasStarted && !isCommittedLoading;
+
+  // Durante o boot: cache se tiver, senão o placeholder antigo. Depois de carregar: dado ao vivo.
+  const effectiveAvailableCaption = isCommittedLoading
+    ? cachedView
+      ? cachedView.availableCaption
+      : 'Carregando...'
+    : liveAvailableCaption;
+  const effectiveCommittedCaption = isCommittedLoading
+    ? cachedView
+      ? cachedView.committedCaption
+      : 'Contas e fatura.'
+    : committedCaption;
+  const effectiveVariationPct = isCommittedLoading && cachedView ? cachedView.spendingVariationPct : spendingVariationPct;
 
   return (
     <section className="page-content">
@@ -313,13 +334,7 @@ export function DashboardPage() {
               onClick={() => setTutorialOpen(true)}
               aria-label="Entender como o Disponível e o Comprometido são calculados"
             >
-              {perDayDisplay
-                ? perDayDisplay
-                : isCommittedLoading
-                ? 'Carregando...'
-                : dashboard.freeToSpendCents <= 0
-                ? 'Você já comprometeu tudo que tem disponível.'
-                : 'Livre agora.'}
+              {effectiveAvailableCaption}
             </button>
           </article>
           <article className="surface surface-pad dash-metric dash-metric--committed">
@@ -331,7 +346,7 @@ export function DashboardPage() {
               onClick={() => setTutorialOpen(true)}
               aria-label="Entender como o Disponível e o Comprometido são calculados"
             >
-              {isCommittedLoading ? 'Contas e fatura.' : committedCaption}
+              {effectiveCommittedCaption}
             </button>
           </article>
         </div>
@@ -408,17 +423,17 @@ export function DashboardPage() {
           <div>
             <p className="eyebrow">Resumo de gastos</p>
             <h2>Para onde foi o dinheiro este mês</h2>
-            {spendingVariationPct !== null && (
+            {effectiveVariationPct !== null && (
               <p className="text-secondary spending-variation">
-                {spendingVariationPct > 0 ? (
+                {effectiveVariationPct > 0 ? (
                   <TrendingUp size={14} aria-hidden="true" />
-                ) : spendingVariationPct < 0 ? (
+                ) : effectiveVariationPct < 0 ? (
                   <TrendingDown size={14} aria-hidden="true" />
                 ) : (
                   <Minus size={14} aria-hidden="true" />
                 )}
-                {spendingVariationPct > 0 ? '+' : ''}
-                {spendingVariationPct}% vs. mês passado
+                {effectiveVariationPct > 0 ? '+' : ''}
+                {effectiveVariationPct}% vs. mês passado
               </p>
             )}
           </div>
