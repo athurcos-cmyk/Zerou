@@ -21,6 +21,7 @@ export type MessageIntent =
   | 'unsupported_action'
   | 'create_category'
   | 'question'
+  | 'advisory_decision'
   | 'unclear';
 
 export interface MessageInterpretation {
@@ -45,7 +46,7 @@ function buildSystemPrompt(): string {
   return `Voce interpreta mensagens em portugues brasileiro enviadas ao bot financeiro Granativa via WhatsApp.
 Retorne SOMENTE um JSON com este formato:
 {
-  "intent": "expense" | "income" | "transfer" | "card_purchase" | "advanced_card_action" | "unsupported_action" | "create_category" | "question" | "unclear",
+  "intent": "expense" | "income" | "transfer" | "card_purchase" | "advanced_card_action" | "unsupported_action" | "create_category" | "question" | "advisory_decision" | "unclear",
   "amountCents": inteiro em centavos (0 se nao aplicavel),
   "description": descricao curta (max 80 chars, "" se nao aplicavel),
   "installments": numero de parcelas (1 se nao mencionado ou compra a vista, so relevante pra card_purchase),
@@ -81,7 +82,17 @@ Como classificar intent:
 - create_category: PEDIDO EXPLICITO para criar categoria (verbos "cria"/"criar"/"adiciona" + a palavra "categoria").
   NUNCA use create_category so porque a categoria ideal nao existe — nesse caso e expense/income/card_purchase
   com categoryId null.
-- question: pergunta sobre a situacao financeira (saldo, gastos, metas, contas a pagar).
+- question: pergunta sobre a situacao financeira (saldo, gastos, metas, contas a pagar) — CONSULTA de dado
+  que ja existe, tipo "quanto gastei", "quanto tenho disponivel", "minhas contas venceram?".
+- advisory_decision: pergunta pedindo OPINIAO sobre uma decisao financeira GRANDE ou de risco, OU qualquer
+  pergunta sobre INVESTIMENTO — pegar emprestimo, financiamento, renegociar divida, tirar um cartao novo ou
+  se vale a pena pagar/manter uma anuidade, ou investimento de qualquer tipo (onde investir, vale a pena
+  investir em acoes/tesouro direto/fundos/criptomoeda/previdencia, etc.) — ou qualquer escolha que
+  compromete o orcamento por varios meses ou e dificil de desfazer. Ex.: "devo pegar um emprestimo pra
+  quitar a fatura?", "vale a pena investir em X?", "e melhor renegociar essa divida ou parcelar de novo?",
+  "vale a pena tirar esse cartao, tem anuidade de 500?". NAO classifique como advisory_decision perguntas
+  rotineiras (question) nem decisoes pequenas do dia a dia (tipo "posso comprar isso?", "vale a pena esse
+  gasto?") — so decisoes realmente grandes/dificeis de desfazer e QUALQUER pergunta de investimento contam.
 - unclear: nenhum valor/pedido claro.
 
 Regras de valor: "10 reais"=1000, "R$ 5,50"=550, "cinco e cinquenta"=550, "dois conto"=200.
@@ -163,7 +174,7 @@ export async function interpretMessage(
     };
 
     const validIntents: MessageIntent[] = [
-      'expense', 'income', 'transfer', 'card_purchase', 'advanced_card_action', 'unsupported_action', 'create_category', 'question', 'unclear',
+      'expense', 'income', 'transfer', 'card_purchase', 'advanced_card_action', 'unsupported_action', 'create_category', 'question', 'advisory_decision', 'unclear',
     ];
     const intent: MessageIntent = validIntents.includes(parsed.intent as MessageIntent)
       ? (parsed.intent as MessageIntent)

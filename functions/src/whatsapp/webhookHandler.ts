@@ -313,6 +313,18 @@ export const whatsappWebhook = onRequest(
         return;
       }
 
+      // ── Decisao financeira grande (emprestimo, investir reserva, renegociar divida) —
+      // redireciona pro app: a Grazi por la tem historico de conversa e consegue ir e voltar
+      // com a pessoa pra ajudar a pensar, o que o WhatsApp (mensagem isolada, sem memoria)
+      // nao faz direito. O WhatsApp fica focado em lancamento e pergunta rapida do dia a dia.
+      if (interpretation.intent === 'advisory_decision') {
+        await sendWhatsAppMessage(
+          phone,
+          'Essa é uma decisão grande — vale mais a pena pensar nela com calma comigo lá no app, na aba Assistente. Lá a gente consegue ir e voltar na conversa direito. Por aqui eu foco em lançamentos e perguntas rápidas do dia a dia. 💛',
+        );
+        return;
+      }
+
       // ── Criar categoria (pedido explicito, nunca cria transacao junto) ──
       if (interpretation.intent === 'create_category') {
         if (!interpretation.newCategoryName) {

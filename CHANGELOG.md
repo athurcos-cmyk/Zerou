@@ -2,6 +2,38 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-18 — Grazi ajuda a pensar em decisão financeira grande (app); WhatsApp redireciona
+
+Preocupação do dono, motivada por feedback real de uma amiga que testou o app: pessoas vão
+usar a Grazi pra tomar decisão de verdade, então o aconselhamento importa. Detalhes e
+racional completo em `docs/whatsapp/WHATSAPP.md` e `docs/ai/GRAZI.md`.
+
+- Grazi do app, ao ser perguntada sobre decisão financeira grande (empréstimo,
+  financiamento, investir reserva, renegociar dívida), agora faz 1-2 perguntas objetivas
+  com os dados reais da pessoa pra ajudar a pensar — em vez de só dar veredito pronto ou
+  mandar procurar um profissional.
+- Decisão explícita do dono: **não levar isso pro WhatsApp** — esse tipo de conversa
+  precisa de histórico (ida e volta), que o WhatsApp nunca teve. Novo intent
+  `advisory_decision` reconhece a pergunta e redireciona pro app, sem gastar chamada de IA.
+- Achado no processo: já existe disclaimer forte sobre isso nos Termos de Uso (seção 9),
+  mas nunca aparecia na conversa — a regra nova é o reforço comportamental que faltava.
+- **Refinamento (mesmo dia)**: regra de "não sugerir produto específico" ficou absoluta —
+  nunca nomeia banco/cartão/investimento, **mesmo se a pessoa pedir direto** (app não é
+  patrocinado por nenhuma marca). Decisão de cartão novo/anuidade entrou no mesmo
+  tratamento de "ajuda a pensar" do empréstimo. **Investimento ganhou regra própria e mais
+  rígida**: nenhuma análise de produto/estratégia, nem as perguntas de reflexão — só
+  redirecionamento caloroso pra profissional licenciado, já que é atividade regulamentada.
+  WhatsApp espelha a regra de produto e passou a redirecionar pro app também em pergunta
+  de cartão novo/anuidade e qualquer pergunta de investimento (antes só pegava "investir
+  reserva").
+- `functions build`/`test` (67/67) limpos em ambas as rodadas. **Deployado e verificado ao
+  vivo três vezes no app real**: empréstimo (perguntou de volta, usou dados reais, só
+  mencionou profissional no fim), cartão com anuidade (mesmo padrão, sem nomear banco),
+  investimento (recusou analisar, redirecionou pra profissional, mas seguiu ajudando a
+  pensar no tamanho da reserva). Pergunta rotineira continuou respondida direto nas três
+  rodadas — regra não dispara fora do escopo. **Ponta do WhatsApp ainda não testada com
+  mensagem real** — depende do dono mandar uma mensagem de teste pro número vinculado.
+
 ## 2026-07-18 — "Disponível"/"Comprometido" podiam piscar um valor errado por um instante
 
 Preocupação do dono: o app não pode dar a sensação de estar sempre carregando. Achado
