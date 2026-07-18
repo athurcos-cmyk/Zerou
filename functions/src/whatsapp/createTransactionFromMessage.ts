@@ -21,11 +21,13 @@ function monthKeyFromDate(d: Date): string {
 export interface CreateFromMessageInput {
   workspaceId: string;
   userId: string;
-  type: 'income' | 'expense';
+  type: 'income' | 'expense' | 'transfer';
   amountCents: number;
   description: string;
   categoryId?: string | null;
   accountId: string;
+  /** Obrigatório e diferente de `accountId` quando `type === 'transfer'`. */
+  destinationAccountId?: string | null;
   date: Date;
   source: 'whatsapp';
 }
@@ -61,7 +63,12 @@ export async function createTransactionFromMessage(
     updatedAt: now,
   };
 
-  if (input.categoryId) {
+  if (input.type === 'transfer' && input.destinationAccountId) {
+    payload.destinationAccountId = input.destinationAccountId;
+  }
+
+  // Transferência não tem categoria — nunca grava categoryId nesse caso.
+  if (input.categoryId && input.type !== 'transfer') {
     payload.categoryId = input.categoryId;
   }
 

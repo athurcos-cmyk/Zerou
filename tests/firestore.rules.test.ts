@@ -1011,6 +1011,17 @@ describe('firestore security rules', () => {
     );
   });
 
+  it('allows marking an account as primary on create and toggling it via update', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    const accountReference = doc(aliceDb, 'workspaces/workspaceA/accounts/accountPrimary');
+
+    await assertSucceeds(
+      setDoc(accountReference, accountPayload('workspaceA', 'accountPrimary', 'alice', { isPrimary: true }))
+    );
+    await assertSucceeds(updateDoc(accountReference, { isPrimary: false, updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(accountReference, { isPrimary: 'sim', updatedAt: serverTimestamp() }));
+  });
+
   it('allows a member to create a transaction only for an account in the same workspace', async () => {
     const aliceDb = testEnv.authenticatedContext('alice').firestore();
 

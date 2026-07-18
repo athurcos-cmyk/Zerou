@@ -4,11 +4,18 @@
 
 ## Visao geral
 
-Integracao oficial com a Meta Cloud API v25.0 para controle financeiro completo por mensagem de WhatsApp — paridade com a Grazi do app, e mais. O usuario vincula seu numero e pode: lancar despesa ("gastei 15 reais no mercado"), lancar receita ("recebi 200 de freela"), lancar compra no cartao a vista ou parcelada ("gastei 300 no cartao em 3x"), criar categoria sob pedido explicito ("cria uma categoria chamada Pet") e fazer perguntas financeiras ("quanto gastei esse mes?", igual a Grazi do app). Uma unica chamada DeepSeek classifica a intencao da mensagem e ja extrai os dados (`interpretMessage.ts`).
+Integracao oficial com a Meta Cloud API v25.0 para controle financeiro completo por mensagem de WhatsApp — paridade com a Grazi do app, e mais. O usuario vincula seu numero e pode: lancar despesa ("gastei 15 reais no mercado"), lancar receita ("recebi 200 de freela"), transferir entre contas ("transfere 100 do nubank pro itau"), lancar compra no cartao a vista ou parcelada ("gastei 300 no cartao em 3x"), criar categoria sob pedido explicito ("cria uma categoria chamada Pet") e fazer perguntas financeiras ("quanto gastei esse mes?", igual a Grazi do app). Uma unica chamada DeepSeek classifica a intencao da mensagem e ja extrai os dados (`interpretMessage.ts`).
 
 **Editar/excluir algo ja lancado nao e suportado** (intent `unsupported_action`, 2026-07-16): pedidos como "exclui essa transacao", "apaga o gasto de mercado", "corrige o valor" sao reconhecidos e respondidos com orientacao pra fazer pelo app — em vez de cair no "nao entendi" generico ou, pior, ser silenciosamente ignorado.
 
 **Cartao**: cobre so compra nova (a vista ou parcelada). Se o usuario tem mais de um cartao ativo, o bot pergunta qual usar (lista numerada) e espera a resposta por ate 3 minutos antes de descartar. Pedidos mais avancados — parcela que ja estava em andamento antes de usar o WhatsApp, antecipar parcela/fatura, renegociar — sao redirecionados pro app, nao executados pelo bot.
+
+**Conta (despesa/receita/transferencia)** (2026-07-18): quando o workspace tem mais de uma conta ativa, o bot precisa saber qual debitar/creditar. Resolucao em 3 niveis, igual pro debito/credito de uma despesa/receita e pra cada lado (origem/destino) de uma transferencia:
+1. **Nome citado na mensagem** ("gastei 30 no mercado itau", "transfere 50 do nubank pra poupanca") — `interpretMessage.ts` recebe a lista de contas do workspace e casa por nome/apelido (acentos e caixa sao normalizados).
+2. **Conta principal** — se nenhuma conta foi citada, cai pra conta marcada como principal em Configuracoes > Contas (`Account.isPrimary`, no maximo uma por workspace, ver `src/pages/AccountsPage.tsx`).
+3. **Pergunta** — se ainda restar ambiguidade (sem conta principal marcada e 2+ contas ativas), o bot pergunta, mesmo padrao do cartao (lista numerada, TTL 3min). Transferencia com os dois lados ambiguos pede os dois numeros numa tacada so ("responda tipo '1 2'"); com um lado so ambiguo, pergunta so esse lado. Logica pura em `functions/src/whatsapp/accountResolution.ts` (testada, `accountResolution.test.ts`).
+
+Transferencia exige pelo menos 2 contas ativas cadastradas; com 0 ou 1 conta, o bot explica que precisa cadastrar outra primeiro em vez de tentar.
 
 **Importante**: a Grazi do app (`financialAssistantChat`) e so leitura/conversa — nunca cria dados. O bot do WhatsApp faz mais que ela: alem de responder perguntas (reusando o mesmo contexto e persona), tambem cria categorias e lanca transacoes.
 
@@ -39,15 +46,16 @@ Integracao oficial com a Meta Cloud API v25.0 para controle financeiro completo 
 | Arquivo | Funcao |
 |---|---|
 | `functions/src/whatsapp/metaClient.ts` | Cliente HTTP para Meta Cloud API v25.0. Envia mensagens (`sendWhatsAppMessage`), define secrets (`WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN`, `GRANATIVA_WHATSAPP_NUMBER`). |
-| `functions/src/whatsapp/webhookHandler.ts` | Cloud Function `onRequest`. GET: verificacao de webhook. POST: le a mensagem, resolve `vincular XXXXXX` via regex (`processLinkCode`) ou chama `interpretMessage` e roteia por intencao: `create_category` → `createCategoryFromMessage`; `question` → `answerFinancialQuestion`; `expense`/`income` → `createTransactionFromMessage`; `advanced_card_action`/`unsupported_action` → mensagem redirecionando pro app; `unclear` → mensagem de ajuda com exemplos. |
-| `functions/src/whatsapp/interpretMessage.ts` | Uma chamada DeepSeek (JSON mode) classifica a mensagem em `expense`/`income`/`card_purchase`/`advanced_card_action`/`unsupported_action`/`create_category`/`question`/`unclear` e ja extrai valor, descricao, categoria (a mais especifica entre as existentes) e dados de categoria nova, tudo numa chamada so. Substitui o antigo `extractExpense.ts` (so cobria despesa). |
+| `functions/src/whatsapp/webhookHandler.ts` | Cloud Function `onRequest`. GET: verificacao de webhook. POST: le a mensagem, resolve `vincular XXXXXX` via regex (`processLinkCode`) ou chama `interpretMessage` (com a lista de contas ativas) e roteia por intencao: `create_category` → `createCategoryFromMessage`; `question` → `answerFinancialQuestion`; `expense`/`income`/`transfer` → resolve a conta via `accountResolution.ts` (nome citado → principal → pergunta) e chama `createTransactionFromMessage`; `advanced_card_action`/`unsupported_action` → mensagem redirecionando pro app; `unclear` → mensagem de ajuda com exemplos. |
+| `functions/src/whatsapp/interpretMessage.ts` | Uma chamada DeepSeek (JSON mode) classifica a mensagem em `expense`/`income`/`transfer`/`card_purchase`/`advanced_card_action`/`unsupported_action`/`create_category`/`question`/`unclear` e ja extrai valor, descricao, categoria (a mais especifica entre as existentes), dados de categoria nova e conta(s) citada(s) (`accountId`, ou `sourceAccountId`/`destinationAccountId` pra transfer), tudo numa chamada so. Recebe a lista de contas ativas do workspace (id: nome) junto com a de categorias. Substitui o antigo `extractExpense.ts` (so cobria despesa). |
+| `functions/src/whatsapp/accountResolution.ts` (2026-07-18) | Logica pura de resolucao de conta: `resolveDebitCreditAccount` (despesa/receita) e `resolveTransferSide` (cada lado de uma transferencia, excluindo a conta ja resolvida do outro lado) — prioridade nome citado → conta principal (`Account.isPrimary`) → conta unica → null (ambiguo, bot pergunta). `accountCandidates` monta a lista numerada. Testado (`accountResolution.test.ts`). |
 | `functions/src/whatsapp/createCategoryFromMessage.ts` | Cria categoria via Admin SDK. Dois gatilhos: (1) pedido avulso explicito ("cria uma categoria X", intent `create_category`, sem transacao); (2) categoria nomeada explicitamente DENTRO de um lancamento que ainda nao existe ("gastei 50 no mercado, coloca na categoria trabalho" — cria "Trabalho" e ja usa nesse mesmo lancamento). Dedupe por nome (case-insensitive), icone validado contra `categoryPalette.ts` (fallback `sliders`), cor escolhida por rotacao na paleta Sol — nunca inventada pela IA. Payload identico a `financeService.createCategory()`. |
 | `functions/src/whatsapp/categoryPalette.ts` | Espelha `src/components/categoryIcons.tsx` e `src/theme/palette.ts` (Cloud Functions nao importa `src/` do app cliente — pacotes separados). Mantenha em sincronia manualmente. |
 | `functions/src/whatsapp/answerFinancialQuestion.ts` | Perguntas financeiras via WhatsApp — reusa `buildFinancialContext` + a mesma persona/regras da Grazi (`financialAssistant.ts`), com o negrito adaptado pro WhatsApp (`*um asterisco*`, nao `**dois**`). Rate limit compartilhado com a Grazi do app (`aiRateLimit.ts`, mesmo contador `workspaces/{id}/aiUsage/{data}`, 60/dia). |
-| `functions/src/whatsapp/createTransactionFromMessage.ts` | Cria transacao no Firestore via Admin SDK (bypassa regras) — despesa ou receita (`type` recebido, nao mais fixo em `'expense'`). Mantenha em sincronia com `src/finance/financeService.ts:createTransaction()`. |
+| `functions/src/whatsapp/createTransactionFromMessage.ts` | Cria transacao no Firestore via Admin SDK (bypassa regras) — despesa, receita ou transferencia (`type` recebido, nao mais fixo em `'expense'`; `destinationAccountId` obrigatorio quando `type === 'transfer'`, categoria nunca gravada nesse caso). Mantenha em sincronia com `src/finance/financeService.ts:createTransaction()`. |
 | `functions/src/whatsapp/createCardPurchaseFromMessage.ts` | Cria compra no cartao (a vista ou parcelada) via Admin SDK — porta `cardService.createCardPurchase()`: divide o total em parcelas, grava um `ledger` entry por parcela nas faturas certas (criando as que faltarem) e um doc de transacao `type:'card_purchase'`. Mantenha em sincronia com `src/cards/cardService.ts:createCardPurchase()`. |
 | `functions/src/cards/cardDates.ts` | Porta de `src/cards/cardDates.ts` (`resolveInstallmentCycle`, `invoiceIdFor`) — Cloud Functions nao importa `src/` do app, mantenha em sincronia manualmente. |
-| `functions/src/whatsapp/pendingCardAction.ts` | Pergunta pendente "qual cartao usar?" quando ha mais de um cartao ativo — doc unico por telefone em `whatsappPendingActions/{phone}`, TTL 3 min. `resolveCardSelection` aceita numero da lista ou nome do cartao (substring). Se a proxima mensagem nao resolver, a pendencia e descartada e a mensagem e tratada normalmente (bot nunca trava esperando resposta). |
+| `functions/src/whatsapp/pendingAction.ts` (generalizado 2026-07-18, era `pendingCardAction.ts`) | Pergunta pendente do bot — doc unico por telefone em `whatsappPendingActions/{phone}`, TTL 3 min, discriminado por `kind`: `card_purchase` (qual cartao), `debit_credit` (qual conta, despesa/receita) ou `transfer` (origem e/ou destino de uma transferencia, campo `missing` indica qual lado falta). `resolveSingleSelection` aceita numero da lista ou nome/apelido (acento-insensivel); `resolveDualSelection` aceita dois numeros ("1 2", "1-2", "1,2") pra quando os dois lados de uma transferencia estao em aberto. Se a proxima mensagem nao resolver, a pendencia e descartada e a mensagem e tratada normalmente (bot nunca trava esperando resposta). Testado (`pendingAction.test.ts`). |
 | `functions/src/whatsapp/linkAccount.ts` | `generateWhatsappLinkCode` (onCall): bloqueia se o workspace ja tiver um numero vinculado (`already-exists`), limpa codigos antigos nao usados do mesmo usuario, gera codigo 6 digitos em `users/{uid}/whatsappLinkCodes/{code}`, retorna link `wa.me`. `processLinkCode`: chamado pelo webhook quando usuario manda "vincular XXXXXX", grava vinculo em `whatsappPhoneIndex/{phone}` e `workspaces/{id}/whatsappLinks/{phone}`. |
 | `functions/src/whatsapp/unlinkWhatsapp.ts` | `unlinkWhatsapp` (onCall): apaga `whatsappPhoneIndex/{phone}` + `workspaces/{id}/whatsappLinks/{phone}`, varre codigos residuais, avisa o numero desvinculado via WhatsApp (best-effort). Fecha o vinculo ja prometido em `src/pages/LegalPages.tsx` (Termos §7.4, Data Deletion). Reusado por `accountDeletionService.ts` (auto-exclusao de conta, 2026-07-17). |
 | `functions-admin/src/index.ts` (`adminUnlinkWhatsappNumber`) | Desvincula qualquer numero pelo painel Admin, inclusive orfao (workspace/usuario ja excluido) — Admin SDK, apaga direto, nao depende do workspace existir. Codebase separado (`admin`), deploy: `npx firebase deploy --only functions:admin:adminUnlinkWhatsappNumber`. |
@@ -77,7 +85,7 @@ Integracao oficial com a Meta Cloud API v25.0 para controle financeiro completo 
 11. processLinkCode: deleta codigo usado, envia confirmacao via sendWhatsAppMessage()
 ```
 
-### Mensagem financeira (despesa, receita, categoria, pergunta)
+### Mensagem financeira (despesa, receita, transferencia, categoria, pergunta)
 
 ```
 1. Usuario: envia qualquer mensagem financeira pelo WhatsApp (nao "vincular XXXXXX")
@@ -87,14 +95,18 @@ Integracao oficial com a Meta Cloud API v25.0 para controle financeiro completo 
 5. webhookHandler: parseia body → object=whatsapp_business_account → entry[0].changes[0].value.messages[0]
 6. webhookHandler: extrai phone (msg.from) e text (msg.text.body)
 7. webhookHandler: consulta whatsappPhoneIndex/{phone} → workspaceId + linkedByUid
-8. webhookHandler: carrega TODAS as categorias ativas (sem filtro de tipo)
-9. webhookHandler: interpretMessage(texto, categorias) → DeepSeek, uma chamada, retorna intent + dados
-10. Roteamento por intent:
+8. webhookHandler: ha pendencia (getPendingAction)? resolve a resposta contra os candidatos
+   guardados (card_purchase/debit_credit/transfer) e ja cria o lancamento, sem gastar
+   chamada DeepSeek nova — se nao resolver, descarta a pendencia e segue pro passo 9
+9. webhookHandler: carrega categorias ativas (sem filtro de tipo) e contas ativas (id+nome+isPrimary)
+10. webhookHandler: interpretMessage(texto, categorias, contas) → DeepSeek, uma chamada, retorna intent + dados
+11. Roteamento por intent:
     - create_category: createCategoryFromMessage() → confirma criacao (ou dedupe)
     - question: checkAiUsageNotExceeded() → answerFinancialQuestion() → incrementAiUsage()
-    - expense/income: carrega conta padrao → createTransactionFromMessage({ type, ... })
+    - expense/income: resolveDebitCreditAccount (nome citado → principal → unica → pergunta) → createTransactionFromMessage({ type, ... })
+    - transfer: resolveTransferSide pros dois lados (excluindo o lado ja resolvido) → createTransactionFromMessage({ type: 'transfer', destinationAccountId, ... }) ou pergunta o(s) lado(s) que faltar
     - unclear: mensagem de ajuda explicando o que o bot faz
-11. webhookHandler: sendWhatsAppMessage(phone, confirmacao/resposta formatada)
+12. webhookHandler: sendWhatsAppMessage(phone, confirmacao/resposta formatada)
 ```
 
 ### Envio de mensagem (outbound)
@@ -166,7 +178,8 @@ A subcolecao `workspaces/{id}/whatsappLinks/{phone}` e escrita via Admin SDK (se
 | `users/{uid}/whatsappLinkCodes/{code}` | Codigo de vinculo temporario (TTL 10min) | `generateWhatsappLinkCode` (onCall) |
 | `whatsappPhoneIndex/{phone}` | Indice phone → workspaceId + uid | `processLinkCode` (webhook), apagado por `deleteAccountData`/`adminDeleteUser`/`adminUnlinkWhatsappNumber` |
 | `workspaces/{id}/whatsappLinks/{phone}` | Registro de vinculo no workspace | `processLinkCode` (webhook), apagado por `deleteAccountData`/`adminDeleteUser`/`adminUnlinkWhatsappNumber` |
-| `whatsappPendingActions/{phone}` | Pergunta pendente "qual cartao usar?" (TTL 3min). Nunca lida/escrita pelo cliente. | `setPendingCardPurchase`/`getPendingCardPurchase`/`clearPendingCardPurchase` (webhook) |
+| `whatsappPendingActions/{phone}` | Pergunta pendente do bot — cartao, conta de debito/credito ou lado(s) de uma transferencia (`kind`, TTL 3min). Nunca lida/escrita pelo cliente. | `setPendingAction`/`getPendingAction`/`clearPendingAction` (webhook, `pendingAction.ts`) |
+| `workspaces/{id}/accounts/{accountId}.isPrimary` | Conta principal (no maximo uma por workspace) — fallback de conta quando a mensagem nao identifica qual usar. Campo no doc de conta existente, nao uma colecao propria. | `setPrimaryAccount`/`unsetPrimaryAccount` (`src/finance/financeService.ts`), UI em `src/pages/AccountsPage.tsx` |
 
 ## Parametros ajustaveis (codigo)
 
@@ -193,7 +206,12 @@ A subcolecao `workspaces/{id}/whatsappLinks/{phone}` e escrita via Admin SDK (se
 
 ## Deploy
 
+**Conta principal + transferencia deployadas em produção em 2026-07-18** (`firestore.rules` e `whatsappWebhook`, autorizado pelo dono) — verificado ao vivo: marcar conta principal em Configuracoes > Contas persiste de verdade (sobrevive a reload) sem `permission-denied`.
+
 ```bash
+# Regra do Firestore (so regras — nao toca billing/functions/hosting)
+npx firebase deploy --only firestore:rules --project zerou-26757
+
 # Deploy das funcoes WhatsApp (inclui unlinkWhatsapp e financialAssistantChat quando o
 # rate limit compartilhado ou o aiRateLimit.ts mudar)
 npx firebase deploy --only functions:billing:whatsappWebhook,functions:billing:generateWhatsappLinkCode,functions:billing:unlinkWhatsapp,functions:billing:financialAssistantChat --project zerou-26757
@@ -289,6 +307,17 @@ Atualmente DESATIVADA (comentada em `webhookHandler.ts`). Para reativar:
 Verificar logs do webhook. Erros 429/503 tem retry automatico. Outros erros resultam em mensagem "Nao consegui entender o valor" para o usuario.
 
 ## Historico
+
+### 2026-07-18 — Conta principal + resolucao de conta e transferencia via WhatsApp
+
+- **Relato do dono**: com mais de uma conta cadastrada, a Grazi no WhatsApp lancava despesa/receita numa conta arbitraria (`.limit(1)` sem ordenacao — nao era nem "a primeira criada" de forma confiavel) e nao tinha suporte nenhum a transferencia entre contas.
+- **Conta principal** (`Account.isPrimary`, `src/types/contracts.ts`): campo opcional, no maximo uma por workspace (exclusividade garantida no client, `setPrimaryAccount` desmarca a anterior no mesmo batch — a regra do Firestore so valida tipo bool, nao exclusividade). UI em `src/pages/AccountsPage.tsx` (botao estrela em cada conta, so aparece com 2+ contas). `firestore.rules`: `validAccountCreate`/`validAccountUpdate` aceitam `isPrimary`, testado em `tests/firestore.rules.test.ts` (`npm run test:rules`, 54/54 passando).
+- **Casamento de conta por nome**: `interpretMessage.ts` agora recebe a lista de contas ativas (igual ja fazia com categorias) e o prompt DeepSeek extrai `accountId` (despesa/receita) ou `sourceAccountId`/`destinationAccountId` (transferencia) quando a mensagem cita o banco/conta ("gastei 30 no mercado itau"). Nunca adivinha — sem mencao clara, fica null.
+- **Resolucao em 3 niveis** (`functions/src/whatsapp/accountResolution.ts`, testado): nome citado → conta principal → conta unica → bot pergunta (reusa o padrao ja existente do cartao: lista numerada, TTL 3min). Extraido do `webhookHandler.ts` pra ficar testavel isoladamente.
+- **Intent `transfer`** (novo): "transfere 100 do nubank pro itau" cria `type: 'transfer'` com `destinationAccountId` (campo/valor ja existiam em `firestore.rules`/`financeSchemas.ts` do lado do app — nao precisou de mudanca de regra alem do `isPrimary`). Cada lado resolvido independentemente, excluindo a conta ja resolvida do outro lado pra nunca sugerir a mesma conta nos dois lados. Se so um lado ficar ambiguo, pergunta so esse; se os dois, pergunta os dois numa mensagem so (`resolveDualSelection`, aceita "1 2"/"1-2"/"1,2"). Exige 2+ contas ativas.
+- **`pendingCardAction.ts` generalizado em `pendingAction.ts`**: mesmo doc unico `whatsappPendingActions/{phone}`, agora discriminado por `kind` (`card_purchase`/`debit_credit`/`transfer`) em vez de ficar restrito a cartao. `resolveCardSelection` virou `resolveSingleSelection` (mesma logica, generica) — achado no processo: nao normalizava acento ("itau" nao batia com "Itaú"), corrigido com `normalize('NFD')` + strip de diacriticos, agora com teste cobrindo o caso.
+- **Testes novos**: `accountResolution.test.ts` (10), `pendingAction.test.ts` (9) — suite de functions foi de 48 pra 67 testes.
+- **Deployado no mesmo dia** — `firestore:rules` e `whatsappWebhook` (+ `gcloud run services update --no-cpu-throttling`, obrigatorio pos-deploy) publicados com autorizacao do dono. Verificado ao vivo no dev server (aponta pro Firebase real): a tentativa inicial reproduziu `permission-denied` (regra ainda nao publicada), e apos o deploy o mesmo fluxo persistiu corretamente (sobreviveu a reload).
 
 ### 2026-07-17 — Numero preso num vinculo orfao apos exclusao de conta pre-correcao
 

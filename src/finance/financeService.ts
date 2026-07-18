@@ -161,6 +161,25 @@ export async function deleteAccount(workspaceId: string, accountId: string) {
   fireWrite(deleteDoc(documentRef(workspaceId, 'accounts', accountId)));
 }
 
+/** Marca `accountId` como conta principal (usada pela Grazi/WhatsApp quando a mensagem não
+ * identifica a conta). No máximo uma por workspace — desmarca `currentPrimaryId` no mesmo
+ * batch, se houver. */
+export async function setPrimaryAccount(workspaceId: string, accountId: string, currentPrimaryId?: string | null) {
+  const batch = writeBatch(getFirebaseDb());
+  const now = serverTimestamp();
+
+  if (currentPrimaryId && currentPrimaryId !== accountId) {
+    batch.update(documentRef(workspaceId, 'accounts', currentPrimaryId), { isPrimary: false, updatedAt: now });
+  }
+  batch.update(documentRef(workspaceId, 'accounts', accountId), { isPrimary: true, updatedAt: now });
+
+  fireWrite(batch.commit());
+}
+
+export async function unsetPrimaryAccount(workspaceId: string, accountId: string) {
+  fireWrite(updateDoc(documentRef(workspaceId, 'accounts', accountId), { isPrimary: false, updatedAt: serverTimestamp() }));
+}
+
 export async function createTransaction(workspaceId: string, userId: string, input: CreateTransactionInput) {
   const parsed = createTransactionSchema.parse(input);
   const id = createId('txn');

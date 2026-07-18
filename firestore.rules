@@ -348,6 +348,7 @@ service cloud.firestore {
           'type',
           'openingBalanceCents',
           'currentBalanceCents',
+          'isPrimary',
           'isActive',
           'createdBy',
           'createdAt',
@@ -359,6 +360,7 @@ service cloud.firestore {
         && request.resource.data.type in ['checking', 'savings', 'wallet', 'investment', 'digital_wallet', 'cash', 'shared']
         && validSignedMoneyCents(request.resource.data.openingBalanceCents)
         && request.resource.data.currentBalanceCents == request.resource.data.openingBalanceCents
+        && (!request.resource.data.keys().hasAny(['isPrimary']) || request.resource.data.isPrimary is bool)
         && request.resource.data.isActive is bool
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.createdAt == request.time
@@ -372,10 +374,11 @@ service cloud.firestore {
         && request.resource.data.createdBy == resource.data.createdBy
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.openingBalanceCents == resource.data.openingBalanceCents
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'type', 'isActive', 'updatedAt', 'currentBalanceCents'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'type', 'isActive', 'isPrimary', 'updatedAt', 'currentBalanceCents'])
         && validShortText(request.resource.data.name, 2, 80)
         && request.resource.data.type in ['checking', 'savings', 'wallet', 'investment', 'digital_wallet', 'cash', 'shared']
         && validSignedMoneyCents(request.resource.data.currentBalanceCents)
+        && (!request.resource.data.keys().hasAny(['isPrimary']) || request.resource.data.isPrimary is bool)
         && request.resource.data.isActive is bool
         && request.resource.data.updatedAt == request.time;
     }

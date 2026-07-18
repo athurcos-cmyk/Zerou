@@ -1,5 +1,5 @@
 ﻿import { useState, type FormEvent } from 'react';
-import { Building2, ChevronDown, Trash2 } from 'lucide-react';
+import { Building2, ChevronDown, Star, Trash2 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useFinanceContext } from '../finance/FinanceDataContext';
 import { SelectField } from '../components/SelectField';
@@ -8,7 +8,7 @@ import { useConfirm } from '../components/ConfirmDialog';
 import { EmptyState } from '../components/EmptyState';
 import { findBankInstitution, searchBankInstitutions, type BankInstitution } from '../finance/bankInstitutions';
 import { accountTypeLabels } from '../finance/financeLabels';
-import { accountHasLiveTransactions, createAccount, deleteAccount } from '../finance/financeService';
+import { accountHasLiveTransactions, createAccount, deleteAccount, setPrimaryAccount, unsetPrimaryAccount } from '../finance/financeService';
 import { accountTypes } from '../finance/financeSchemas';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
@@ -35,6 +35,24 @@ export function AccountsPage() {
   function selectInstitution(institution: BankInstitution) {
     setName(institution.name);
     setType(institution.suggestedType);
+  }
+
+  function handleTogglePrimary(accountId: string, isPrimary: boolean) {
+    if (!workspaceId) {
+      return;
+    }
+
+    if (isPrimary) {
+      unsetPrimaryAccount(workspaceId, accountId).catch((error) =>
+        setMessage(getUserFacingErrorMessage(error, 'Não foi possível atualizar a conta principal agora.'))
+      );
+      return;
+    }
+
+    const currentPrimaryId = finance.accountBalances.find((account) => account.isPrimary)?.id ?? null;
+    setPrimaryAccount(workspaceId, accountId, currentPrimaryId).catch((error) =>
+      setMessage(getUserFacingErrorMessage(error, 'Não foi possível atualizar a conta principal agora.'))
+    );
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -124,6 +142,13 @@ export function AccountsPage() {
 
       <FormMessage>{message}</FormMessage>
 
+      {finance.accountBalances.length > 1 && (
+        <p className="settings-hint">
+          Marque uma conta principal (<Star size={13} aria-hidden="true" style={{ verticalAlign: '-2px' }} />) — é nela que a Grazi
+          debita ou credita pelo WhatsApp quando a mensagem não deixa clara a conta.
+        </p>
+      )}
+
       {finance.accountBalances.length > 0 ? (
         <div className="account-card-list">
           {finance.accountBalances.map((account) => {
@@ -142,15 +167,31 @@ export function AccountsPage() {
                 </div>
                 <div className="account-card-hero-footer">
                   <SyncStatusBadge status={syncStatusByAccountId.get(account.id) ?? 'synced'} />
-                  <button
-                    className="icon-button"
-                    type="button"
-                    aria-label={`Excluir ${account.name}`}
-                    disabled={deleteProbeAccountId !== null}
-                    onClick={() => void handleDeleteAccount(account.id, account.name)}
-                  >
-                    <Trash2 size={17} aria-hidden="true" />
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <button
+                      className={`icon-button icon-button--star${account.isPrimary ? ' is-active' : ''}`}
+                      type="button"
+                      aria-pressed={account.isPrimary === true}
+                      aria-label={
+                        account.isPrimary
+                          ? `${account.name} é a conta principal. Clique para desmarcar.`
+                          : `Definir ${account.name} como conta principal`
+                      }
+                      title={account.isPrimary ? 'Conta principal' : 'Definir como conta principal'}
+                      onClick={() => handleTogglePrimary(account.id, account.isPrimary === true)}
+                    >
+                      <Star size={17} aria-hidden="true" fill={account.isPrimary ? 'currentColor' : 'none'} />
+                    </button>
+                    <button
+                      className="icon-button"
+                      type="button"
+                      aria-label={`Excluir ${account.name}`}
+                      disabled={deleteProbeAccountId !== null}
+                      onClick={() => void handleDeleteAccount(account.id, account.name)}
+                    >
+                      <Trash2 size={17} aria-hidden="true" />
+                    </button>
+                  </div>
                 </div>
               </div>
             );

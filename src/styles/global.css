@@ -2079,6 +2079,16 @@ span.service-mark--brand {
   color: var(--danger);
 }
 
+.icon-button--star:hover {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.icon-button--star.is-active {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
 .empty-copy {
   display: grid;
   gap: 0.75rem;

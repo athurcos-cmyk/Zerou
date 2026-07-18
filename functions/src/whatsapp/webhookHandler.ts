@@ -3,18 +3,20 @@ import { onRequest } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions';
 import crypto from 'crypto';
 import { sendWhatsAppMessage, getVerifyToken, whatsappAccessToken } from './metaClient.js';
-import { interpretMessage, type CategoryOption, type MessageInterpretation } from './interpretMessage.js';
+import { interpretMessage, type AccountOption, type CategoryOption, type MessageInterpretation } from './interpretMessage.js';
 import { createTransactionFromMessage } from './createTransactionFromMessage.js';
 import { createCategoryFromMessage } from './createCategoryFromMessage.js';
 import { createCardPurchaseFromMessage } from './createCardPurchaseFromMessage.js';
 import { answerFinancialQuestion } from './answerFinancialQuestion.js';
 import { processLinkCode } from './linkAccount.js';
 import {
-  getPendingCardPurchase,
-  setPendingCardPurchase,
-  clearPendingCardPurchase,
-  resolveCardSelection,
-} from './pendingCardAction.js';
+  getPendingAction,
+  setPendingAction,
+  clearPendingAction,
+  resolveSingleSelection,
+  resolveDualSelection,
+} from './pendingAction.js';
+import { resolveDebitCreditAccount, resolveTransferSide, accountCandidates, type AccountRow } from './accountResolution.js';
 import { deepseekApiKey } from '../ai/deepseekClient.js';
 import { checkAiUsageNotExceeded, incrementAiUsage } from '../ai/aiRateLimit.js';
 
@@ -167,33 +169,93 @@ export const whatsappWebhook = onRequest(
       const { workspaceId, linkedByUid } = link;
       if (!workspaceId || !linkedByUid) return;
 
-      // ── Pergunta pendente: usuario tinha mais de um cartao e o bot perguntou qual ──
-      const pending = await getPendingCardPurchase(db, phone);
+      // ── Pergunta pendente: bot tinha perguntado qual cartao/conta usar ──
+      const pending = await getPendingAction(db, phone);
       if (pending) {
-        const resolvedCardId = resolveCardSelection(cleanText, pending.candidates);
-        await clearPendingCardPurchase(db, phone);
+        await clearPendingAction(db, phone);
 
-        if (resolvedCardId) {
-          const result = await createCardPurchaseFromMessage({
-            workspaceId: pending.workspaceId,
-            userId: pending.userId,
-            cardId: resolvedCardId,
-            amountCents: pending.amountCents,
-            description: pending.description,
-            categoryId: pending.categoryId,
-            installments: pending.installments,
-            purchaseDate: new Date(),
-          });
+        if (pending.kind === 'card_purchase') {
+          const resolvedCardId = resolveSingleSelection(cleanText, pending.candidates);
+          if (resolvedCardId) {
+            const result = await createCardPurchaseFromMessage({
+              workspaceId: pending.workspaceId,
+              userId: pending.userId,
+              cardId: resolvedCardId,
+              amountCents: pending.amountCents,
+              description: pending.description,
+              categoryId: pending.categoryId,
+              installments: pending.installments,
+              purchaseDate: new Date(),
+            });
 
-          const catSuffix = result.categoryName ? ` (${result.categoryName})` : '';
-          const installmentSuffix = pending.installments > 1 ? ` em ${pending.installments}x` : '';
-          await sendWhatsAppMessage(
-            phone,
-            `✅ Compra registrada no ${result.cardName}${installmentSuffix}: ${formatBRL(result.amountCents)} — ${result.description}${catSuffix}`,
-          );
-          return;
+            const catSuffix = result.categoryName ? ` (${result.categoryName})` : '';
+            const installmentSuffix = pending.installments > 1 ? ` em ${pending.installments}x` : '';
+            await sendWhatsAppMessage(
+              phone,
+              `✅ Compra registrada no ${result.cardName}${installmentSuffix}: ${formatBRL(result.amountCents)} — ${result.description}${catSuffix}`,
+            );
+            return;
+          }
+          // Nao resolveu -> descarta a pendencia e segue o fluxo normal com esta mesma mensagem.
+        } else if (pending.kind === 'debit_credit') {
+          const resolvedAccountId = resolveSingleSelection(cleanText, pending.candidates);
+          if (resolvedAccountId) {
+            const result = await createTransactionFromMessage({
+              workspaceId: pending.workspaceId,
+              userId: pending.userId,
+              type: pending.type,
+              amountCents: pending.amountCents,
+              description: pending.description,
+              categoryId: pending.categoryId,
+              accountId: resolvedAccountId,
+              date: new Date(),
+              source: 'whatsapp',
+            });
+
+            const catSuffix = result.categoryName ? ` (${result.categoryName})` : '';
+            const confirmation = pending.type === 'income'
+              ? `💰 Receita registrada: ${formatBRL(result.amountCents)} — ${result.description}${catSuffix}`
+              : `✅ Registrado: ${formatBRL(result.amountCents)} — ${result.description}${catSuffix}`;
+            await sendWhatsAppMessage(phone, confirmation);
+            return;
+          }
+        } else if (pending.kind === 'transfer') {
+          let sourceAccountId = pending.sourceAccountId;
+          let destinationAccountId = pending.destinationAccountId;
+
+          if (pending.missing === 'both') {
+            const resolved = resolveDualSelection(cleanText, pending.candidates);
+            if (resolved) {
+              sourceAccountId = resolved.sourceId;
+              destinationAccountId = resolved.destinationId;
+            }
+          } else if (pending.missing === 'source') {
+            sourceAccountId = resolveSingleSelection(cleanText, pending.candidates);
+          } else {
+            destinationAccountId = resolveSingleSelection(cleanText, pending.candidates);
+          }
+
+          if (sourceAccountId && destinationAccountId && sourceAccountId !== destinationAccountId) {
+            const result = await createTransactionFromMessage({
+              workspaceId: pending.workspaceId,
+              userId: pending.userId,
+              type: 'transfer',
+              amountCents: pending.amountCents,
+              description: pending.description,
+              accountId: sourceAccountId,
+              destinationAccountId,
+              date: new Date(),
+              source: 'whatsapp',
+            });
+
+            await sendWhatsAppMessage(
+              phone,
+              `🔄 Transferência registrada: ${formatBRL(result.amountCents)} — ${result.description}`,
+            );
+            return;
+          }
+          // Nao resolveu -> descarta a pendencia e segue o fluxo normal com esta mesma mensagem.
         }
-        // Nao resolveu -> descarta a pendencia e segue o fluxo normal com esta mesma mensagem.
       }
 
       // ── Load categories (todas — expense/income/both — a intencao decide qual usar) ──
@@ -208,13 +270,27 @@ export const whatsappWebhook = onRequest(
         type: d.data().type as 'income' | 'expense' | 'both',
       }));
 
+      // ── Load contas ativas (usadas pra casar nome na mensagem e como fallback) ──
+      const acctsSnap = await db
+        .collection(`workspaces/${workspaceId}/accounts`)
+        .where('isActive', '==', true)
+        .get();
+
+      const accounts: AccountRow[] = acctsSnap.docs.map((d) => ({
+        id: d.id,
+        name: d.data().name as string,
+        isPrimary: d.data().isPrimary === true,
+      }));
+
+      const accountOptions: AccountOption[] = accounts.map((a) => ({ id: a.id, name: a.name }));
+
       // ── Interpretar a mensagem (intencao + extracao, uma unica chamada) ──
-      const interpretation = await interpretMessage(cleanText, categories);
+      const interpretation = await interpretMessage(cleanText, categories, accountOptions);
 
       if (!interpretation || interpretation.intent === 'unclear') {
         await sendWhatsAppMessage(
           phone,
-          'Não entendi. Você pode:\n- Registrar um gasto: "gastei 15 reais no mercado"\n- Registrar uma receita: "recebi 200 reais de freela"\n- Registrar compra no cartão: "gastei 300 no cartão em 3x"\n- Criar categoria: "cria uma categoria chamada Pet"\n- Perguntar sobre suas finanças: "quanto gastei esse mês?"',
+          'Não entendi. Você pode:\n- Registrar um gasto: "gastei 15 reais no mercado"\n- Registrar uma receita: "recebi 200 reais de freela"\n- Registrar compra no cartão: "gastei 300 no cartão em 3x"\n- Transferir entre contas: "transfere 50 do nubank pro itaú"\n- Criar categoria: "cria uma categoria chamada Pet"\n- Perguntar sobre suas finanças: "quanto gastei esse mês?"',
         );
         return;
       }
@@ -326,7 +402,8 @@ export const whatsappWebhook = onRequest(
           return;
         }
 
-        await setPendingCardPurchase(db, phone, {
+        await setPendingAction(db, phone, {
+          kind: 'card_purchase',
           workspaceId,
           userId: linkedByUid,
           amountCents: interpretation.amountCents,
@@ -344,6 +421,96 @@ export const whatsappWebhook = onRequest(
         return;
       }
 
+      // ── Transferencia entre contas ───────────────────────────────────
+      if (interpretation.intent === 'transfer') {
+        if (interpretation.confidence === 'low' || interpretation.amountCents <= 0) {
+          await sendWhatsAppMessage(
+            phone,
+            'Não consegui entender o valor da transferência. Pode reformular? Ex: "transfere 100 do nubank pro itaú"',
+          );
+          return;
+        }
+
+        if (accounts.length < 2) {
+          await sendWhatsAppMessage(
+            phone,
+            'Você precisa ter pelo menos duas contas cadastradas pra transferir entre elas. Cadastre outra conta no app primeiro.',
+          );
+          return;
+        }
+
+        const description = interpretation.description || 'Transferência';
+
+        let sourceAccountId: string | null = interpretation.sourceAccountId;
+        let destinationAccountId: string | null = interpretation.destinationAccountId;
+
+        if (sourceAccountId && !destinationAccountId) {
+          destinationAccountId = resolveTransferSide(null, accounts, sourceAccountId);
+        } else if (!sourceAccountId && destinationAccountId) {
+          sourceAccountId = resolveTransferSide(null, accounts, destinationAccountId);
+        }
+        // Se nenhum dos dois lados foi identificado na mensagem, nao adivinha direcao —
+        // melhor perguntar do que mover dinheiro pro lado errado.
+
+        if (sourceAccountId && destinationAccountId && sourceAccountId !== destinationAccountId) {
+          const result = await createTransactionFromMessage({
+            workspaceId,
+            userId: linkedByUid,
+            type: 'transfer',
+            amountCents: interpretation.amountCents,
+            description,
+            accountId: sourceAccountId,
+            destinationAccountId,
+            date: new Date(),
+            source: 'whatsapp',
+          });
+
+          await sendWhatsAppMessage(
+            phone,
+            `🔄 Transferência registrada: ${formatBRL(result.amountCents)} — ${result.description}`,
+          );
+
+          logger.info('whatsapp_transaction_created', {
+            phone, workspaceId, transactionId: result.id, type: 'transfer', amountCents: result.amountCents,
+          });
+          return;
+        }
+
+        const missing: 'source' | 'destination' | 'both' = !sourceAccountId && !destinationAccountId
+          ? 'both'
+          : !sourceAccountId
+          ? 'source'
+          : 'destination';
+
+        const candidates = missing === 'both'
+          ? accountCandidates(accounts)
+          : missing === 'source'
+          ? accountCandidates(accounts, destinationAccountId)
+          : accountCandidates(accounts, sourceAccountId);
+
+        await setPendingAction(db, phone, {
+          kind: 'transfer',
+          workspaceId,
+          userId: linkedByUid,
+          amountCents: interpretation.amountCents,
+          description,
+          sourceAccountId,
+          destinationAccountId,
+          missing,
+          candidates,
+        });
+
+        const list = candidates.map((c, i) => `${i + 1} - ${c.label}`).join('\n');
+        const question = missing === 'both'
+          ? `Você tem mais de uma conta. De qual conta sai e pra qual vai a transferência?\n${list}\n\nResponda com dois números, tipo "1 2" (sai da 1, vai pra 2), em até 3 minutos.`
+          : missing === 'source'
+          ? `Você tem mais de uma conta. De qual conta sai a transferência?\n${list}\n\nResponda com o número em até 3 minutos.`
+          : `Você tem mais de uma conta. Pra qual conta vai a transferência?\n${list}\n\nResponda com o número em até 3 minutos.`;
+
+        await sendWhatsAppMessage(phone, question);
+        return;
+      }
+
       // ── Despesa ou receita — daqui pra baixo intent e 'expense' | 'income' ──
       if (interpretation.confidence === 'low' || interpretation.amountCents <= 0) {
         await sendWhatsAppMessage(
@@ -353,14 +520,7 @@ export const whatsappWebhook = onRequest(
         return;
       }
 
-      const accountsSnap = await db
-        .collection(`workspaces/${workspaceId}/accounts`)
-        .where('isActive', '==', true)
-        .limit(1)
-        .get();
-
-      const defaultAccountId = accountsSnap.docs[0]?.id;
-      if (!defaultAccountId) {
+      if (accounts.length === 0) {
         await sendWhatsAppMessage(
           phone,
           'Você ainda não tem uma conta cadastrada no Granativa. Crie uma conta primeiro pelo app.',
@@ -369,15 +529,38 @@ export const whatsappWebhook = onRequest(
       }
 
       const categoryId = await resolveOrCreateCategory(workspaceId, linkedByUid, interpretation.intent, interpretation, categories);
+      const description = interpretation.description || cleanText.slice(0, 80);
+      const accountId = resolveDebitCreditAccount(interpretation.accountId, accounts);
+
+      if (!accountId) {
+        await setPendingAction(db, phone, {
+          kind: 'debit_credit',
+          workspaceId,
+          userId: linkedByUid,
+          type: interpretation.intent,
+          amountCents: interpretation.amountCents,
+          description,
+          categoryId,
+          candidates: accountCandidates(accounts),
+        });
+
+        const list = accountCandidates(accounts).map((c, i) => `${i + 1} - ${c.label}`).join('\n');
+        const verb = interpretation.intent === 'income' ? 'entra' : 'sai';
+        await sendWhatsAppMessage(
+          phone,
+          `Você tem mais de uma conta. De qual conta ${verb} esse valor?\n${list}\n\nResponda com o número em até 3 minutos.`,
+        );
+        return;
+      }
 
       const result = await createTransactionFromMessage({
         workspaceId,
         userId: linkedByUid,
         type: interpretation.intent,
         amountCents: interpretation.amountCents,
-        description: interpretation.description || cleanText.slice(0, 80),
+        description,
         categoryId,
-        accountId: defaultAccountId,
+        accountId,
         date: new Date(),
         source: 'whatsapp',
       });
