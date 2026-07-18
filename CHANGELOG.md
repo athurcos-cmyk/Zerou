@@ -2,6 +2,23 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-18 — Bloqueio do "puxar pra recarregar" (pull-to-refresh) no mobile
+
+Decisão de produto (pedido do dono): o app é offline-first e sincroniza sozinho, então o
+pull-to-refresh do Chrome Android só servia pra reiniciar o app à toa e reexibir o boot de
+1-2s (o "pisca"). Contexto: cold-open sempre cai no Dashboard (já sem flash) e navegar entre
+telas nunca pisca — o único jeito de piscar era dar refresh parado numa tela.
+
+- `src/styles/global.css`: `overscroll-behavior-y: contain` em `html, body`. Mata a recarga
+  por arrasto e o scroll-chaining pra fora, mantendo o scroll normal.
+- **Não** bloqueia reload pelo botão do navegador / F5 / Ctrl+R, nem o cold-start.
+- Escopo global (app + landing). Efeito concentrado no Chrome Android em aba de navegador —
+  PWA instalado geralmente já não tem o gesto e o iOS Safari não recarrega por arrasto.
+- Gesto de toque: não verificável no preview de desktop (validar no celular). Build limpo.
+- A "etapa 2" (cache das outras telas via seed no núcleo) foi **arquivada de propósito**:
+  ganho estreito (só refresh-na-tela) não justifica o risco de mexer em `useFinanceData`/
+  `useCardsData` + serializar `Timestamp` do Firestore. Raciocínio em `docs/history/2026-07.md`.
+
 ## 2026-07-18 — Dashboard 100% offline: as listas também pintam do cache (fim do "pisca em branco")
 
 Continuação do `dashboardSummaryCache` (que só cobria os 3 números do topo), a pedido do
