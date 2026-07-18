@@ -7,6 +7,7 @@ import {
   useSpring,
   useTransform,
   useScroll,
+  useReducedMotion,
 } from 'framer-motion';
 import { ArrowRight, CheckCircle2, CreditCard, PiggyBank, TrendingUp } from 'lucide-react';
 import { AppMockup } from './AppMockup';
@@ -27,6 +28,7 @@ const fadeUp = {
 
 export function LandingCss() {
   const heroRef = useRef<HTMLElement>(null);
+  const reduceMotion = useReducedMotion();
   /* só dispara tilt quando o dispositivo tem cursor (não-touch) */
   const canHover = useRef(
     typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches
@@ -150,7 +152,7 @@ export function LandingCss() {
                 <motion.div
                   className="lp-float lp-float--a lp-float--light"
                   style={{ z: 60 }}
-                  animate={{ y: [0, -10, 0] }}
+                  animate={reduceMotion ? {} : { y: [0, -10, 0] }}
                   transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut' }}
                 >
                   <span className="ico" style={{ background: '#1f9e6e' }}><TrendingUp size={15} /></span>
@@ -161,7 +163,7 @@ export function LandingCss() {
                 <motion.div
                   className="lp-float lp-float--c lp-float--light"
                   style={{ z: 30 }}
-                  animate={{ y: [0, -8, 0] }}
+                  animate={reduceMotion ? {} : { y: [0, -8, 0] }}
                   transition={{ duration: 5.2, repeat: Infinity, ease: 'easeInOut', delay: 0.6 }}
                 >
                   <span className="ico" style={{ background: '#6366c9' }}><CreditCard size={15} /></span>
@@ -172,7 +174,7 @@ export function LandingCss() {
                 <motion.div
                   className="lp-float lp-float--d lp-float--light"
                   style={{ z: -15 }}
-                  animate={{ y: [0, -12, 0] }}
+                  animate={reduceMotion ? {} : { y: [0, -12, 0] }}
                   transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut', delay: 1.2 }}
                 >
                   <span className="ico" style={{ background: '#e8911c' }}><PiggyBank size={15} /></span>
@@ -182,7 +184,7 @@ export function LandingCss() {
                 {/* Phone no Z=0 + bob + gloss de luz */}
                 <motion.div
                   className="lp-stage-phone"
-                  animate={{ y: [0, -8, 0] }}
+                  animate={reduceMotion ? {} : { y: [0, -8, 0] }}
                   transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
                 >
                   <AppMockup />
