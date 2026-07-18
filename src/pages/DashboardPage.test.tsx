@@ -114,5 +114,19 @@ describe('DashboardPage — listas do cache no boot', () => {
     expect(screen.getByText('Sem gastos este mês')).toBeInTheDocument();
     expect(screen.getByText('Nenhum compromisso pendente')).toBeInTheDocument();
     expect(screen.getByText('Nenhuma transação ainda')).toBeInTheDocument();
+    // Conta genuinamente nova/vazia, já carregada, É o único caso que mostra o guia inicial.
+    expect(screen.getByText('Comece em poucos minutos')).toBeInTheDocument();
+  });
+
+  it('não mostra o guia "Comece em poucos minutos" enquanto uma conta já usada recarrega', () => {
+    // Boot de uma conta established: os arrays ao vivo ainda estão vazios, mas isso não pode
+    // disparar o guia de conta nova (bug de "pisca no refresh" achado pelo dono).
+    saveCachedDashboardView(WORKSPACE_ID, cachedView);
+    state.finance = financeCtx({ loading: true });
+    state.cards = cardsCtx({ loading: true });
+
+    renderDashboard();
+
+    expect(screen.queryByText('Comece em poucos minutos')).not.toBeInTheDocument();
   });
 });

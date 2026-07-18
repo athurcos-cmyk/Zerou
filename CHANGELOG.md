@@ -18,8 +18,11 @@ maioria vai usar. Detalhes técnicos e risco residual em `docs/history/2026-07.m
   real continua sendo o cache do Firestore + os listeners.
 - Marca (ícone+cor) pré-resolvida na gravação pra bater com o render ao vivo; datas via ISO;
   validação defensiva descarta cache corrompido/formato antigo e cai pro dado ao vivo.
-- 2 arquivos de teste novos (round-trip do cache + render do Dashboard). **Verificado que o
-  teste de render falha sem a correção.** `typecheck`/`test` (339/339)/`build` limpos.
+- **Mesma classe de bug no guia "Comece em poucos minutos"** (achado pelo dono ao dar
+  refresh): ele era decidido pelo dado ao vivo, que começa vazio no boot, então piscava
+  mesmo numa conta já usada. Agora só aparece depois que finanças+cartões resolveram.
+- 2 arquivos de teste novos (round-trip do cache + render do Dashboard). **Verificado que os
+  testes de render falham sem a correção.** `typecheck`/`test` (340/340)/`build` limpos.
 
 ## 2026-07-18 — "Disponível"/"Comprometido" ainda piscavam no celular (causa diferente do fix anterior)
 

@@ -275,6 +275,10 @@ export function DashboardPage() {
       ? Math.round(((currentMonthSpendCents - previousMonthSpendCents) / previousMonthSpendCents) * 100)
       : null;
   const hasStarted = finance.accounts.length > 0 || finance.transactions.length > 0 || cardsData.cards.length > 0;
+  // Só decide "conta nova" depois que finanças E cartões resolveram. No boot os arrays
+  // começam vazios, então sem esse guard o guia "Comece em poucos minutos" piscava mesmo
+  // numa conta já usada (achado pelo dono ao dar refresh).
+  const showStartGuide = !hasStarted && !isCommittedLoading;
 
   return (
     <section className="page-content">
@@ -376,7 +380,7 @@ export function DashboardPage() {
         </Link>
       </div>
 
-      {!hasStarted ? (
+      {showStartGuide ? (
         <article className="surface surface-pad start-guide">
           <div>
             <p className="eyebrow">Comece em poucos minutos</p>
