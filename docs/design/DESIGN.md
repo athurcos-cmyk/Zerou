@@ -33,7 +33,7 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
 
 | Componente | Uso |
 |---|---|
-| `BottomSheet` | Folha que sobe de baixo (portal, ESC, backdrop). Base de todos os pickers/modais. |
+| `BottomSheet` | Folha que sobe de baixo (portal, ESC, backdrop, **swipe-to-dismiss** desde 2026-07-18 — drag só no grabber/header via `.sheet-drag-zone`, nunca no corpo). Base de todos os pickers/modais, **inclusive o menu mobile** (`.menu-sheet` no `AppShell`). |
 | `SelectField` | Campo que abre sheet com lista de opções + ícones. Substitui `<select>`. |
 | `CategoryField` | Sheet de categorias com ícone+cor, criar/editar/excluir. |
 | `ConfirmDialog` (`useConfirm`) | Confirmação destrutiva em sheet — nunca `window.confirm`. |
@@ -44,6 +44,17 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
 ## Padrões de UX
 
 - Seleção (conta, categoria, bandeira, parcelas): bottom-sheet, não dropdown nativo.
+- **Lista de itens no mobile = linha inteira como alvo de toque** (`.list-row--tap`,
+  extrato de Transações, 2026-07-18): nada de "Editar"/lixeira inline por linha — as ações
+  vivem num sheet de detalhe. Destrutivo nunca a um toque em lista rolável.
+- **Extrato agrupado por dia** (`.day-group`/`.day-group-header`, 2026-07-18): header sticky
+  "Hoje/Ontem/12 jul" + líquido do dia. Cuidado: sticky dentro do `.app-main` mobile exige
+  `overflow-x: clip` (não `hidden`, que vira scroll container e mata o sticky).
+- **CTA de conclusão de formulário longo é sticky** (`.entry-actions`): no mobile o offset
+  usa `--bottom-nav-space` (fonte única da folga da bottom nav, definida no media query
+  de 900px) — nunca hardcodar 5.75rem de novo.
+- **Chips que não cabem numa linha rolam** (`.chip-row--scroll`), não quebram; chip que
+  carrega estado (ex.: "Filtros · N") vai primeiro pra nunca sair da viewport.
 - Chips para presets (datas Hoje/Ontem/Outra, tipo de divisão).
 - Empty states sempre com ilustração + CTA, não texto seco.
 - Barras de progresso para limite de cartão, metas e cofrinho. **Forma da barra** (achado no `/dataviz`, 2026-07-18): quadrada na base (início), arredondada só na ponta (4px) — nunca pílula nos dois lados. Vale pra track e fill juntos (`.spending-bar-track`, `.goal-progress-track`, `.card-limit-bar-track` em `global.css`), senão o clip do container arredonda os dois lados mesmo que só o fill mude.

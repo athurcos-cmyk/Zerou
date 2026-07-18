@@ -2,6 +2,36 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-18 — Mobile com cara de app nativo: extrato por dia, sheet de detalhe, swipe nas sheets, menu novo
+
+Auditoria de UX mobile (375px) com debate entre dois agentes (designer propôs, crítico
+verificou cada alegação no código) e implementação dos 9 itens aprovados. Detalhes e
+vereditos em `docs/history/2026-07.md`.
+
+- **Extrato agrupado por dia** com header sticky ("Hoje/Ontem/12 jul") e líquido do dia;
+  total some sob busca textual (senão o subtotal parece bug). `overflow-x` do `.app-main`
+  mobile virou `clip` (era `hidden`, que mata `position: sticky` dos descendentes).
+- **Linha de transação virou alvo de toque único**: Editar/lixeira saíram da linha e
+  vivem num sheet de detalhe (`BottomSheet`) — destrutivo a dois toques, linha limpa.
+- **`BottomSheet` ganhou swipe-to-dismiss** (drag restrito a grabber/header, threshold de
+  8px preserva cliques; flick rápido também fecha) — todas as sheets do app herdam.
+- **Menu mobile migrou pro `BottomSheet` base** em duas zonas: tiles "Ir para" (6 destinos,
+  ícone em cima) e lista "Sua conta" — corrige o desalinhamento do grid antigo e o ícone
+  "sumido" do Compartilhado.
+- **Dashboard mobile**: só "Lançar agora" some (o FAB já cobre); Contas, Cartões,
+  Compromissos e Metas continuam com atalho, em grid 2x2 mais compacto que o do desktop.
+  (Primeira versão tinha removido Contas/Cartões também — corrigido no mesmo dia após
+  o dono notar que sumiram do menu principal.)
+- **Lançamento**: autofocus no valor (corta um toque do fluxo mais usado) e CTA "Salvar"
+  sticky acima da bottom nav (nova var `--bottom-nav-space`, antes 5.75rem hardcoded).
+- **Transações**: "+ Nova" oculto no mobile (FAB já cobre), placeholder curto, chips de
+  filtro compactos em trilho horizontal com "Filtros" primeiro (carrega o contador de
+  estado) — tamanho reduzido depois que o dono flagrou os últimos chips cortados fora da
+  viewport em 375px. Linha do extrato ficou mais baixa (isenta da regra antiga que
+  quebrava valor pra segunda linha, criada quando a linha ainda tinha botões inline).
+- Proposta "Lança e vai" (captura relâmpago por long-press no FAB) **não implementada** por
+  decisão do dono — spec salva em `docs/planning/LANCA_E_VAI.md` pra avaliação futura.
+
 ## 2026-07-18 — Landing: CTA do menu parava de implicar plano pago + "Entrar" sumia no celular
 
 Dois ajustes pontuais na landing, achados numa revisão de design/frontend a pedido do
