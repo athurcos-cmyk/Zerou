@@ -235,6 +235,24 @@ export function DashboardPage() {
         </Link>
       </div>
 
+      {/* Mobile: o grid acima some ("Lançar agora" some pois o FAB já cobre), mas
+          Contas/Cartões/Compromissos/Metas continuam com atalho aqui. Visibilidade
+          controlada em global.css. */}
+      <div className="dash-shortcut-row">
+        <Link className="button button--subtle" to="/app/accounts">
+          <Wallet size={17} aria-hidden="true" /> Contas
+        </Link>
+        <Link className="button button--subtle" to="/app/cards">
+          <CreditCard size={17} aria-hidden="true" /> Cartões
+        </Link>
+        <Link className="button button--subtle" to="/app/bills">
+          <CalendarClock size={17} aria-hidden="true" /> Compromissos
+        </Link>
+        <Link className="button button--subtle" to="/app/goals">
+          <Target size={17} aria-hidden="true" /> Metas
+        </Link>
+      </div>
+
       {!hasStarted ? (
         <article className="surface surface-pad start-guide">
           <div>

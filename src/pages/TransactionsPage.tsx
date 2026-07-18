@@ -9,9 +9,9 @@ import { CategoryMark } from '../components/categoryIcons';
 import { SelectField } from '../components/SelectField';
 import { useConfirm } from '../components/ConfirmDialog';
 import { defaultCategoryColors } from '../theme/palette';
-import { formatFriendlyDate } from '../finance/financeDates';
+import { formatFriendlyDate, toDateInputValue } from '../finance/financeDates';
 import { transactionTypeLabels } from '../finance/financeLabels';
-import { softDeleteTransaction } from '../finance/financeService';
+import { softDeleteTransaction, type LocalSynced } from '../finance/financeService';
 import { formatMoney } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
 import type { Transaction } from '../types/contracts';
@@ -27,8 +27,12 @@ export function TransactionsPage() {
   const [cardFilter, setCardFilter] = useState('');
   const [tagFilter, setTagFilter] = useState<Set<string>>(new Set());
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // Sheet de detalhe: a linha inteira é o alvo de toque; Editar/Excluir vivem aqui dentro.
+  const [detailTransaction, setDetailTransaction] = useState<LocalSynced<Transaction> | null>(null);
 
   const categoryMap = useMemo(() => new Map(finance.categories.map((c) => [c.id, c])), [finance.categories]);
+  const accountNameMap = useMemo(() => new Map(finance.accounts.map((a) => [a.id, a.name])), [finance.accounts]);
+  const cardNameMap = useMemo(() => new Map(cardsData.cards.map((c) => [c.id, c.name])), [cardsData.cards]);
   const cardOptions = useMemo(
     () => [
       { value: '', label: 'Todos os cartões' },
@@ -82,6 +86,28 @@ export function TransactionsPage() {
     });
   }, [activeTransactions, cardFilter, typeFilter, tagFilter, normalizedQuery, categoryMap]);
 
+  // Extrato agrupado por dia (padrão de app financeiro nativo): cabeçalho "Hoje/Ontem/12 jul"
+  // com o líquido do dia. A lista já vem ordenada por data; agrupar preserva a ordem.
+  const dayGroups = useMemo(() => {
+    const groups: Array<{ key: string; label: string; netCents: number; transactions: Array<LocalSynced<Transaction>> }> = [];
+    let current: (typeof groups)[number] | undefined;
+    for (const transaction of visibleTransactions) {
+      const key = toDateInputValue(transaction.date);
+      if (!current || current.key !== key) {
+        current = { key, label: formatFriendlyDate(transaction.date), netCents: 0, transactions: [] };
+        groups.push(current);
+      }
+      current.transactions.push(transaction);
+      if (transaction.type === 'income') current.netCents += transaction.amountCents;
+      else if (transaction.type === 'expense' || transaction.type === 'card_purchase') current.netCents -= transaction.amountCents;
+    }
+    return groups;
+  }, [visibleTransactions]);
+
+  // Com busca textual ativa o "total do dia" seria o total do subconjunto encontrado —
+  // parece bug ("total: R$ 37"). Só mostrar sem busca; filtros de tipo/tag são intencionais.
+  const showDayTotals = normalizedQuery.length === 0;
+
   const typeChips: Array<{ key: typeof typeFilter; label: string }> = [
     { key: 'all', label: 'Tudo' },
     { key: 'expense', label: 'Despesas' },
@@ -118,6 +144,7 @@ export function TransactionsPage() {
       return;
     }
 
+    setDetailTransaction(null);
     softDeleteTransaction(workspaceId, user.uid, transaction.id, {
       type: transaction.type,
       amountCents: transaction.amountCents,
@@ -134,7 +161,8 @@ export function TransactionsPage() {
           <p className="eyebrow">Pessoal</p>
           <h1 className="page-title page-title--compact">Transações</h1>
         </div>
-        <Link className="button button--primary" to="/app/transactions/new">
+        {/* Mobile esconde este CTA (o FAB da bottom nav já é "lançar"); desktop não tem FAB. */}
+        <Link className="button button--primary transactions-new-link" to="/app/transactions/new">
           <Plus size={16} aria-hidden="true" /> Nova
         </Link>
       </div>
@@ -147,11 +175,20 @@ export function TransactionsPage() {
               className="input"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar por nome, categoria, tag, estabelecimento…"
-              aria-label="Buscar transações"
+              placeholder="Buscar transações"
+              aria-label="Buscar por nome, categoria, tag ou estabelecimento"
             />
           </div>
-          <div className="chip-row">
+          {/* Trilho horizontal (sem quebra) — "Filtros" primeiro porque carrega estado
+              (contador de filtros ativos) e não pode sair da viewport rolando. */}
+          <div className="chip-row chip-row--scroll">
+            <button
+              type="button"
+              className={`chip${activeSecondaryFilterCount > 0 ? ' chip--active' : ''}`}
+              onClick={() => setFiltersOpen(true)}
+            >
+              <SlidersHorizontal size={13} aria-hidden="true" /> Filtros{activeSecondaryFilterCount > 0 ? ` · ${activeSecondaryFilterCount}` : ''}
+            </button>
             {typeChips.map((chip) => (
               <button
                 key={chip.key}
@@ -162,13 +199,6 @@ export function TransactionsPage() {
                 {chip.label}
               </button>
             ))}
-            <button
-              type="button"
-              className={`chip${activeSecondaryFilterCount > 0 ? ' chip--active' : ''}`}
-              onClick={() => setFiltersOpen(true)}
-            >
-              <SlidersHorizontal size={13} aria-hidden="true" /> Filtros{activeSecondaryFilterCount > 0 ? ` · ${activeSecondaryFilterCount}` : ''}
-            </button>
           </div>
         </div>
       )}
@@ -242,51 +272,136 @@ export function TransactionsPage() {
             description={normalizedQuery ? `Nada encontrado para "${query.trim()}".` : 'Nenhuma transação nesse filtro.'}
           />
         ) : (
-          <div className="item-list">
-            {visibleTransactions.map((transaction) => {
-              const isIncome = transaction.type === 'income';
-              const isExpense = transaction.type === 'expense' || transaction.type === 'card_purchase';
-              const amountClass = isIncome ? 'amount--income' : isExpense ? 'amount--expense' : '';
-              const category = transaction.categoryId ? categoryMap.get(transaction.categoryId) : null;
-              const fallback = isIncome
-                ? { icon: 'money', color: defaultCategoryColors.income_salary }
-                : transaction.type === 'transfer'
-                ? { icon: 'repeat', color: defaultCategoryColors.both_transfer }
-                : undefined;
-              return (
-                <div className="list-row list-row--with-icon" key={transaction.id}>
-                  <CategoryMark category={category} fallback={fallback} />
-                  <div className="list-row-body">
-                    <strong>{transaction.description}</strong>
-                    <span className="text-secondary">
-                      {transactionTypeLabels[transaction.type]} · {formatFriendlyDate(transaction.date)}
+          <div className="item-list item-list--grouped">
+            {dayGroups.map((group) => (
+              <section className="day-group" key={group.key} aria-label={group.label}>
+                <header className="day-group-header">
+                  <span className="day-group-label">{group.label}</span>
+                  {showDayTotals && group.netCents !== 0 ? (
+                    <span className={`day-group-total${group.netCents > 0 ? ' amount--income' : ' amount--expense'}`}>
+                      {group.netCents > 0 ? '+' : '−'}{formatMoney(Math.abs(group.netCents))}
                     </span>
-                  </div>
-                  <div className="list-row-end">
-                    <strong className={amountClass}>
-                      {isIncome ? '+' : isExpense ? '−' : ''}{formatMoney(transaction.amountCents)}
-                    </strong>
-                    <SyncStatusBadge status={transaction.localSyncStatus} />
-                    {transaction.type !== 'card_purchase' ? (
-                      <Link className="button button--subtle button--compact" to={`/app/transactions/${transaction.id}/edit`}>
-                        Editar
-                      </Link>
-                    ) : null}
+                  ) : null}
+                </header>
+                {group.transactions.map((transaction) => {
+                  const isIncome = transaction.type === 'income';
+                  const isExpense = transaction.type === 'expense' || transaction.type === 'card_purchase';
+                  const amountClass = isIncome ? 'amount--income' : isExpense ? 'amount--expense' : '';
+                  const category = transaction.categoryId ? categoryMap.get(transaction.categoryId) : null;
+                  const fallback = isIncome
+                    ? { icon: 'money', color: defaultCategoryColors.income_salary }
+                    : transaction.type === 'transfer'
+                    ? { icon: 'repeat', color: defaultCategoryColors.both_transfer }
+                    : undefined;
+                  return (
                     <button
-                      className="icon-button"
+                      className="list-row list-row--with-icon list-row--tap"
                       type="button"
-                      aria-label="Excluir transação"
-                      onClick={() => void handleDelete(transaction)}
+                      key={transaction.id}
+                      onClick={() => setDetailTransaction(transaction)}
                     >
-                      <Trash2 size={17} aria-hidden="true" />
+                      <CategoryMark category={category} fallback={fallback} />
+                      <div className="list-row-body">
+                        <strong>{transaction.description}</strong>
+                        <span className="text-secondary">{transactionTypeLabels[transaction.type]}</span>
+                      </div>
+                      <div className="list-row-end">
+                        <strong className={amountClass}>
+                          {isIncome ? '+' : isExpense ? '−' : ''}{formatMoney(transaction.amountCents)}
+                        </strong>
+                        <SyncStatusBadge status={transaction.localSyncStatus} />
+                      </div>
                     </button>
-                  </div>
-                </div>
-              );
-            })}
+                  );
+                })}
+              </section>
+            ))}
           </div>
         )}
       </article>
+
+      {detailTransaction ? (() => {
+        const t = detailTransaction;
+        const isIncome = t.type === 'income';
+        const isExpense = t.type === 'expense' || t.type === 'card_purchase';
+        const category = t.categoryId ? categoryMap.get(t.categoryId) : null;
+        const fallback = isIncome
+          ? { icon: 'money', color: defaultCategoryColors.income_salary }
+          : t.type === 'transfer'
+          ? { icon: 'repeat', color: defaultCategoryColors.both_transfer }
+          : undefined;
+        const placeName = t.type === 'card_purchase'
+          ? (t.cardId ? cardNameMap.get(t.cardId) : undefined)
+          : (t.accountId ? accountNameMap.get(t.accountId) : undefined);
+        const destinationName = t.destinationAccountId ? accountNameMap.get(t.destinationAccountId) : undefined;
+        return (
+          <BottomSheet
+            open
+            onClose={() => setDetailTransaction(null)}
+            title={t.description}
+            subtitle={`${transactionTypeLabels[t.type]} · ${formatFriendlyDate(t.date)}`}
+          >
+            <div className="tx-detail">
+              <p className={`tx-detail-amount display-number${isIncome ? ' amount--income' : isExpense ? ' amount--expense' : ''}`}>
+                {isIncome ? '+' : isExpense ? '−' : ''}{formatMoney(t.amountCents)}
+              </p>
+              <dl className="tx-detail-facts">
+                <div className="tx-detail-fact">
+                  <dt>Categoria</dt>
+                  <dd className="tx-detail-category">
+                    <CategoryMark category={category} fallback={fallback} />
+                    {category?.name ?? 'Sem categoria'}
+                  </dd>
+                </div>
+                {placeName ? (
+                  <div className="tx-detail-fact">
+                    <dt>{t.type === 'card_purchase' ? 'Cartão' : t.type === 'transfer' ? 'De' : 'Conta'}</dt>
+                    <dd>{placeName}</dd>
+                  </div>
+                ) : null}
+                {destinationName ? (
+                  <div className="tx-detail-fact">
+                    <dt>Para</dt>
+                    <dd>{destinationName}</dd>
+                  </div>
+                ) : null}
+                {t.merchant ? (
+                  <div className="tx-detail-fact">
+                    <dt>Estabelecimento</dt>
+                    <dd>{t.merchant}</dd>
+                  </div>
+                ) : null}
+                {t.tags.length > 0 ? (
+                  <div className="tx-detail-fact">
+                    <dt>Tags</dt>
+                    <dd>{t.tags.join(', ')}</dd>
+                  </div>
+                ) : null}
+                {t.notes ? (
+                  <div className="tx-detail-fact">
+                    <dt>Notas</dt>
+                    <dd>{t.notes}</dd>
+                  </div>
+                ) : null}
+              </dl>
+              <div className="sheet-actions">
+                <button
+                  className="button button--ghost"
+                  type="button"
+                  onClick={() => void handleDelete(t)}
+                >
+                  <Trash2 size={16} aria-hidden="true" /> Excluir
+                </button>
+                {t.type !== 'card_purchase' ? (
+                  <Link className="button button--primary" to={`/app/transactions/${t.id}/edit`}>
+                    Editar
+                  </Link>
+                ) : null}
+              </div>
+            </div>
+          </BottomSheet>
+        );
+      })() : null}
       {confirmDialog}
     </section>
   );

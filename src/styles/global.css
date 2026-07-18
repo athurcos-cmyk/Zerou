@@ -897,6 +897,21 @@ html[data-reduce-motion='true'] *::after {
   grid-column: 1 / -1;
 }
 
+/* Grid de atalhos do dashboard mobile (Contas · Cartões · Compromissos · Metas) —
+   substitui o grid do desktop, que também tem "Lançar agora" (redundante com o
+   FAB da bottom nav, por isso ele não entra aqui). 2x2 pra "Compromissos" caber
+   sem apertar numa linha só de 4. */
+.dash-shortcut-row {
+  display: none;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin: 1rem 0 1.5rem;
+}
+
+.dash-shortcut-row .button {
+  justify-content: center;
+}
+
 .start-guide,
 .spending-summary-card {
   display: grid;
@@ -1061,6 +1076,123 @@ span.category-mark {
 
 .list-row--with-icon {
   gap: 0.75rem;
+}
+
+/* Linha inteira como alvo de toque (extrato): as ações vivem no sheet de detalhe.
+   É um <button> real, então precisa desfazer o chrome nativo sem perder o
+   separador (border-top) que o .list-row usa. */
+.list-row--tap {
+  width: 100%;
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 0;
+  transition: background 140ms ease;
+}
+
+.list-row--tap:first-child {
+  border-top: 0;
+}
+
+.list-row--tap:hover,
+.list-row--tap:active {
+  background: var(--bg-surface-subtle);
+}
+
+.list-row--tap:focus-visible {
+  outline: 2px solid var(--action-primary);
+  outline-offset: -2px;
+  border-radius: 0.65rem;
+}
+
+/* --- Extrato agrupado por dia --- */
+.item-list--grouped {
+  gap: 0;
+}
+
+.day-group {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.day-group + .day-group {
+  margin-top: 1rem;
+}
+
+.day-group-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.35rem 0;
+  background: var(--bg-surface);
+}
+
+.day-group-label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.day-group-total {
+  font-size: 0.82rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.day-group .list-row--tap:first-of-type {
+  border-top: 0;
+}
+
+/* --- Sheet de detalhe da transação --- */
+.tx-detail {
+  display: grid;
+  gap: 1.1rem;
+}
+
+.tx-detail-amount {
+  margin: 0;
+  font-size: clamp(1.9rem, 8vw, 2.4rem);
+}
+
+.tx-detail-facts {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0;
+}
+
+.tx-detail-fact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.tx-detail-fact dt {
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.tx-detail-fact dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: right;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tx-detail-category {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .account-list-main {
@@ -2339,32 +2471,13 @@ span.service-mark--brand {
   border-color: var(--action-primary);
 }
 
-.mobile-more-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 18;
-  background: var(--bg-overlay);
+/* --- Menu mobile (dentro do BottomSheet base) --- */
+.menu-sheet {
+  display: grid;
+  gap: 0.75rem;
 }
 
-.mobile-menu-sheet {
-  position: fixed;
-  right: 0.75rem;
-  bottom: 5.2rem;
-  left: 0.75rem;
-  z-index: 19;
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-  border: 1px solid var(--border-subtle);
-  border-radius: 1.1rem;
-  background: var(--bg-surface);
-  box-shadow: var(--shadow-md);
-  padding: 1rem;
-  max-height: 70vh;
-  overflow-y: auto;
-}
-
-.mobile-menu-header {
+.menu-sheet-header {
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -2372,32 +2485,77 @@ span.service-mark--brand {
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.mobile-menu-header strong {
-  display: block;
+.menu-sheet-identity {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+}
+
+.menu-sheet-identity strong {
   font-size: 0.92rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-sheet-identity span {
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Zona "Ir para": tiles quadrados, ícone em cima — rótulo de até 2 linhas com
+   altura reservada pra "Contas a Pagar" não desalinhar os vizinhos. */
+.menu-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.menu-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.45rem;
+  padding: 0.8rem 0.35rem 0.7rem;
+  border-radius: 0.85rem;
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-align: center;
+  background: var(--bg-surface-subtle);
+}
+
+.menu-tile svg {
+  color: var(--action-primary);
+}
+
+.menu-tile span {
+  display: block;
+  min-height: 2em;
+  line-height: 1.2;
+}
+
+.menu-tile.active,
+.menu-tile:hover {
+  background: var(--action-primary-soft);
   color: var(--text-primary);
 }
 
-.mobile-menu-grid {
+/* Zona "Sua conta": lista vertical — layout certo pra rótulos longos. */
+.menu-account-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.4rem;
 }
 
-.mobile-menu-footer {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.4rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--border-subtle);
+.menu-account-list .nav-link {
+  font-size: 0.9rem;
+  padding: 0.6rem 0.55rem;
 }
 
-.mobile-menu-footer .nav-link {
-  font-size: 0.85rem;
-  padding: 0.45rem 0.55rem;
-}
-
-.mobile-menu-sheet button.nav-link:focus-visible {
+.menu-sheet button.nav-link:focus-visible {
   outline: none;
 }
 
@@ -2748,6 +2906,13 @@ span.service-mark--brand {
 }
 
 @media (max-width: 900px) {
+  /* Folga que o conteúdo precisa pra não ficar atrás da bottom nav fixa.
+     Única fonte da medida — usada no padding do .app-main e no offset do
+     CTA sticky do lançamento (.entry-actions). */
+  :root {
+    --bottom-nav-space: calc(5.75rem + env(safe-area-inset-bottom));
+  }
+
   .marketing-hero {
     width: min(100% - 1.25rem, 42rem);
     align-content: start;
@@ -2864,8 +3029,10 @@ span.service-mark--brand {
   }
 
   .app-main {
-    padding: 1rem 1rem calc(5.75rem + env(safe-area-inset-bottom));
-    overflow-x: hidden;
+    padding: 1rem 1rem var(--bottom-nav-space);
+    /* clip (não hidden): hidden viraria scroll container e mataria os
+       position:sticky de dentro (headers de dia do extrato, CTA do lançamento). */
+    overflow-x: clip;
   }
 
   .app-layout--focus .app-main {
@@ -2897,8 +3064,20 @@ span.service-mark--brand {
     gap: 0.75rem;
   }
 
-  .quick-actions .button {
-    flex: 1 1 12rem;
+  /* No mobile o FAB já cobre "Lançar agora" — o resto dos atalhos (Contas,
+     Cartões, Compromissos, Metas) continua, só em grid 2x2 mais compacto que o
+     do desktop. */
+  .quick-actions {
+    display: none;
+  }
+
+  .dash-shortcut-row {
+    display: grid;
+  }
+
+  /* O FAB da bottom nav já é o "+ Nova" no mobile. */
+  .transactions-new-link {
+    display: none;
   }
 
   .metric-card strong {
@@ -3058,8 +3237,22 @@ span.service-mark--brand {
   padding: 0 0.25rem;
 }
 
+/* CTA de salvar sempre à vista: com "Mais detalhes" aberto o form fica longo
+   e o botão sumia abaixo da dobra. No mobile o offset desconta a bottom nav
+   fixa (senão o sticky gruda atrás dela). */
 .entry-actions {
   margin-top: 0.5rem;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: var(--bg-page);
+  padding: 0.5rem 0 0.75rem;
+}
+
+@media (max-width: 900px) {
+  .entry-actions {
+    bottom: calc(var(--bottom-nav-space) - 1rem);
+  }
 }
 
 .button--block {
@@ -3074,6 +3267,35 @@ span.service-mark--brand {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+/* Trilho horizontal de uma linha (filtros de Transações): chips não quebram,
+   rolam. O corte seco do overflow é o próprio affordance de scroll. */
+.chip-row--scroll {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  /* sangra até a borda do card pra o chip cortado indicar que há mais */
+  margin-inline: -0.25rem;
+  padding-inline: 0.25rem;
+}
+
+.chip-row--scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.chip-row--scroll {
+  gap: 0.4rem;
+}
+
+/* Chips compactos no trilho: em 375px os padrão (padding 1rem) estouravam tanto
+   que os últimos ficavam invisíveis — menores, cabem quase todos na primeira dobra. */
+.chip-row--scroll .chip {
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.82rem;
 }
 
 /* `.eyebrow`/`.chip-row` used as a bare label + filter row directly inside a `.surface-pad`
@@ -3364,6 +3586,13 @@ span.service-mark--brand {
   box-shadow: var(--shadow-sheet);
   padding: 0.75rem 1.25rem calc(1.5rem + env(safe-area-inset-bottom));
   animation: sheet-up 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Zona de arrasto do swipe-to-dismiss: só grabber + header (nunca o corpo,
+   que precisa do scroll próprio). touch-action none pra o pointermove chegar. */
+.sheet-drag-zone {
+  touch-action: none;
+  cursor: grab;
 }
 
 .sheet-grabber {
@@ -5396,6 +5625,18 @@ span.service-mark--brand {
        do canto direito onde o dedo espera encontrá-lo. */
     justify-content: flex-end;
     text-align: right;
+  }
+
+  /* Exceção: a linha-botão do extrato (2026-07-18) não tem mais ações inline —
+     o "fim" é só valor + badge de sync e cabe ao lado do texto. Sem isso o valor
+     caía pra uma segunda linha à toa, deixando a lista 2x mais alta. */
+  .list-row--tap {
+    flex-wrap: nowrap;
+  }
+
+  .list-row--tap .list-row-end {
+    width: auto;
+    padding-left: 0;
   }
 }
 

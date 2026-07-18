@@ -21,6 +21,7 @@ import {
   X
 } from 'lucide-react';
 import { UserAvatar } from '../profile/UserAvatar';
+import { BottomSheet } from '../components/BottomSheet';
 import { BrandLockup } from '../components/BrandLogo';
 import { logout } from '../auth/authService';
 import { useAuth } from '../auth/AuthContext';
@@ -30,6 +31,10 @@ import { useWelcomeTour } from '../onboarding/welcomeTour.store';
 
 function getNavClass({ isActive }: { isActive: boolean }) {
   return `nav-link${isActive ? ' active' : ''}`;
+}
+
+function getTileClass({ isActive }: { isActive: boolean }) {
+  return `menu-tile${isActive ? ' active' : ''}`;
 }
 
 export function AppShell() {
@@ -137,72 +142,70 @@ export function AppShell() {
         <Outlet />
       </main>
 
-      {mobileMenuOpen && !isFoundationPending ? (
-        <>
-          <button
-            className="mobile-more-backdrop"
-            type="button"
-            aria-label="Fechar menu"
-            onClick={() => setMobileMenuOpen(false)}
-          />
-          <section className="mobile-menu-sheet" aria-label="Menu">
-            <div className="mobile-menu-header">
-              <UserAvatar profile={profile} size={44} />
-              <div>
-                <strong>{profile?.name ?? user?.email}</strong>
-                {profile?.name ? <span className="text-secondary" style={{ fontSize: '0.8rem' }}>{user?.email}</span> : null}
-              </div>
-              <button className="icon-button" type="button" aria-label="Fechar menu" onClick={() => setMobileMenuOpen(false)}>
-                <X size={18} aria-hidden="true" />
-              </button>
+      {/* Menu mobile sobre o BottomSheet base (herda backdrop, ESC e swipe-to-dismiss).
+          Duas zonas: destinos de produto (tiles) e conta/configurações (lista). */}
+      <BottomSheet open={mobileMenuOpen && !isFoundationPending} onClose={() => setMobileMenuOpen(false)} bare>
+        <div className="menu-sheet" aria-label="Menu">
+          <div className="menu-sheet-header">
+            <UserAvatar profile={profile} size={44} />
+            <div className="menu-sheet-identity">
+              <strong>{profile?.name ?? user?.email}</strong>
+              {profile?.name ? <span className="text-secondary">{user?.email}</span> : null}
             </div>
-            <div className="mobile-menu-grid">
-              <NavLink className={getNavClass} to="/app/accounts" onClick={() => setMobileMenuOpen(false)}>
-                <WalletCards size={19} aria-hidden="true" /> Contas
-              </NavLink>
-              {/* Patrimônio Líquido desativado (2026-07-16, pedido do dono) — ver docs/planning/TODOS.md. */}
-              <NavLink className={getNavClass} to="/app/shared" onClick={() => setMobileMenuOpen(false)}>
-                <Users size={19} aria-hidden="true" /> Compartilhado
-              </NavLink>
-              <NavLink className={getNavClass} to="/app/bills" onClick={() => setMobileMenuOpen(false)}>
-                <CalendarClock size={19} aria-hidden="true" /> Contas a Pagar
-              </NavLink>
-              <NavLink className={getNavClass} to="/app/goals" onClick={() => setMobileMenuOpen(false)}>
-                <Target size={19} aria-hidden="true" /> Metas
-              </NavLink>
-              <NavLink className={getNavClass} to="/app/search" onClick={() => setMobileMenuOpen(false)}>
-                <BarChart2 size={19} aria-hidden="true" /> Análise
-              </NavLink>
-              <NavLink className={getNavClass} to="/app/settings/whatsapp" onClick={() => setMobileMenuOpen(false)}>
-                <MessageCircle size={19} aria-hidden="true" /> WhatsApp
-              </NavLink>
-              <NavLink className={getNavClass} to="/app/assistant" onClick={() => setMobileMenuOpen(false)}>
-                <Bot size={19} aria-hidden="true" /> Assistente
-              </NavLink>
-            </div>
-            <div className="mobile-menu-footer">
-              <NavLink className={getNavClass} to="/app/settings/payday" onClick={() => setMobileMenuOpen(false)}>
-                <Banknote size={17} aria-hidden="true" /> Recebimento
-              </NavLink>
-              <NavLink className={getNavClass} to="/app/settings/onboarding" onClick={() => setMobileMenuOpen(false)}>
-                <Compass size={17} aria-hidden="true" /> Objetivo e desafio
-              </NavLink>
-              <NavLink className={getNavClass} to="/app/settings/appearance" onClick={() => setMobileMenuOpen(false)}>
-                <Palette size={17} aria-hidden="true" /> Aparência
-              </NavLink>
-              <NavLink className={getNavClass} to="/app/settings/security/login-methods" onClick={() => setMobileMenuOpen(false)}>
-                <Shield size={17} aria-hidden="true" /> Segurança
-              </NavLink>
-              <button className="nav-link" type="button" onClick={() => { setMobileMenuOpen(false); openTour(); }}>
-                <HelpCircle size={17} aria-hidden="true" /> Como funciona
-              </button>
-              <button className="nav-link" type="button" onClick={() => { setMobileMenuOpen(false); void handleLogout(); }}>
-                <LogOut size={17} aria-hidden="true" /> Sair
-              </button>
-            </div>
-          </section>
-        </>
-      ) : null}
+            <button className="icon-button" type="button" aria-label="Fechar menu" onClick={() => setMobileMenuOpen(false)}>
+              <X size={18} aria-hidden="true" />
+            </button>
+          </div>
+
+          <p className="eyebrow">Ir para</p>
+          <div className="menu-tiles">
+            <NavLink className={getTileClass} to="/app/accounts" onClick={() => setMobileMenuOpen(false)}>
+              <WalletCards size={20} aria-hidden="true" /> <span>Contas</span>
+            </NavLink>
+            {/* Patrimônio Líquido desativado (2026-07-16, pedido do dono) — ver docs/planning/TODOS.md. */}
+            <NavLink className={getTileClass} to="/app/bills" onClick={() => setMobileMenuOpen(false)}>
+              <CalendarClock size={20} aria-hidden="true" /> <span>Contas a Pagar</span>
+            </NavLink>
+            <NavLink className={getTileClass} to="/app/goals" onClick={() => setMobileMenuOpen(false)}>
+              <Target size={20} aria-hidden="true" /> <span>Metas</span>
+            </NavLink>
+            <NavLink className={getTileClass} to="/app/search" onClick={() => setMobileMenuOpen(false)}>
+              <BarChart2 size={20} aria-hidden="true" /> <span>Análise</span>
+            </NavLink>
+            <NavLink className={getTileClass} to="/app/shared" onClick={() => setMobileMenuOpen(false)}>
+              <Users size={20} aria-hidden="true" /> <span>Compartilhado</span>
+            </NavLink>
+            <NavLink className={getTileClass} to="/app/assistant" onClick={() => setMobileMenuOpen(false)}>
+              <Bot size={20} aria-hidden="true" /> <span>Assistente</span>
+            </NavLink>
+          </div>
+
+          <p className="eyebrow">Sua conta</p>
+          <div className="menu-account-list">
+            <NavLink className={getNavClass} to="/app/settings/payday" onClick={() => setMobileMenuOpen(false)}>
+              <Banknote size={17} aria-hidden="true" /> Recebimento
+            </NavLink>
+            <NavLink className={getNavClass} to="/app/settings/onboarding" onClick={() => setMobileMenuOpen(false)}>
+              <Compass size={17} aria-hidden="true" /> Objetivo e desafio
+            </NavLink>
+            <NavLink className={getNavClass} to="/app/settings/appearance" onClick={() => setMobileMenuOpen(false)}>
+              <Palette size={17} aria-hidden="true" /> Aparência
+            </NavLink>
+            <NavLink className={getNavClass} to="/app/settings/whatsapp" onClick={() => setMobileMenuOpen(false)}>
+              <MessageCircle size={17} aria-hidden="true" /> WhatsApp
+            </NavLink>
+            <NavLink className={getNavClass} to="/app/settings/security/login-methods" onClick={() => setMobileMenuOpen(false)}>
+              <Shield size={17} aria-hidden="true" /> Segurança
+            </NavLink>
+            <button className="nav-link" type="button" onClick={() => { setMobileMenuOpen(false); openTour(); }}>
+              <HelpCircle size={17} aria-hidden="true" /> Como funciona
+            </button>
+            <button className="nav-link" type="button" onClick={() => { setMobileMenuOpen(false); void handleLogout(); }}>
+              <LogOut size={17} aria-hidden="true" /> Sair
+            </button>
+          </div>
+        </div>
+      </BottomSheet>
 
       {!isFoundationPending ? (
         <nav className="mobile-nav" aria-label="Navegação mobile">

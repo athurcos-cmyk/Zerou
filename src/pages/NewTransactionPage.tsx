@@ -168,6 +168,7 @@ export function NewTransactionPage() {
             <input
               className="amount-hero-input"
               inputMode="decimal"
+              autoFocus
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
               placeholder="0,00"
