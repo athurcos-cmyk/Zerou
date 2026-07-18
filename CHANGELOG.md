@@ -2,6 +2,63 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-18 — Metas ganham histórico por contribuição, retirada de valor e exclusão com devolução
+
+O dono testou a fundo e trouxe 4 pontos reais sobre Metas: sem histórico por meta, sem
+como retirar valor (só "Corrigir", que nunca mexia em conta nenhuma), exclusão de meta
+nunca devolvia o dinheiro guardado (nem pedia confirmação), e uma suspeita de bug na
+criação que não se confirmou ao testar ao vivo.
+
+- **Depósito e retirada agora simétricos** (`contributeToGoalWithTransaction`): os dois
+  podem mexer numa conta de verdade (débito no depósito, crédito na retirada) ou só
+  corrigir o progresso ("Só registrar"). Bloqueia no formulário se a retirada passar do
+  que a meta tem guardado.
+- **Nova tela `/app/goals/:goalId`** com o histórico de cada meta — data, tipo
+  (guardado/retirado) e conta envolvida.
+- **Excluir meta com escolha**: meta de economizar com saldo > 0 agora pergunta —
+  devolver pra uma conta escolhida ou deixar sumir. Meta de dívida (ou sem nada
+  guardado) só pede confirmação simples — antes não pedia nenhuma.
+- `firestore.rules` ganhou `accountId` opcional em `goalContributions` (já publicada em
+  produção) e uma correção de robustez em `findNextIncomeDate` (não excluía retirada de
+  meta/cofrinho do cálculo de "próximo recebimento").
+- Verificado ao vivo, contra o banco de produção: depósito/retirada com conta escolhida
+  moveram o saldo certinho, exclusão com devolução creditou o valor exato e limpou o
+  histórico, exclusão sem devolver manteve o saldo intacto.
+- Detalhes em `docs/history/2026-07.md`.
+
+## 2026-07-18 — Revisão de design mobile: remove Projeção de Fluxo de Caixa, ajusta dataviz e formatação
+
+Revisão tela a tela do app (Dashboard, Transações, Contas, Cartões, Contas a Pagar,
+Metas, Análise, Compartilhado) a pedido do dono, usando lentes de design/dataviz.
+
+- **Projeção de Fluxo de Caixa removida por completo** (`CashFlowChart`,
+  `ProjectionTimeline`, `cashFlowProjection.ts` apagados, não só desconectados):
+  especulava receita futura a partir de média histórica + regra de recebimento, e o
+  dono decidiu que o risco de iludir alguém com dinheiro que não tem supera o valor da
+  feature.
+- Dashboard: "Disponível" ganha a mesma explicação clicável que só "Comprometido"
+  tinha; card de gastos mostra variação vs. mês anterior.
+- Cartões/Fatura: mês de referência da fatura formatado ("jul 2026" em vez de "2026-07"
+  cru) em 6 lugares, inclusive no título da própria página da fatura.
+- Análise: remove ícone redundante de "limite por categoria" do cabeçalho; corrige
+  grade pontilhada e cor errada de "Saídas" no gráfico de entradas/saídas; lista de
+  categorias agora expande além do top 6.
+- Achado e corrigido: botão de excluir em listas pulava de posição quando a linha não
+  tinha "Editar" (Transações, beneficia também Contas a Pagar); barras de progresso
+  (gastos, metas, limite de cartão) ficam quadradas na base, arredondadas só na ponta;
+  seletor 30d/60d/90d parou de quebrar letra por letra.
+- Rodado o validador de paleta do dataviz na cor de categorias (`theme/palette.ts`):
+  2 cores falham checagem de daltonismo/contraste. Dono decidiu não mexer — é a
+  identidade visual do app. Documentado em `docs/planning/TODOS.md`.
+- Detalhes em `docs/history/2026-07.md`.
+
+## 2026-07-18 — Landing perde contraste AA no texto secundário e ignora prefers-reduced-motion
+
+`--ink-3` tinha só 3.07:1 de contraste contra o fundo branco (usado em "Grátis · sem
+cartão de crédito" e no fechamento do CTA) — escurecido pra 4.59:1. Bob do telefone e
+das badges flutuantes no hero rodava infinito mesmo com `prefers-reduced-motion` (são
+animações inline do Framer Motion, não pegas pelo media query CSS já existente).
+
 ## 2026-07-17 — Aba WhatsApp do admin: linha "fantasma" após excluir a conta dona
 
 Achado pelo dono testando a feature nova de hoje: excluiu uma conta pelo admin (que já desvincula o WhatsApp sozinha) e, ao tentar desvincular esse mesmo número manualmente depois, caiu num erro "não pertence a nenhuma conta" — a lista da aba não se atualiza sozinha após excluir um usuário, então a linha continuava aparecendo mesmo já limpa no banco. `handleDeleteConfirm` agora também remove da lista local qualquer vínculo do usuário excluído; e tentar desvincular algo que já sumiu (corrida entre duas ações) agora é tratado como sucesso, não erro. Também esclarecido um segundo ponto levantado (sem mudança de código): reabrir o app em outro aparelho logo depois de excluir a conta em outro pode mostrar dado antigo por um instante — comportamento esperado de app offline-first + token JWT, não um bug novo. Detalhes em `docs/history/2026-07.md`.

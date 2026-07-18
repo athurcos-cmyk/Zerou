@@ -46,11 +46,12 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
 - Seleção (conta, categoria, bandeira, parcelas): bottom-sheet, não dropdown nativo.
 - Chips para presets (datas Hoje/Ontem/Outra, tipo de divisão).
 - Empty states sempre com ilustração + CTA, não texto seco.
-- Barras de progresso para limite de cartão, metas e cofrinho.
+- Barras de progresso para limite de cartão, metas e cofrinho. **Forma da barra** (achado no `/dataviz`, 2026-07-18): quadrada na base (início), arredondada só na ponta (4px) — nunca pílula nos dois lados. Vale pra track e fill juntos (`.spending-bar-track`, `.goal-progress-track`, `.card-limit-bar-track` em `global.css`), senão o clip do container arredonda os dois lados mesmo que só o fill mude.
 - Nunca expor termo técnico ao usuário (sem "ledger", "workspace", "checkout").
 - **Navegação por mês/período** (`.month-switcher`, `global.css`): `‹ Mês de Ano › ` com `.icon-button`, introduzido em `SearchPage.tsx` (2026-07-08) — padrão a reaproveitar se outra tela precisar filtrar por mês, em vez de inventar um novo controle.
 - Ação em cartão do casal/despesa que muda estado do servidor (gerar/regenerar/revogar convite): sempre com `confirm()` explicando a consequência antes de agir, principalmente se for destrutiva ou invalidar algo que já foi compartilhado com outra pessoa.
 - **Estado exclusivo/progressivo precisa de indicador visível do que está ativo** (aprendido nos modos do casal, 2026-07-08): quando uma escolha é um valor único mas as opções são níveis cumulativos (cada uma mostra mais UI), o usuário acha que está "acumulando". Sempre mostrar um badge do estado atual na tela (não escondido em acordeão), usar verbo de troca ("Mudar pra X", não "Ativar X"), e no seletor marcar o valor vigente ("Atual") distinto do tentativamente selecionado.
+- **Excluir algo que guarda dinheiro de verdade (meta, cofrinho) precisa perguntar o destino do valor** (aprendido nas Metas, 2026-07-18): nunca decidir sozinho se o dinheiro some ou volta. Sheet de duas opções no molde `.choice-list`/`.choice-card` (ver `AvailableModeSheet`) — "devolver pra uma conta" (pede pra escolher qual, nunca assume a conta original) ou "deixar sumir" — e só oferecer a devolução quando fizer sentido ter "guardado" pra devolver (não numa meta de dívida, onde o valor já foi pago a um credor real).
 
 ## Landing (`src/landing/`)
 
