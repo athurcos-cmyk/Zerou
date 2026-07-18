@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { resolveInvoiceStatus } from '../domain/invoices/calculateInvoice';
 import { subscribeWithTransientRetry } from '../firebase/firestoreRetry';
-import { subscribeCards, subscribeInvoices, type LocalCardSynced } from './cardService';
+import { markClosedInvoices, subscribeCards, subscribeInvoices, type LocalCardSynced } from './cardService';
 import type { CreditCard, Invoice } from '../types/contracts';
 
 interface CardsState {
@@ -83,11 +83,13 @@ export function useCardsData(workspaceId?: string) {
           subscribeInvoices(
             workspaceId,
             card.id,
-            (items) =>
+            (items) => {
+              markClosedInvoices(workspaceId, items, card.closingDay);
               setState((current) => ({
                 ...current,
                 invoices: [...current.invoices.filter((invoice) => invoice.cardId !== card.id), ...items]
-              })),
+              }));
+            },
             onError
           ),
         onError: () => setState((current) => ({ ...current, error: 'Não foi possível carregar faturas.' }))

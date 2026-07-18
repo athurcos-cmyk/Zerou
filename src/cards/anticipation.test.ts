@@ -140,6 +140,17 @@ describe('groupAnticipatablePurchases', () => {
     expect(groups[0].installments.map((i) => i.entryId)).toEqual(['e-08b']);
   });
 
+  // Regressão: compra à vista (sem installmentTotal, ocorre uma única vez no ledger todo)
+  // que só caiu numa fatura futura porque a atual já fechou não é "parcela antecipável".
+  it('ignores a single-shot purchase that just rolled into a future invoice', () => {
+    const groups = groupAnticipatablePurchases(
+      [invoice({ id: 'inv-08', referenceMonth: '2026-08', ledgerEntries: [purchase('e-08', 5000, { sourceTransactionId: 'txn-avista' })] })],
+      current
+    );
+
+    expect(groups).toEqual([]);
+  });
+
   it('ignores ledger entries that are not purchases', () => {
     const groups = groupAnticipatablePurchases(
       [

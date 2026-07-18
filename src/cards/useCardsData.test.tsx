@@ -4,7 +4,8 @@ import { useCardsData } from './useCardsData';
 
 const cardMocks = vi.hoisted(() => ({
   subscribeCards: vi.fn(),
-  subscribeInvoices: vi.fn()
+  subscribeInvoices: vi.fn(),
+  markClosedInvoices: vi.fn()
 }));
 
 vi.mock('./cardService', () => cardMocks);
@@ -29,14 +30,25 @@ function invoice(overrides: Partial<Record<string, unknown>> = {}) {
 
 describe('useCardsData', () => {
   beforeEach(() => {
+    cardMocks.markClosedInvoices.mockClear();
     cardMocks.subscribeCards.mockImplementation((_workspaceId, onNext) => {
-      onNext([{ id: 'card-1', workspaceId: 'ws-1', name: 'Cartão', isActive: true, localSyncStatus: 'synced' }]);
+      onNext([{ id: 'card-1', workspaceId: 'ws-1', name: 'Cartão', isActive: true, closingDay: 10, localSyncStatus: 'synced' }]);
       return vi.fn();
     });
     cardMocks.subscribeInvoices.mockImplementation((_workspaceId, _cardId, onNext) => {
       onNext([invoice()]);
       return vi.fn();
     });
+  });
+
+  // Regressão: a chamada a markClosedInvoices foi acrescentada à mão dentro do callback de
+  // subscribeInvoices (arrow function viraram block body) — sem este teste, um refactor que
+  // derrubasse a chamada, trocasse a ordem dos argumentos ou passasse card.dueDay em vez de
+  // card.closingDay passaria por todo o resto da suíte sem quebrar nada.
+  it('chama markClosedInvoices com a fatura recebida e o closingDay do cartão certo', () => {
+    renderHook(() => useCardsData('ws-1'));
+
+    expect(cardMocks.markClosedInvoices).toHaveBeenCalledWith('ws-1', [invoice()], 10);
   });
 
   it('exposes cards and invoices with totals já persistidos, sem recalcular do ledger', () => {

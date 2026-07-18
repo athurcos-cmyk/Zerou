@@ -55,6 +55,20 @@ function collectFutureInstallments(
   invoices: AnticipatableInvoice[],
   currentInvoice: { id: string; cardId: string; referenceMonth: string }
 ): AnticipatableInstallment[] {
+  // Compra à vista nunca grava installmentTotal ("1x não vira 1/1" — createCardPurchase) e só
+  // aparece UMA vez em todo o ledger do cartão. Compra parcelada — mesmo antiga, de antes do
+  // campo installmentTotal existir — sempre tem mais de uma ocorrência do mesmo
+  // sourceTransactionId, uma por fatura. Sem essa checagem, uma compra à vista que só rolou
+  // pra fatura seguinte porque a atual já fechou virava candidata a "antecipar".
+  const purchaseOccurrences = new Map<string, number>();
+  for (const invoice of invoices) {
+    if (invoice.cardId !== currentInvoice.cardId) continue;
+    for (const entry of invoice.ledgerEntries) {
+      if (entry.type !== 'purchase' || !entry.sourceTransactionId) continue;
+      purchaseOccurrences.set(entry.sourceTransactionId, (purchaseOccurrences.get(entry.sourceTransactionId) ?? 0) + 1);
+    }
+  }
+
   return invoices
     .filter(
       (invoice) =>
@@ -76,6 +90,9 @@ function collectFutureInstallments(
       return invoice.ledgerEntries
         .filter((entry) => {
           if (entry.type !== 'purchase' || !entry.sourceTransactionId) return false;
+          const isInstallmentPurchase =
+            (entry.installmentTotal ?? 0) > 1 || (purchaseOccurrences.get(entry.sourceTransactionId) ?? 0) > 1;
+          if (!isInstallmentPurchase) return false;
           const pending = alreadyAnticipated.get(entry.sourceTransactionId) ?? 0;
           if (pending > 0) {
             alreadyAnticipated.set(entry.sourceTransactionId, pending - 1);

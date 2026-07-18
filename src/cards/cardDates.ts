@@ -70,6 +70,21 @@ export function invoiceIdFor(cardId: string, referenceMonth: string) {
 }
 
 /**
+ * Início (00:00) do dia de fechamento da fatura de um `referenceMonth`, dado o cartão —
+ * sempre o `closingDay` clampado no próprio mês de referência (é a definição de
+ * referenceMonth: uma compra até o dia de fechamento cai na fatura DESSE mês; ver
+ * `resolveInstallmentCycle`). Meia-noite de propósito, não meio-dia: quem usa isso pra
+ * decidir "essa fatura já fechou?" precisa comparar por DIA inteiro — `resolveInstallmentCycle`
+ * trata o dia de fechamento inteiro como parte do ciclo atual, então fechar a fatura a
+ * partir do meio-dia desse mesmo dia fecharia horas antes de uma compra da tarde ainda
+ * poder cair nela.
+ */
+export function invoiceClosingDateForReferenceMonth(referenceMonth: string, closingDay: number) {
+  const [year, month] = referenceMonth.split('-').map(Number);
+  return clampDay(new Date(year, month - 1, 1), closingDay);
+}
+
+/**
  * Escolhe a fatura "atual" (a que está acumulando compras novas agora, mais próxima
  * de fechar) entre as faturas abertas de um cartão. Compras parceladas criam faturas
  * abertas em vários meses futuros ao mesmo tempo — sem ordenar por referenceMonth,

@@ -15,7 +15,7 @@ import {
   type QueryDocumentSnapshot,
   type Unsubscribe
 } from 'firebase/firestore';
-import { addMonths, format } from 'date-fns';
+import { addMonths, format, startOfDay } from 'date-fns';
 import { getFirebaseDb } from '../firebase/config';
 import { fireWrite } from '../firebase/fireWrite';
 import { readSnapshotData, readSnapshotDoc } from '../firebase/snapshotData';
@@ -40,7 +40,7 @@ import {
   type RecordInvoicePaymentInput,
   type RegisterOngoingInstallmentsInput
 } from './cardSchemas';
-import { invoiceDueDateForReferenceMonth, invoiceIdFor, resolveInstallmentCycle } from './cardDates';
+import { invoiceClosingDateForReferenceMonth, invoiceDueDateForReferenceMonth, invoiceIdFor, resolveInstallmentCycle } from './cardDates';
 import type { CreditCard, Invoice, InvoiceLedgerEntry, InvoiceLedgerEntryType, SyncStatus } from '../types/contracts';
 
 export type LocalCardSynced<T> = T & {
@@ -422,6 +422,30 @@ export async function closeInvoice(workspaceId: string, cardId: string, invoiceI
     status: 'closed',
     updatedAt: serverTimestamp()
   }));
+}
+
+/**
+ * Marca como `closed` toda fatura `open` cujo dia de fechamento já passou. Chamado a cada
+ * snapshot de `subscribeInvoices` — silencioso, sem feedback de UI (mesmo padrão de
+ * `markOverdueBills` pra contas a pagar). Sem isso, o único jeito de uma fatura fechar é o
+ * Cloud Scheduler `closeInvoicesDue`, que roda uma vez por dia e só pega faturas do dia exato
+ * do fechamento — uma compra lançada com data retroativa (ou o scheduler falhando um dia)
+ * deixava a fatura "Aberta" por até um mês, com o botão errado ("Antecipar fatura" em vez de
+ * "Pagar fatura").
+ */
+export function markClosedInvoices(
+  workspaceId: string,
+  invoices: Array<Pick<Invoice, 'id' | 'cardId' | 'status' | 'referenceMonth'>>,
+  closingDay: number
+) {
+  const todayStart = startOfDay(new Date());
+
+  invoices
+    .filter(
+      (invoice) =>
+        invoice.status === 'open' && invoiceClosingDateForReferenceMonth(invoice.referenceMonth, closingDay) < todayStart
+    )
+    .forEach((invoice) => closeInvoice(workspaceId, invoice.cardId, invoice.id));
 }
 
 export async function recordInvoicePayment(workspaceId: string, userId: string, input: RecordInvoicePaymentInput) {
