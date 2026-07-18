@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Calendar, ChevronLeft, ChevronRight, Download, Minus, Plus, Search, Target, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
+import { Calendar, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, Minus, Plus, Search, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
 import {
   PieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -146,6 +146,7 @@ export function SearchPage() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [selectedCatIndex, setSelectedCatIndex] = useState<number | null>(null);
+  const [showAllCategories, setShowAllCategories] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [annualOpen, setAnnualOpen] = useState(false);
@@ -388,6 +389,7 @@ export function SearchPage() {
 
   function changeMonth(delta: number) {
     setSelectedCatIndex(null);
+    setShowAllCategories(false);
     setSelectedMonth((m) => shiftMonth(m, delta));
   }
 
@@ -414,9 +416,6 @@ export function SearchPage() {
         <div style={{ display: 'flex', gap: '0.25rem' }}>
           <button className="icon-button" type="button" aria-label="Resumo anual" title="Resumo anual" onClick={() => setAnnualOpen(true)}>
             <Calendar size={18} aria-hidden="true" />
-          </button>
-          <button className="icon-button" type="button" aria-label="Definir limite de gasto por categoria" title="Limite por categoria" onClick={() => setBudgetOpen(true)}>
-            <Target size={18} aria-hidden="true" />
           </button>
           <button className="icon-button" type="button" aria-label="Exportar CSV" onClick={handleExportCsv}>
             <Download size={18} aria-hidden="true" />
@@ -584,7 +583,7 @@ export function SearchPage() {
 
               {/* legenda com barras de progresso */}
               <div style={{ width: '100%', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
-                {spendingByCategory.slice(0, 6).map((cat, i) => {
+                {(showAllCategories ? spendingByCategory : spendingByCategory.slice(0, 6)).map((cat, i) => {
                   const pct = Math.round((cat.amountCents / totalSpent) * 100);
                   const isSelected = selectedCatIndex === i;
                   const isDimmed = selectedCatIndex !== null && !isSelected;
@@ -650,9 +649,21 @@ export function SearchPage() {
                 })}
 
                 {spendingByCategory.length > 6 && (
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0.15rem 0 0' }}>
-                    +{spendingByCategory.length - 6} categorias menores
-                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowAllCategories((v) => !v)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '0.3rem',
+                      fontSize: '0.78rem', fontWeight: 600, color: 'var(--action-primary)',
+                      background: 'none', border: 'none', padding: '0.15rem 0 0', cursor: 'pointer',
+                    }}
+                  >
+                    {showAllCategories ? (
+                      <>Ver menos <ChevronUp size={14} aria-hidden="true" /></>
+                    ) : (
+                      <>Ver todas as {spendingByCategory.length} categorias <ChevronDown size={14} aria-hidden="true" /></>
+                    )}
+                  </button>
                 )}
                 {selectedCatIndex !== null && (
                   <button
@@ -751,7 +762,7 @@ export function SearchPage() {
             <p className="text-secondary" style={{ margin: '0.1rem 0 1rem' }}>Últimos 6 meses</p>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={monthlyData} barGap={4} barCategoryGap="32%" margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-subtle)" />
+                <CartesianGrid vertical={false} stroke="var(--border-subtle)" />
                 <XAxis
                   dataKey="month"
                   tick={{ fontSize: 11, fill: 'var(--text-secondary)', fontWeight: 500 }}
@@ -767,7 +778,7 @@ export function SearchPage() {
                 />
                 <ReTooltip content={<BarTooltip />} cursor={{ fill: 'var(--bg-surface-subtle)', radius: 6 }} />
                 <Bar dataKey="incomeCents" name="Entradas" fill="var(--success)" radius={[5, 5, 0, 0]} />
-                <Bar dataKey="expenseCents" name="Saídas" fill="var(--action-primary)" radius={[5, 5, 0, 0]} />
+                <Bar dataKey="expenseCents" name="Saídas" fill="var(--danger)" radius={[5, 5, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
 
@@ -778,7 +789,7 @@ export function SearchPage() {
                 Entradas
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                <span style={{ width: 10, height: 10, borderRadius: 3, background: 'var(--action-primary)', display: 'block' }} />
+                <span style={{ width: 10, height: 10, borderRadius: 3, background: 'var(--danger)', display: 'block' }} />
                 Saídas
               </div>
             </div>

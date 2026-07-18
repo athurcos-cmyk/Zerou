@@ -909,6 +909,15 @@ html[data-reduce-motion='true'] *::after {
   margin: 0.25rem 0 0;
 }
 
+.spending-variation {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0.35rem 0 0;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
 .start-guide-steps {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -955,14 +964,14 @@ html[data-reduce-motion='true'] *::after {
 
 .spending-bar-track {
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: 0 4px 4px 0;
   background: var(--bg-surface-muted);
 }
 
 .spending-bar-track span {
   display: block;
   height: 0.65rem;
-  border-radius: inherit;
+  border-radius: 0 4px 4px 0;
   background: var(--action-primary);
 }
 
@@ -980,7 +989,7 @@ html[data-reduce-motion='true'] *::after {
 
 .section-heading {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 1rem;
@@ -1622,7 +1631,7 @@ span.service-mark--brand {
 .card-limit-bar-track {
   overflow: hidden;
   height: 0.55rem;
-  border-radius: 999px;
+  border-radius: 0 4px 4px 0;
   background: var(--bg-surface-muted);
 }
 
@@ -4096,7 +4105,7 @@ span.service-mark--brand {
 
 .goal-progress-track {
   height: 0.65rem;
-  border-radius: 999px;
+  border-radius: 0 4px 4px 0;
   background: var(--bg-surface-muted);
   overflow: hidden;
 }
@@ -4104,7 +4113,7 @@ span.service-mark--brand {
 .goal-progress-fill {
   display: block;
   height: 100%;
-  border-radius: 999px;
+  border-radius: 0 4px 4px 0;
   background: var(--action-primary);
   transition: width 0.3s ease;
 }
@@ -5380,6 +5389,13 @@ span.service-mark--brand {
   .list-row--with-icon .list-row-end {
     width: 100%;
     padding-left: calc(2.15rem + 0.75rem);
+    /* A regra de .list-row-end lá em cima (900px, pra variante empilhada) vira
+       flex-start — aqui o grupo fica numa linha própria mas continua um "fim de
+       linha", então precisa voltar a colar na direita, senão o grupo de ações fica
+       mais curto (sem "Editar" nas compras de cartão) e o botão de excluir some
+       do canto direito onde o dedo espera encontrá-lo. */
+    justify-content: flex-end;
+    text-align: right;
   }
 }
 
@@ -5485,16 +5501,4 @@ span.service-mark--brand {
   .avatar-picker__grid {
     grid-template-columns: repeat(3, 1fr);
   }
-}
-
-/* ── Cash Flow Projection ─────────────────────────────── */
-
-.cash-flow-section .segmented {
-  display: flex;
-  gap: 0.25rem;
-}
-
-.cash-flow-section .segmented .chip {
-  padding: 0.3rem 0.6rem;
-  font-size: 0.78rem;
 }

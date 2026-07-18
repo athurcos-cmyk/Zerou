@@ -18,7 +18,7 @@ import {
 } from '../cards/cardService';
 import { mergeInvoicesWithLedger, useInvoiceLedger } from '../cards/useInvoiceLedger';
 
-import { formatFriendlyDate, fromDateInputValue, todayInputValue } from '../finance/financeDates';
+import { formatFriendlyDate, formatFriendlyMonth, fromDateInputValue, todayInputValue } from '../finance/financeDates';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 
 import type { InvoiceLedgerEntryType } from '../types/contracts';
@@ -223,7 +223,7 @@ export function InvoicePage() {
       <div className="page-heading-row">
         <div>
           <p className="eyebrow">Fatura · {card?.name ?? ''}</p>
-          <h1 className="page-title">{invoice ? invoice.referenceMonth : 'Carregando…'}</h1>
+          <h1 className="page-title">{invoice ? formatFriendlyMonth(invoice.referenceMonth) : 'Carregando…'}</h1>
         </div>
         <Link className="button button--secondary" to={`/app/cards/${cardId ?? ''}`}>
           Voltar
@@ -411,9 +411,9 @@ export function InvoicePage() {
                         <span className="text-muted anticipation-group-hint">
                           {count === 0
                             ? nextToAnticipate
-                              ? `Próxima a antecipar: ${parcelaLabel(nextToAnticipate.installmentNumber) ?? `fatura ${nextToAnticipate.referenceMonth}`}`
+                              ? `Próxima a antecipar: ${parcelaLabel(nextToAnticipate.installmentNumber) ?? `fatura ${formatFriendlyMonth(nextToAnticipate.referenceMonth)}`}`
                               : ''
-                            : `${parcelaLabel(selected[selected.length - 1].installmentNumber) ?? `fatura ${selected[selected.length - 1].referenceMonth}`} até ${parcelaLabel(selected[0].installmentNumber) ?? `fatura ${selected[0].referenceMonth}`} · ${formatMoney(groupTotal)}`}
+                            : `${parcelaLabel(selected[selected.length - 1].installmentNumber) ?? `fatura ${formatFriendlyMonth(selected[selected.length - 1].referenceMonth)}`} até ${parcelaLabel(selected[0].installmentNumber) ?? `fatura ${formatFriendlyMonth(selected[0].referenceMonth)}`} · ${formatMoney(groupTotal)}`}
                         </span>
                       </div>
                     );
@@ -479,7 +479,7 @@ export function InvoicePage() {
         open={paySheetOpen}
         onClose={() => setPaySheetOpen(false)}
         title={isOpen ? 'Antecipar fatura' : 'Pagar fatura'}
-        subtitle={invoice ? `${invoice.referenceMonth} · ${formatMoney(invoice.outstandingBalanceCents)} em aberto` : undefined}
+        subtitle={invoice ? `${formatFriendlyMonth(invoice.referenceMonth)} · ${formatMoney(invoice.outstandingBalanceCents)} em aberto` : undefined}
       >
         <div className="form-stack">
           <label className="field">

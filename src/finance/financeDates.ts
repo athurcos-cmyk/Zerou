@@ -28,6 +28,13 @@ export function monthKeyFromDate(value: Date) {
   return format(value, 'yyyy-MM');
 }
 
+/** Mês de referência amigável pro usuário ("jul 2026") — nunca mostrar o
+ * `referenceMonth` (`yyyy-MM`) de fatura cru na tela. */
+export function formatFriendlyMonth(referenceMonth: string) {
+  const [year, month] = referenceMonth.split('-').map(Number);
+  return format(new Date(year, month - 1, 1), 'MMM yyyy', { locale: ptBR });
+}
+
 export function todayInputValue() {
   return format(new Date(), 'yyyy-MM-dd');
 }

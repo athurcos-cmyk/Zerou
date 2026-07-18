@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarClock, CreditCard, Plus, Target, Wallet } from 'lucide-react';
+import { CalendarClock, CreditCard, Minus, Plus, Target, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
@@ -19,9 +19,6 @@ import { CategoryMark } from '../components/categoryIcons';
 import { defaultCategoryColors } from '../theme/palette';
 import { InstallPromptSheet } from '../pwa/InstallPromptSheet';
 import { useWelcomeTour } from '../onboarding/welcomeTour.store';
-import { projectDailyBalance } from '../finance/cashFlowProjection';
-import { CashFlowChart } from '../components/CashFlowChart';
-import { ProjectionTimeline } from '../components/ProjectionTimeline';
 import { BudgetAlertBanner } from '../components/BudgetAlertBanner';
 
 import { EmptyState } from '../components/EmptyState';
@@ -43,7 +40,6 @@ export function DashboardPage() {
   const welcomeTourSeen = useWelcomeTour((state) => state.seen);
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [tutorialDismissed, setTutorialDismissed] = useState(false);
-  const [cashFlowHorizon, setCashFlowHorizon] = useState(30);
   const dashboard = calculateDashboardSummary({
     accounts: finance.accounts,
     transactions: finance.transactions,
@@ -123,16 +119,17 @@ export function DashboardPage() {
     : formatMoney(dashboard.committedCents);
   const syncStatus = finance.pendingWrites || cardsData.pendingWrites ? 'pending' : 'synced';
   const currentMonth = new Date().toISOString().slice(0, 7);
+  const now = new Date();
+  const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 7);
   const categoryMap = new Map(finance.categories.map((c) => [c.id, c]));
+  const isCountableSpend = (transaction: (typeof finance.transactions)[number], month: string) =>
+    !transaction.deletedAt &&
+    (transaction.type === 'expense' || transaction.type === 'card_purchase') &&
+    (transaction.cashMonth === month || transaction.competenceMonth === month) &&
+    !transaction.tags?.includes('meta') &&
+    !transaction.tags?.includes('cofrinho');
   const spendingByCategory = finance.transactions
-    .filter(
-      (transaction) =>
-        !transaction.deletedAt &&
-        (transaction.type === 'expense' || transaction.type === 'card_purchase') &&
-        (transaction.cashMonth === currentMonth || transaction.competenceMonth === currentMonth) &&
-        !transaction.tags?.includes('meta') &&
-        !transaction.tags?.includes('cofrinho')
-    )
+    .filter((transaction) => isCountableSpend(transaction, currentMonth))
     .reduce((totals, transaction) => {
       // `||`, não `??`: compra no cartão sem categoria grava `categoryId: ''`
       // (`createCardPurchase`), e string vazia passa pelo `??`. Com `??`, os sem-categoria
@@ -146,25 +143,15 @@ export function DashboardPage() {
     .sort((left, right) => right[1] - left[1])
     .slice(0, 5);
   const maxSpendingCents = Math.max(...spendingRows.map(([, amount]) => amount), 1);
+  const currentMonthSpendCents = [...spendingByCategory.values()].reduce((sum, amount) => sum + amount, 0);
+  const previousMonthSpendCents = finance.transactions
+    .filter((transaction) => isCountableSpend(transaction, previousMonth))
+    .reduce((sum, transaction) => sum + transaction.amountCents, 0);
+  const spendingVariationPct =
+    !isCommittedLoading && previousMonthSpendCents > 0
+      ? Math.round(((currentMonthSpendCents - previousMonthSpendCents) / previousMonthSpendCents) * 100)
+      : null;
   const hasStarted = finance.accounts.length > 0 || finance.transactions.length > 0 || cardsData.cards.length > 0;
-
-  const cashFlowProjection = useMemo(
-    () =>
-      hasStarted && !isCommittedLoading
-        ? projectDailyBalance(
-            cashFlowHorizon,
-            finance.accounts,
-            finance.transactions,
-            finance.bills,
-            finance.recurringRules,
-            cardsData.invoices,
-            profile?.payday,
-            undefined,
-            cardsData.cards,
-          )
-        : null,
-    [hasStarted, isCommittedLoading, cashFlowHorizon, finance.accounts, finance.transactions, finance.bills, finance.recurringRules, cardsData.invoices, profile?.payday, cardsData.cards],
-  );
 
   return (
     <section className="page-content">
@@ -193,7 +180,12 @@ export function DashboardPage() {
           <article className="surface surface-pad dash-metric dash-metric--available">
             <p className="eyebrow">Disponível</p>
             <strong className="display-number">{freeToSpendDisplay}</strong>
-            <span className="text-secondary">
+            <button
+              type="button"
+              className="dash-metric-explain"
+              onClick={() => setTutorialOpen(true)}
+              aria-label="Entender como o Disponível e o Comprometido são calculados"
+            >
               {perDayDisplay
                 ? perDayDisplay
                 : isCommittedLoading
@@ -201,7 +193,7 @@ export function DashboardPage() {
                 : dashboard.freeToSpendCents <= 0
                 ? 'Você já comprometeu tudo que tem disponível.'
                 : 'Livre agora.'}
-            </span>
+            </button>
           </article>
           <article className="surface surface-pad dash-metric dash-metric--committed">
             <p className="eyebrow">Comprometido</p>
@@ -271,6 +263,19 @@ export function DashboardPage() {
           <div>
             <p className="eyebrow">Resumo de gastos</p>
             <h2>Para onde foi o dinheiro este mês</h2>
+            {spendingVariationPct !== null && (
+              <p className="text-secondary spending-variation">
+                {spendingVariationPct > 0 ? (
+                  <TrendingUp size={14} aria-hidden="true" />
+                ) : spendingVariationPct < 0 ? (
+                  <TrendingDown size={14} aria-hidden="true" />
+                ) : (
+                  <Minus size={14} aria-hidden="true" />
+                )}
+                {spendingVariationPct > 0 ? '+' : ''}
+                {spendingVariationPct}% vs. mês passado
+              </p>
+            )}
           </div>
           <Link className="inline-link" to="/app/search" state={{ autoOpenSearch: true }}>
             Buscar
@@ -399,31 +404,6 @@ export function DashboardPage() {
           ) : null}
         </article>
       </div>
-
-      {hasStarted && cashFlowProjection && cashFlowProjection.length > 0 ? (
-        <article className="surface surface-pad cash-flow-section" style={{ marginTop: '1.5rem' }}>
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Projeção de fluxo</p>
-              <h2 style={{ fontSize: '1.05rem', margin: 0 }}>Saldo nos próximos dias</h2>
-            </div>
-            <div className="segmented" role="group" aria-label="Horizonte da projeção">
-              {[30, 60, 90].map((days) => (
-                <button
-                  key={days}
-                  type="button"
-                  className={`chip${cashFlowHorizon === days ? ' chip--active' : ''}`}
-                  onClick={() => setCashFlowHorizon(days)}
-                >
-                  {days}d
-                </button>
-              ))}
-            </div>
-          </div>
-          <CashFlowChart projections={cashFlowProjection} />
-          <ProjectionTimeline projections={cashFlowProjection} />
-        </article>
-      ) : null}
     </section>
   );
 }

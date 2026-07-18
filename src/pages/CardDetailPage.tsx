@@ -13,7 +13,7 @@ import { deleteCard, recordInvoicePayment } from '../cards/cardService';
 import { pickCurrentInvoice } from '../cards/cardDates';
 import { mergeInvoicesWithLedger, useInvoiceLedger } from '../cards/useInvoiceLedger';
 
-import { formatFriendlyDate } from '../finance/financeDates';
+import { formatFriendlyDate, formatFriendlyMonth } from '../finance/financeDates';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
@@ -171,7 +171,7 @@ export function CardDetailPage() {
                     </span>
                   </strong>
                   <span className="text-secondary">
-                    {openInvoice.referenceMonth} · {openInvoice.status === 'open' ? 'em aberto' : 'fechada'} · vence {formatFriendlyDate(openInvoice.dueDate)}
+                    {formatFriendlyMonth(openInvoice.referenceMonth)} · {openInvoice.status === 'open' ? 'em aberto' : 'fechada'} · vence {formatFriendlyDate(openInvoice.dueDate)}
                   </span>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
@@ -230,7 +230,7 @@ export function CardDetailPage() {
               return (
                 <Link className="list-row list-row--link" key={invoice.id} to={`/app/cards/${invoice.cardId}/invoices/${invoice.id}`}>
                   <div>
-                    <strong>Fatura {invoice.referenceMonth}</strong>
+                    <strong>Fatura {formatFriendlyMonth(invoice.referenceMonth)}</strong>
                     <span className="text-secondary">
                       {invoiceStatusLabels[invoice.status]} · vence {formatFriendlyDate(invoice.dueDate)}
                     </span>
@@ -262,7 +262,7 @@ export function CardDetailPage() {
         open={paySheetOpen}
         onClose={() => setPaySheetOpen(false)}
         title="Pagar fatura"
-        subtitle={openInvoice ? `${openInvoice.referenceMonth} · ${formatMoney(openInvoice.outstandingBalanceCents)} em aberto` : undefined}
+        subtitle={openInvoice ? `${formatFriendlyMonth(openInvoice.referenceMonth)} · ${formatMoney(openInvoice.outstandingBalanceCents)} em aberto` : undefined}
       >
         <div className="form-stack">
           <label className="field">
