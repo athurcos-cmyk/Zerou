@@ -84,6 +84,41 @@ describe('subscribeWithTransientRetry', () => {
     expect(attempts).toBe(attemptsBeforeSustained + 1);
   });
 
+  // Regressão real (relatado pelo dono, 2026-07-18): depois que os cartões já carregaram
+  // com sucesso, um soluço de rede no celular (troca de torre, sinal fraco) fazia o
+  // Firestore chamar erro de novo no MESMO listener ao vivo — e o código tratava isso como
+  // se fosse a primeira tentativa de novo, jogando a UI de volta pra "Carregando..." mesmo
+  // com dado bom já na tela. Repetia a cada soluço, causando um "piscar" de 4-5 vezes.
+  it('depois de um sucesso (markLoaded), erro transiente no mesmo listener é ignorado — não pisca a UI', () => {
+    const onError = vi.fn();
+    const onRetrying = vi.fn();
+    let onErrorCallback: ((error: Error) => void) | undefined;
+    let markLoadedCallback: (() => void) | undefined;
+    const subscribeMock = vi.fn((onErr: (error: Error) => void, markLoaded: () => void) => {
+      onErrorCallback = onErr;
+      markLoadedCallback = markLoaded;
+      return vi.fn();
+    });
+
+    subscribeWithTransientRetry({ subscribe: subscribeMock, onRetrying, onError });
+
+    // Consumidor real (ex.: subscribeCards) chama markLoaded() dentro do próprio onNext
+    // quando entrega o primeiro snapshot bom.
+    markLoadedCallback?.();
+
+    // Reconexão de rede dispara erro transiente no mesmo listener ao vivo.
+    onErrorCallback?.(permissionDenied());
+    expect(onRetrying).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+    expect(subscribeMock).toHaveBeenCalledTimes(1); // não resubscreveu, não piscou
+
+    // Mesmo esperando bastante, continua sem reagir — o SDK do Firestore cuida do
+    // reconnect por conta própria, sem precisar de retry visível aqui.
+    vi.advanceTimersByTime(SUSTAINED_FIRESTORE_RETRY_DELAY_MS * 5);
+    expect(onRetrying).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+  });
+
   it('erro não-transiente falha imediatamente, sem retry', () => {
     const onError = vi.fn();
     const onRetrying = vi.fn();

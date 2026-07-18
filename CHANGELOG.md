@@ -2,6 +2,28 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-18 — "Disponível"/"Comprometido" ainda piscavam no celular (causa diferente do fix anterior)
+
+Achado pelo dono com print, ao vivo no celular (PWA instalado e navegador mobile — nunca no
+desktop), mesmo depois do fix de mais cedo no dia. Causa raiz completa em
+`docs/history/2026-07.md`.
+
+- Depois que os cartões carregavam com sucesso, um soluço de rede (comum em dados móveis)
+  fazia o Firestore chamar erro de novo no MESMO listener — e o código tratava isso como a
+  primeira tentativa, jogando a tela de volta pra "Carregando..." mesmo com dado bom na
+  tela. Repetia a cada soluço (o "pisca 4-5 vezes" relatado).
+- Achado revelador: uma variável `resolved` existia em `firestoreRetry.ts` mas nunca era
+  usada — proteção que alguém começou e não terminou (`useFinanceData.ts` já tinha a
+  versão certa disso). Foi descartada como "código morto" no fix de mais cedo no dia, sem
+  perceber que era inacabada, não descartável.
+- `subscribeWithTransientRetry` ganhou um `markLoaded()` que o consumidor chama ao receber
+  o primeiro dado bom — erro depois disso no mesmo listener é ignorado silenciosamente.
+  `useCardsData.ts` atualizado pra usar. **5 outros hooks que usam o mesmo utilitário
+  ainda não foram migrados** (mudança é retrocompatível, nada quebra, mas continuam
+  vulneráveis ao mesmo piscar) — anotado em `docs/planning/TODOS.md`.
+- 1 teste novo, verificado que falha sem a correção. `typecheck`/`test` (332/332)/`build`
+  limpos.
+
 ## 2026-07-18 — Grazi ajuda a pensar em decisão financeira grande (app); WhatsApp redireciona
 
 Preocupação do dono, motivada por feedback real de uma amiga que testou o app: pessoas vão

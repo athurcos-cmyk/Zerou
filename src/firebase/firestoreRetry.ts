@@ -23,7 +23,7 @@ export function isTransientFirestoreError(error: unknown) {
 }
 
 interface SubscribeWithTransientRetryOptions {
-  subscribe: (onError: (error: Error) => void) => Unsubscribe;
+  subscribe: (onError: (error: Error) => void, markLoaded: () => void) => Unsubscribe;
   onRetrying?: () => void;
   onError: (error: Error) => void;
   retryDelaysMs?: number[];
@@ -39,6 +39,11 @@ export function subscribeWithTransientRetry({
   let unsubscribe: Unsubscribe = () => undefined;
   const timers: number[] = [];
   let hasReportedError = false;
+  // Ja entregamos dado bom pelo menos uma vez neste listener ao vivo? Um erro depois
+  // disso e reconexao de rede (troca de torre, sinal fraco), nao falha de carga inicial —
+  // ignorar em vez de reabrir loading/erro evita "piscar" a UI com dado bom ja na tela a
+  // cada soluco de conexao. Mesmo padrao ja usado em `useFinanceData.ts` (`resolved`).
+  let resolved = false;
 
   function start(attempt = 0) {
     unsubscribe = subscribe((error) => {
@@ -48,6 +53,8 @@ export function subscribeWithTransientRetry({
 
       // unavailable = offline. Se ja recebeu dados, ignora. O SDK retenta sozinho.
       if (code === 'unavailable') return;
+
+      if (resolved) return;
 
       unsubscribe();
 
@@ -75,6 +82,8 @@ export function subscribeWithTransientRetry({
         }
       }, delay);
       timers.push(timer);
+    }, () => {
+      resolved = true;
     });
   }
 

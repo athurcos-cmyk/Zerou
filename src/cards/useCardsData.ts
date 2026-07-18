@@ -58,10 +58,13 @@ export function useCardsData(workspaceId?: string) {
     }, 2500);
 
     const unsub = subscribeWithTransientRetry({
-      subscribe: (onError) =>
+      subscribe: (onError, markLoaded) =>
         subscribeCards(
           workspaceId,
-          (cards) => setState((current) => ({ ...current, cards, loading: false, error: null })),
+          (cards) => {
+            markLoaded();
+            setState((current) => ({ ...current, cards, loading: false, error: null }));
+          },
           onError
         ),
       onRetrying: () => setState((current) => ({ ...current, loading: true, error: null })),
@@ -101,7 +104,7 @@ export function useCardsData(workspaceId?: string) {
       timers.push(bootTimer);
 
       return subscribeWithTransientRetry({
-        subscribe: (onError) =>
+        subscribe: (onError, markLoaded) =>
           subscribeInvoices(
             workspaceId,
             card.id,
@@ -109,6 +112,7 @@ export function useCardsData(workspaceId?: string) {
               resolved = true;
               window.clearTimeout(bootTimer);
               markInvoiceLoaded(card.id);
+              markLoaded();
               markClosedInvoices(workspaceId, items, card.closingDay);
               setState((current) => ({
                 ...current,
