@@ -2,6 +2,25 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-18 — Dashboard 100% offline: as listas também pintam do cache (fim do "pisca em branco")
+
+Continuação do `dashboardSummaryCache` (que só cobria os 3 números do topo), a pedido do
+dono — a sensação de "app sempre carregando" ao abrir a conta, pior no celular onde a
+maioria vai usar. Detalhes técnicos e risco residual em `docs/history/2026-07.md`.
+
+- Ao abrir, "Resumo de gastos", "Próximos compromissos" e "Transações recentes" apareciam
+  em branco por 1-2s (o dado já está no cache do Firestore, mas ler o IndexedDB de volta no
+  boot frio custa no celular). Os 3 números do topo já não piscavam porque tinham cache
+  síncrono; as listas não tinham — era só estender o mesmo padrão.
+- `dashboardSummaryCache.ts` → `dashboardViewCache.ts` (v2): guarda também uma foto
+  denormalizada das 3 listas por workspace. No boot pinta do cache na hora; quando o dado
+  real chega, troca sem piscar (quase sempre idênticos). Só acelerador de exibição — a fonte
+  real continua sendo o cache do Firestore + os listeners.
+- Marca (ícone+cor) pré-resolvida na gravação pra bater com o render ao vivo; datas via ISO;
+  validação defensiva descarta cache corrompido/formato antigo e cai pro dado ao vivo.
+- 2 arquivos de teste novos (round-trip do cache + render do Dashboard). **Verificado que o
+  teste de render falha sem a correção.** `typecheck`/`test` (339/339)/`build` limpos.
+
 ## 2026-07-18 — "Disponível"/"Comprometido" ainda piscavam no celular (causa diferente do fix anterior)
 
 Achado pelo dono com print, ao vivo no celular (PWA instalado e navegador mobile — nunca no

@@ -5,13 +5,18 @@ import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { AvailableModeSheet } from '../finance/AvailableModeSheet';
 import { updateAvailableMode } from '../workspaces/workspaceService';
-import type { AvailableMode } from '../types/contracts';
+import type { AvailableMode, TransactionType } from '../types/contracts';
 
 import { calculateDashboardSummary } from '../finance/financeCalculations';
 import { defaultAvailableMode } from '../finance/availableMode';
-import { readCachedDashboardSummary, saveCachedDashboardSummary } from '../finance/dashboardSummaryCache';
+import {
+  readCachedDashboardView,
+  saveCachedDashboardView,
+  type CachedCategoryMark,
+  type CachedSpendingRow
+} from '../finance/dashboardViewCache';
 import { differenceInCalendarDays } from 'date-fns';
-import { formatFriendlyDate } from '../finance/financeDates';
+import { formatFriendlyDate, toDate, type DateLike } from '../finance/financeDates';
 import { transactionTypeLabels } from '../finance/financeLabels';
 import { formatMoney } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
@@ -22,6 +27,50 @@ import { useWelcomeTour } from '../onboarding/welcomeTour.store';
 import { BudgetAlertBanner } from '../components/BudgetAlertBanner';
 
 import { EmptyState } from '../components/EmptyState';
+
+// Forma comum que o render das listas consome, venha o dado do cálculo ao vivo ou do cache
+// local (que guarda datas como ISO). `DateLike` cobre os dois: Date ao vivo, `new Date(iso)`
+// do cache — ambos aceitos por `formatFriendlyDate`.
+interface RecentTransactionView {
+  id: string;
+  type: TransactionType;
+  description: string;
+  date: DateLike;
+  amountCents: number;
+  mark: CachedCategoryMark | null;
+}
+
+interface CommitmentView {
+  id: string;
+  kind: 'bill' | 'recurring' | 'invoice';
+  cardId?: string;
+  description: string;
+  dueAt: DateLike;
+  amountCents: number;
+}
+
+type CategoryLike = { id: string; name?: string; icon?: string; color?: string };
+
+/** Guarda só o que o `CategoryMark` precisa (id/ícone/cor). Props opcionais de propósito:
+ * `finance.categories` é uma união (categorias reais + defaults inline) e um dos membros
+ * não expõe `color`/`icon` no tipo — o opcional aceita os dois sem erro. */
+function markForCategory(category: CategoryLike | null | undefined): CachedCategoryMark | null {
+  return category ? { id: category.id, icon: category.icon, color: category.color } : null;
+}
+
+/** Reproduz a marca (ícone+cor) exatamente como o render ao vivo: categoria da transação
+ * quando existe; senão o fallback por tipo (receita/transferência); senão o padrão. Usado
+ * tanto no render ao vivo quanto ao gravar o cache, pra os dois baterem visualmente. */
+function markForTransaction(
+  transaction: { type: TransactionType; categoryId?: string },
+  categoryMap: ReadonlyMap<string, CategoryLike>
+): CachedCategoryMark | null {
+  const categoryMark = markForCategory(transaction.categoryId ? categoryMap.get(transaction.categoryId) : null);
+  if (categoryMark) return categoryMark;
+  if (transaction.type === 'income') return { id: '', icon: 'money', color: defaultCategoryColors.income_salary };
+  if (transaction.type === 'transfer') return { id: '', icon: 'repeat', color: defaultCategoryColors.both_transfer };
+  return null;
+}
 
 export function DashboardPage() {
   const { user, profile } = useAuth();
@@ -74,13 +123,14 @@ export function DashboardPage() {
     setTutorialDismissed(true);
     setTutorialOpen(false);
   }
-  // Mostra o último saldo conhecido (cache local) enquanto os listeners do
-  // Firestore ainda não entregaram o primeiro snapshot — evita o "—" piscando
-  // por 1-2s a cada reload, sem alterar a lógica de correção do loading em si.
-  const cachedSummary = useMemo(() => readCachedDashboardSummary(workspaceId), [workspaceId]);
+  // Mostra a última tela conhecida (cache local) enquanto os listeners do Firestore ainda
+  // não entregaram o primeiro snapshot — evita os números piscando "—" e as listas piscando
+  // em branco por 1-2s a cada abertura, sem mexer na lógica de loading em si. A gravação
+  // desse cache fica mais abaixo, depois que `spendingRows`/`categoryMap` já existem.
+  const cachedView = useMemo(() => readCachedDashboardView(workspaceId), [workspaceId]);
 
-  const effectiveFreeToSpend = isCommittedLoading && cachedSummary
-    ? cachedSummary.freeToSpendCents
+  const effectiveFreeToSpend = isCommittedLoading && cachedView
+    ? cachedView.freeToSpendCents
     : dashboard.freeToSpendCents;
 
   const perDayDisplay = useMemo(() => {
@@ -93,28 +143,19 @@ export function DashboardPage() {
       : null;
   }, [dashboard.committedCutoff, effectiveFreeToSpend]);
 
-  useEffect(() => {
-    if (!isCommittedLoading && workspaceId) {
-      saveCachedDashboardSummary(workspaceId, {
-        totalBalanceCents: dashboard.totalBalanceCents,
-        freeToSpendCents: dashboard.freeToSpendCents,
-        committedCents: dashboard.committedCents
-      });
-    }
-  }, [isCommittedLoading, workspaceId, dashboard.totalBalanceCents, dashboard.freeToSpendCents, dashboard.committedCents]);
   const totalBalanceDisplay = isLoading
-    ? cachedSummary
-      ? formatMoney(cachedSummary.totalBalanceCents)
+    ? cachedView
+      ? formatMoney(cachedView.totalBalanceCents)
       : '—'
     : formatMoney(dashboard.totalBalanceCents);
   const freeToSpendDisplay = isCommittedLoading
-    ? cachedSummary
-      ? formatMoney(cachedSummary.freeToSpendCents)
+    ? cachedView
+      ? formatMoney(cachedView.freeToSpendCents)
       : '—'
     : formatMoney(dashboard.freeToSpendCents);
   const committedDisplay = isCommittedLoading
-    ? cachedSummary
-      ? formatMoney(cachedSummary.committedCents)
+    ? cachedView
+      ? formatMoney(cachedView.committedCents)
       : '—'
     : formatMoney(dashboard.committedCents);
   const syncStatus = finance.pendingWrites || cardsData.pendingWrites ? 'pending' : 'synced';
@@ -142,7 +183,89 @@ export function DashboardPage() {
   const spendingRows = [...spendingByCategory.entries()]
     .sort((left, right) => right[1] - left[1])
     .slice(0, 5);
-  const maxSpendingCents = Math.max(...spendingRows.map(([, amount]) => amount), 1);
+  // Denormaliza as listas do jeito que o render consome — a mesma forma serve pra gravar no
+  // cache e pra reler depois sem depender de `finance.categories` já ter chegado.
+  const liveSpending: CachedSpendingRow[] = spendingRows.map(([categoryId, amount]) => {
+    const category = categoryMap.get(categoryId);
+    return {
+      categoryId,
+      categoryName: category?.name ?? 'Sem categoria',
+      amountCents: amount,
+      mark: markForCategory(category)
+    };
+  });
+  const liveRecent: RecentTransactionView[] = dashboard.recentTransactions.map((transaction) => ({
+    id: transaction.id,
+    type: transaction.type,
+    description: transaction.description,
+    date: transaction.date,
+    amountCents: transaction.amountCents,
+    mark: markForTransaction(transaction, categoryMap)
+  }));
+
+  // Enquanto ainda carrega, renderiza o que o cache guardou; quando o dado real chega, troca
+  // sem piscar (na imensa maioria das aberturas os dois são idênticos, então é imperceptível).
+  const effectiveSpending: CachedSpendingRow[] = isCommittedLoading && cachedView ? cachedView.spending : liveSpending;
+  const effectiveCommitments: CommitmentView[] = isCommittedLoading && cachedView
+    ? cachedView.commitments.map((commitment) => ({ ...commitment, dueAt: new Date(commitment.dueAtISO) }))
+    : dashboard.upcomingCommitments;
+  const effectiveRecent: RecentTransactionView[] = isLoading && cachedView
+    ? cachedView.recentTransactions.map((transaction) => ({
+        id: transaction.id,
+        type: transaction.type,
+        description: transaction.description,
+        date: new Date(transaction.dateISO),
+        amountCents: transaction.amountCents,
+        mark: transaction.mark
+      }))
+    : liveRecent;
+  const maxSpendingCents = Math.max(...effectiveSpending.map((row) => row.amountCents), 1);
+
+  useEffect(() => {
+    // Só grava depois que cartões e faturas resolveram (senão poderia persistir um
+    // "Comprometido" inflado). Nesse ponto `isLoading` (finanças) também já é false, então
+    // todas as listas estão finais e consistentes entre si.
+    if (isCommittedLoading || !workspaceId) return;
+    saveCachedDashboardView(workspaceId, {
+      totalBalanceCents: dashboard.totalBalanceCents,
+      freeToSpendCents: dashboard.freeToSpendCents,
+      committedCents: dashboard.committedCents,
+      spending: liveSpending,
+      commitments: dashboard.upcomingCommitments.map((commitment) => ({
+        id: commitment.id,
+        kind: commitment.kind,
+        cardId: commitment.cardId,
+        description: commitment.description,
+        dueAtISO: toDate(commitment.dueAt).toISOString(),
+        amountCents: commitment.amountCents
+      })),
+      recentTransactions: dashboard.recentTransactions.map((transaction) => ({
+        id: transaction.id,
+        type: transaction.type,
+        description: transaction.description,
+        dateISO: toDate(transaction.date).toISOString(),
+        amountCents: transaction.amountCents,
+        mark: markForTransaction(transaction, categoryMap)
+      }))
+    });
+    // Deps = as fontes estáveis do dashboard (os arrays do contexto só trocam de referência
+    // quando chega snapshot novo), não os objetos recomputados a cada render — senão isto
+    // regravaria o cache em toda renderização.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isCommittedLoading,
+    workspaceId,
+    finance.accounts,
+    finance.transactions,
+    finance.bills,
+    finance.recurringRules,
+    finance.categories,
+    cardsData.invoices,
+    cardsData.cards,
+    profile?.payday,
+    profile?.committedWindowDays,
+    profile?.availableMode
+  ]);
   const currentMonthSpendCents = [...spendingByCategory.values()].reduce((sum, amount) => sum + amount, 0);
   const previousMonthSpendCents = finance.transactions
     .filter((transaction) => isCountableSpend(transaction, previousMonth))
@@ -299,25 +422,22 @@ export function DashboardPage() {
             Buscar
           </Link>
         </div>
-        {spendingRows.length > 0 ? (
+        {effectiveSpending.length > 0 ? (
           <div className="spending-bars">
-            {spendingRows.map(([categoryId, amount]) => {
-              const category = categoryMap.get(categoryId);
-              return (
-                <div className="spending-row" key={categoryId}>
-                  <div className="spending-row-label">
-                    <span className="spending-row-name">
-                      <CategoryMark category={category} />
-                      <strong>{category?.name ?? 'Sem categoria'}</strong>
-                    </span>
-                    <span>{formatMoney(amount)}</span>
-                  </div>
-                  <div className="spending-bar-track" aria-hidden="true">
-                    <span style={{ width: `${Math.max(8, Math.round((amount / maxSpendingCents) * 100))}%` }} />
-                  </div>
+            {effectiveSpending.map((row) => (
+              <div className="spending-row" key={row.categoryId}>
+                <div className="spending-row-label">
+                  <span className="spending-row-name">
+                    <CategoryMark category={row.mark} />
+                    <strong>{row.categoryName}</strong>
+                  </span>
+                  <span>{formatMoney(row.amountCents)}</span>
                 </div>
-              );
-            })}
+                <div className="spending-bar-track" aria-hidden="true">
+                  <span style={{ width: `${Math.max(8, Math.round((row.amountCents / maxSpendingCents) * 100))}%` }} />
+                </div>
+              </div>
+            ))}
           </div>
         ) : !isCommittedLoading ? (
           <EmptyState
@@ -337,9 +457,9 @@ export function DashboardPage() {
               <h2>O que vence primeiro</h2>
             </div>
           </div>
-          {isCommittedLoading ? null : dashboard.upcomingCommitments.length > 0 ? (
+          {effectiveCommitments.length > 0 ? (
             <div className="item-list">
-              {dashboard.upcomingCommitments.map((commitment) => {
+              {effectiveCommitments.map((commitment) => {
                 // Fatura leva pra fatura do cartao; conta (avulsa ou recorrente) vai pra Contas a Pagar.
                 const href =
                   commitment.kind === 'invoice' && commitment.cardId
@@ -379,21 +499,15 @@ export function DashboardPage() {
               Ver todas
             </Link>
           </div>
-          {isLoading ? null : dashboard.recentTransactions.length > 0 ? (
+          {effectiveRecent.length > 0 ? (
             <div className="item-list">
-              {dashboard.recentTransactions.map((transaction) => {
+              {effectiveRecent.map((transaction) => {
                 const isIncome = transaction.type === 'income';
                 const isExpense = transaction.type === 'expense' || transaction.type === 'card_purchase';
                 const amountClass = isIncome ? 'amount--income' : isExpense ? 'amount--expense' : 'amount--neutral';
-                const category = transaction.categoryId ? categoryMap.get(transaction.categoryId) : null;
-                const fallback = isIncome
-                  ? { icon: 'money', color: defaultCategoryColors.income_salary }
-                  : transaction.type === 'transfer'
-                  ? { icon: 'repeat', color: defaultCategoryColors.both_transfer }
-                  : undefined;
                 return (
                   <div className="list-row list-row--with-icon" key={transaction.id}>
-                    <CategoryMark category={category} fallback={fallback} />
+                    <CategoryMark category={transaction.mark} />
                     <div className="list-row-body">
                       <strong>{transaction.description}</strong>
                       <span className="text-secondary">
