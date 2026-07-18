@@ -25,7 +25,7 @@ export function LandingShell({ hero, children }: LandingShellProps) {
           </nav>
           <div className="lp-nav-cta">
             <Link className="lp-btn lp-btn--ghost" to="/login">Entrar</Link>
-            <Link className="lp-btn lp-btn--primary" to="/register">Começar grátis</Link>
+            <Link className="lp-btn lp-btn--primary" to="/register">Começar agora</Link>
           </div>
         </div>
       </header>

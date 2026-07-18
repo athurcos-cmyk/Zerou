@@ -752,10 +752,18 @@
   }
 }
 
-/* ── Nav mobile: esconde "Entrar" em telas muito pequenas ── */
+/* ── Nav mobile: "Entrar" vira link enxuto em telas muito pequenas ──
+   Antes escondia por completo — quem já tem conta não tinha nenhum jeito de
+   voltar a logar a partir da landing no celular (achado pelo dono, 2026-07-18). */
 @media (max-width: 480px) {
+  .lp-brand img { height: 22px; }
   .lp-nav-cta .lp-btn--ghost {
-    display: none;
+    padding: 0.5rem 0.6rem;
+    font-size: 0.85rem;
+  }
+  .lp-nav-cta .lp-btn--primary {
+    padding: 0.65rem 0.9rem;
+    font-size: 0.85rem;
   }
 }
 
