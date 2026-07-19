@@ -2,6 +2,22 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-19 — Dashboard e alerta de orçamento batem com a Análise mesmo com +300 no mês (Fase 3)
+
+Terceira e última fase do plano `docs/planning/HISTORICO_TRANSACOES.md`, fechando a limitação da
+janela de 300. O "Resumo de gastos" do Dashboard e o banner de orçamento calculavam das 300 do
+boot — então, se alguém fizesse +300 lançamentos **no mês corrente**, subcontavam (a Análise não).
+
+- Hook compartilhado `useCompleteCurrentMonth` (`useMonthlyTransactions.ts`, DRY): usado pelo
+  Dashboard ("Resumo de gastos" + variação vs. mês passado) e pelo `BudgetAlertBanner`.
+- **Detecção esperta e barata**: só carrega o mês atual (+ anterior no Dashboard) completo **se** a
+  janela de 300 está cheia **E** a mais antiga carregada é do mês atual (sinal de transbordo). Pra
+  todo mundo com ≤300 (todos hoje), **custo ZERO** — nenhuma leitura extra no boot.
+- Fecha a inconsistência com a Análise sem cobrar leitura por abertura do Dashboard de todos. 3
+  testes novos. `typecheck`/`test` (355/355)/`build` limpos.
+- **A limitação das 300 transações está resolvida por completo** (Análise por mês + "Carregar mais"
+  em Transações + Dashboard/banner do mês atual).
+
 ## 2026-07-19 — Transações: "Carregar mais" pra ver histórico antigo (Fase 2)
 
 Segunda fase do plano `docs/planning/HISTORICO_TRANSACOES.md`. A lista de Transações mostrava só

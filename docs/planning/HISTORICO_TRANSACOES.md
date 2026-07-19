@@ -115,10 +115,13 @@ já endurecida em 2026-07-18). Nenhuma leitura crítica com `await` bloqueante.
   DocumentSnapshot via `getDoc` da âncora — robusto contra empate de data) + botão "Carregar mais"
   em `TransactionsPage` (300 ao vivo ∪ páginas de 50 antigas, dedupe por id, aviso de offline). 2
   testes novos.
-- **Fase 3 (deferível):** Dashboard "Resumo de gastos" + banner do mês atual usam o **mesmo** hook
-  por mês (DRY) pro mês corrente. **Recomendo DEFERIR:** só quebra com >300 no mês corrente (extremo),
-  a Análise já dá o número certo, e o alerta de orçamento **server-side** (`sendBudgetAlerts`) já é
-  completo. Documentar a borda em vez de gastar leitura por boot de todo mundo.
+- **Fase 3 — ✅ IMPLEMENTADA em 2026-07-19 (versão esperta/condicional):** Dashboard "Resumo de
+  gastos" + variação vs. mês passado + `BudgetAlertBanner` usam o hook compartilhado
+  `useCompleteCurrentMonth` (`useMonthlyTransactions.ts`, DRY). Detecção barata de transbordo: só
+  carrega o mês atual (+ anterior no Dashboard) completo **se** a janela de 300 está cheia **E** a
+  mais antiga carregada é do mês atual — senão **custo ZERO** (as 300 já cobrem, o caso de todo
+  mundo hoje). Fecha a inconsistência com a Análise sem cobrar leitura por boot de todos. 3 testes
+  novos (< 300 não carrega; janela cheia com mês antigo não carrega; transbordo carrega e une).
 
 ## Arquivos afetados
 

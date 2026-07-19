@@ -8,6 +8,7 @@ import { updateAvailableMode } from '../workspaces/workspaceService';
 import type { AvailableMode, TransactionType } from '../types/contracts';
 
 import { calculateDashboardSummary } from '../finance/financeCalculations';
+import { useCompleteCurrentMonth } from '../finance/useMonthlyTransactions';
 import { defaultAvailableMode } from '../finance/availableMode';
 import {
   readCachedDashboardView,
@@ -162,6 +163,10 @@ export function DashboardPage() {
   const currentMonth = new Date().toISOString().slice(0, 7);
   const now = new Date();
   const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 7);
+  // Fase 3: o "Resumo de gastos" (mês atual) e a variação vs. mês passado calculam das 300 do
+  // boot. Se o mês atual transbordou a janela (>300 lançamentos no mês), carrega mês atual +
+  // anterior completos sob demanda — senão, custo ZERO (as 300 já cobrem). Bate com a Análise.
+  const spendingSource = useCompleteCurrentMonth(workspaceId, finance.transactions, [currentMonth, previousMonth]);
   const categoryMap = new Map(finance.categories.map((c) => [c.id, c]));
   const isCountableSpend = (transaction: (typeof finance.transactions)[number], month: string) =>
     !transaction.deletedAt &&
@@ -169,7 +174,7 @@ export function DashboardPage() {
     (transaction.cashMonth === month || transaction.competenceMonth === month) &&
     !transaction.tags?.includes('meta') &&
     !transaction.tags?.includes('cofrinho');
-  const spendingByCategory = finance.transactions
+  const spendingByCategory = spendingSource
     .filter((transaction) => isCountableSpend(transaction, currentMonth))
     .reduce((totals, transaction) => {
       // `||`, não `??`: compra no cartão sem categoria grava `categoryId: ''`
@@ -226,7 +231,7 @@ export function DashboardPage() {
   const liveAvailableCaption =
     perDayDisplay ?? (dashboard.freeToSpendCents <= 0 ? 'Você já comprometeu tudo que tem disponível.' : 'Livre agora.');
   const currentMonthSpendCents = [...spendingByCategory.values()].reduce((sum, amount) => sum + amount, 0);
-  const previousMonthSpendCents = finance.transactions
+  const previousMonthSpendCents = spendingSource
     .filter((transaction) => isCountableSpend(transaction, previousMonth))
     .reduce((sum, transaction) => sum + transaction.amountCents, 0);
   const spendingVariationPct =
@@ -273,6 +278,7 @@ export function DashboardPage() {
     workspaceId,
     finance.accounts,
     finance.transactions,
+    spendingSource,
     finance.bills,
     finance.recurringRules,
     finance.categories,

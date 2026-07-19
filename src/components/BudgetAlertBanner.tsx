@@ -1,27 +1,34 @@
 import { useMemo } from 'react';
 import { X } from 'lucide-react';
+import { useAuth } from '../auth/AuthContext';
 import { useFinanceContext } from '../finance/FinanceDataContext';
+import { useCompleteCurrentMonth } from '../finance/useMonthlyTransactions';
 import { spendingByCategoryForMonth } from '../finance/spendingAnalysis';
 import { formatMoney } from '../finance/money';
 import { isAlertDismissed, dismissAlert } from '../finance/budgetAlertCache';
 
 export function BudgetAlertBanner() {
   const finance = useFinanceContext();
+  const { profile } = useAuth();
+  const workspaceId = profile?.defaultWorkspaceId;
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  // Fase 3: se o mês atual transbordou as 300 do boot (>300 lançamentos no mês), carrega o mês
+  // completo (senão custo zero) — pro alerta bater com a Análise. Ver HISTORICO_TRANSACOES.md.
+  const spendingSource = useCompleteCurrentMonth(workspaceId, finance.transactions, [currentMonth]);
 
   const alerts = useMemo(() => {
     if (finance.loading) return [];
 
-    const currentMonth = new Date().toISOString().slice(0, 7);
     const activeBudgets = finance.budgets.filter((b) => b.isActive && b.limitCents > 0);
     if (activeBudgets.length === 0) return [];
 
     const spending = spendingByCategoryForMonth(
       currentMonth,
-      finance.transactions,
+      spendingSource,
       [],
       (txnId) => {
         if (!txnId) return undefined;
-        const txn = finance.transactions.find((t) => t.id === txnId);
+        const txn = spendingSource.find((t) => t.id === txnId);
         return txn?.categoryId;
       },
     );
@@ -40,13 +47,12 @@ export function BudgetAlertBanner() {
         return !isAlertDismissed(a.categoryId, currentMonth);
       })
       .sort((a, b) => b.pct - a.pct);
-  }, [finance.budgets, finance.transactions, finance.loading]);
+  }, [finance.budgets, spendingSource, finance.loading, currentMonth]);
 
   if (alerts.length === 0) return null;
 
   const dangerAlerts = alerts.filter((a) => a.level === 'danger');
   const warningAlerts = alerts.filter((a) => a.level === 'warning');
-  const currentMonth = new Date().toISOString().slice(0, 7);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>

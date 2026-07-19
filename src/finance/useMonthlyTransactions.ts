@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { subscribeWithTransientRetry } from '../firebase/firestoreRetry';
-import { subscribeTransactionsForMonths, type LocalSynced } from './financeService';
+import { dedupeById, subscribeTransactionsForMonths, type LocalSynced } from './financeService';
 import type { Transaction } from '../types/contracts';
 
 // Se as queries por mês não responderem em 2.5s (cache vazio + offline), destrava o loading
@@ -69,4 +69,37 @@ export function useMonthlyTransactions(workspaceId: string | undefined, monthKey
   }, [workspaceId, monthsKey]);
 
   return state;
+}
+
+/**
+ * Fonte de transações pro gasto do MÊS ATUAL garantindo o mês completo mesmo quando a janela de
+ * 300 do boot transbordou (>300 lançamentos no mês corrente). Detecção barata: só carrega sob
+ * demanda se a janela está CHEIA (300) E a mais antiga carregada é do mês atual (`months[0]`) —
+ * senão as 300 já cobrem o mês e é ZERO leitura extra (o caso de todo mundo hoje). `months` são
+ * os meses a garantir completos (ex.: [mês atual, mês anterior] pro Dashboard). Fase 3 do plano
+ * `docs/planning/HISTORICO_TRANSACOES.md`.
+ */
+export function useCompleteCurrentMonth(
+  workspaceId: string | undefined,
+  windowTransactions: Array<LocalSynced<Transaction>>,
+  months: string[]
+): Array<LocalSynced<Transaction>> {
+  const currentMonth = months[0];
+  // `windowTransactions` vem ordenado por data desc (`subscribeTransactions`), então o último é
+  // o mais antigo carregado. Janela cheia (300) + mais antigo no mês atual = o mês transbordou.
+  const oldest = windowTransactions[windowTransactions.length - 1];
+  const overflowed =
+    windowTransactions.length >= 300 &&
+    !!oldest &&
+    !!currentMonth &&
+    (oldest.cashMonth === currentMonth || oldest.competenceMonth === currentMonth);
+
+  const monthsKey = months.join(',');
+  const monthsToLoad = useMemo(() => (overflowed ? monthsKey.split(',') : []), [overflowed, monthsKey]);
+  const loaded = useMonthlyTransactions(overflowed ? workspaceId : undefined, monthsToLoad);
+
+  return useMemo(
+    () => (overflowed ? dedupeById(windowTransactions, loaded.transactions) : windowTransactions),
+    [overflowed, windowTransactions, loaded.transactions]
+  );
 }
