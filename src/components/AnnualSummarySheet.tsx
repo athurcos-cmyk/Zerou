@@ -5,6 +5,8 @@ import {
   Tooltip as ReTooltip, ResponsiveContainer,
 } from 'recharts';
 import { BottomSheet } from './BottomSheet';
+import { useMonthlyTransactions } from '../finance/useMonthlyTransactions';
+import { dedupeById } from '../finance/financeService';
 import { computeAnnualSummary } from '../finance/annualSummaryCalculations';
 import { formatMoney } from '../finance/money';
 import { categoryColors, defaultCategoryColor, defaultCategoryColors } from '../theme/palette';
@@ -30,6 +32,7 @@ const FULL_MONTH_NAMES: Record<string, string> = {
 interface Props {
   open: boolean;
   onClose: () => void;
+  workspaceId?: string;
   transactions: Transaction[];
   invoices: InvoiceForSpending[];
   categories: { id: string; name: string; color?: string }[];
@@ -51,7 +54,7 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
   );
 }
 
-export function AnnualSummarySheet({ open, onClose, transactions, invoices, categories, currentYear }: Props) {
+export function AnnualSummarySheet({ open, onClose, workspaceId, transactions, invoices, categories, currentYear }: Props) {
   const [year, setYear] = useState(currentYear);
 
   const categoryNames = useMemo(
@@ -59,9 +62,22 @@ export function AnnualSummarySheet({ open, onClose, transactions, invoices, cate
     [categories],
   );
 
+  // O resumo anual precisa dos 12 meses do ano — além da janela de 300. Carrega sob demanda
+  // (só quando a folha abre) via o mesmo hook da Análise; ver docs/planning/HISTORICO_TRANSACOES.md.
+  const yearMonths = useMemo(
+    () => Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, '0')}`),
+    [year],
+  );
+  const yearData = useMonthlyTransactions(open ? workspaceId : undefined, yearMonths);
+  // União com as 300 do boot: durante o carregamento mostra o parcial, refina pro ano completo.
+  const completeTransactions = useMemo(
+    () => dedupeById(transactions, yearData.transactions),
+    [transactions, yearData.transactions]
+  );
+
   const summary = useMemo(
-    () => computeAnnualSummary(year, transactions, invoices, categoryNames),
-    [year, transactions, invoices, categoryNames],
+    () => computeAnnualSummary(year, completeTransactions, invoices, categoryNames),
+    [year, completeTransactions, invoices, categoryNames],
   );
 
   const chartData = useMemo(

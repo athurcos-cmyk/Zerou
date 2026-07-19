@@ -106,9 +106,11 @@ já endurecida em 2026-07-18). Nenhuma leitura crítica com `await` bloqueante.
 
 ## Fases (TRAVADAS, cada uma mergeável sozinha)
 
-- **Fase 1 (essencial):** `getTransactionsForMonths` + hook `useMonthlyTransactions` (sob demanda,
-  onSnapshot com a proteção anti-piscar) + `SearchPage` passa a usar o hook nas agregações. Mensagem
-  de offline. → Análise correta e offline (após 1º acesso online).
+- **Fase 1 (essencial) — ✅ IMPLEMENTADA em 2026-07-19:** `subscribeTransactionsForMonths` + hook
+  `useMonthlyTransactions` (sob demanda, onSnapshot com a proteção anti-piscar) + `SearchPage`
+  (Análise) **e `AnnualSummarySheet` (resumo anual — 12 meses do ano, sob demanda)** agregam sobre
+  a UNIÃO das 300 do boot + os meses completos (helper `dedupeById`, DRY). Nota de offline. **Sem
+  regressão pra quem tem ≤300** (união = as 300). 9 testes novos.
 - **Fase 2:** `loadMoreTransactions` + "Carregar mais" em `TransactionsPage`.
 - **Fase 3 (deferível):** Dashboard "Resumo de gastos" + banner do mês atual usam o **mesmo** hook
   por mês (DRY) pro mês corrente. **Recomendo DEFERIR:** só quebra com >300 no mês corrente (extremo),

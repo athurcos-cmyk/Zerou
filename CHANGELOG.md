@@ -2,6 +2,29 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-19 — Análise correta além de 300 transações (Fase 1: leitura por mês)
+
+Primeira fase do plano `docs/planning/HISTORICO_TRANSACOES.md` (travado com `/plan-eng-review`).
+A Análise e o resumo anual **subcontavam** meses/anos de quem passa de 300 transações, porque
+calculavam filtrando só as 300 mais recentes carregadas no boot. Agora leem o histórico **por
+mês, sob demanda**. Detalhes em `docs/history/2026-07.md`.
+
+- `subscribeTransactionsForMonths` (`financeService.ts`): assina as transações de um conjunto de
+  meses — 2 queries `in` (por `cashMonth`/`competenceMonth`, mescladas por id) **sem limite**, então
+  um mês com >300 vem inteiro. Novo hook `useMonthlyTransactions` (sob demanda, mesma proteção
+  anti-piscar dos outros hooks).
+- `SearchPage` (Análise) e `AnnualSummarySheet` (resumo anual, 12 meses do ano sob demanda) passam
+  a agregar sobre a **união** das 300 do boot + os meses completos carregados. Durante o
+  carregamento mostram o resultado das 300 (sem flash vazio) e refinam pro completo.
+- **Sem regressão pra quem tem ≤300 transações**: a união = as 300 (o histórico inteiro cabe na
+  janela) → resultado idêntico ao de hoje. Só corrige quem passa de 300.
+- Offline: mês já aberto online funciona offline (cache); nota sutil quando offline. Sem aquecedor
+  proativo (decisão de custo — só lê o que a pessoa olha). **Zero mudança em `firestore.rules` e
+  índices** (leitura já é por membro; campos string auto-indexados — verificado no código).
+- Helper `dedupeById` extraído (DRY, 3 usos). 9 testes novos. `typecheck`/`test` (350/350)/`build`
+  limpos. Verificação ao vivo do caso >300 depende de volume que ninguém tem ainda (~2 meses de app).
+- **Falta**: Fase 2 ("Carregar mais" em Transações). Fase 3 (Dashboard/banner do mês atual) deferida.
+
 ## 2026-07-18 — Bloqueio do "puxar pra recarregar" (pull-to-refresh) no mobile
 
 Decisão de produto (pedido do dono): o app é offline-first e sincroniza sozinho, então o

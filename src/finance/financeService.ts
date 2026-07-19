@@ -655,6 +655,85 @@ export function subscribeTransactions(
   );
 }
 
+/**
+ * Une listas de docs por `id` (o último vence). Usado pra mesclar as duas queries por mês e
+ * pra unir as 300 do boot com os meses carregados da Análise sem duplicar na fronteira.
+ */
+export function dedupeById<T extends { id: string }>(...lists: ReadonlyArray<readonly T[]>): T[] {
+  const byId = new Map<string, T>();
+  for (const list of lists) {
+    for (const item of list) byId.set(item.id, item);
+  }
+  return [...byId.values()];
+}
+
+/**
+ * Assina as transações de um conjunto de meses — usado pela Análise (sob demanda), ao
+ * contrário do boot global (`subscribeTransactions`, limitado a 300). Uma transação conta num
+ * mês por `cashMonth` OU `competenceMonth` (podem divergir), então são DUAS queries `in`
+ * (cada campo é auto-indexado — sem índice manual) mescladas por id. **Sem `limit`**: um mês
+ * com >300 transações vem inteiro. Serve offline do cache pros meses já vistos online.
+ *
+ *   meses ─┬─ where('cashMonth','in',meses) ───────┐
+ *          └─ where('competenceMonth','in',meses) ─┴─ merge + dedupe(id) → transações completas
+ *
+ * `monthKeys` deve ter no máx. 30 itens (limite do `in` do Firestore); a Análise passa ~8.
+ */
+export function subscribeTransactionsForMonths(
+  workspaceId: string,
+  monthKeys: string[],
+  onNext: (items: Array<LocalSynced<Transaction>>) => void,
+  onError: (error: Error) => void
+): Unsubscribe {
+  if (monthKeys.length === 0) {
+    onNext([]);
+    return () => undefined;
+  }
+
+  const months = monthKeys.slice(0, 30); // guarda contra o teto de 30 do `in` (inalcançável no uso real)
+  const transactions = collectionRef(workspaceId, 'transactions');
+  const byCash = new Map<string, LocalSynced<Transaction>>();
+  const byCompetence = new Map<string, LocalSynced<Transaction>>();
+  let cashSeen = false;
+  let competenceSeen = false;
+
+  const emit = () => {
+    // Só emite depois que as DUAS queries responderam ao menos uma vez, pra não piscar um
+    // total parcial (só cashMonth) antes da outra chegar.
+    if (!cashSeen || !competenceSeen) return;
+    onNext(dedupeById([...byCash.values()], [...byCompetence.values()]));
+  };
+
+  const unsubCash = onSnapshot(
+    query(transactions, where('cashMonth', 'in', months)),
+    { includeMetadataChanges: true },
+    (snapshot) => {
+      byCash.clear();
+      snapshot.docs.forEach((item) => byCash.set(item.id, withLocalSync<Transaction>(item)));
+      cashSeen = true;
+      emit();
+    },
+    onError
+  );
+
+  const unsubCompetence = onSnapshot(
+    query(transactions, where('competenceMonth', 'in', months)),
+    { includeMetadataChanges: true },
+    (snapshot) => {
+      byCompetence.clear();
+      snapshot.docs.forEach((item) => byCompetence.set(item.id, withLocalSync<Transaction>(item)));
+      competenceSeen = true;
+      emit();
+    },
+    onError
+  );
+
+  return () => {
+    unsubCash();
+    unsubCompetence();
+  };
+}
+
 export function subscribeGoals(
   workspaceId: string,
   onNext: (items: Array<LocalSynced<Goal>>) => void,

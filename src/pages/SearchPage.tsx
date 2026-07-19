@@ -12,7 +12,8 @@ import { EmptyState } from '../components/EmptyState';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { mergeInvoicesWithLedger, useInvoiceLedger } from '../cards/useInvoiceLedger';
 import { formatFriendlyDate, toDate } from '../finance/financeDates';
-import { nextOccurrenceDate } from '../finance/financeService';
+import { dedupeById, nextOccurrenceDate } from '../finance/financeService';
+import { useMonthlyTransactions } from '../finance/useMonthlyTransactions';
 import { billStatusLabels, transactionTypeLabels } from '../finance/financeLabels';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { centsToInputValue } from '../finance/money';
@@ -162,6 +163,36 @@ export function SearchPage() {
   const [comparisonMode, setComparisonMode] = useState<'previous_month' | 'last_year'>('previous_month');
   const last6Months = useMemo(() => getLastNMonths(6), []);
 
+  // Meses que a Análise precisa COMPLETOS: o gráfico de 6 meses + o mês selecionado + os dois
+  // meses de comparação possíveis (mês anterior e mesmo mês do ano passado). A Análise lê esses
+  // meses sob demanda, sem a janela de 300 — ver docs/planning/HISTORICO_TRANSACOES.md.
+  const analysisMonths = useMemo(
+    () => [...new Set([...last6Months, selectedMonth, shiftMonth(selectedMonth, -1), shiftMonth(selectedMonth, -12)])],
+    [last6Months, selectedMonth]
+  );
+  const analysis = useMonthlyTransactions(workspaceId, analysisMonths);
+  // União: as 300 do boot (já na tela, sem flash) ∪ os meses completos da Análise. Durante o
+  // carregamento a tela mostra o resultado das 300; quando a Análise chega, refina pro completo
+  // (a agregação filtra por mês, então a união é completa pros meses que a Análise cobre).
+  const knownTransactions = useMemo(
+    () => dedupeById(finance.transactions, analysis.transactions),
+    [finance.transactions, analysis.transactions]
+  );
+
+  // Aviso de offline: com o histórico sob demanda, um mês que você nunca abriu online pode vir
+  // incompleto offline. Nota sutil, não bloqueia (o resto segue funcionando pelo cache).
+  const [isOnline, setIsOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine);
+  useEffect(() => {
+    const goOnline = () => setIsOnline(true);
+    const goOffline = () => setIsOnline(false);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => {
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
+    };
+  }, []);
+
   const normalizedQuery = query.trim().toLocaleLowerCase('pt-BR');
 
   // SearchPage é a única tela que precisa do ledger de TODAS as faturas de TODOS os cartões
@@ -183,12 +214,12 @@ export function SearchPage() {
   );
   // Cartão entra na Análise pela parcela; a categoria/descrição de cada parcela vem da transação-mãe.
   const txnCategoryById = useMemo(
-    () => new Map(finance.transactions.map((t) => [t.id, t.categoryId])),
-    [finance.transactions]
+    () => new Map(knownTransactions.map((t) => [t.id, t.categoryId])),
+    [knownTransactions]
   );
   const txnDescriptionById = useMemo(
-    () => new Map(finance.transactions.map((t) => [t.id, t.description])),
-    [finance.transactions]
+    () => new Map(knownTransactions.map((t) => [t.id, t.description])),
+    [knownTransactions]
   );
   // Contas a pagar reduzidas ao que a projeção futura precisa (mês do vencimento resolvido aqui).
   const billsForCommitment = useMemo<BillForCommitment[]>(
@@ -257,7 +288,7 @@ export function SearchPage() {
         totals.set(cat, (totals.get(cat) ?? 0) + cents);
       }
     } else {
-      totals = spendingByCategoryForMonth(selectedMonth, finance.transactions, invoicesForSpending, catOf);
+      totals = spendingByCategoryForMonth(selectedMonth, knownTransactions, invoicesForSpending, catOf);
     }
     return [...totals.entries()]
       .filter(([, amountCents]) => amountCents > 0) // mês só de estorno pode zerar/inverter uma categoria
@@ -272,7 +303,7 @@ export function SearchPage() {
         };
       })
       .sort((a, b) => b.amountCents - a.amountCents);
-  }, [finance.transactions, invoicesForSpending, billsForCommitment, rulesForProjection, isFutureMonth, txnCategoryById, categoryMap, categoryNames, selectedMonth]);
+  }, [knownTransactions, invoicesForSpending, billsForCommitment, rulesForProjection, isFutureMonth, txnCategoryById, categoryMap, categoryNames, selectedMonth]);
 
   const totalSpent = spendingByCategory.reduce((s, c) => s + c.amountCents, 0);
 
@@ -301,12 +332,12 @@ export function SearchPage() {
   // ── histórico mensal (últimos 6 meses reais — não acompanha selectedMonth) ─
   const monthlyData = useMemo(
     () =>
-      monthlyTotals(last6Months, finance.transactions, invoicesForSpending).map((m) => ({
+      monthlyTotals(last6Months, knownTransactions, invoicesForSpending).map((m) => ({
         month: monthLabel(m.month),
         incomeCents: m.incomeCents,
         expenseCents: m.expenseCents
       })),
-    [finance.transactions, invoicesForSpending, last6Months]
+    [knownTransactions, invoicesForSpending, last6Months]
   );
 
   const hasMonthlyData = monthlyData.some((m) => m.incomeCents > 0 || m.expenseCents > 0);
@@ -318,11 +349,11 @@ export function SearchPage() {
   const comparisonExpense = useMemo(
     () =>
       sumPositive(
-        spendingByCategoryForMonth(comparisonMonth, finance.transactions, invoicesForSpending, (id) =>
+        spendingByCategoryForMonth(comparisonMonth, knownTransactions, invoicesForSpending, (id) =>
           id ? txnCategoryById.get(id) : undefined
         )
       ),
-    [finance.transactions, invoicesForSpending, txnCategoryById, comparisonMonth]
+    [knownTransactions, invoicesForSpending, txnCategoryById, comparisonMonth]
   );
   // Comparação só faz sentido entre meses realizados; mês futuro é comprometido, não gasto.
   const variation = !isFutureMonth && comparisonExpense > 0
@@ -351,7 +382,7 @@ export function SearchPage() {
   // ── busca por texto ────────────────────────────────────────────────────────
   const results = useMemo(() => {
     if (!normalizedQuery) return [];
-    const transactions = finance.transactions
+    const transactions = knownTransactions
       .filter((t) => !t.deletedAt)
       .filter((t) =>
         [t.description, t.merchant, t.notes, t.tags.join(' ')]
@@ -380,7 +411,7 @@ export function SearchPage() {
       .map((a) => ({ id: a.id, kind: 'Conta', title: a.name, detail: 'Conta financeira', amountCents: a.openingBalanceCents }));
 
     return [...transactions, ...bills, ...accounts].slice(0, 25);
-  }, [finance.accounts, finance.bills, finance.transactions, installmentInfoById, normalizedQuery]);
+  }, [finance.accounts, finance.bills, knownTransactions, installmentInfoById, normalizedQuery]);
 
   const selectedCat = selectedCatIndex !== null ? spendingByCategory[selectedCatIndex] : null;
   const topCat = spendingByCategory[0] ?? null;
@@ -394,7 +425,7 @@ export function SearchPage() {
   }
 
   function handleExportCsv() {
-    const monthTxs = finance.transactions.filter(
+    const monthTxs = knownTransactions.filter(
       (t) => !t.deletedAt && (t.cashMonth === selectedMonth || t.competenceMonth === selectedMonth)
     );
     const csv = transactionsToCsv(monthTxs, categoryMap, accountMap);
@@ -436,6 +467,12 @@ export function SearchPage() {
           <ChevronRight size={18} aria-hidden="true" />
         </button>
       </div>
+
+      {!isOnline && (
+        <p className="text-secondary" style={{ textAlign: 'center', fontSize: '0.8rem', margin: '0 0 0.75rem' }}>
+          Você está offline · meses que você não abriu antes podem aparecer incompletos até reconectar.
+        </p>
+      )}
 
       {/* ── Comparação toggle ───────────────────────────────────────────────── */}
       {!isFutureMonth && (
@@ -902,6 +939,7 @@ export function SearchPage() {
       <AnnualSummarySheet
         open={annualOpen}
         onClose={() => setAnnualOpen(false)}
+        workspaceId={workspaceId}
         transactions={finance.transactions}
         invoices={invoicesForSpending}
         categories={expenseCategories}
