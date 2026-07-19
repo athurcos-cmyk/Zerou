@@ -54,6 +54,7 @@ Use este arquivo como mapa antes de abrir documentos grandes. Regra: leia o meno
 | Alertas de Orçamento | `src/components/BudgetAlertBanner.tsx`, `src/finance/budgetAlertCache.ts` (banner cliente); `functions/src/budgetAlerts.ts` (Cloud Function push) |
 | Tokens de cor / temas | `src/styles/themes.css` |
 | CSS global | `src/styles/global.css` |
+| Pull-to-refresh bloqueado (mobile, PWA incluso) | `src/pwa/preventPullToRefresh.ts` (JS cirúrgico via `touchmove`, chamado no `main.tsx`). **NÃO** usar `overscroll-behavior` pra isso — travou todo o scroll (ver `docs/design/DESIGN.md` e histórico 2026-07) |
 | Landing pública | `src/landing/` (`LandingCss`, `LandingSections`, `LandingShell`, `AppMockup`, `landing.css`) |
 | Regras Firestore | `firestore.rules` |
 

@@ -2,17 +2,21 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
-## 2026-07-19 — Pull-to-refresh bloqueado via JS cirúrgico (2ª tentativa, sem quebrar o scroll)
+## 2026-07-19 — Pull-to-refresh bloqueado via JS cirúrgico (✅ confirmado no celular do dono)
 
 O PWA instalado no Android **tem** pull-to-refresh (o dono confirmou com print — não some só por
 estar instalado, como eu tinha suposto errado). Depois da 1ª tentativa via CSS ter travado o scroll
 (ver entrada abaixo), agora via JS **cirúrgico** (`src/pwa/preventPullToRefresh.ts`, chamado no
-`main.tsx`): um listener de `touchmove` só cancela o gesto quando a página está **no topo**
-(`window.scrollY <= 0`) **E** o dedo vai **pra baixo** — o único movimento que dispara o refresh.
-Rolar a tela (dedo pra cima, ou fora do topo) nunca é cancelado, então o scroll normal fica intacto.
-`window.scrollY` é confiável independente de qual elemento rola (evita a ambiguidade que quebrou o
-CSS). **Verificação depende de teste no celular real do dono** — sem staging, então testar no ato do
-deploy e reverter na hora se algo no scroll estranhar.
+`main.tsx`): um listener de `touchmove` só cancela o gesto quando **três** coisas valem ao mesmo
+tempo — a página está no topo (`window.scrollY <= 0`), o dedo vai pra baixo, **e** nenhum ancestral
+rolável sob o dedo tem `scrollTop > 0` pra consumir o puxão. Ou seja, só o overscroll real do
+documento vira refresh e é cancelado; rolar a tela (dedo pra cima, ou fora do topo) **e rolar dentro
+de um BottomSheet** nunca são tocados. `window.scrollY`/`scrollTop` são confiáveis independente de
+qual elemento rola (evita a ambiguidade que quebrou o CSS).
+- Achado no processo (antes de ir pro dono): a 1ª versão do guard bloquearia o scroll pra cima
+  DENTRO de um sheet aberto — corrigido com a checagem de ancestral rolável (`pullCanBeConsumed`).
+- **Confirmado ao vivo pelo dono no Android**: refresh bloqueado, scroll normal e scroll dentro de
+  sheet intactos. `typecheck`/`build` limpos.
 
 ## 2026-07-19 — REVERTIDO: bloqueio de pull-to-refresh travava o scroll no celular
 
