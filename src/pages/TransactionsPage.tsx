@@ -9,9 +9,9 @@ import { CategoryMark } from '../components/categoryIcons';
 import { SelectField } from '../components/SelectField';
 import { useConfirm } from '../components/ConfirmDialog';
 import { defaultCategoryColors } from '../theme/palette';
-import { formatFriendlyDate, toDateInputValue } from '../finance/financeDates';
+import { formatFriendlyDate, toDate, toDateInputValue } from '../finance/financeDates';
 import { transactionTypeLabels } from '../finance/financeLabels';
-import { softDeleteTransaction, type LocalSynced } from '../finance/financeService';
+import { dedupeById, loadMoreTransactions, softDeleteTransaction, type LocalSynced } from '../finance/financeService';
 import { formatMoney } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
 import type { Transaction } from '../types/contracts';
@@ -40,10 +40,52 @@ export function TransactionsPage() {
     ],
     [cardsData.cards]
   );
-  const activeTransactions = useMemo(
-    () => finance.transactions.filter((transaction) => !transaction.deletedAt),
-    [finance.transactions]
+  // ── paginação "Carregar mais" (Fase 2) ──────────────────────────────────────
+  // As 300 do boot continuam ao vivo (onSnapshot); páginas mais antigas entram aqui sob
+  // demanda (leitura pontual, ver `loadMoreTransactions`). Ver docs/planning/HISTORICO_TRANSACOES.md.
+  const [olderTransactions, setOlderTransactions] = useState<Array<LocalSynced<Transaction>>>([]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [reachedEnd, setReachedEnd] = useState(false);
+  const [loadMoreFailed, setLoadMoreFailed] = useState(false);
+
+  // Conjunto carregado = 300 do boot ∪ páginas antigas, ordenado por data desc. Inclui
+  // excluídas (o cursor de paginação precisa continuar certo); o filtro de exibição tira depois.
+  const loadedTransactions = useMemo(
+    () =>
+      dedupeById(finance.transactions, olderTransactions).sort(
+        (a, b) => toDate(b.date).getTime() - toDate(a.date).getTime()
+      ),
+    [finance.transactions, olderTransactions]
   );
+
+  const activeTransactions = useMemo(
+    () => loadedTransactions.filter((transaction) => !transaction.deletedAt),
+    [loadedTransactions]
+  );
+
+  async function handleLoadMore() {
+    if (loadingMore || reachedEnd || !workspaceId) return;
+    const oldest = loadedTransactions[loadedTransactions.length - 1];
+    if (!oldest) return;
+    setLoadingMore(true);
+    setLoadMoreFailed(false);
+    try {
+      const page = await loadMoreTransactions(workspaceId, oldest.id, 50);
+      const known = new Set(loadedTransactions.map((transaction) => transaction.id));
+      const fresh = page.filter((transaction) => !known.has(transaction.id));
+      if (fresh.length > 0) setOlderTransactions((prev) => dedupeById(prev, fresh));
+      // Página incompleta = fim da coleção — mas só confia nisso online (offline pode ser cache
+      // parcial). Offline sem completar vira aviso de reconectar, não "fim".
+      if (page.length < 50) {
+        if (typeof navigator !== 'undefined' && navigator.onLine) setReachedEnd(true);
+        else setLoadMoreFailed(true);
+      }
+    } catch {
+      setLoadMoreFailed(true);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   const availableTags = useMemo(() => {
     const tags = new Set<string>();
@@ -318,6 +360,24 @@ export function TransactionsPage() {
             ))}
           </div>
         )}
+
+        {!reachedEnd && loadedTransactions.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem', marginTop: '0.85rem' }}>
+            <button
+              type="button"
+              className="button button--subtle button--compact"
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+            >
+              {loadingMore ? 'Carregando…' : 'Carregar mais'}
+            </button>
+            {loadMoreFailed ? (
+              <span className="text-secondary" style={{ fontSize: '0.8rem', textAlign: 'center' }}>
+                Não foi possível carregar mais. Verifique a conexão e tente de novo.
+              </span>
+            ) : null}
+          </div>
+        ) : null}
       </article>
 
       {detailTransaction ? (() => {

@@ -4,6 +4,7 @@ import {
   deleteField,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   increment,
   limit,
@@ -12,6 +13,7 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  startAfter,
   updateDoc,
   where,
   writeBatch,
@@ -732,6 +734,28 @@ export function subscribeTransactionsForMonths(
     unsubCash();
     unsubCompetence();
   };
+}
+
+/**
+ * Página de transações MAIS ANTIGAS que uma âncora (o lançamento mais antigo já na tela), pro
+ * "Carregar mais" da lista de Transações. Leitura pontual (`getDocs`), não tempo real —
+ * histórico velho quase não muda, e escutar tudo ao vivo custaria à toa. O cursor é um
+ * DocumentSnapshot (um `getDoc` da âncora, 1 leitura), que resolve empates de data corretamente
+ * (encode do `__name__`), ao contrário de cursor por valor de data. Offline: servido do cache
+ * pros docs já sincronizados. Devolve [] se a âncora não existe (ex.: excluída de vez).
+ */
+export async function loadMoreTransactions(
+  workspaceId: string,
+  afterTransactionId: string,
+  pageSize = 50
+): Promise<Array<LocalSynced<Transaction>>> {
+  const cursor = await getDoc(documentRef(workspaceId, 'transactions', afterTransactionId));
+  if (!cursor.exists()) return [];
+
+  const snapshot = await getDocs(
+    query(collectionRef(workspaceId, 'transactions'), orderBy('date', 'desc'), startAfter(cursor), limit(pageSize))
+  );
+  return snapshot.docs.map((item) => withLocalSync<Transaction>(item));
 }
 
 export function subscribeGoals(

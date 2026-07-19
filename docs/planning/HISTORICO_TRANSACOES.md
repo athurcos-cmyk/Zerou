@@ -111,7 +111,10 @@ já endurecida em 2026-07-18). Nenhuma leitura crítica com `await` bloqueante.
   (Análise) **e `AnnualSummarySheet` (resumo anual — 12 meses do ano, sob demanda)** agregam sobre
   a UNIÃO das 300 do boot + os meses completos (helper `dedupeById`, DRY). Nota de offline. **Sem
   regressão pra quem tem ≤300** (união = as 300). 9 testes novos.
-- **Fase 2:** `loadMoreTransactions` + "Carregar mais" em `TransactionsPage`.
+- **Fase 2 — ✅ IMPLEMENTADA em 2026-07-19:** `loadMoreTransactions` (getDocs com cursor por
+  DocumentSnapshot via `getDoc` da âncora — robusto contra empate de data) + botão "Carregar mais"
+  em `TransactionsPage` (300 ao vivo ∪ páginas de 50 antigas, dedupe por id, aviso de offline). 2
+  testes novos.
 - **Fase 3 (deferível):** Dashboard "Resumo de gastos" + banner do mês atual usam o **mesmo** hook
   por mês (DRY) pro mês corrente. **Recomendo DEFERIR:** só quebra com >300 no mês corrente (extremo),
   a Análise já dá o número certo, e o alerta de orçamento **server-side** (`sendBudgetAlerts`) já é

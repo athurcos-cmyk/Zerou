@@ -2,6 +2,21 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-19 — Transações: "Carregar mais" pra ver histórico antigo (Fase 2)
+
+Segunda fase do plano `docs/planning/HISTORICO_TRANSACOES.md`. A lista de Transações mostrava só
+as 300 mais recentes, sem como ver as mais antigas. Agora tem paginação sob demanda.
+
+- `loadMoreTransactions` (`financeService.ts`): busca a próxima página de 50 transações mais
+  antigas via `getDocs` com cursor por **DocumentSnapshot** (um `getDoc` da âncora — robusto contra
+  empate de data, ao contrário de cursor por valor). Leitura pontual, não tempo real.
+- `TransactionsPage`: as 300 do boot seguem ao vivo; botão **"Carregar mais"** anexa páginas de 50
+  antigas (união por id, sem duplicar na fronteira). Página incompleta = fim do histórico. Offline
+  sem cache → aviso pra reconectar (não marca "fim" à toa).
+- ~50 leituras por toque, só quando a pessoa pede. **Sem índice novo** (ordena por `date`, já
+  indexado). 2 testes novos. `typecheck`/`test` (352/352)/`build` limpos.
+- Fase 3 (Dashboard/banner do mês atual, borda extrema) segue deferida.
+
 ## 2026-07-19 — Análise correta além de 300 transações (Fase 1: leitura por mês)
 
 Primeira fase do plano `docs/planning/HISTORICO_TRANSACOES.md` (travado com `/plan-eng-review`).
