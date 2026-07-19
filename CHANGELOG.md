@@ -21,6 +21,12 @@ reembolso, racha de conta). Plano em `docs/planning/CONTAS_A_RECEBER.md`.
   nova + teste real no emulador, 55/55). **Precisa de deploy das regras** pra funcionar em produção.
 - Só **avulso** nesta fase; **recorrente** virou TODO/Fase 2 (mexe em Cloud Function + `RecurringRule`
   compartilhado). `typecheck`/`test` (357/357)/`test:rules` (55/55)/`build` limpos.
+- **Polimento visual** (design pass) pra casar com o capricho das outras telas: o cabeçalho
+  colapsável ganhou o chevron que rotaciona ao abrir (igual Contas a Pagar — antes não tinha
+  affordance de "abre"), cada linha ganhou o ícone-tile de receita, form + lista foram pro
+  `finance-grid` (respiro entre os cards no mobile, antes colados; 2 colunas no desktop), botões da
+  linha no peso subtle/ghost em vez de primary "gritando", e a meta-linha deixou de ter um `<span>`
+  aninhado que viraria bloco por `.list-row span`. Só visual, sem mudança de dado/fluxo.
 
 ## 2026-07-19 — Pull-to-refresh bloqueado via JS cirúrgico (✅ confirmado no celular do dono)
 
