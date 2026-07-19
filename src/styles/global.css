@@ -50,15 +50,6 @@ body {
   color: var(--text-primary);
 }
 
-/* Bloqueia o "puxar pra baixo pra recarregar" (pull-to-refresh do Chrome Android): o app é
-   offline-first e sincroniza sozinho, então um refresh manual só reinicia o app à toa e
-   reexibe o boot de 1-2s. `contain` mata a recarga e o scroll-chaining pra fora, mas mantém
-   o scroll normal — e não bloqueia o reload pelo botão do navegador. */
-html,
-body {
-  overscroll-behavior-y: contain;
-}
-
 body,
 button,
 input,

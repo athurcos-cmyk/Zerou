@@ -2,6 +2,16 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-19 — REVERTIDO: bloqueio de pull-to-refresh travava o scroll no celular
+
+`overscroll-behavior-y: contain` em `html, body` (adicionado mais cedo hoje pra bloquear o "puxar
+pra recarregar") **travou todo o scroll no mobile** — dava pra clicar, mas não rolar a tela.
+Deveria ser inofensivo pro scroll (é o uso padrão da propriedade), mas interagiu mal com o
+`overflow-x: hidden` do body + o modelo de scroll do documento no navegador mobile real, que não
+reproduzi no preview de desktop. **Revertido por completo** (`global.css`) — restaura o estado que
+funcionava. O gesto nativo de pull-to-refresh fica como está (o flash que ele causava já foi
+minimizado pelo cache do Dashboard). Nota de "não tentar de novo assim" em `docs/design/DESIGN.md`.
+
 ## 2026-07-19 — Dashboard e alerta de orçamento batem com a Análise mesmo com +300 no mês (Fase 3)
 
 Terceira e última fase do plano `docs/planning/HISTORICO_TRANSACOES.md`, fechando a limitação da
