@@ -2,7 +2,7 @@ import { addDays, compareAsc, endOfDay, isAfter, isBefore, isEqual } from 'date-
 import { formatFriendlyMonth, toDate } from './financeDates';
 import { defaultAvailableMode } from './availableMode';
 import { defaultCommittedWindowDays, nextPaydayFrom } from './payday';
-import type { Account, AvailableMode, Bill, CreditCard, Invoice, PaydayRule, RecurringRule, Transaction } from '../types/contracts';
+import type { Account, AvailableMode, Bill, CreditCard, Invoice, PaydayRule, Receivable, RecurringRule, Transaction } from '../types/contracts';
 
 export interface AccountBalance extends Account {
   balanceCents: number;
@@ -21,6 +21,39 @@ export interface UpcomingCommitment {
 // De onde veio a data-limite usada pra decidir o que conta como "Comprometido" —
 // exibido no Dashboard pra explicar o número em vez de só mostrar um valor sem contexto.
 export type CommittedCutoffSource = 'income' | 'payday' | 'window';
+
+export interface UpcomingReceivable {
+  id: string;
+  description: string;
+  fromWho?: string;
+  amountCents: number;
+  dueAt: Date;
+}
+
+/** Janela do Dashboard pra "Próximos a receber": só o que vence em até N dias (pedido do dono,
+ * pra não dar ilusão de dinheiro distante). Inclui atrasados (venceram e não foram recebidos). */
+export const RECEIVABLE_DASHBOARD_WINDOW_DAYS = 5;
+
+/**
+ * "Próximos a receber" do Dashboard: só `pending`/`overdue` com vencimento até hoje + 5 dias.
+ * Puramente informativo — NÃO entra em saldo/comprometido nenhum (receivables vivem separados).
+ */
+export function buildUpcomingReceivables(
+  receivables: Array<Pick<Receivable, 'id' | 'description' | 'fromWho' | 'amountCents' | 'dueDate' | 'status'>>,
+  now: Date = new Date()
+): UpcomingReceivable[] {
+  const cutoff = endOfDay(addDays(now, RECEIVABLE_DASHBOARD_WINDOW_DAYS));
+  return receivables
+    .filter((receivable) => (receivable.status === 'pending' || receivable.status === 'overdue') && toDate(receivable.dueDate) <= cutoff)
+    .map((receivable) => ({
+      id: receivable.id,
+      description: receivable.description,
+      fromWho: receivable.fromWho,
+      amountCents: receivable.amountCents,
+      dueAt: toDate(receivable.dueDate)
+    }))
+    .sort((left, right) => compareAsc(left.dueAt, right.dueAt));
+}
 
 export interface DashboardSummary {
   totalBalanceCents: number;

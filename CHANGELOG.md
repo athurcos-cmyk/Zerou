@@ -2,6 +2,26 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-19 — Contas a Receber (Fase 1: avulso) — espelho do Contas a Pagar
+
+Feature nova pedida pelo dono: anotar dinheiro a receber (quem te deve, freela pendente,
+reembolso, racha de conta). Plano em `docs/planning/CONTAS_A_RECEBER.md`.
+
+- **Coleção `receivables` SEPARADA** (não campo em `bills`) — decisão de arquitetura chave: o
+  cálculo de saldo/Disponível/Comprometido **nunca** lê essa coleção, então um "a receber" é
+  **impossível** de inflar o número por acidente. Dinheiro a receber só vira dinheiro ao marcar
+  "recebido" (cria uma **receita** de verdade na conta escolhida, via `markReceivableReceived` —
+  espelho de `payBill`). Mantém o número honesto, o valor nº1 do dono.
+- `ReceivablesPage` (`/app/receivables`, nav sidebar + mobile): anotar (descrição, valor, de quem,
+  previsão, conta), "Recebi" (escolhe a conta), cancelar (com confirmação). Atrasados marcados
+  automático (`markOverdueReceivables`, espelho de `markOverdueBills`).
+- **Dashboard**: seção "Próximos a receber" **no fim** da tela, só o que vence em **≤5 dias** e
+  totalmente fora de qualquer total de saldo (pedido do dono, pra não dar ilusão de dinheiro).
+- `firestore.rules`: `validReceivableCreate/Update` + `match /receivables` (a regra nº1 — coleção
+  nova + teste real no emulador, 55/55). **Precisa de deploy das regras** pra funcionar em produção.
+- Só **avulso** nesta fase; **recorrente** virou TODO/Fase 2 (mexe em Cloud Function + `RecurringRule`
+  compartilhado). `typecheck`/`test` (357/357)/`test:rules` (55/55)/`build` limpos.
+
 ## 2026-07-19 — Pull-to-refresh bloqueado via JS cirúrgico (✅ confirmado no celular do dono)
 
 O PWA instalado no Android **tem** pull-to-refresh (o dono confirmou com print — não some só por

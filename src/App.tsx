@@ -13,6 +13,7 @@ import { AppearanceSettingsPage } from './settings/AppearanceSettingsPage';
 import { AssistantPage } from './pages/AssistantPage';
 import { AccountsPage } from './pages/AccountsPage';
 import { BillsPage } from './pages/BillsPage';
+import { ReceivablesPage } from './pages/ReceivablesPage';
 import { CardDetailPage } from './pages/CardDetailPage';
 import { CardsPage } from './pages/CardsPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -92,6 +93,7 @@ export function App() {
                 <Route path="cards/:cardId" element={<CardDetailPage />} />
                 <Route path="cards/:cardId/invoices/:invoiceId" element={<InvoicePage />} />
                 <Route path="bills" element={<BillsPage />} />
+                <Route path="receivables" element={<ReceivablesPage />} />
                 <Route path="goals" element={<GoalsPage />} />
                 <Route path="goals/:goalId" element={<GoalDetailPage />} />
                 {/* Patrimônio Líquido desativado (2026-07-16) — redireciona em vez de remover, pra não deixar link morto se alguém tiver a URL salva/favoritada. */}

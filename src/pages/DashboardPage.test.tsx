@@ -39,6 +39,7 @@ function financeCtx(overrides: Record<string, unknown> = {}) {
     accounts: [],
     transactions: [],
     bills: [],
+    receivables: [],
     recurringRules: [],
     categories: [],
     budgets: [],

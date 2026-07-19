@@ -4,15 +4,17 @@ import { currentAccountBalances } from './financeCalculations';
 import {
   ensureDefaultCategories,
   markOverdueBills,
+  markOverdueReceivables,
   subscribeAccounts,
   subscribeBills,
   subscribeBudgets,
   subscribeCategories,
+  subscribeReceivables,
   subscribeRecurringRules,
   subscribeTransactions,
   type LocalSynced
 } from './financeService';
-import type { Account, Bill, Budget, Category, RecurringRule, Transaction } from '../types/contracts';
+import type { Account, Bill, Budget, Category, Receivable, RecurringRule, Transaction } from '../types/contracts';
 
 const FINANCE_BOOT_RETRY_DELAYS_MS = [600, 1200, 2400, 4000];
 // Depois de esgotar o backoff acima, continua tentando neste intervalo pra sempre em vez
@@ -63,6 +65,7 @@ interface FinanceDataState {
   categories: Array<LocalSynced<Category>>;
   transactions: Array<LocalSynced<Transaction>>;
   bills: Array<LocalSynced<Bill>>;
+  receivables: Array<LocalSynced<Receivable>>;
   recurringRules: Array<LocalSynced<RecurringRule>>;
   budgets: Array<LocalSynced<Budget>>;
   loading: boolean;
@@ -74,6 +77,7 @@ const initialState: FinanceDataState = {
   categories: [],
   transactions: [],
   bills: [],
+  receivables: [],
   recurringRules: [],
   budgets: [],
   loading: true,
@@ -88,9 +92,9 @@ function canRetryFinanceBoot(error: unknown) {
   return ['permission-denied', 'unavailable', 'deadline-exceeded'].includes(getErrorCode(error));
 }
 
-type FinanceSliceKey = keyof Pick<FinanceDataState, 'accounts' | 'categories' | 'transactions' | 'bills' | 'recurringRules' | 'budgets'>;
+type FinanceSliceKey = keyof Pick<FinanceDataState, 'accounts' | 'categories' | 'transactions' | 'bills' | 'receivables' | 'recurringRules' | 'budgets'>;
 
-const REQUIRED_SLICES: FinanceSliceKey[] = ['accounts', 'categories', 'transactions', 'bills', 'recurringRules', 'budgets'];
+const REQUIRED_SLICES: FinanceSliceKey[] = ['accounts', 'categories', 'transactions', 'bills', 'receivables', 'recurringRules', 'budgets'];
 
 function setSlice<K extends FinanceSliceKey>(
   key: K,
@@ -259,6 +263,10 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
         markOverdueBills(activeWorkspaceId, items);
         setState(setSlice('bills', items, markSliceLoaded('bills')));
       }),
+      subscribeWithBootRetry(subscribeReceivables, (items) => {
+        markOverdueReceivables(activeWorkspaceId, items);
+        setState(setSlice('receivables', items, markSliceLoaded('receivables')));
+      }),
       subscribeWithBootRetry(subscribeRecurringRules, (items) => setState(setSlice('recurringRules', items, markSliceLoaded('recurringRules')))),
       subscribeWithBootRetry(subscribeBudgets, (items) => setState(setSlice('budgets', items, markSliceLoaded('budgets'))))
     ];
@@ -295,10 +303,10 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
 
   const pendingWrites = useMemo(
     () =>
-      [...state.accounts, ...state.categories, ...state.transactions, ...state.bills, ...state.recurringRules, ...state.budgets].some(
+      [...state.accounts, ...state.categories, ...state.transactions, ...state.bills, ...state.receivables, ...state.recurringRules, ...state.budgets].some(
         (item) => item.localSyncStatus === 'pending'
       ),
-    [state.accounts, state.bills, state.budgets, state.categories, state.recurringRules, state.transactions]
+    [state.accounts, state.bills, state.budgets, state.categories, state.receivables, state.recurringRules, state.transactions]
   );
 
   // Transações excluídas no Extrato (soft delete) precisam propagar pro cálculo da fatura:

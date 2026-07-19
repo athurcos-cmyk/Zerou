@@ -107,9 +107,11 @@ saldo). Se vazia, não renderiza nada (nem título) — pra não poluir.
 O feature toca > 8 arquivos (tela, serviço, regras, contrato, dashboard, schemas, testes; Fase 2 +
 Cloud Function). Recomendo **fasear**:
 
-- **Fase 1 (essencial): avulso.** Coleção `receivables`, `ReceivablesPage` (`/app/receivables`),
-  criar/editar/cancelar, "marcar recebido" → income, `markOverdueReceivables`, seção no Dashboard
-  (≤5 dias), nav. **Sem Cloud Function.** Entrega o valor central, bounded e seguro.
+- **Fase 1 (essencial): avulso. ✅ IMPLEMENTADA em 2026-07-19.** Coleção `receivables`,
+  `ReceivablesPage` (`/app/receivables`), criar/cancelar, "marcar recebido" → income na conta,
+  `markOverdueReceivables`, seção no Dashboard (≤5 dias, no fim), nav (sidebar + mobile). Sem Cloud
+  Function. `firestore.rules` (`validReceivable*` + match) + teste no emulador (55/55). **Depende de
+  deploy das regras** pra funcionar em produção (autorização do dono).
 - **Fase 2: recorrente.** `direction` no `RecurringRule` + `generateRecurrences` roteando pra
   `receivables` + regra atualizada + deploy da function.
 

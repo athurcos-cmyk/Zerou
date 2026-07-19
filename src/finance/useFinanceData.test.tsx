@@ -5,8 +5,10 @@ import { useFinanceData } from './useFinanceData';
 const financeMocks = vi.hoisted(() => ({
   ensureDefaultCategories: vi.fn(),
   markOverdueBills: vi.fn(),
+  markOverdueReceivables: vi.fn(),
   subscribeAccounts: vi.fn(),
   subscribeBills: vi.fn(),
+  subscribeReceivables: vi.fn(),
   subscribeBudgets: vi.fn(),
   subscribeCategories: vi.fn(),
   subscribeRecurringRules: vi.fn(),
@@ -35,6 +37,7 @@ describe('useFinanceData', () => {
 
     for (const subscribe of [
       financeMocks.subscribeBills,
+      financeMocks.subscribeReceivables,
       financeMocks.subscribeBudgets,
       financeMocks.subscribeCategories,
       financeMocks.subscribeRecurringRules,

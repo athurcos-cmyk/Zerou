@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Timestamp } from 'firebase/firestore';
 import {
   buildUpcomingCommitments,
+  buildUpcomingReceivables,
   calculateAccountBalances,
   calculateDashboardSummary,
   calculateTotalBalance,
@@ -12,7 +13,7 @@ import {
   mergeAccountEffects,
   transactionAccountEffects
 } from './financeCalculations';
-import type { Account, Bill, CreditCard, Invoice, RecurringRule, Transaction } from '../types/contracts';
+import type { Account, Bill, CreditCard, Invoice, Receivable, RecurringRule, Transaction } from '../types/contracts';
 
 function account(id: string, openingBalanceCents = 0, overrides: Partial<Account> = {}): Account {
   return {
@@ -998,5 +999,41 @@ describe('findNextIncomeDate — receita de hoje não é "próximo recebimento"'
     );
 
     expect(next?.toISOString().slice(0, 10)).toBe('2026-06-15');
+  });
+});
+
+describe('buildUpcomingReceivables', () => {
+  const now = new Date('2026-07-19T12:00:00');
+  const day = (offset: number) => new Date(now.getTime() + offset * 24 * 60 * 60 * 1000);
+
+  function receivable(id: string, dueDate: Date, status: Receivable['status']): Receivable {
+    return {
+      id,
+      workspaceId: 'workspaceA',
+      description: id,
+      amountCents: 1000,
+      dueDate: Timestamp.fromDate(dueDate),
+      status,
+      createdBy: 'alice'
+    };
+  }
+
+  it('mostra só pending/overdue com vencimento em ≤5 dias, ordenado por data', () => {
+    const items = [
+      receivable('soon', day(3), 'pending'), // ≤5d → entra
+      receivable('today', day(0), 'pending'), // hoje → entra
+      receivable('atrasado', day(-2), 'overdue'), // atrasado → entra
+      receivable('far', day(10), 'pending'), // >5d → fora
+      receivable('recebido', day(1), 'received'), // recebido → fora
+      receivable('cancelado', day(1), 'cancelled') // cancelado → fora
+    ];
+
+    const result = buildUpcomingReceivables(items, now);
+
+    expect(result.map((r) => r.id)).toEqual(['atrasado', 'today', 'soon']);
+  });
+
+  it('devolve vazio quando nada vence em ≤5 dias', () => {
+    expect(buildUpcomingReceivables([receivable('far', day(20), 'pending')], now)).toEqual([]);
   });
 });

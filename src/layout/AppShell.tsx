@@ -6,6 +6,7 @@ import {
   Banknote,
   Bot,
   CalendarClock,
+  HandCoins,
   Compass,
   HelpCircle,
   Home,
@@ -98,6 +99,9 @@ export function AppShell() {
           <NavLink className={getNavClass} to="/app/bills">
             <CalendarClock size={19} aria-hidden="true" /> Contas a Pagar
           </NavLink>
+          <NavLink className={getNavClass} to="/app/receivables">
+            <HandCoins size={19} aria-hidden="true" /> Contas a Receber
+          </NavLink>
           <NavLink className={getNavClass} to="/app/goals">
             <Target size={19} aria-hidden="true" /> Metas
           </NavLink>
@@ -165,6 +169,9 @@ export function AppShell() {
             {/* Patrimônio Líquido desativado (2026-07-16, pedido do dono) — ver docs/planning/TODOS.md. */}
             <NavLink className={getTileClass} to="/app/bills" onClick={() => setMobileMenuOpen(false)}>
               <CalendarClock size={20} aria-hidden="true" /> <span>Contas a Pagar</span>
+            </NavLink>
+            <NavLink className={getTileClass} to="/app/receivables" onClick={() => setMobileMenuOpen(false)}>
+              <HandCoins size={20} aria-hidden="true" /> <span>Contas a Receber</span>
             </NavLink>
             <NavLink className={getTileClass} to="/app/goals" onClick={() => setMobileMenuOpen(false)}>
               <Target size={20} aria-hidden="true" /> <span>Metas</span>

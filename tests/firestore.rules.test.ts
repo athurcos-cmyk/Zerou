@@ -173,6 +173,27 @@ function budgetPayload(workspaceId: string, budgetId: string, uid: string, overr
   };
 }
 
+// Reflete o payload REAL de `createReceivable` (financeService.ts) — a lição nº1 do CLAUDE.md:
+// se o payload de teste for uma versão simplificada, o teste passa com a regra desatualizada.
+function receivablePayload(workspaceId: string, receivableId: string, uid: string, overrides: Record<string, unknown> = {}) {
+  const now = serverTimestamp();
+
+  return {
+    id: receivableId,
+    workspaceId,
+    description: 'Freela do site',
+    amountCents: 50000,
+    fromWho: 'Cliente X',
+    dueDate: Timestamp.fromDate(new Date('2026-08-01T12:00:00')),
+    status: 'pending',
+    accountId: 'acc1',
+    createdBy: uid,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides
+  };
+}
+
 function goalContributionPayload(workspaceId: string, contribId: string, goalId: string, uid: string, overrides: Record<string, unknown> = {}) {
   return {
     id: contribId,
@@ -1378,6 +1399,34 @@ describe('firestore security rules', () => {
     // Create referencing a nonexistent category: must fail.
     await assertFails(
       setDoc(doc(aliceDb, 'workspaces/workspaceA/budgets/nonexistent'), budgetPayload('workspaceA', 'nonexistent', 'alice'))
+    );
+  });
+
+  it('validates receivable documents (Contas a Receber)', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    const ref = doc(aliceDb, 'workspaces/workspaceA/receivables/rcv1');
+
+    // Create válido (payload real do cliente).
+    await assertSucceeds(setDoc(ref, receivablePayload('workspaceA', 'rcv1', 'alice')));
+    // Marcar recebido (update de status): permitido.
+    await assertSucceeds(updateDoc(ref, { status: 'received', updatedAt: serverTimestamp() }));
+    // Update de campo travado (createdBy): falha.
+    await assertFails(updateDoc(ref, { createdBy: 'bob', updatedAt: serverTimestamp() }));
+    // Create com uid de outro usuário: falha.
+    await assertFails(
+      setDoc(doc(aliceDb, 'workspaces/workspaceA/receivables/forged'), receivablePayload('workspaceA', 'forged', 'bob'))
+    );
+    // Status que não existe pra receivable (ex.: 'paid' é de bill): falha.
+    await assertFails(
+      setDoc(doc(aliceDb, 'workspaces/workspaceA/receivables/badstatus'), receivablePayload('workspaceA', 'badstatus', 'alice', { status: 'paid' }))
+    );
+    // Campo contrabandeado (categoryId não é permitido em receivable): falha.
+    await assertFails(
+      setDoc(doc(aliceDb, 'workspaces/workspaceA/receivables/smuggled'), receivablePayload('workspaceA', 'smuggled', 'alice', { categoryId: 'x' }))
+    );
+    // Outro workspace do qual alice não é membro: falha.
+    await assertFails(
+      setDoc(doc(aliceDb, 'workspaces/workspaceB/receivables/rcvB'), receivablePayload('workspaceB', 'rcvB', 'alice'))
     );
   });
 

@@ -643,6 +643,60 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time;
     }
 
+    // Contas a Receber (Fase 1: avulso) — espelho de validBill*, coleção separada `receivables`.
+    // NUNCA compartilha coleção com bills, pra um "a receber" jamais vazar pro Comprometido.
+    function validReceivableCreate(workspaceId, receivableId) {
+      return isActiveMember(workspaceId)
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'workspaceId',
+          'description',
+          'amountCents',
+          'fromWho',
+          'dueDate',
+          'status',
+          'accountId',
+          'createdBy',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.id == receivableId
+        && request.resource.data.workspaceId == workspaceId
+        && validShortText(request.resource.data.description, 2, 120)
+        && validMoneyCents(request.resource.data.amountCents)
+        && validOptionalString('fromWho', 120)
+        && request.resource.data.dueDate is timestamp
+        && request.resource.data.status in ['pending', 'received', 'overdue', 'cancelled']
+        && validOptionalString('accountId', 120)
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validReceivableUpdate(workspaceId) {
+      return isActiveMember(workspaceId)
+        && request.resource.data.workspaceId == resource.data.workspaceId
+        && request.resource.data.workspaceId == workspaceId
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'description',
+          'amountCents',
+          'fromWho',
+          'dueDate',
+          'status',
+          'accountId',
+          'updatedAt'
+        ])
+        && validShortText(request.resource.data.description, 2, 120)
+        && validMoneyCents(request.resource.data.amountCents)
+        && validOptionalString('fromWho', 120)
+        && request.resource.data.dueDate is timestamp
+        && request.resource.data.status in ['pending', 'received', 'overdue', 'cancelled']
+        && validOptionalString('accountId', 120)
+        && request.resource.data.updatedAt == request.time;
+    }
+
     function validRecurringCreate(workspaceId, recurringId) {
       return isActiveMember(workspaceId)
         && request.resource.data.keys().hasOnly([
@@ -1585,6 +1639,13 @@ service cloud.firestore {
         allow read: if isActiveMember(workspaceId);
         allow create: if validBillCreate(workspaceId, billId);
         allow update: if validBillUpdate(workspaceId);
+        allow delete: if canDeleteWorkspaceTree(workspaceId);
+      }
+
+      match /receivables/{receivableId} {
+        allow read: if isActiveMember(workspaceId);
+        allow create: if validReceivableCreate(workspaceId, receivableId);
+        allow update: if validReceivableUpdate(workspaceId);
         allow delete: if canDeleteWorkspaceTree(workspaceId);
       }
 

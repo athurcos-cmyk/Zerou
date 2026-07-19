@@ -254,6 +254,29 @@ export interface Bill {
   updatedAt?: Timestamp;
 }
 
+/**
+ * Contas a Receber (Fase 1: avulso) — espelho do `Bill`, mas semântica de ENTRADA. Vive numa
+ * coleção separada (`receivables`) de propósito: o cálculo de saldo/comprometido nunca lê isto,
+ * então um "a receber" nunca infla o Disponível. Só vira dinheiro ao marcar `received` (cria uma
+ * transação `income` de verdade). Ver `docs/planning/CONTAS_A_RECEBER.md`.
+ */
+export interface Receivable {
+  id: string;
+  workspaceId: string;
+  description: string;
+  amountCents: MoneyCents;
+  /** "De quem" — quem te deve (ex.: "Fulano"). Opcional. */
+  fromWho?: string;
+  dueDate: Timestamp;
+  /** `received` no lugar de `paid`; `overdue` = atrasado (venceu sem receber). */
+  status: 'pending' | 'received' | 'overdue' | 'cancelled';
+  /** Conta onde o dinheiro cai quando recebido (default; escolhível no ato). */
+  accountId?: string;
+  createdBy: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
 export interface RecurringRule {
   id: string;
   workspaceId: string;

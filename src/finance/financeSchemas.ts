@@ -7,6 +7,8 @@ export const transactionTypes = ['income', 'expense', 'transfer', 'adjustment', 
 
 export const billStatuses = ['pending', 'paid', 'overdue', 'cancelled'] as const;
 
+export const receivableStatuses = ['pending', 'received', 'overdue', 'cancelled'] as const;
+
 export const recurringFrequencies = ['weekly', 'monthly', 'yearly'] as const;
 
 const moneyCentsSchema = z
@@ -68,6 +70,14 @@ export const createBillSchema = z.object({
   accountId: z.string().trim().max(120).optional()
 });
 
+export const createReceivableSchema = z.object({
+  description: z.string().trim().min(2, 'Informe uma descrição.').max(120),
+  amountCents: moneyCentsSchema,
+  fromWho: z.string().trim().max(120).optional(),
+  dueDate: z.date(),
+  accountId: z.string().trim().max(120).optional()
+});
+
 export const createRecurringRuleSchema = z.object({
   description: z.string().trim().min(2, 'Informe uma descrição.').max(120),
   amountCents: moneyCentsSchema.optional(),
@@ -80,6 +90,7 @@ export const createRecurringRuleSchema = z.object({
 export type CreateAccountInput = z.infer<typeof createAccountSchema>;
 export type CreateTransactionInput = z.infer<typeof createTransactionSchema>;
 export type CreateBillInput = z.infer<typeof createBillSchema>;
+export type CreateReceivableInput = z.infer<typeof createReceivableSchema>;
 export type CreateRecurringRuleInput = z.infer<typeof createRecurringRuleSchema>;
 export type SupportedTransactionType = (typeof transactionTypes)[number] & TransactionType;
 export type SupportedAccountType = (typeof accountTypes)[number] & AccountType;

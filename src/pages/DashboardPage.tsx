@@ -7,7 +7,7 @@ import { AvailableModeSheet } from '../finance/AvailableModeSheet';
 import { updateAvailableMode } from '../workspaces/workspaceService';
 import type { AvailableMode, TransactionType } from '../types/contracts';
 
-import { calculateDashboardSummary } from '../finance/financeCalculations';
+import { calculateDashboardSummary, buildUpcomingReceivables } from '../finance/financeCalculations';
 import { useCompleteCurrentMonth } from '../finance/useMonthlyTransactions';
 import { defaultAvailableMode } from '../finance/availableMode';
 import {
@@ -307,6 +307,10 @@ export function DashboardPage() {
     : committedCaption;
   const effectiveVariationPct = isCommittedLoading && cachedView ? cachedView.spendingVariationPct : spendingVariationPct;
 
+  // "Próximos a receber": só o que vence em ≤5 dias, no fim da tela e SEM entrar em nenhum total —
+  // dinheiro a receber não é dinheiro que se tem (ver docs/planning/CONTAS_A_RECEBER.md).
+  const upcomingReceivables = buildUpcomingReceivables(finance.receivables);
+
   return (
     <section className="page-content">
       <InstallPromptSheet />
@@ -561,6 +565,35 @@ export function DashboardPage() {
           ) : null}
         </article>
       </div>
+
+      {/* Próximos a receber — no FIM da tela de propósito, e fora de qualquer total de saldo:
+          é lembrete, não dinheiro em mãos. Só aparece se houver algo vencendo em ≤5 dias. */}
+      {upcomingReceivables.length > 0 ? (
+        <article className="surface surface-pad">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Próximos a receber</p>
+              <h2>Chega nos próximos dias</h2>
+            </div>
+            <Link className="inline-link" to="/app/receivables">
+              Ver todos
+            </Link>
+          </div>
+          <div className="item-list">
+            {upcomingReceivables.map((receivable) => (
+              <Link className="list-row list-row--link" to="/app/receivables" key={receivable.id}>
+                <div>
+                  <strong>{receivable.description}</strong>
+                  <span className="text-secondary">
+                    {receivable.fromWho ? `${receivable.fromWho} · ` : ''}A receber · {formatFriendlyDate(receivable.dueAt)}
+                  </span>
+                </div>
+                <strong className="amount--income">+{formatMoney(receivable.amountCents)}</strong>
+              </Link>
+            ))}
+          </div>
+        </article>
+      ) : null}
     </section>
   );
 }

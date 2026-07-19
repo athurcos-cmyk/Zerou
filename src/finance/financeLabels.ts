@@ -28,6 +28,13 @@ export const billStatusLabels = {
   cancelled: 'Cancelado'
 } as const;
 
+export const receivableStatusLabels = {
+  pending: 'A receber',
+  received: 'Recebido',
+  overdue: 'Atrasado',
+  cancelled: 'Cancelado'
+} as const;
+
 export const recurringFrequencyLabels = {
   weekly: 'Semanal',
   monthly: 'Mensal',

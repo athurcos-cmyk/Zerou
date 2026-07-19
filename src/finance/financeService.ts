@@ -32,16 +32,18 @@ import { mergeAccountEffects, invertAccountEffects, transactionAccountEffects, t
 import {
   createAccountSchema,
   createBillSchema,
+  createReceivableSchema,
   createRecurringRuleSchema,
   createTransactionSchema,
   type CreateAccountInput,
   type CreateBillInput,
+  type CreateReceivableInput,
   type CreateRecurringRuleInput,
   type CreateTransactionInput
 } from './financeSchemas';
-import type { Account, Bill, Budget, Category, Goal, GoalContribution, RecurringRule, SyncStatus, Transaction } from '../types/contracts';
+import type { Account, Bill, Budget, Category, Goal, GoalContribution, Receivable, RecurringRule, SyncStatus, Transaction } from '../types/contracts';
 
-export type FinancialCollectionName = 'accounts' | 'categories' | 'transactions' | 'bills' | 'recurring' | 'goals' | 'goalContributions' | 'budgets';
+export type FinancialCollectionName = 'accounts' | 'categories' | 'transactions' | 'bills' | 'recurring' | 'goals' | 'goalContributions' | 'budgets' | 'receivables';
 
 export type LocalSynced<T> = T & {
   localSyncStatus: SyncStatus;
@@ -841,6 +843,98 @@ export function subscribeBills(
     (snapshot) => onNext(snapshot.docs.map((item) => withLocalSync<Bill>(item))),
     onError
   );
+}
+
+// ─── Contas a Receber (Fase 1: avulso) ────────────────────────────────────────
+// Espelho do Contas a Pagar numa coleção SEPARADA (`receivables`) de propósito: o cálculo de
+// saldo/comprometido NUNCA lê isto, então um "a receber" nunca infla o Disponível. Só vira
+// dinheiro em `markReceivableReceived`. Ver `docs/planning/CONTAS_A_RECEBER.md`.
+
+export function subscribeReceivables(
+  workspaceId: string,
+  onNext: (items: Array<LocalSynced<Receivable>>) => void,
+  onError: (error: Error) => void
+): Unsubscribe {
+  return onSnapshot(
+    query(collectionRef(workspaceId, 'receivables'), orderBy('dueDate', 'asc')),
+    { includeMetadataChanges: true },
+    (snapshot) => onNext(snapshot.docs.map((item) => withLocalSync<Receivable>(item))),
+    onError
+  );
+}
+
+export async function createReceivable(workspaceId: string, userId: string, input: CreateReceivableInput) {
+  const parsed = createReceivableSchema.parse(input);
+  const id = createId('rcv');
+  const now = serverTimestamp();
+
+  fireWrite(setDoc(documentRef(workspaceId, 'receivables', id), omitUndefined({
+    id,
+    workspaceId,
+    description: parsed.description,
+    amountCents: parsed.amountCents,
+    fromWho: parsed.fromWho,
+    dueDate: Timestamp.fromDate(parsed.dueDate),
+    status: 'pending',
+    accountId: parsed.accountId,
+    createdBy: userId,
+    createdAt: now,
+    updatedAt: now
+  })));
+
+  return id;
+}
+
+export async function updateReceivableStatus(workspaceId: string, receivableId: string, status: Receivable['status']) {
+  fireWrite(updateDoc(documentRef(workspaceId, 'receivables', receivableId), {
+    status,
+    updatedAt: serverTimestamp()
+  }));
+}
+
+/** Marca como `overdue` todo receivable `pending` cujo vencimento já passou. Chamado a cada
+ * snapshot — silencioso (não é ação do usuário), espelho de `markOverdueBills`. */
+export function markOverdueReceivables(
+  workspaceId: string,
+  receivables: Array<Pick<Receivable, 'id' | 'status' | 'dueDate'>>
+) {
+  const todayStart = startOfDay(new Date());
+
+  receivables
+    .filter((receivable) => receivable.status === 'pending' && receivable.dueDate.toDate() < todayStart)
+    .forEach((receivable) => updateReceivableStatus(workspaceId, receivable.id, 'overdue'));
+}
+
+/**
+ * "Marcar como recebido" — espelho de `payBill`: num batch, marca o receivable como `received` e
+ * cria uma transação `income` de verdade na conta escolhida (creditando o saldo via `increment`).
+ * Só AQUI o dinheiro a receber entra no app. Fire-and-forget (offline-first, nunca `await`).
+ */
+export function markReceivableReceived(
+  workspaceId: string,
+  userId: string,
+  receivable: Pick<Receivable, 'id' | 'description' | 'amountCents' | 'accountId'>,
+  opts: { accountId?: string; amountCents?: number; description?: string } = {}
+) {
+  const amount = opts.amountCents ?? receivable.amountCents;
+  const acctId = opts.accountId ?? receivable.accountId;
+  const desc = opts.description ?? receivable.description;
+  const batch = writeBatch(getFirebaseDb());
+  batch.update(documentRef(workspaceId, 'receivables', receivable.id), { status: 'received', updatedAt: serverTimestamp() });
+  if (acctId) {
+    const id = createId('txn');
+    const now = new Date();
+    batch.set(documentRef(workspaceId, 'transactions', id), omitUndefined({
+      id, workspaceId, createdBy: userId, updatedBy: userId,
+      type: 'income', amountCents: amount, description: desc,
+      accountId: acctId,
+      date: Timestamp.fromDate(now), competenceMonth: monthKeyFromDate(now), cashMonth: monthKeyFromDate(now),
+      tags: ['a-receber'], isRecurring: false, clientMutationId: id,
+      syncStatus: 'synced', version: 1, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+    }));
+    applyAccountEffectsToBatch(batch, workspaceId, transactionAccountEffects({ type: 'income', amountCents: amount, accountId: acctId }));
+  }
+  fireWrite(batch.commit());
 }
 
 // ─── nextOccurrenceDate ───────────────────────────────────────────────────────
