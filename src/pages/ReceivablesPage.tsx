@@ -1,10 +1,12 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { HandCoins } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useFinanceContext } from '../finance/FinanceDataContext';
 import { SelectField } from '../components/SelectField';
 import { BottomSheet } from '../components/BottomSheet';
 import { EmptyState } from '../components/EmptyState';
+import { CategoryMark } from '../components/categoryIcons';
+import { defaultCategoryColors } from '../theme/palette';
 import { FormMessage } from '../components/FormMessage';
 import { useConfirm } from '../components/ConfirmDialog';
 import { formatFriendlyDate, fromDateInputValue, todayInputValue } from '../finance/financeDates';
@@ -122,122 +124,127 @@ export function ReceivablesPage() {
         <div>
           <p className="eyebrow">O que você tem pra receber</p>
           <h1 className="page-title page-title--compact">Contas a Receber</h1>
+          <p className="text-secondary" style={{ margin: '0.35rem 0 0', maxWidth: '34rem' }}>
+            Anote quem te deve. Só entra no seu saldo quando você marcar como recebido.
+          </p>
         </div>
         <SyncStatusBadge status={finance.pendingWrites ? 'pending' : 'synced'} />
       </div>
 
-      <p className="text-secondary" style={{ marginTop: '-0.5rem' }}>
-        Anote quem te deve e o que você espera receber. Só entra no seu saldo quando você marcar como recebido.
-      </p>
+      <div className="finance-grid">
+        <form className="surface surface-pad form-stack" onSubmit={handleSubmit}>
+          <button
+            type="button"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
+            onClick={() => setFormOpen((v) => !v)}
+            aria-expanded={formOpen}
+          >
+            <div>
+              <p className="eyebrow">Novo a receber</p>
+              <h2 style={{ margin: 0 }}>Anotar valor a receber</h2>
+            </div>
+            <ChevronDown size={20} aria-hidden="true" style={{ transform: formOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0, color: 'var(--text-secondary)' }} />
+          </button>
 
-      <form className="surface surface-pad form-stack" onSubmit={handleSubmit}>
-        <button
-          type="button"
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
-          onClick={() => setFormOpen((v) => !v)}
-          aria-expanded={formOpen}
-        >
-          <div>
-            <p className="eyebrow">Novo a receber</p>
-            <h2 style={{ margin: 0 }}>Anotar valor a receber</h2>
+          {formOpen && (
+            <>
+              <FormMessage>{message}</FormMessage>
+
+              <label className="field">
+                <span>Descrição</span>
+                <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Freela, empréstimo, racha do jantar" autoFocus />
+              </label>
+
+              <label className="field">
+                <span>Valor</span>
+                <input className="input" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0,00" />
+              </label>
+
+              <label className="field">
+                <span>De quem <span className="text-secondary">(opcional)</span></span>
+                <input className="input" value={fromWho} onChange={(e) => setFromWho(e.target.value)} placeholder="Fulano, Cliente X" />
+              </label>
+
+              <label className="field">
+                <span>Previsão de recebimento</span>
+                <input className="input" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+              </label>
+
+              <SelectField
+                label="Cai em qual conta?"
+                value={accountId}
+                onChange={setAccountId}
+                options={accountOptions}
+                placeholder="Escolher na hora de receber"
+              />
+
+              <button className="button button--primary" type="submit">Anotar</button>
+            </>
+          )}
+        </form>
+
+        <article className="surface surface-pad">
+          <div className="chip-row chip-row--scroll" role="group" aria-label="Filtrar">
+            {filterChips.map((chip) => (
+              <button
+                key={chip.key}
+                type="button"
+                className={`chip${filter === chip.key ? ' chip--active' : ''}`}
+                onClick={() => setFilter(chip.key)}
+              >
+                {chip.label}
+              </button>
+            ))}
           </div>
-          <HandCoins size={20} aria-hidden="true" style={{ flexShrink: 0, color: 'var(--text-secondary)' }} />
-        </button>
 
-        {formOpen && (
-          <>
-            <FormMessage>{message}</FormMessage>
-
-            <label className="field">
-              <span>Descrição</span>
-              <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Freela, empréstimo, racha do jantar" autoFocus />
-            </label>
-
-            <label className="field">
-              <span>Valor</span>
-              <input className="input" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0,00" />
-            </label>
-
-            <label className="field">
-              <span>De quem <span className="text-secondary">(opcional)</span></span>
-              <input className="input" value={fromWho} onChange={(e) => setFromWho(e.target.value)} placeholder="Fulano, Cliente X" />
-            </label>
-
-            <label className="field">
-              <span>Previsão de recebimento</span>
-              <input className="input" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-            </label>
-
-            <SelectField
-              label="Cai em qual conta?"
-              value={accountId}
-              onChange={setAccountId}
-              options={accountOptions}
-              placeholder="Escolher na hora de receber"
+          {visible.length === 0 ? (
+            <EmptyState
+              illustration="bills"
+              compact
+              title={filter === 'received' ? 'Nada recebido ainda' : 'Nada a receber por aqui'}
+              description="Anote dinheiro que esperam te pagar — freela, empréstimo, um racha de conta. Nada entra no saldo até você confirmar o recebimento."
             />
-
-            <button className="button button--primary" type="submit">Anotar</button>
-          </>
-        )}
-      </form>
-
-      <article className="surface surface-pad">
-        <div className="chip-row chip-row--scroll" role="group" aria-label="Filtrar">
-          {filterChips.map((chip) => (
-            <button
-              key={chip.key}
-              type="button"
-              className={`chip${filter === chip.key ? ' chip--active' : ''}`}
-              onClick={() => setFilter(chip.key)}
-            >
-              {chip.label}
-            </button>
-          ))}
-        </div>
-
-        {visible.length === 0 ? (
-          <EmptyState
-            illustration="bills"
-            compact
-            title={filter === 'received' ? 'Nada recebido ainda' : 'Nada a receber por aqui'}
-            description="Anote dinheiro que esperam te pagar — freela, empréstimo, um racha de conta. Nada entra no saldo até você confirmar o recebimento."
-          />
-        ) : (
-          <div className="item-list">
-            {visible.map((receivable) => {
-              const isOpen = receivable.status === 'pending' || receivable.status === 'overdue';
-              const isOverdue = receivable.status === 'overdue';
-              return (
-                <div className="list-row list-row--with-icon" key={receivable.id}>
-                  <div className="list-row-body">
-                    <strong>{receivable.description}</strong>
-                    <span className="text-secondary">
-                      {receivable.fromWho ? `${receivable.fromWho} · ` : ''}
-                      <span className={isOverdue ? 'amount--expense' : undefined}>
-                        {receivableStatusLabels[receivable.status]}
+          ) : (
+            <div className="item-list">
+              {visible.map((receivable) => {
+                const isOpen = receivable.status === 'pending' || receivable.status === 'overdue';
+                const metaClass =
+                  receivable.status === 'overdue'
+                    ? 'amount--expense'
+                    : receivable.status === 'received' || receivable.status === 'cancelled'
+                      ? 'text-muted'
+                      : 'text-secondary';
+                return (
+                  <div className="list-row list-row--with-icon" key={receivable.id}>
+                    <CategoryMark category={null} fallback={{ icon: 'money', color: defaultCategoryColors.income_salary }} />
+                    <div className="list-row-body">
+                      <strong>{receivable.description}</strong>
+                      <span className={metaClass}>
+                        {receivable.fromWho ? `${receivable.fromWho} · ` : ''}
+                        {receivableStatusLabels[receivable.status]} · {formatFriendlyDate(receivable.dueDate)}
                       </span>
-                      {' · '}{formatFriendlyDate(receivable.dueDate)}
-                    </span>
+                    </div>
+                    <div className="list-row-end">
+                      <strong className="amount--income">+{formatMoney(receivable.amountCents)}</strong>
+                      <SyncStatusBadge status={receivable.localSyncStatus} />
+                      {isOpen ? (
+                        <>
+                          <button type="button" className="button button--subtle button--compact" onClick={() => handleOpenReceive(receivable)}>
+                            Recebi
+                          </button>
+                          <button type="button" className="button button--ghost button--compact" onClick={() => handleCancel(receivable)}>
+                            Cancelar
+                          </button>
+                        </>
+                      ) : null}
+                    </div>
                   </div>
-                  <div className="list-row-end" style={{ alignItems: 'flex-end', gap: '0.4rem' }}>
-                    <strong className="amount--income">+{formatMoney(receivable.amountCents)}</strong>
-                    {isOpen ? (
-                      <div style={{ display: 'flex', gap: '0.4rem' }}>
-                        <button type="button" className="button button--subtle button--compact" onClick={() => handleCancel(receivable)}>
-                          Cancelar
-                        </button>
-                        <button type="button" className="button button--primary button--compact" onClick={() => handleOpenReceive(receivable)}>
-                          Recebi
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </article>
+                );
+              })}
+            </div>
+          )}
+        </article>
+      </div>
 
       <BottomSheet open={receiveTarget !== null} onClose={() => setReceiveTarget(null)} title="Marcar como recebido">
         <div className="form-stack">
