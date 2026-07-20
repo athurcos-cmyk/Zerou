@@ -88,6 +88,8 @@ Já aconteceu **duas vezes** neste projeto — cada uma quebrando uma feature in
 
 Isso vale tanto pra campo novo (`createdBy`) quanto pra valor novo dentro de um enum já existente (`installment_anticipation_credit`) — os dois incidentes reais foram um de cada tipo.
 
+**Caso especial — `InvoiceLedgerEntryType` tem um TERCEIRO ponto de sincronia (Cloud Function).** Além do enum TS (`src/types/contracts.ts`) e da regra (`validInvoiceLedgerEntryType`, `firestore.rules`), os totais da fatura (Compras/Créditos/Tarifas/Pagamentos e o saldo) são mantidos por uma Cloud Function que bucketiza cada `type` em `functions/src/cards/invoiceTotals.ts` (`invoiceTotalsDeltaForEntry`). Um tipo novo que caia no `return zero` final **não move total nenhum** — o lançamento até existe, mas o saldo da fatura fica errado, em silêncio (mesma invisibilidade offline-first). Então, ao adicionar um valor de ledger novo, são **três** lugares no mesmo commit: (1) enum TS, (2) `firestore.rules` + `test:rules`, (3) `invoiceTotals.ts` — e lembrar que **`git push` NÃO reimplanta functions**: precisa de deploy manual (`npx firebase deploy --only functions`, ver `docs/RUNBOOK.md`). Auditado em 2026-07-19: os 14 tipos estão em sincronia nos três lugares.
+
 ---
 
 ## Regras de código

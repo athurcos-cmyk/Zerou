@@ -2,6 +2,24 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-19 — Fatura: espaçamento das seções avançadas + auditoria da lógica (antecipar/estornos)
+
+As duas seções colapsáveis do fim da fatura ("Antecipar parcelas de faturas futuras" e "Estornos,
+créditos e tarifas") estavam **coladas** — `.advanced-panel` tem margem 0 e, com o mesmo
+`bg-surface-subtle`, as bordas encostavam e viravam um bloco só.
+
+- **Espaçamento** (`src/pages/InvoicePage.tsx` + `src/styles/global.css`): modificador `.invoice-page`
+  dá `margin-top: 1rem` nos painéis (separa os dois **e** o primeiro do card acima) + entre
+  Compras/Pagamentos quando ambos aparecem. Escopado na página: o `.advanced-panel` de outras telas
+  vive em form com `gap` próprio e não pode ganhar margem à toa. Zero impacto fora da fatura.
+- **Auditoria da lógica (código + dados) — sem bug, nada mudou no código.** Os 14 valores de
+  `InvoiceLedgerEntryType` estão em sincronia nos **três** lugares: enum TS, `validInvoiceLedgerEntryType`
+  (`firestore.rules`) e o bucketing da Cloud Function (`functions/src/cards/invoiceTotals.ts`). Saldo da
+  fatura confere (`compras + tarifas − pagamentos − créditos`); a antecipação se anula na fatura de
+  origem e passa a pesar na atual. O "terceiro ponto de sincronia" (a Cloud Function, que `git push`
+  não reimplanta) ficou registrado na REGRA PRINCIPAL de enums do `CLAUDE.md`.
+- typecheck / test (357) / build verdes.
+
 ## 2026-07-19 — Contas a Receber (Fase 1: avulso) — espelho do Contas a Pagar
 
 Feature nova pedida pelo dono: anotar dinheiro a receber (quem te deve, freela pendente,
