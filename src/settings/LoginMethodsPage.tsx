@@ -102,7 +102,16 @@ export function LoginMethodsPage() {
       window.location.assign('/');
     } catch (error) {
       setAccountDeleting(false);
-      setMessage(getAuthErrorMessage(error));
+      const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : '';
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+        // Fechou a janela do Google sem confirmar: tranquiliza (nada foi excluído) e
+        // explica exatamente como concluir, em vez de um erro técnico assustador.
+        setMessage(
+          'Você fechou a janela do Google, então nada foi excluído — sua conta continua ativa. Para concluir, toque em "Excluir minha conta" e escolha sua conta na janela do Google (não feche no X).'
+        );
+      } else {
+        setMessage(getAuthErrorMessage(error));
+      }
     } finally {
       setBusy(false);
     }
@@ -247,8 +256,9 @@ export function LoginMethodsPage() {
             <p className="text-secondary">Essa exclusão não pode ser desfeita. Para confirmar, digite EXCLUIR abaixo.</p>
             {hasGoogle ? (
               <p className="text-secondary">
-                Como você entra com o Google, vai abrir a janela de escolher conta do Google de novo — é só pra
-                confirmar que é você mesmo. Escolha a <strong>mesma conta</strong> que você já está usando aqui.
+                Como você entra com o Google, vai abrir uma janela rápida do Google só pra confirmar que é
+                você. <strong>Clique na sua conta</strong> pra concluir — se fechar no X, a exclusão é
+                cancelada e nada é apagado.
               </p>
             ) : null}
           </div>

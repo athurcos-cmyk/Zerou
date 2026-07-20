@@ -92,7 +92,16 @@ export async function reauthenticateWithPassword(user: User, password: string) {
 }
 
 export async function reauthenticateWithGoogle(user: User) {
-  await reauthenticateWithPopup(user, googleProvider);
+  // Reautenticação usa um provider com `login_hint` na conta atual (em vez do
+  // `prompt: 'select_account'` do login), então o Google já abre apontado pra
+  // mesma conta e costuma confirmar e fechar sozinho — sem forçar o seletor e
+  // sem risco de `auth/user-mismatch` por escolher a conta errada. Deixa a
+  // exclusão de conta fluir direto pra landing.
+  const provider = new GoogleAuthProvider();
+  if (user.email) {
+    provider.setCustomParameters({ login_hint: user.email });
+  }
+  await reauthenticateWithPopup(user, provider);
 }
 
 export async function unlinkProvider(user: User, providerId: string) {
