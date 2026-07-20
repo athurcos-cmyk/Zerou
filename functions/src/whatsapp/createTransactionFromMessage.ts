@@ -2,6 +2,17 @@ import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import crypto from 'crypto';
 import { transactionAccountEffects } from '../shared/accountEffects.js';
 
+// Teto de sanidade pra valores vindos do WhatsApp: o DeepSeek pode extrair um número
+// absurdo de uma mensagem, e o Admin SDK ignora as firestore.rules — então validamos aqui,
+// no boundary de escrita, antes de gravar. Rejeita valor não-inteiro, <= 0 ou acima do teto.
+export const MAX_TRANSACTION_CENTS = 1_000_000_000; // R$ 10 milhões
+
+export function assertSaneAmountCents(amountCents: number, contexto = 'lançamento'): void {
+  if (!Number.isInteger(amountCents) || amountCents <= 0 || amountCents > MAX_TRANSACTION_CENTS) {
+    throw new Error(`Valor inválido para ${contexto} via WhatsApp: ${amountCents}`);
+  }
+}
+
 /**
  * Cria transação via Admin SDK com o MESMO payload que `financeService.createTransaction`
  * gera no client. Admin SDK ignora firestore.rules — a responsabilidade de gerar o
@@ -35,6 +46,7 @@ export interface CreateFromMessageInput {
 export async function createTransactionFromMessage(
   input: CreateFromMessageInput,
 ): Promise<{ id: string; amountCents: number; description: string; categoryName?: string }> {
+  assertSaneAmountCents(input.amountCents);
   const db = getFirestore();
   const id = createId('txn');
   const now = FieldValue.serverTimestamp();

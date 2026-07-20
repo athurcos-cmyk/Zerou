@@ -1,6 +1,7 @@
 import { FieldValue, Timestamp, getFirestore, type DocumentReference } from 'firebase-admin/firestore';
 import crypto from 'crypto';
 import { resolveInstallmentCycle, invoiceIdFor } from '../cards/cardDates.js';
+import { assertSaneAmountCents } from './createTransactionFromMessage.js';
 
 /**
  * Cria compra no cartao (com parcelamento) via Admin SDK com o MESMO payload que
@@ -42,6 +43,10 @@ export interface CreateCardPurchaseFromMessageInput {
 export async function createCardPurchaseFromMessage(
   input: CreateCardPurchaseFromMessageInput,
 ): Promise<{ id: string; amountCents: number; description: string; categoryName?: string; cardName: string }> {
+  assertSaneAmountCents(input.amountCents, 'compra no cartão');
+  if (!Number.isInteger(input.installments) || input.installments < 1 || input.installments > 72) {
+    throw new Error(`Número de parcelas inválido para compra via WhatsApp: ${input.installments}`);
+  }
   const db = getFirestore();
 
   const cardSnap = await db.doc(`workspaces/${input.workspaceId}/cards/${input.cardId}`).get();
