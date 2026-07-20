@@ -4,7 +4,8 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { FirebaseConfigurationError, getFirebaseAuth, getFirebaseDb, isFirebaseConfigured } from '../firebase/config';
 import { useAppearanceStore } from '../theme/appearance.store';
 import type { UserProfile } from '../types/contracts';
-import { readCachedProfile, readLastCachedProfile, saveCachedProfile } from './profileCache';
+import { readCachedProfile, readLastCachedProfile, saveCachedProfile, clearCachedProfiles } from './profileCache';
+import { clearIntentionalSignOut, isIntentionalSignOut } from './authSession';
 
 interface AuthContextValue {
   user: User | null;
@@ -98,6 +99,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const finishBoot = (nextUser: User | null) => {
         bootResolved = true;
+
+        // Sessão real chegou: descarta qualquer sinal de logout pendente que tenha
+        // ficado pra trás (ex.: logout que falhou sem recarregar a página).
+        if (nextUser) {
+          clearIntentionalSignOut();
+        }
+
+        // Logout / exclusão de conta INTENCIONAL: o null é real, não uma oscilação de
+        // rede. Não ressuscita do cache (isso criaria um usuário-zumbi de conta deletada
+        // → dado órfão no onboarding). Zera o cache pra nenhum reload trazer o zumbi de
+        // volta e segue pro fluxo de sessão nula limpa abaixo.
+        if (!nextUser && isIntentionalSignOut()) {
+          clearIntentionalSignOut();
+          clearCachedProfiles();
+        }
 
         // Quando offline, o Firebase Auth pode disparar null se nao conseguir renovar
         // o token. Se temos perfil em cache, confiamos nele em vez de deslogar o usuario

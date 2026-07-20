@@ -19,6 +19,7 @@ import {
 import { clearIndexedDbPersistence, terminate } from 'firebase/firestore';
 import { getFirebaseAuth, getFirebaseDb } from '../firebase/config';
 import { clearCachedProfiles } from './profileCache';
+import { beginIntentionalSignOut } from './authSession';
 
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
@@ -51,6 +52,9 @@ export async function logout(options?: { clearLocalCache?: boolean }) {
   const auth = getFirebaseAuth();
   const db = getFirebaseDb();
 
+  // Marca ANTES do signOut: o `onAuthStateChanged(null)` que vem logo em seguida é
+  // intencional e não deve ser mascarado pelo fallback de cache offline do AuthContext.
+  beginIntentionalSignOut();
   await signOut(auth);
 
   if (options?.clearLocalCache) {
@@ -100,6 +104,10 @@ export async function unlinkProvider(user: User, providerId: string) {
 }
 
 export async function deleteAuthenticatedUser(user: User) {
-  await deleteUser(user);
+  // Limpa cache e marca o sign-out ANTES do deleteUser: ele dispara
+  // `onAuthStateChanged(null)` na hora, e sem isso o AuthContext ressuscitaria um
+  // usuário-zumbi do cache (uid de conta já deletada → onboarding grava dado órfão).
+  beginIntentionalSignOut();
   clearCachedProfiles();
+  await deleteUser(user);
 }

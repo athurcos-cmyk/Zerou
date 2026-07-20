@@ -95,7 +95,9 @@ export function LoginMethodsPage() {
         reauthenticateWithPassword: (password) => reauthenticateWithPassword(user, password),
         deleteAccountData: () => deleteAccountData(user.uid),
         deleteAuthenticatedUser: () => deleteAuthenticatedUser(user),
-        logout: () => logout()
+        // clearLocalCache: se deleteUser falhar depois dos dados já apagados, limpa
+        // também cache de perfil + IndexedDB do Firestore (dados residuais da conta morta).
+        logout: () => logout({ clearLocalCache: true })
       });
       window.location.assign('/');
     } catch (error) {

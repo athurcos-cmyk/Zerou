@@ -1,6 +1,6 @@
 import type { User } from 'firebase/auth';
 import { deleteField, doc, serverTimestamp, updateDoc, writeBatch } from 'firebase/firestore';
-import { getFirebaseDb } from '../firebase/config';
+import { getFirebaseAuth, getFirebaseDb } from '../firebase/config';
 import { fireWrite } from '../firebase/fireWrite';
 import type { AppearancePreferences } from '../theme/theme.types';
 import type { AvailableMode, PaydayRule } from '../types/contracts';
@@ -47,6 +47,16 @@ export async function ensurePersonalFoundation({
   payday,
   committedWindowDays
 }: EnsurePersonalFoundationInput): Promise<EnsurePersonalFoundationResponse> {
+  // Só cria o espaço se houver uma sessão Firebase Auth VIVA pro mesmo uid. Sem isso,
+  // um "usuário-zumbi" restaurado do cache (conta já deletada, ou sessão expirada) grava
+  // users/workspaces/members pra um uid que não existe mais no Auth → dados órfãos,
+  // inconsistência Auth×Firestore. `currentUser` vem da persistência local, então essa
+  // checagem funciona offline pra quem acabou de logar de verdade (não bloqueia rede fraca).
+  const liveUser = getFirebaseAuth().currentUser;
+  if (!liveUser || liveUser.uid !== user.uid) {
+    throw new Error('Sua sessão expirou. Entre de novo para preparar seu espaço.');
+  }
+
   const db = getFirebaseDb();
   const displayName = sanitizeDisplayName(name);
   const workspaceId = getPersonalWorkspaceId(user.uid);
