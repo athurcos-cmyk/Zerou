@@ -8,6 +8,7 @@ import {
   useTransform,
   useScroll,
   useReducedMotion,
+  MotionConfig,
 } from 'framer-motion';
 import { ArrowRight, CheckCircle2, CreditCard, PiggyBank, TrendingUp } from 'lucide-react';
 import { AppMockup } from './AppMockup';
@@ -212,8 +213,10 @@ export function LandingCss() {
   );
 
   return (
-    <LandingShell hero={hero}>
-      <LandingSections />
-    </LandingShell>
+    <MotionConfig reducedMotion="user">
+      <LandingShell hero={hero}>
+        <LandingSections />
+      </LandingShell>
+    </MotionConfig>
   );
 }

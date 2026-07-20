@@ -43,6 +43,9 @@
 
         document.documentElement.dataset.theme = resolvedTheme;
         document.documentElement.dataset.themeMode = mode;
+
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (prefersReducedMotion) document.documentElement.dataset.reduceMotion = 'true';
       })();
     </script>
   </head>
