@@ -12,6 +12,7 @@ firebase-export-*/
 
 # Environment files
 .env
+.env.*
 .env.local
 .env.*.local
 
