@@ -62,7 +62,7 @@ export default defineConfig(({ mode }) => {
       react(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'favicon.png', 'favicon-16x16.png', 'favicon-32x32.png', 'brand/granativa-app-icon-180.png'],
+        includeAssets: ['favicon.ico', 'favicon-16x16.png', 'favicon-32x32.png', 'brand/granativa-app-icon-180.png'],
         manifest: {
           name: 'Granativa',
           short_name: 'Granativa',
@@ -97,6 +97,7 @@ export default defineConfig(({ mode }) => {
           clientsClaim: true,
           cleanupOutdatedCaches: true,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest,jpg,jpeg,webp}'],
+          maximumFileSizeToCacheInBytes: 2 * 1024 * 1024,
           navigateFallback: '/index.html',
           runtimeCaching: [
             {
