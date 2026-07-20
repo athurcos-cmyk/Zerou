@@ -61,6 +61,7 @@ export function TagInput({ value, onChange, placeholder = 'Digite e pressione En
         className="tag-input-field"
         type="text"
         placeholder={value.length === 0 ? placeholder : ''}
+        aria-label="Adicionar tag"
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
       />

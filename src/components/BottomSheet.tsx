@@ -82,7 +82,7 @@ export function BottomSheet({ open, onClose, title, subtitle, children, bare = f
   }
 
   return createPortal(
-    <div className="sheet-root" role="dialog" aria-modal="true" aria-label={title}>
+    <div className="sheet-root" role="dialog" aria-modal="true" aria-label={title || 'Painel'}>
       <button className="sheet-backdrop" type="button" aria-label="Fechar" onClick={onClose} />
       <div className="sheet-panel" ref={panelRef}>
         <div

@@ -75,6 +75,7 @@ export function SelectField({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Buscar por nome"
+            aria-label="Buscar"
             autoFocus
           />
         )}
