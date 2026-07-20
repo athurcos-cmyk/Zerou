@@ -477,7 +477,7 @@ export const whatsappWebhook = onRequest(
         if (accounts.length < 2) {
           await sendWhatsAppMessage(
             phone,
-            'Você precisa ter pelo menos duas contas cadastradas pra transferir entre elas. Cadastre outra conta no app primeiro.',
+            'Pra transferir você precisa de pelo menos duas contas (carteira, banco, dinheiro...) cadastradas. Cadastre outra pelo app primeiro.',
           );
           return;
         }
@@ -566,7 +566,7 @@ export const whatsappWebhook = onRequest(
       if (accounts.length === 0) {
         await sendWhatsAppMessage(
           phone,
-          'Você ainda não tem uma conta cadastrada no Granativa. Crie uma conta primeiro pelo app.',
+          'Você ainda não cadastrou nenhuma conta (carteira, banco, dinheiro...) no Granativa. Crie uma pelo app antes de registrar gastos por aqui.',
         );
         return;
       }
