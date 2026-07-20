@@ -1,8 +1,9 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ArrowLeft, ArrowRight, CalendarClock, PieChart, ReceiptText, Sparkles, WalletCards, Wallet
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { useFocusTrap } from '../utils/useFocusTrap';
 import { useWelcomeTour } from './welcomeTour.store';
 
 interface Slide {
@@ -54,6 +55,9 @@ export function WelcomeTour() {
   const { profile } = useAuth();
   const { open, seen, openTour, closeTour } = useWelcomeTour();
   const [index, setIndex] = useState(0);
+  const tourRef = useRef<HTMLDivElement | null>(null);
+
+  useFocusTrap(open, tourRef);
 
   // Abre sozinho uma vez quando o espaço já está pronto (onboarding concluído).
   useEffect(() => {
@@ -71,7 +75,7 @@ export function WelcomeTour() {
   const isLast = index === slides.length - 1;
 
   return (
-    <div className="welcome-tour" role="dialog" aria-modal="true" aria-label="Boas-vindas à Granativa">
+    <div className="welcome-tour" role="dialog" aria-modal="true" aria-label="Boas-vindas à Granativa" ref={tourRef}>
       <div className="welcome-tour-card">
         <button className="welcome-tour-skip" type="button" onClick={closeTour}>
           Pular

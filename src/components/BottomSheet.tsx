@@ -1,6 +1,7 @@
 import { useEffect, useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { useFocusTrap } from '../utils/useFocusTrap';
 
 interface BottomSheetProps {
   open: boolean;
@@ -22,6 +23,8 @@ const DISMISS_FLICK_VELOCITY = 0.5; // px/ms
 export function BottomSheet({ open, onClose, title, subtitle, children, bare = false }: BottomSheetProps) {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{ startY: number; startTime: number; delta: number; captured: boolean } | null>(null);
+
+  useFocusTrap(open, panelRef);
 
   useEffect(() => {
     if (!open) return;
