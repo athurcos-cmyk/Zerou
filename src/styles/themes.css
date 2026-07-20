@@ -51,6 +51,10 @@
 
   /* Universal tokens (shared across all themes via cascade) */
   --accent-foreground: #fff;
+  --bg-input: var(--bg-surface-subtle);
+  --text-placeholder: var(--text-muted);
+  --shadow-lg: 0 14px 40px rgba(0, 0, 0, 0.15);
+  --radius-md: 0.65rem;
   --text-on-light: #1C1814;
   --gradient-income: linear-gradient(140deg, #1F9E6E 0%, #36C18C 100%);
   --gradient-slate: linear-gradient(140deg, #3B4658 0%, #5A6B82 100%);

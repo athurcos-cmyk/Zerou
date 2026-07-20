@@ -45,6 +45,8 @@ export function readStoredAppearance(): AppearancePreferences {
         ? (window.localStorage.getItem(STORAGE_KEYS.fontScale) as AppearancePreferences['fontScale'])
         : DEFAULT_APPEARANCE.fontScale,
     reduceMotion: window.localStorage.getItem(STORAGE_KEYS.reduceMotion) === 'true'
+	      || (window.localStorage.getItem(STORAGE_KEYS.reduceMotion) === null
+	        && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   };
 }
 
