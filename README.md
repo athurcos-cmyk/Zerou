@@ -67,4 +67,3 @@ Estado atual do projeto fica em `SESSAO.md`; mapa de toda a documentacao em `doc
 Historico resumido de mudancas fica em `CHANGELOG.md`; detalhe por mes em `docs/history/`.
 Arquitetura, seguranca, privacidade e operacao ficam em `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/PRIVACY.md`, `docs/RUNBOOK.md` e `docs/PRODUCTION_CHECKLIST.md`.
 Setup de billing futuro fica em `docs/BILLING.md` e `docs/BOOTSTRAP_FIREBASE_STRIPE.md`.
-Handoff legado: `docs/HANDOFF-PARA-CLAUDE.md` e `documentacao-v12.2/`.

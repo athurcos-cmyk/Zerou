@@ -33,4 +33,3 @@ Fluxos a validar fim a fim num aparelho real: cadastro, login (email + Google), 
 
 - Dados em centavos inteiros — conferir formatação com `formatMoney()`.
 - Não expor erro técnico: validar mensagens via `getUserFacingErrorMessage`.
-- Cenários de sucesso/erro herdados ficam em `../legacy/documentacao-v12.2/QA_SCENARIOS.md` (legado).

@@ -18,8 +18,6 @@ Documentação organizada para reduzir contexto inicial. Os arquivos de entrada 
 | `docs/ARCHITECTURE.md` | Visão técnica/arquitetura |
 | `docs/SECURITY.md`, `docs/PRIVACY.md` | Segurança e privacidade (LGPD) |
 | `docs/RUNBOOK.md` | Operação e deploy |
-| `docs/HANDOFF-PARA-CLAUDE.md`, `docs/README-START-HERE.md` | **Arquivados** — handoff legado, conteúdo desatualizado. Ver `SESSAO.md`/`CLAUDE.md` em vez disso. |
-| `docs/legacy/documentacao-v12.2/` | Especificação original pré-lançamento (24 arquivos). Histórico puro, não reflete o app atual. |
 
 ## Arquivos de entrada (na raiz)
 
