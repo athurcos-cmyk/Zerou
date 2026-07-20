@@ -2,6 +2,15 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-20 — Bugs: exclusão de conta (dado órfão), recorrente duplicada, mensagens WhatsApp
+
+Três correções antes da fase de front-end. Client (as duas primeiras) já no ar via Vercel; a de WhatsApp é functions e precisa de deploy manual.
+
+- **Exclusão de conta + login Google não gera mais dado órfão (crítico).** Excluir a conta usando só Google podia deixar uma conta nos dados do app sem usuário no Firebase Auth (inconsistência Auth×Firestore). Causa: `AuthContext.finishBoot` restaura o usuário do cache quando o `onAuthStateChanged` dispara null — proteção offline correta pra queda de rede, mas a exclusão também dispara null e ressuscitava um "usuário-zumbi" (uid deletado) que o onboarding usava pra gravar. Correção em camadas: `authSession.ts` (sinal de sign-out intencional), `authService` (marca o sinal + limpa cache antes do `deleteUser`), `finishBoot` (null intencional desloga limpo, offline segue protegido), `ensurePersonalFoundation` (backstop: só grava com sessão Auth viva pro mesmo uid) e `LoginMethodsPage` (fallback com `clearLocalCache`). Fecha AUTH-03/AUTH-07 da auditoria. Regressão coberta em `src/workspaces/workspaceService.test.ts`.
+- **Conta recorrente não duplica mais em avulsas.** `BillsPage` criava a regra em `recurring` E um bill avulso na hora; a ocorrência já vira transação quando vence (idempotente), então o bill imediato era um registro extra e errado. A recorrente agora vive só na seção "Recorrentes".
+- **Mensagens do WhatsApp** ("não tem conta cadastrada" / transferência) reescritas pra deixar claro que falta uma conta **financeira** (carteira/banco), não uma conta de login no app. Requer deploy de functions.
+- typecheck (client + functions) / test (359) / build verdes.
+
 ## 2026-07-19 — Meta-auditoria de seguranca (Camada 3): consolidacao de 26 relatorios
 
 Auditoria final que consolida e audita 16 dominios da Camada 1 + 10 revisoes da Camada 2 da auditoria de seguranca 2026-07-19. Documento em `docs/security/auditoria-2026-07-19/meta-auditoria.md`.
