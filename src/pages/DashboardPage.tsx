@@ -322,7 +322,7 @@ export function DashboardPage() {
         <SyncStatusBadge status={syncStatus} />
       </div>
 
-      {finance.error || cardsData.error ? <div className="notice notice--danger">{finance.error ?? cardsData.error}</div> : null}
+      {finance.error || cardsData.error ? <div className="notice notice--danger" role="alert">{finance.error ?? cardsData.error}</div> : null}
 
       <BudgetAlertBanner />
 

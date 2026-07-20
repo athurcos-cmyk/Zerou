@@ -119,7 +119,7 @@ export function NetWorthPage() {
       <div className="page-heading-row page-heading-row--tight">
         <div>
           <p className="eyebrow">Visão geral</p>
-          <h1 className="page-title--compact">Patrimônio Líquido</h1>
+          <h1 className="page-title page-title--compact">Patrimônio Líquido</h1>
         </div>
       </div>
 

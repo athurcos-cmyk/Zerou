@@ -2163,7 +2163,7 @@ span.service-mark--brand {
   font-size: 0.78rem;
 }
 
-.theme-card[aria-pressed='true'] {
+.theme-card[aria-pressed='true'], .theme-card[aria-checked='true'] {
   border-color: var(--border-focus);
   box-shadow: 0 0 0 3px var(--action-primary-soft);
 }
@@ -2253,7 +2253,7 @@ span.service-mark--brand {
   overflow-wrap: anywhere;
 }
 
-.segmented button[aria-pressed='true'] {
+.segmented button[aria-pressed='true'], .segmented button[aria-checked='true'] {
   background: var(--bg-surface);
   color: var(--text-primary);
   box-shadow: var(--shadow-xs);
