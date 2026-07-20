@@ -156,16 +156,14 @@ export function CategoryField({
                     {isSelected && !manage && <Check size={14} className="category-tile-check" aria-hidden="true" />}
                     {manage && <Pencil size={13} className="category-tile-check" aria-hidden="true" />}
                     {manage && onDeleteCategory && !cat.isDefault && (
-                      <span
+                      <button
+                        type="button"
                         className="category-tile-delete"
-                        role="button"
-                        tabIndex={0}
                         aria-label={`Excluir ${cat.name}`}
                         onClick={(event) => { event.stopPropagation(); void handleDelete(cat.id); }}
-                        onKeyDown={(event) => { if (event.key === 'Enter') { event.stopPropagation(); void handleDelete(cat.id); } }}
                       >
                         {deletingId === cat.id ? <span className="spinner-dot" /> : <Trash2 size={13} />}
-                      </span>
+                      </button>
                     )}
                   </button>
                 );

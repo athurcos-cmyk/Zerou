@@ -47,7 +47,7 @@ export function AssistantPage() {
     const text = input.trim();
     if (!text || loading) return;
     if (!workspaceId) {
-      setError('Conclua seu cadastro antes de usar o assistente.');
+      setError('Aguarde um momento antes de usar o assistente.');
       return;
     }
 

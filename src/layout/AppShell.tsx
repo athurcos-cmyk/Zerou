@@ -75,7 +75,7 @@ export function AppShell() {
   return (
     <div className={`app-layout${isFoundationPending ? ' app-layout--focus' : ''}`}>
       {!isFoundationPending ? (
-        <aside className="sidebar" aria-label="Navegação principal">
+        <nav className="sidebar" aria-label="Navegação principal">
         <div>
           <BrandLockup />
           <p className="text-secondary" style={{ margin: '0.5rem 0 0 0.6rem', fontSize: '0.85rem' }}>
@@ -139,7 +139,7 @@ export function AppShell() {
             <LogOut size={18} aria-hidden="true" /> Sair
           </button>
         </div>
-        </aside>
+        </nav>
       ) : null}
 
       <main className="app-main">

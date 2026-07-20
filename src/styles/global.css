@@ -683,11 +683,6 @@ html[data-reduce-motion='true'] *::after {
   margin-top: 1.5rem;
 }
 
-.metric-card {
-  display: grid;
-  gap: 0.55rem;
-}
-
 /* Compact dashboard summary: prominent balance + two smaller metrics */
 .dash-summary {
   display: grid;
