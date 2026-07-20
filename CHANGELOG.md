@@ -2,6 +2,15 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-19 — Meta-auditoria de seguranca (Camada 3): consolidacao de 26 relatorios
+
+Auditoria final que consolida e audita 16 dominios da Camada 1 + 10 revisoes da Camada 2 da auditoria de seguranca 2026-07-19. Documento em `docs/security/auditoria-2026-07-19/meta-auditoria.md`.
+
+- **Duplicatas eliminadas**: 8 grupos de duplicatas identificados (ex.: dangerouslySetInnerHTML reportado em 4 dominios, HMAC em 3, dados ao DeepSeek em 5).
+- **Inconsistencias de severidade**: 7 subestimacoes corrigidas (PERF-4 de Media para Alta, WHATSAPP-04 de Alta para Critica, GRAZI-3/5 de Media para Alta, etc.) e 2 superestimacoes rebaixadas (AUTH-03 de Alta para Media, AUTH-06 de Media para Info).
+- **7 lacunas globais** identificadas (testes automatizados, supply chain, disaster recovery, monitoramento, governanca de dados, seguranca fisica) — nenhuma coberta por C1 ou C2.
+- **Ranking de qualidade**: LGPD (9), Auth/Grazi/WhatsApp C2 (9), UX C1 (5). A estrutura de 2 camadas se mostrou eficaz — C2 agregou valor real em todos os dominios.
+
 ## 2026-07-19 — Fatura: espaçamento das seções avançadas + auditoria da lógica (antecipar/estornos)
 
 As duas seções colapsáveis do fim da fatura ("Antecipar parcelas de faturas futuras" e "Estornos,
