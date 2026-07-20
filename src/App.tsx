@@ -1,5 +1,6 @@
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthContext';
+import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { FinanceDataProvider } from './finance/FinanceDataContext';
 import { SharedDataProvider } from './shared/SharedDataContext';
 import { LandingCss } from './landing/LandingCss';
@@ -55,6 +56,7 @@ export function App() {
       <ThemeRuntime />
       <AppearanceSyncBridge />
       <ScrollToTop />
+      <AppErrorBoundary>
       <Routes>
         <Route path="/" element={<RootRoute />} />
         <Route path="/pricing" element={<Navigate to="/" replace />} />
@@ -113,6 +115,7 @@ export function App() {
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </AppErrorBoundary>
     </AuthProvider>
   );
 }
