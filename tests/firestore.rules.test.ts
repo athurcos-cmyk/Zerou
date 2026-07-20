@@ -1764,4 +1764,41 @@ describe('firestore security rules', () => {
 
     await assertFails(updateDoc(doc(bobDb, 'workspaces/couple_a/members/bob'), { role: 'owner', updatedAt: serverTimestamp() }));
   });
+
+  describe('whatsappPhoneIndex', () => {
+    it('blocks read by non-admin authenticated user', async () => {
+      const aliceDb = testEnv.authenticatedContext('alice', { email: 'alice@zerou.test' }).firestore();
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), 'whatsappPhoneIndex/5511999999999'), {
+          workspaceId: 'personal_alice',
+          linkedByUid: 'alice',
+          linkedAt: serverTimestamp()
+        });
+      });
+      await assertFails(getDoc(doc(aliceDb, 'whatsappPhoneIndex/5511999999999')));
+    });
+
+    it('allows read by admin', async () => {
+      const adminDb = testEnv.authenticatedContext('admin-uid', { email: 'a.thurcos@gmail.com' }).firestore();
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), 'whatsappPhoneIndex/5511999999999'), {
+          workspaceId: 'personal_alice',
+          linkedByUid: 'alice',
+          linkedAt: serverTimestamp()
+        });
+      });
+      await assertSucceeds(getDoc(doc(adminDb, 'whatsappPhoneIndex/5511999999999')));
+    });
+
+    it('blocks client-side write', async () => {
+      const aliceDb = testEnv.authenticatedContext('alice').firestore();
+      await assertFails(
+        setDoc(doc(aliceDb, 'whatsappPhoneIndex/5511999999999'), {
+          workspaceId: 'personal_alice',
+          linkedByUid: 'alice',
+          linkedAt: serverTimestamp()
+        })
+      );
+    });
+  });
 });
