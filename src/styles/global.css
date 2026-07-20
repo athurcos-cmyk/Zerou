@@ -403,7 +403,7 @@ html[data-reduce-motion='true'] *::after {
   background: var(--bg-surface);
   color: var(--text-primary);
   padding: 0.75rem 0.95rem;
-  transition: border-color 160ms ease, box-shadow 160ms ease;
+  transition: border-color var(--duration-normal) ease, box-shadow var(--duration-normal) ease;
 }
 
 .input:focus,
@@ -457,7 +457,7 @@ html[data-reduce-motion='true'] *::after {
   padding: 0.75rem 1.25rem;
   font-weight: 700;
   letter-spacing: 0.01em;
-  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease, filter 160ms ease;
+  transition: transform var(--duration-normal) ease, background var(--duration-normal) ease, border-color var(--duration-normal) ease, box-shadow var(--duration-normal) ease, filter var(--duration-normal) ease;
 }
 
 .button:hover {
@@ -1628,7 +1628,7 @@ span.service-mark--brand {
   height: 100%;
   border-radius: inherit;
   background: var(--action-primary);
-  transition: width 300ms ease;
+  transition: width var(--duration-slow) ease;
 }
 
 .card-limit-bar-fill--warning {
@@ -3290,7 +3290,7 @@ span.service-mark--brand {
   justify-content: center;
   padding: 1.25rem;
   background: var(--bg-overlay);
-  animation: sheet-fade 0.2s ease;
+  animation: sheet-fade var(--duration-normal) ease;
 }
 
 .welcome-tour-card {
@@ -3301,7 +3301,7 @@ span.service-mark--brand {
   box-shadow: var(--shadow-sheet);
   padding: 2rem 1.5rem 1.5rem;
   text-align: center;
-  animation: sheet-up 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: sheet-up var(--duration-normal) cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .welcome-tour-skip {
@@ -3448,7 +3448,7 @@ span.service-mark--brand {
   inset: 0;
   border: none;
   background: var(--bg-overlay);
-  animation: sheet-fade 0.2s ease;
+  animation: sheet-fade var(--duration-normal) ease;
   cursor: pointer;
 }
 
@@ -3464,7 +3464,7 @@ span.service-mark--brand {
   background: var(--bg-surface);
   box-shadow: var(--shadow-sheet);
   padding: 0.75rem 1.25rem calc(1.5rem + env(safe-area-inset-bottom));
-  animation: sheet-up 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: sheet-up var(--duration-normal) cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Zona de arrasto do swipe-to-dismiss: só grabber + header (nunca o corpo,
@@ -5180,7 +5180,7 @@ span.service-mark--brand {
   font-size: 0.875rem;
   font-weight: 600;
   box-shadow: var(--shadow-md);
-  animation: admin-toast-in 220ms ease;
+  animation: admin-toast-in var(--duration-normal) ease;
   white-space: nowrap;
 }
 

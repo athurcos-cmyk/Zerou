@@ -1,3 +1,9 @@
+:root {
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+}
+
 :root,
 [data-theme='paper'] {
   --brand-chip-bg: #FFFFFF;
