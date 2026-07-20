@@ -219,7 +219,7 @@ export function InvoicePage() {
     (invoice?.paymentsTotalCents ?? 0) > 0;
 
   return (
-    <section className="page-content page-content--narrow">
+    <section className="page-content page-content--narrow invoice-page">
       <div className="page-heading-row">
         <div>
           <p className="eyebrow">Fatura · {card?.name ?? ''}</p>

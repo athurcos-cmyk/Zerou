@@ -1852,6 +1852,16 @@ span.service-mark--brand {
   color: var(--text-primary);
 }
 
+/* Respiro entre as seções empilhadas da fatura. Sem margem, superfícies de mesma
+   cor encostam as bordas e viram um bloco só — os dois .advanced-panel (antecipar
+   parcelas + estornos) e, quando aparece, Compras + Pagamentos. Escopo na página:
+   o .advanced-panel de outras telas vive dentro de form com gap próprio e não pode
+   ganhar margem à toa. */
+.invoice-page .advanced-panel,
+.invoice-page > .surface + .surface {
+  margin-top: 1rem;
+}
+
 .anticipation-explain {
   display: grid;
   gap: 0.5rem;
