@@ -1,10 +1,15 @@
-import { defineString } from 'firebase-functions/params';
+import { defineString, defineSecret } from 'firebase-functions/params';
 import { logger } from 'firebase-functions';
 
 export const whatsappAccessToken = defineString('WHATSAPP_ACCESS_TOKEN');
 export const whatsappPhoneNumberId = defineString('WHATSAPP_PHONE_NUMBER_ID');
 export const whatsappVerifyToken = defineString('WHATSAPP_VERIFY_TOKEN');
 export const granativaWhatsAppNumber = defineString('GRANATIVA_WHATSAPP_NUMBER');
+
+// App Secret da Meta — usado SÓ pra validar o HMAC (X-Hub-Signature-256) dos webhooks.
+// `defineSecret` (Google Secret Manager), nunca em plaintext. Setar com:
+//   npx firebase functions:secrets:set WHATSAPP_APP_SECRET --project zerou-26757
+export const whatsappAppSecret = defineSecret('WHATSAPP_APP_SECRET');
 
 const META_API_BASE = 'https://graph.facebook.com/v25.0';
 

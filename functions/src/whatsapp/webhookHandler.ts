@@ -2,7 +2,7 @@ import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { onRequest } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions';
 import crypto from 'crypto';
-import { sendWhatsAppMessage, getVerifyToken, whatsappAccessToken } from './metaClient.js';
+import { sendWhatsAppMessage, getVerifyToken, whatsappAppSecret } from './metaClient.js';
 import { interpretMessage, type AccountOption, type CategoryOption, type MessageInterpretation } from './interpretMessage.js';
 import { createTransactionFromMessage } from './createTransactionFromMessage.js';
 import { createCategoryFromMessage } from './createCategoryFromMessage.js';
@@ -78,7 +78,7 @@ async function resolveOrCreateCategory(
  * confirmacao ao usuario demora dezenas de segundos pra sair.
  */
 export const whatsappWebhook = onRequest(
-  { region, maxInstances: 10, memory: '512MiB', cpu: 1, secrets: [deepseekApiKey] },
+  { region, maxInstances: 10, memory: '512MiB', cpu: 1, secrets: [deepseekApiKey, whatsappAppSecret] },
   async (req, res) => {
     // ── GET: webhook verification ───────────────────────────────────────
     if (req.method === 'GET') {
@@ -100,22 +100,23 @@ export const whatsappWebhook = onRequest(
       return;
     }
 
-    // Signature validation disabled until WHATSAPP_APP_SECRET is configured.
-    // Using the access token (wrong secret) causes HMAC mismatch and Meta stops delivery.
-    // TODO: add WHATSAPP_APP_SECRET secret, then uncomment validation below.
-    //
-    // const appSecret = whatsappAccessToken.value();
-    // const signature = req.headers['x-hub-signature-256'] as string;
-    // if (appSecret && signature) {
-    //   const rawBody = JSON.stringify(req.body);
-    //   const expected = `sha256=${crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex')}`;
-    //   if (signature !== expected) {
-    //     res.status(401).json({ error: 'Invalid signature' });
-    //     return;
-    //   }
-    // }
+    // ── Validação HMAC (X-Hub-Signature-256) ──────────────────────────────
+    // A Meta assina o corpo CRU da requisição com o WHATSAPP_APP_SECRET. Comparamos com
+    // `req.rawBody` (NÃO `JSON.stringify(req.body)` — não reproduz os bytes assinados) em
+    // tempo constante. Sem assinatura válida, a requisição é forjada: rejeita ANTES de processar.
+    const signature = req.headers['x-hub-signature-256'] as string | undefined;
+    const expected = `sha256=${crypto.createHmac('sha256', whatsappAppSecret.value()).update(req.rawBody).digest('hex')}`;
+    const signatureValid =
+      !!signature &&
+      signature.length === expected.length &&
+      crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+    if (!signatureValid) {
+      logger.warn('whatsappWebhook: assinatura HMAC ausente ou inválida — requisição rejeitada');
+      res.status(401).json({ error: 'Invalid signature' });
+      return;
+    }
 
-    // Respond 200 immediately — Meta expects fast response
+    // Assinatura OK — responde 200 rápido (Meta espera) e processa em seguida.
     res.status(200).json({ ok: true });
 
     try {
