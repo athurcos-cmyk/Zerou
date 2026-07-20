@@ -25,7 +25,18 @@ function formatPercent(value: number): string {
 }
 
 function sanitize(text: string): string {
-  return text.replace(/\n/g, ' ').replace(/\r/g, ' ').trim();
+  // Dado do usuario (nome de conta/categoria/descricao) vai cru pro prompt do DeepSeek.
+  // Remove caracteres de controle (C0/C1, inclui quebras) e invisiveis (zero-width, bidi,
+  // separadores, BOM) usados pra smugglar instrucao / quebrar o prompt (prompt injection),
+  // filtrando por code point. Depois colapsa espacos e trima.
+  let out = '';
+  for (const ch of text) {
+    const code = ch.codePointAt(0) ?? 0;
+    const isControl = code <= 0x1f || (code >= 0x7f && code <= 0x9f);
+    const isInvisible = (code >= 0x200b && code <= 0x200f) || code === 0x2028 || code === 0x2029 || code === 0xfeff;
+    out += (isControl || isInvisible) ? ' ' : ch;
+  }
+  return out.replace(/\s+/g, ' ').trim();
 }
 
 function friendlyDate(date: Date): string {
