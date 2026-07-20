@@ -212,17 +212,9 @@ export function BillsPage() {
         accountId: accountId || undefined,
         categoryId: categoryId || undefined,
       }).catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar a conta recorrente.')));
-
-      // Também cria a primeira conta já se tiver valor definido.
-      if (amountCents && amountCents > 0) {
-        createBill(workspaceId, user.uid, {
-          description,
-          amountCents,
-          dueDate: fromDateInputValue(dueDate),
-          categoryId: categoryId || undefined,
-          accountId: accountId || undefined,
-        }).catch(() => {});
-      }
+      // NÃO cria um compromisso avulso aqui: a recorrente vive só na seção "Recorrentes".
+      // As ocorrências viram compromissos quando vencem, materializadas pela Cloud Function
+      // `generateRecurrences` — criar um bill agora duplicava a conta na lista de avulsas.
     } else {
       createBill(workspaceId, user.uid, baseData).catch((error) =>
         setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar a conta.')),
