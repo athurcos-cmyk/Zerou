@@ -1,4 +1,4 @@
-import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { getFirestore, FieldValue, type Firestore } from 'firebase-admin/firestore';
 import { onRequest } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions';
 import crypto from 'crypto';
@@ -143,6 +143,25 @@ export const whatsappWebhook = onRequest(
 
       logger.info('whatsapp_message_received', { phone, text: cleanText.slice(0, 100) });
 
+      const db: Firestore = getFirestore();
+
+      // ── Dedup (WHATSAPP-05): a Meta reentrega webhooks (vimos vários retries hoje). Sem
+      // isso, cada reentrega vira uma transação nova. `create()` é atômico (falha se já
+      // existe), então claima o message_id ANTES de processar. Coleção Admin-only — nenhum
+      // caminho de cliente a acessa (default-deny do Firestore protege, sem regra nova).
+      const messageId = (msg.id as string | undefined)?.trim();
+      if (messageId) {
+        try {
+          await db.doc(`whatsappProcessedMessages/${messageId}`).create({
+            processedAt: FieldValue.serverTimestamp(),
+            phone,
+          });
+        } catch {
+          logger.info('whatsapp_duplicate_message_skipped', { messageId });
+          return;
+        }
+      }
+
       // ── Check if it's a linking code ────────────────────────────────
       if (/vincular\s+\d{6}/i.test(cleanText)) {
         const reply = await processLinkCode(phone, cleanText);
@@ -153,7 +172,6 @@ export const whatsappWebhook = onRequest(
       }
 
       // ── Look up workspace by phone number ───────────────────────────
-      const db: Firestore = getFirestore();
       const indexDoc = await db.doc(`whatsappPhoneIndex/${phone}`).get();
       if (!indexDoc.exists) {
         await sendWhatsAppMessage(
@@ -169,6 +187,18 @@ export const whatsappWebhook = onRequest(
       };
       const { workspaceId, linkedByUid } = link;
       if (!workspaceId || !linkedByUid) return;
+
+      // ── Membership (WHATSAPP-04): confirma que o vínculo ainda é válido. O usuário pode ter
+      // sido removido do workspace ou excluído a conta sem o índice ter sido limpo; sem esta
+      // checagem, a mensagem escreveria num workspace órfão via Admin SDK (que ignora as rules).
+      const memberDoc = await db.doc(`workspaces/${workspaceId}/members/${linkedByUid}`).get();
+      if (!memberDoc.exists) {
+        await sendWhatsAppMessage(
+          phone,
+          'Seu vínculo do WhatsApp não está mais ativo. Vá em Configurações > WhatsApp no app para reconectar.',
+        );
+        return;
+      }
 
       // ── Pergunta pendente: bot tinha perguntado qual cartao/conta usar ──
       const pending = await getPendingAction(db, phone);
