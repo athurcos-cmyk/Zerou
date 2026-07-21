@@ -127,7 +127,7 @@ export function WhatsAppLinkPage() {
       <div style={{ maxWidth: 480, margin: '0 auto' }}>
         <article className="surface surface-pad">
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '1rem' }}>
-            <MessageCircle size={22} style={{ color: 'var(--brand-color)', marginTop: 2 }} aria-hidden="true" />
+            <MessageCircle size={22} style={{ color: 'var(--action-primary)', marginTop: 2 }} aria-hidden="true" />
             <div>
               <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>Lançamento via WhatsApp</h2>
               <p className="text-secondary" style={{ margin: '0.25rem 0 0', fontSize: '0.86rem' }}>
@@ -196,7 +196,7 @@ export function WhatsAppLinkPage() {
               </div>
 
               {copied ? (
-                <p className="text-secondary" style={{ marginBottom: '1rem', fontSize: '0.82rem', color: 'var(--brand-color)' }}>
+                <p className="text-secondary" style={{ marginBottom: '1rem', fontSize: '0.82rem', color: 'var(--action-primary)' }}>
                   Código copiado!
                 </p>
               ) : null}

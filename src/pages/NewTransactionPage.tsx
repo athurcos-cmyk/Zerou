@@ -67,7 +67,7 @@ export function NewTransactionPage() {
 
   const destinationOptions = walletOptions.filter((option) => option.value !== accountId);
   const categoryFilterType = type === 'income' ? 'income' : type === 'expense' ? 'expense' : 'all';
-  const moodClass = type === 'income' ? 'amount-hero--income' : type === 'transfer' ? 'amount-hero--transfer' : 'amount-hero--expense';
+  const moodClass = type === 'income' ? 'amount-hero--income' : type === 'transfer' ? 'amount-hero--transfer' : '';
 
   const today = todayInputValue();
   const yesterday = yesterdayInputValue();
@@ -146,13 +146,13 @@ export function NewTransactionPage() {
           <Link className="amount-hero-back" to="/app/transactions" aria-label="Voltar">
             <ArrowLeft size={20} aria-hidden="true" />
           </Link>
-          <div className="type-switch" role="tablist" aria-label="Tipo de transação">
+          <div className="type-switch" role="radiogroup" aria-label="Tipo de transação">
             {primaryTypes.map((option) => (
               <button
                 key={option}
                 type="button"
-                role="tab"
-                aria-selected={type === option}
+                role="radio"
+                aria-checked={type === option}
                 className={`type-switch-btn${type === option ? ' type-switch-btn--active' : ''}`}
                 onClick={() => { setType(option); setCategoryId(''); if (option !== 'expense' && accountId.startsWith(CARD_PREFIX)) setAccountId(''); }}
               >

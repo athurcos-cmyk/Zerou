@@ -304,10 +304,10 @@
   --bg-overlay: rgba(12, 6, 20, 0.72);
   --text-primary: #ede7f6;
   --text-secondary: #b09bcc;
-  --text-muted: #7a6a8f;
+  --text-muted: #9A8AB0;
   --text-inverse: #1a1028;
-  --border-subtle: #32254c;
-  --border-default: #3a2852;
+  --border-subtle: rgba(255,255,255,0.08);
+  --border-default: rgba(255,255,255,0.13);
   --border-focus: #b388ff;
   --action-primary: #b388ff;
   --action-primary-hover: #9c6ee6;
