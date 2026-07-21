@@ -157,6 +157,8 @@ export interface AccountDeletionDeps {
   hasGoogle: boolean;
   hasPassword: boolean;
   currentPassword: string;
+  userEmail: string;
+  userName: string;
   reauthenticateWithGoogle: () => Promise<unknown>;
   reauthenticateWithPassword: (password: string) => Promise<unknown>;
   deleteAccountData: () => Promise<unknown>;
@@ -192,6 +194,22 @@ export async function runAccountDeletion(deps: AccountDeletionDeps) {
     }
     await deps.reauthenticateWithPassword(deps.currentPassword);
   }
+
+  // Envia email de despedida ANTES de apagar os dados (fire-and-forget, não bloqueia)
+  if (deps.userEmail) {
+    sendGoodbyeEmailCallable(deps.userEmail, deps.userName);
+  }
+
+/**
+ * Dispara o email de despedida via Cloud Function. Fire-and-forget — não bloqueia a exclusão.
+ */
+function sendGoodbyeEmailCallable(email: string, name: string) {
+  const fn = httpsCallable<{ email: string; name: string }, { sent: boolean }>(
+    getFirebaseFunctions(),
+    'sendGoodbyeEmail'
+  );
+  fn({ email, name }).catch(() => undefined);
+}
 
   await deps.deleteAccountData();
 

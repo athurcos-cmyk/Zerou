@@ -26,6 +26,9 @@ export { unlinkWhatsapp } from './whatsapp/unlinkWhatsapp.js';
 export { onInvoiceLedgerEntryCreated } from './cards/invoiceLedgerEntryTrigger.js';
 export { reverseCardPurchaseOnDelete } from './cards/reverseCardPurchaseOnDelete.js';
 
+// ─── Emails transacionais (Resend) ──────────────────────────────────────────────
+export { onUserCreated, send3DayFollowUp, sendGoodbyeEmail } from './email/triggers.js';
+
 // ─── Admin ────────────────────────────────────────────────────────────────────
 // adminDeleteUser NÃO fica aqui — vive isolado em functions-admin/ (codebase
 // "admin"), sem dependência do Stripe, pra poder deployar independente do

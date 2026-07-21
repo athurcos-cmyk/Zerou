@@ -47,19 +47,24 @@ export const emailTemplates: Record<EmailKind, { subject: string; purpose: strin
 };
 
 export async function sendOperationalEmail(input: EmailInput): Promise<EmailResult> {
-  const provider = process.env.EMAIL_PROVIDER?.trim() || null;
+  const provider = process.env.EMAIL_PROVIDER?.trim() || 'resend';
 
-  if (!provider || provider === 'disabled') {
+  if (provider === 'disabled') {
     return {
       sent: false,
-      provider,
-      reason: `Email provider not configured for ${input.kind}. No fake send was performed.`
+      provider: null,
+      reason: `Email provider is disabled. ${input.kind} email to ${input.to} was not sent.`
     };
+  }
+
+  if (provider === 'resend') {
+    const { sendWithResend } = await import('./resendProvider.js');
+    return sendWithResend(input);
   }
 
   return {
     sent: false,
     provider,
-    reason: 'Provider adapter is not implemented yet. Configure a real provider before enabling email sends.'
+    reason: `Unknown email provider: ${provider}`
   };
 }

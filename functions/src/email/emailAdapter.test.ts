@@ -13,8 +13,18 @@ describe('email adapter', () => {
     ]);
   });
 
-  it('does not fake-send when no provider is configured', async () => {
+  it('defaults to resend provider and fails gracefully without API key', async () => {
     delete process.env.EMAIL_PROVIDER;
+    delete process.env.RESEND_API_KEY;
+
+    await expect(sendOperationalEmail({ kind: 'welcome', to: 'user@zerou.test' })).resolves.toMatchObject({
+      sent: false,
+      provider: 'resend'
+    });
+  });
+
+  it('returns disabled when EMAIL_PROVIDER=disabled', async () => {
+    process.env.EMAIL_PROVIDER = 'disabled';
 
     await expect(sendOperationalEmail({ kind: 'welcome', to: 'user@zerou.test' })).resolves.toMatchObject({
       sent: false,

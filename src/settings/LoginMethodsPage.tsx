@@ -91,6 +91,8 @@ export function LoginMethodsPage() {
         hasGoogle,
         hasPassword,
         currentPassword,
+        userEmail: user.email ?? '',
+        userName: user.displayName ?? '',
         reauthenticateWithGoogle: () => reauthenticateWithGoogle(user),
         reauthenticateWithPassword: (password) => reauthenticateWithPassword(user, password),
         deleteAccountData: () => deleteAccountData(user.uid),

@@ -6,6 +6,8 @@ function makeDeps(overrides: Partial<AccountDeletionDeps> = {}): AccountDeletion
     hasGoogle: true,
     hasPassword: false,
     currentPassword: '',
+    userEmail: '',
+    userName: '',
     reauthenticateWithGoogle: vi.fn().mockResolvedValue(undefined),
     reauthenticateWithPassword: vi.fn().mockResolvedValue(undefined),
     deleteAccountData: vi.fn().mockResolvedValue(undefined),
