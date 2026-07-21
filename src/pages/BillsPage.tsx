@@ -249,7 +249,7 @@ export function BillsPage() {
         <form className="surface surface-pad form-stack" onSubmit={handleSubmit}>
           <button
             type="button"
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
+            className="form-accordion-toggle"
             onClick={() => setFormOpen((v) => !v)}
             aria-expanded={formOpen}
           >

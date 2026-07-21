@@ -708,9 +708,17 @@ html[data-reduce-motion='true'] *::after {
   gap: 0.65rem;
 }
 
-/* "Gasto no mês" is the hero number — full width so the money value never truncates. */
-.metric-card--accent {
-  grid-column: 1 / -1;
+.form-accordion-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
 }
 
 .metric-card {
@@ -748,6 +756,7 @@ html[data-reduce-motion='true'] *::after {
 }
 
 .metric-card--accent {
+  grid-column: 1 / -1;
   background: var(--gradient-brand);
   border-color: transparent;
   box-shadow: var(--shadow-brand-26);

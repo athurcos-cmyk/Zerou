@@ -26,5 +26,15 @@ export function ThemeRuntime() {
     return () => media.removeEventListener('change', onChange);
   }, [refreshSystemTheme]);
 
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const onChange = (event: MediaQueryListEvent) => {
+      document.documentElement.dataset.reduceMotion = String(event.matches);
+    };
+
+    media.addEventListener('change', onChange);
+    return () => media.removeEventListener('change', onChange);
+  }, []);
+
   return null;
 }
