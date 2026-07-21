@@ -4,7 +4,8 @@ export type EmailKind =
   | 'invite'
   | 'billing_failed'
   | 'cancellation'
-  | 'privacy_request';
+  | 'privacy_request'
+  | 'follow_up';
 
 export interface EmailInput {
   kind: EmailKind;
@@ -43,6 +44,10 @@ export const emailTemplates: Record<EmailKind, { subject: string; purpose: strin
   privacy_request: {
     subject: 'Solicitacao de privacidade recebida',
     purpose: 'Confirmar abertura de protocolo LGPD.'
+  },
+  follow_up: {
+    subject: 'Já deu uma olhada na Granativa?',
+    purpose: 'Lembrete 3 dias após cadastro para incentivar o uso do app.'
   }
 };
 

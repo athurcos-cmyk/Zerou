@@ -73,9 +73,8 @@ export const send3DayFollowUp = onSchedule(
         }
 
         const result = await sendOperationalEmail({
-          kind: 'welcome',
+          kind: 'follow_up',
           to: user.email,
-          subject: 'Já deu uma olhada na Granativa?',
           data: { name: user.name || user.email.split('@')[0] },
         });
 

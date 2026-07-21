@@ -7,6 +7,7 @@ import { emailTemplates } from './emailAdapter.js';
 import { WelcomeEmail } from './templates/WelcomeEmail.js';
 import { GoodbyeEmail } from './templates/GoodbyeEmail.js';
 import { FollowUpEmail } from './templates/FollowUpEmail.js';
+import { GenericEmail } from './templates/GenericEmail.js';
 
 export const resendApiKey = defineSecret('RESEND_API_KEY');
 
@@ -18,17 +19,20 @@ const FROM = 'Granativa <suporte@granativa.com.br>';
 
 function pickTemplate(input: EmailInput): React.ReactElement | null {
   const name = input.data?.name || 'usuário';
-
-  // Follow-up de 3 dias: detecta pelo subject override
-  if (input.kind === 'welcome' && input.subject?.includes('deu uma olhada')) {
-    return FollowUpEmail({ name });
-  }
+  const tpl = emailTemplates[input.kind];
 
   switch (input.kind) {
     case 'welcome':
       return WelcomeEmail({ name });
+    case 'follow_up':
+      return FollowUpEmail({ name });
     case 'cancellation':
       return GoodbyeEmail({ name });
+    case 'security':
+    case 'invite':
+    case 'billing_failed':
+    case 'privacy_request':
+      return GenericEmail({ name, subject: tpl.subject, purpose: tpl.purpose });
     default:
       return null;
   }

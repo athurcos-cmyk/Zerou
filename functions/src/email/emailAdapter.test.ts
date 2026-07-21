@@ -6,6 +6,7 @@ describe('email adapter', () => {
     expect(Object.keys(emailTemplates).sort()).toEqual([
       'billing_failed',
       'cancellation',
+      'follow_up',
       'invite',
       'privacy_request',
       'security',
