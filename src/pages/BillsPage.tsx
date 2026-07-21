@@ -257,7 +257,7 @@ export function BillsPage() {
               <p className="eyebrow">Nova conta</p>
               <h2 style={{ margin: 0 }}>Adicionar conta</h2>
             </div>
-            <ChevronDown size={20} aria-hidden="true" style={{ transform: formOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0, color: 'var(--text-secondary)' }} />
+            <ChevronDown size={20} aria-hidden="true" style={{ transform: formOpen ? 'rotate(180deg)' : 'none', transition: 'transform var(--duration-normal)', flexShrink: 0, color: 'var(--text-secondary)' }} />
           </button>
           {formOpen && (<>
             <FormMessage>{message}</FormMessage>

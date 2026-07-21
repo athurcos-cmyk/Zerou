@@ -956,7 +956,7 @@ html[data-reduce-motion='true'] *::after {
 .list-row--link {
   border-radius: 0.95rem;
   padding: 0.75rem;
-  transition: background 140ms ease;
+  transition: background var(--duration-fast) ease;
 }
 
 .list-row--link:hover {
@@ -1009,7 +1009,7 @@ span.category-mark {
   text-align: left;
   cursor: pointer;
   border-radius: 0;
-  transition: background 140ms ease;
+  transition: background var(--duration-fast) ease;
 }
 
 .list-row--tap:first-child {
@@ -1425,7 +1425,7 @@ span.service-mark--brand {
   font-size: 0.84rem;
   font-weight: 500;
   letter-spacing: 0;
-  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+  transition: border-color var(--duration-fast) ease, background var(--duration-fast) ease, color var(--duration-fast) ease;
 }
 
 .category-option:hover {
@@ -1480,7 +1480,7 @@ span.service-mark--brand {
   color: var(--text-muted);
   padding: 0;
   margin-left: 0.1rem;
-  transition: background 120ms ease, color 120ms ease;
+  transition: background var(--duration-fast) ease, color var(--duration-fast) ease;
 }
 
 .category-option-delete:hover {
@@ -1517,7 +1517,7 @@ span.service-mark--brand {
   border-radius: 8px;
   background: var(--bg-surface);
   color: var(--text-secondary);
-  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+  transition: border-color var(--duration-fast) ease, background var(--duration-fast) ease, color var(--duration-fast) ease;
 }
 
 .category-icon-option:hover {
@@ -2200,7 +2200,7 @@ span.service-mark--brand {
   color: var(--accent-foreground);
   background: var(--gradient-brand);
   box-shadow: var(--shadow-fab);
-  transition: transform 0.16s ease, box-shadow 0.16s ease;
+  transition: transform var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
 }
 
 .mobile-fab:hover {
@@ -2220,7 +2220,7 @@ span.service-mark--brand {
 
 .mobile-menu-trigger .user-avatar {
   border: 1.5px solid transparent;
-  transition: border-color 120ms;
+  transition: border-color var(--duration-fast);
 }
 
 .mobile-nav .nav-link.active .user-avatar,
@@ -2759,7 +2759,7 @@ span.service-mark--brand {
   color: var(--on-accent-85);
   background: transparent;
   cursor: pointer;
-  transition: background 0.18s ease, color 0.18s ease;
+  transition: background var(--duration-normal) ease, color var(--duration-normal) ease;
 }
 
 .type-switch-btn--active {
@@ -2910,7 +2910,7 @@ span.service-mark--brand {
   color: var(--text-secondary);
   background: var(--bg-surface);
   cursor: pointer;
-  transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
+  transition: border-color var(--duration-normal) ease, color var(--duration-normal) ease, background var(--duration-normal) ease;
 }
 
 .chip--active {
@@ -3065,7 +3065,7 @@ span.service-mark--brand {
   height: 0.45rem;
   border-radius: 999px;
   background: var(--border-default);
-  transition: background 0.2s ease, width 0.2s ease;
+  transition: background var(--duration-normal) ease, width var(--duration-normal) ease;
 }
 
 .welcome-tour-dot--active {
@@ -3093,7 +3093,7 @@ span.service-mark--brand {
   padding: 0.7rem 0.9rem;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  transition: border-color var(--duration-normal) ease, box-shadow var(--duration-normal) ease;
 }
 
 .select-row:hover {
@@ -3318,7 +3318,7 @@ span.service-mark--brand {
   padding: 0.7rem 0.6rem;
   text-align: left;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background var(--duration-fast) ease;
 }
 
 .sheet-option:hover {
@@ -3423,7 +3423,7 @@ span.service-mark--brand {
   background: var(--bg-surface-subtle);
   padding: 0.85rem 0.4rem;
   cursor: pointer;
-  transition: border-color 0.16s ease, transform 0.16s ease;
+  transition: border-color var(--duration-fast) ease, transform var(--duration-fast) ease;
 }
 
 .category-tile:hover {
@@ -3539,7 +3539,7 @@ span.service-mark--brand {
   color: var(--text-secondary);
   background: var(--bg-surface);
   cursor: pointer;
-  transition: transform 0.14s ease;
+  transition: transform var(--duration-fast) ease;
 }
 
 .icon-cell:hover {
@@ -3791,7 +3791,7 @@ span.service-mark--brand {
   cursor: pointer;
   text-align: left;
   width: 100%;
-  transition: border-color 0.15s;
+  transition: border-color var(--duration-fast);
 }
 .couple-mode-card:hover { border-color: var(--border-default); }
 .couple-mode-card--selected {
@@ -3844,7 +3844,7 @@ span.service-mark--brand {
   cursor: pointer;
   text-align: left;
   width: 100%;
-  transition: border-color 0.15s;
+  transition: border-color var(--duration-fast);
 }
 .couple-upgrade-card:hover { border-color: var(--action-primary); }
 .couple-upgrade-text { display: grid; gap: 0.1rem; flex: 1; min-width: 0; }
@@ -3862,7 +3862,7 @@ span.service-mark--brand {
   padding: 0.4rem 0.75rem;
   font-size: 0.82rem;
   cursor: pointer;
-  transition: border-color 0.15s;
+  transition: border-color var(--duration-fast);
 }
 .couple-mode-badge:hover { border-color: var(--action-primary); }
 .couple-mode-badge strong { font-weight: 800; }
@@ -3935,7 +3935,7 @@ span.service-mark--brand {
   height: 100%;
   border-radius: 0 4px 4px 0;
   background: var(--action-primary);
-  transition: width 0.3s ease;
+  transition: width var(--duration-slow) ease;
 }
 
 .goal-progress-fill--done {
@@ -4034,7 +4034,7 @@ span.service-mark--brand {
   height: 0.35rem;
   border-radius: 999px;
   background: var(--bg-surface-muted);
-  transition: background 0.25s ease;
+  transition: background var(--duration-normal) ease;
 }
 
 .onboard-progress-bar--done {
@@ -4075,7 +4075,7 @@ span.service-mark--brand {
   padding: 1rem;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.16s ease, background 0.16s ease, transform 0.16s ease;
+  transition: border-color var(--duration-fast) ease, background var(--duration-fast) ease, transform var(--duration-fast) ease;
 }
 
 .choice-card:hover {
@@ -4397,7 +4397,7 @@ span.service-mark--brand {
   font-size: 0.875rem;
   font-weight: 500;
   white-space: nowrap;
-  transition: color 120ms, border-color 120ms;
+  transition: color var(--duration-fast), border-color var(--duration-fast);
 }
 
 .admin-tab:hover {
@@ -4457,7 +4457,7 @@ span.service-mark--brand {
   border-radius: 6px;
   background: transparent;
   color: var(--text-secondary);
-  transition: background 120ms, color 120ms;
+  transition: background var(--duration-fast), color var(--duration-fast);
 }
 
 .admin-refresh-btn:hover:not(:disabled) {
@@ -4476,7 +4476,7 @@ span.service-mark--brand {
   color: var(--text-secondary);
   font-size: 0.82rem;
   font-weight: 600;
-  transition: background 120ms, color 120ms, border-color 120ms;
+  transition: background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast);
 }
 
 .admin-back-btn:hover {
@@ -4768,7 +4768,7 @@ span.service-mark--brand {
   background: transparent;
   color: var(--text-muted);
   opacity: 0;
-  transition: background 120ms, color 120ms, opacity 120ms;
+  transition: background var(--duration-fast), color var(--duration-fast), opacity var(--duration-fast);
 }
 
 .admin-table tbody tr:hover .admin-delete-row-btn {
@@ -4849,7 +4849,7 @@ span.service-mark--brand {
   font-size: 0.9rem;
   color: var(--text-primary);
   width: 100%;
-  transition: border-color 140ms;
+  transition: border-color var(--duration-fast);
 }
 
 .admin-modal__input:focus {
@@ -4880,7 +4880,7 @@ span.service-mark--brand {
   color: var(--text-inverse);
   font-weight: 600;
   font-size: 0.875rem;
-  transition: opacity 140ms;
+  transition: opacity var(--duration-fast);
 }
 
 .admin-modal__delete-btn:disabled {
@@ -4920,7 +4920,7 @@ span.service-mark--brand {
   cursor: pointer;
   text-align: left;
   font: inherit;
-  transition: border-color 120ms, background 120ms, transform 120ms;
+  transition: border-color var(--duration-fast), background var(--duration-fast), transform var(--duration-fast);
 }
 
 .admin-stat--clickable:hover {
@@ -5055,7 +5055,7 @@ span.service-mark--brand {
   color: var(--text-secondary);
   font-weight: 600;
   font-size: 0.875rem;
-  transition: background 120ms, color 120ms, border-color 120ms;
+  transition: background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast);
 }
 
 .admin-detail-action:hover {
@@ -5136,7 +5136,7 @@ span.service-mark--brand {
   font-size: 0.82rem;
   font-weight: 500;
   color: var(--text-secondary);
-  transition: border-color 120ms, color 120ms, background 120ms;
+  transition: border-color var(--duration-fast), color var(--duration-fast), background var(--duration-fast);
 }
 
 .assistant-suggestion-chip:hover {
@@ -5307,7 +5307,7 @@ span.service-mark--brand {
   border-radius: 12px;
   background: var(--bg-surface);
   padding: 0.65rem 0.4rem;
-  transition: border-color 120ms, background 120ms;
+  transition: border-color var(--duration-fast), background var(--duration-fast);
   font-size: 0.7rem;
   color: var(--text-secondary);
 }

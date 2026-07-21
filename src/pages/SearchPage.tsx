@@ -587,7 +587,7 @@ export function SearchPage() {
                           opacity={selectedCatIndex === null || selectedCatIndex === i ? 1 : 0.2}
                           stroke={selectedCatIndex === i ? 'var(--bg-surface)' : 'transparent'}
                           strokeWidth={selectedCatIndex === i ? 3 : 0}
-                          style={{ outline: 'none', transition: 'opacity 200ms ease' }}
+                          style={{ outline: 'none', transition: 'opacity var(--duration-normal) ease' }}
                         />
                       ))}
                     </Pie>
@@ -646,7 +646,7 @@ export function SearchPage() {
                         background: 'none', border: 'none', padding: 0,
                         cursor: 'pointer', textAlign: 'left', width: '100%',
                         opacity: isDimmed ? 0.35 : 1,
-                        transition: 'opacity 200ms ease',
+                        transition: 'opacity var(--duration-normal) ease',
                       }}
                     >
                       {/* nome + valor */}
@@ -667,7 +667,7 @@ export function SearchPage() {
                           height: 4, borderRadius: 999,
                           background: barColor,
                           width: budgetBarWidthPct !== null ? `${budgetBarWidthPct}%` : `${pct}%`,
-                          transition: 'width 400ms ease',
+                          transition: 'width var(--duration-slow) ease',
                         }} />
                         {budget && (
                           <div
