@@ -19,6 +19,7 @@ import {
 import { resolveDebitCreditAccount, resolveTransferSide, accountCandidates, type AccountRow } from './accountResolution.js';
 import { deepseekApiKey } from '../ai/deepseekClient.js';
 import { checkAiUsageNotExceeded, incrementAiUsage } from '../ai/aiRateLimit.js';
+import { checkWhatsappTransactionUsageNotExceeded } from './whatsappTransactionRateLimit.js';
 
 const region = 'southamerica-east1';
 
@@ -196,6 +197,17 @@ export const whatsappWebhook = onRequest(
         await sendWhatsAppMessage(
           phone,
           'Seu vínculo do WhatsApp não está mais ativo. Vá em Configurações > WhatsApp no app para reconectar.',
+        );
+        return;
+      }
+
+      // ── Rate limit diário de transações via WhatsApp ──
+      try {
+        await checkWhatsappTransactionUsageNotExceeded(db, workspaceId);
+      } catch {
+        await sendWhatsAppMessage(
+          phone,
+          'Você atingiu o limite diário de lançamentos pelo WhatsApp. Volte amanhã ou cadastre pelo app.',
         );
         return;
       }
