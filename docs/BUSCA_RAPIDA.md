@@ -24,6 +24,11 @@ Use este arquivo como mapa antes de abrir documentos grandes. Regra: leia o meno
 | Contas de teste (login p/ navegador) | `TEST_ACCOUNTS.local.md` (raiz, local, fora do git) | Só existe se criado na máquina |
 | Assistente de IA (Grazi) | `docs/ai/GRAZI.md` | Documento canonico — tudo sobre a feature |
 | WhatsApp (bot de lancamentos) | `docs/whatsapp/WHATSAPP.md` | Documento canonico — URLs, IDs, fluxo, config |
+| Emails transacionais (Resend) | `functions/src/email/` | Templates, provider, triggers, adapter |
+| Limpeza de dados orfaos | `functions/src/cleanup.ts` | `dailyCleanup` (04:57 BRT), `scripts/listOrphanWorkspaces.mjs` |
+| Force logout ao excluir conta | `functions/src/forceLogoutAllDevices.ts` | Revoga refresh tokens em todos dispositivos |
+| Cancel workspace (Admin SDK) | `functions/src/cancelCoupleWorkspace.ts` | recursiveDelete + coupleInvites + workspaceRef |
+| Rate limit WhatsApp | `functions/src/whatsapp/whatsappTransactionRateLimit.ts` | 100 transacoes/dia/workspace |
 
 ## Onde está cada coisa no código
 
@@ -42,7 +47,10 @@ Use este arquivo como mapa antes de abrir documentos grandes. Regra: leia o meno
 | Contas a Receber (Fase 1: avulso) | `src/pages/ReceivablesPage.tsx` (`/app/receivables`). Coleção **separada** `receivables` (nunca entra em saldo/comprometido). `createReceivable`/`markReceivableReceived` (espelho de `payBill` → cria income)/`markOverdueReceivables`/`subscribeReceivables` (`financeService.ts`). Dashboard ≤5 dias: `buildUpcomingReceivables` (`financeCalculations.ts`). Regras `validReceivable*` (`firestore.rules`). Recorrente = Fase 2 (ver `docs/planning/TODOS.md`). Detalhe: `docs/history/2026-07.md` |
 | Orçamento por categoria | `createBudget`/`updateBudgetLimit`/`deleteBudget`/`subscribeBudgets` (`financeService.ts`), UI em `src/pages/SearchPage.tsx` (sheet "Orçamentos") |
 | Exclusão de conta (self-service) | `src/settings/LoginMethodsPage.tsx` (UI, digitar EXCLUIR) + `src/settings/accountDeletionService.ts` (`runAccountDeletion`/`deleteAccountData`, inclui desvínculo de WhatsApp) + `src/settings/accountDeletion.store.ts` (flag que impede o guard de rota mandar pro onboarding no meio da exclusão, ver `src/auth/routeGuards.tsx`) |
-| Exclusão de conta (admin) | `functions-admin/src/index.ts` (`adminDeleteUser`, codebase separado `admin` — deploy: `npx firebase deploy --only functions:admin:adminDeleteUser`), botão em `src/pages/AdminPage.tsx` |
+| Exclusão de conta (admin) | `functions-admin/src/index.ts` (`adminDeleteUser`, codebase separado `admin` — deploy: `npx firebase deploy --only functions:admin`). Auth deletado primeiro, Firestore depois. 7 etapas com try/catch individual. `commitDeletes` retorna contagem real de documentos deletados. |
+| Emails — boas-vindas, follow-up 3 dias, despedida | `functions/src/email/triggers.ts` (`onUserCreated`, `send3DayFollowUp`, `sendGoodbyeEmail`) + templates em `functions/src/email/templates/` + provider Resend em `resendProvider.ts`. Domínio verificado: `suporte@granativa.com.br`. |
+| Limpeza diária automática | `functions/src/cleanup.ts` (`dailyCleanup`, 04:57 BRT): (A) couples abandonados (>7 dias sem partner), (B) ghosts (ownerUserId não existe), (C) mensagens WhatsApp >30 dias. Scripts manuais: `scripts/listOrphanWorkspaces.mjs`, `scripts/resetAllData.mjs`. |
+| Force logout (auto-exclusão) | `functions/src/forceLogoutAllDevices.ts` — `auth.revokeRefreshTokens(uid)` via Admin SDK. Chamado com `Promise.race` de 5s no cliente antes de `deleteAccountData`. |
 | WhatsApp preso/órfão (admin) | Painel Admin > aba "WhatsApp" (`AdminPage.tsx`, `WhatsappTab`) lista `whatsappPhoneIndex`, marca "Órfão" e desvincula via `adminUnlinkWhatsappNumber` (`functions-admin/src/index.ts`, deploy: `npx firebase deploy --only functions:admin:adminUnlinkWhatsappNumber`) — funciona mesmo com workspace já excluído |
 | Exportar CSV | `src/finance/csvExport.ts` |
 | Cartões / faturas | `src/cards/`. Totais da fatura mantidos incrementalmente por Cloud Function (`functions/src/cards/invoiceLedgerEntryTrigger.ts`, reversão de compra excluída em `reverseCardPurchaseOnDelete.ts`) — nunca mais recalculados do zero. Ledger detalhado carregado sob demanda via `src/cards/useInvoiceLedger.ts` (não mais no boot global, `useCardsData.ts` só usa os totais já persistidos). Fechamento de fatura tem dois autores: `closeInvoicesDue` (Cloud Scheduler diário, `functions/src/automation.ts`) e `markClosedInvoices` (client-side self-heal a cada snapshot, 2026-07-18, `cardService.ts` — mesmo padrão de `markOverdueBills`). Antecipação de parcela (`src/cards/anticipation.ts`) só aceita compra com `installmentTotal > 1` ou múltipla ocorrência no ledger — compra à vista nunca entra |

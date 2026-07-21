@@ -2,6 +2,28 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-21 — Infraestrutura: 14 correções de segurança, dados e resiliência
+
+Maratona de 12h. 43 agentes de auditoria em 3 camadas (primária → secundária → terciária). 14 bugs corrigidos, 25 Cloud Functions no ar, 440 testes verdes. Detalhes em `docs/history/2026-07.md`.
+
+- **Resiliência — try/catch em 5 loops de automação.** `closeInvoicesDue`, `generateRecurrences`, `sendDueReminders`, `sendDailyLogReminder`, `sendBudgetAlerts` — cada iteração de loop agora tem try/catch individual. Um documento corrompido ou falha de rede não derruba mais a função inteira (antes, todos os documentos seguintes eram perdidos). Loga o erro e continua.
+- **Segurança de dados — `adminDeleteUser` reestruturado.** Auth deletado ANTES do Firestore (antes era o contrário: se Auth falhasse, dados já tinham sido apagados). CommitDeletes agora retorna contagem real com try/catch por lote de 450. Todas as 7 etapas de coleta de dados com try/catch individual.
+- **Segurança de autenticação — `sendGoodbyeEmail` agora exige login.** Antes, qualquer pessoa podia chamar a função e enviar email de "conta excluída" para qualquer endereço. Agora verifica `request.auth?.uid`.
+- **Segurança de workspace — `cancelCoupleWorkspace` com verificação de tipo.** Antes, passando o ID do workspace pessoal, a função deletava todos os dados financeiros sem apagar a conta. Agora valida `type === 'couple'` antes de prosseguir.
+- **Dados órfãos — 3 subcoleções adicionadas à lista de deleção.** `aiUsage`, `budgetAlertState` e `whatsappTransactionUsage` agora são varridas na exclusão de conta (cliente + admin). Antes, sobreviviam como dados fantasmas.
+- **Dados órfãos — `cancelCoupleWorkspace` usa `recursiveDelete`.** Antes, deletava só o documento workspace com `batch.delete`, deixando TODAS as subcoleções órfãs. Agora é uma Cloud Function que usa Admin SDK para deletar a árvore inteira.
+- **Segurança — WhatsApp com rate limit de 100 transações/dia.** Transação atômica no Firestore (sem TOCTOU). Ao atingir o limite, responde "Volte amanhã ou cadastre pelo app". Antes, era possível criar transações ilimitadas via WhatsApp.
+- **Segurança — `forceLogoutAllDevices` ao excluir conta.** Revoga refresh tokens de todos os dispositivos antes de apagar os dados. Com `Promise.race` de 5s (nunca bloqueia a exclusão). Antes, o PC continuava ativo por até 1h após exclusão no celular.
+- **Resiliência — `metaClient` propaga erros em vez de engolir.** `sendWhatsAppMessage` agora lança exceção em falha HTTP e rede. O webhook captura no try/catch global. Antes, erros eram silenciosamente ignorados.
+- **Resiliência — `generateRecurrences` não causa mais leituras infinitas.** Regra sem `accountId` agora avança `nextOccurrenceAt` antes de pular. Antes, era relida todo dia para sempre (730+ reads/ano por regra).
+- **Correção de fuso — `send3DayFollowUp` usa BRT, não UTC.** Query de "3 dias atrás" agora calcula no fuso America/Sao_Paulo com offset explícito -03:00.
+- **Email — templates e infraestrutura.** `follow_up` adicionado como tipo legítimo (antes era substring frágil). `GenericEmail` cobre 4 tipos sem template. WhatsApp mencionado nos emails de boas-vindas e follow-up.
+- **Retry — `deepseekClient` com retry habilitado para jsonMode.** Antes, chamadas com `jsonMode: true` (interpretação de mensagens WhatsApp) não faziam retry em 429/503.
+- **5 índices compostos** no Firestore para queries de automação. Sem eles, 4 funções agendadas falhavam silenciosamente em produção.
+- typecheck / test (440) / build verdes. 25/25 Cloud Functions deployadas.
+
+## 2026-07-20 — Passada visual front-end (pré-lançamento): contraste, a11y, CSS, ARIA
+
 ## 2026-07-21 — Infraestrutura: emails transacionais (Resend), limpeza de dados órfãos, force logout
 
 Segunda metade da maratona de pré-lançamento. Foco em backend e segurança de dados.
