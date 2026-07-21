@@ -198,19 +198,26 @@ export async function runAccountDeletion(deps: AccountDeletionDeps) {
   }
 
   // Aguarda até 5s pela revogação de refresh tokens em todos os dispositivos
-  // ANTES de apagar os dados. Sem isso, outro dispositivo com sessão ativa
-  // continua escrevendo por até 1h (token ainda válido), criando dados fantasmas
-  // depois que o Firestore foi limpo. O timeout garante que a exclusão nunca
-  // trava se a Cloud Function estiver fora do ar.
+  // ANTES de apagar os dados. O timeout garante que a exclusão nunca trava.
   await Promise.race([
     forceLogoutAllDevicesCallable(),
     new Promise<void>(resolve => setTimeout(resolve, 5000))
   ]);
 
-  // Envia email de despedida ANTES de apagar os dados (fire-and-forget, não bloqueia)
+  // Envia email de despedida ANTES de apagar os dados
   if (deps.userEmail) {
     sendGoodbyeEmailCallable(deps.userEmail, deps.userName);
   }
+
+  await deps.deleteAccountData();
+
+  try {
+    await deps.deleteAuthenticatedUser();
+  } catch (error) {
+    await deps.logout();
+    throw error;
+  }
+}
 
 /**
  * Força logout em todos os dispositivos revogando refresh tokens.
@@ -236,16 +243,6 @@ function sendGoodbyeEmailCallable(email: string, name: string) {
     'sendGoodbyeEmail'
   );
   fn({ email, name }).catch(() => undefined);
-}
-
-  await deps.deleteAccountData();
-
-  try {
-    await deps.deleteAuthenticatedUser();
-  } catch (error) {
-    await deps.logout();
-    throw error;
-  }
 }
 
 export async function deleteAccountData(userId: string) {
