@@ -142,13 +142,14 @@ export const adminDeleteUser = onCall(
       }
     }
 
-    const workspaceRefsSnap = await db.collection(`users/${userId}/workspaceRefs`).get();
+    try {
+      const workspaceRefsSnap = await db.collection(`users/${userId}/workspaceRefs`).get();
 
-    for (const wsRefDoc of workspaceRefsSnap.docs) {
-      let wsId = '';
-      try {
-        wsId = wsRefDoc.id;
-        if (wsId === personalWorkspaceId) continue;
+      for (const wsRefDoc of workspaceRefsSnap.docs) {
+        let wsId = '';
+        try {
+          wsId = wsRefDoc.id;
+          if (wsId === personalWorkspaceId) continue;
 
         const wsSnap = await db.doc(`workspaces/${wsId}`).get();
         if (!wsSnap.exists) continue;
@@ -172,7 +173,10 @@ export const adminDeleteUser = onCall(
       }
     }
 
-    refs.push(...workspaceRefsSnap.docs.map((d) => d.ref));
+      refs.push(...workspaceRefsSnap.docs.map((d) => d.ref));
+    } catch (err) {
+      logger.error('Falha ao consultar workspaceRefs', { userId, err });
+    }
 
     const billingId = `billing_${userId}`;
     try {
