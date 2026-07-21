@@ -112,6 +112,7 @@ export const sendGoodbyeEmail = onCall(
     const result = await sendOperationalEmail({
       kind: 'cancellation',
       to: email,
+      subject: 'Sua conta na Granativa foi excluída',
       data: { name: name || email.split('@')[0] },
     });
 

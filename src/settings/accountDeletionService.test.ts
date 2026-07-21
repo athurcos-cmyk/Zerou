@@ -10,6 +10,8 @@ function makeDeps(overrides: Partial<AccountDeletionDeps> = {}): AccountDeletion
     userName: '',
     reauthenticateWithGoogle: vi.fn().mockResolvedValue(undefined),
     reauthenticateWithPassword: vi.fn().mockResolvedValue(undefined),
+    sendGoodbyeEmail: vi.fn().mockResolvedValue(undefined),
+    forceLogoutAllDevices: vi.fn().mockResolvedValue(undefined),
     deleteAccountData: vi.fn().mockResolvedValue(undefined),
     deleteAuthenticatedUser: vi.fn().mockResolvedValue(undefined),
     logout: vi.fn().mockResolvedValue(undefined),
@@ -30,6 +32,31 @@ describe('runAccountDeletion', () => {
 
     expect(calls).toEqual(['reauth', 'data', 'auth']);
     expect(deps.logout).not.toHaveBeenCalled();
+  });
+
+  it('regression: sends the goodbye email BEFORE revoking tokens and BEFORE wiping data (bug: goodbye fired AFTER forceLogout revoked tokens and was fire-and-forget, so the auth-required onCall lost its session and the page reload aborted the in-flight request — the email never went out)', async () => {
+    const calls: string[] = [];
+    const deps = makeDeps({
+      userEmail: 'user@example.com',
+      reauthenticateWithGoogle: vi.fn(async () => { calls.push('reauth'); }),
+      sendGoodbyeEmail: vi.fn(async () => { calls.push('goodbye'); }),
+      forceLogoutAllDevices: vi.fn(async () => { calls.push('forcelogout'); }),
+      deleteAccountData: vi.fn(async () => { calls.push('data'); }),
+      deleteAuthenticatedUser: vi.fn(async () => { calls.push('auth'); })
+    });
+
+    await runAccountDeletion(deps);
+
+    expect(calls).toEqual(['reauth', 'goodbye', 'forcelogout', 'data', 'auth']);
+  });
+
+  it('skips the goodbye email when the account has no email on file', async () => {
+    const deps = makeDeps({ userEmail: '' });
+
+    await runAccountDeletion(deps);
+
+    expect(deps.sendGoodbyeEmail).not.toHaveBeenCalled();
+    expect(deps.deleteAccountData).toHaveBeenCalledTimes(1);
   });
 
   it('regression: never deletes Firestore data if reauthentication fails (bug: data was wiped before confirming a fresh session, so a requires-recent-login failure on the Auth delete left the account undeleted but all data gone)', async () => {

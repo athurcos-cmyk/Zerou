@@ -164,6 +164,10 @@ export interface AccountDeletionDeps {
   userName: string;
   reauthenticateWithGoogle: () => Promise<unknown>;
   reauthenticateWithPassword: (password: string) => Promise<unknown>;
+  /** Email de despedida (já vinculado a email/nome pelo caller). Injetado pra ordem ser testável. */
+  sendGoodbyeEmail: () => Promise<unknown>;
+  /** Revoga refresh tokens em todos os dispositivos. Injetado pra ordem ser testável. */
+  forceLogoutAllDevices: () => Promise<unknown>;
   deleteAccountData: () => Promise<unknown>;
   deleteAuthenticatedUser: () => Promise<unknown>;
   logout: () => Promise<unknown>;
@@ -198,17 +202,23 @@ export async function runAccountDeletion(deps: AccountDeletionDeps) {
     await deps.reauthenticateWithPassword(deps.currentPassword);
   }
 
-  // Aguarda até 5s pela revogação de refresh tokens em todos os dispositivos
-  // ANTES de apagar os dados. O timeout garante que a exclusão nunca trava.
+  // Email de despedida PRIMEIRO, enquanto a sessão está fresca (recém-reautenticada) e
+  // ANTES de revogar tokens / apagar o Auth. `sendGoodbyeEmail` é onCall que EXIGE auth —
+  // se disparasse depois do forceLogout (tokens revogados) e como fire-and-forget, o
+  // `window.location.assign('/')` do caller abortava a requisição em voo e o email nunca
+  // saía. `await` com teto de 5s garante que a chamada chega na função sem travar a exclusão.
+  if (deps.userEmail) {
+    await Promise.race([
+      deps.sendGoodbyeEmail(),
+      new Promise<void>(resolve => setTimeout(resolve, 5000))
+    ]);
+  }
+
+  // Só depois revoga os refresh tokens em todos os dispositivos (idem, teto de 5s).
   await Promise.race([
-    forceLogoutAllDevicesCallable(),
+    deps.forceLogoutAllDevices(),
     new Promise<void>(resolve => setTimeout(resolve, 5000))
   ]);
-
-  // Envia email de despedida ANTES de apagar os dados
-  if (deps.userEmail) {
-    sendGoodbyeEmailCallable(deps.userEmail, deps.userName);
-  }
 
   await deps.deleteAccountData();
 
@@ -223,7 +233,7 @@ export async function runAccountDeletion(deps: AccountDeletionDeps) {
 /**
  * Força logout em todos os dispositivos revogando refresh tokens.
  */
-async function forceLogoutAllDevicesCallable() {
+export async function forceLogoutAllDevicesCallable() {
   const fn = httpsCallable<Record<string, never>, { success: boolean }>(
     getFirebaseFunctions(),
     'forceLogoutAllDevices'
@@ -236,14 +246,15 @@ async function forceLogoutAllDevicesCallable() {
 }
 
 /**
- * Dispara o email de despedida via Cloud Function. Fire-and-forget — não bloqueia a exclusão.
+ * Dispara o email de despedida via Cloud Function. Devolve a promise (pra quem chama poder
+ * dar `await` com timeout), mas engole o erro — uma falha de email nunca pode travar a exclusão.
  */
-function sendGoodbyeEmailCallable(email: string, name: string) {
+export function sendGoodbyeEmailCallable(email: string, name: string) {
   const fn = httpsCallable<{ email: string; name: string }, { sent: boolean }>(
     getFirebaseFunctions(),
     'sendGoodbyeEmail'
   );
-  fn({ email, name }).catch(() => undefined);
+  return fn({ email, name }).catch(() => undefined);
 }
 
 export async function deleteAccountData(userId: string) {
