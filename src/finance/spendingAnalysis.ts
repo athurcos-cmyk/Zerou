@@ -102,6 +102,101 @@ export function spendingByCategoryForMonth(
   return totals;
 }
 
+/**
+ * Gasto por categoria em VÁRIOS meses: `categoria → (mês → centavos)`. Reusa
+ * `spendingByCategoryForMonth` por mês, então os números batem exatamente com o donut da
+ * Análise. Só entra valor > 0 (mês só de estorno pode zerar/inverter uma categoria — não é
+ * "gasto"). Puro/em memória: quem chama passa as transações e faturas já carregadas, sem leitura
+ * nova. Base da tendência por categoria (`CategoryTrendSheet`).
+ */
+export function spendingByCategoryAcrossMonths(
+  months: string[],
+  transactions: Transaction[],
+  invoices: InvoiceForSpending[],
+  categoryOfTransaction: (transactionId: string | undefined) => string | undefined
+): Map<string, Map<string, number>> {
+  const byCategory = new Map<string, Map<string, number>>();
+  for (const month of months) {
+    const perCategory = spendingByCategoryForMonth(month, transactions, invoices, categoryOfTransaction);
+    for (const [categoryId, cents] of perCategory) {
+      if (cents <= 0) continue;
+      let byMonth = byCategory.get(categoryId);
+      if (!byMonth) {
+        byMonth = new Map<string, number>();
+        byCategory.set(categoryId, byMonth);
+      }
+      byMonth.set(month, cents);
+    }
+  }
+  return byCategory;
+}
+
+export interface CategoryTrendMonth {
+  month: string;
+  amountCents: number;
+  /** É o mês corrente (ainda em andamento)? A UI marca a barra e sai da média. */
+  isCurrent: boolean;
+}
+
+export interface CategoryTrend {
+  series: CategoryTrendMonth[];
+  /** Média dos meses FECHADOS (exclui `currentMonth`). */
+  averageCents: number;
+  currentCents: number;
+  /** % do mês atual vs média dos fechados. `null` quando não há base (nenhum mês fechado com gasto). */
+  vsAveragePct: number | null;
+  /** Maior/menor mês COM gasto, **só entre os fechados** (exclui o atual parcial). `null` se não houver. */
+  maxMonth: { month: string; amountCents: number } | null;
+  minMonth: { month: string; amountCents: number } | null;
+  totalCents: number;
+}
+
+/**
+ * Série de gasto de UMA categoria ao longo de `months` (ordem cronológica), com estatísticas.
+ *
+ * A média usa só os meses FECHADOS (exclui `currentMonth`, que ainda está em andamento): comparar
+ * um mês parcial contra uma média que o inclui é circular, e o app não projeta o mês cheio de
+ * propósito (postura anti-especulação). O veredito `vsAveragePct` só existe quando há base real
+ * (algum mês fechado com gasto), senão vira `null` e a UI esconde o "acima/abaixo".
+ */
+export function computeCategoryTrend(
+  categoryId: string,
+  months: string[],
+  currentMonth: string,
+  byCategory: Map<string, Map<string, number>>
+): CategoryTrend {
+  const byMonth = byCategory.get(categoryId);
+  const series: CategoryTrendMonth[] = months.map((month) => ({
+    month,
+    amountCents: byMonth?.get(month) ?? 0,
+    isCurrent: month === currentMonth
+  }));
+
+  const closed = series.filter((m) => !m.isCurrent);
+  const closedTotal = closed.reduce((sum, m) => sum + m.amountCents, 0);
+  const averageCents = closed.length > 0 ? Math.round(closedTotal / closed.length) : 0;
+
+  const currentCents = series.find((m) => m.isCurrent)?.amountCents ?? 0;
+
+  const hasClosedSpend = closed.some((m) => m.amountCents > 0);
+  const vsAveragePct = hasClosedSpend && averageCents > 0
+    ? Math.round(((currentCents - averageCents) / averageCents) * 100)
+    : null;
+
+  let maxMonth: { month: string; amountCents: number } | null = null;
+  let minMonth: { month: string; amountCents: number } | null = null;
+  for (const m of series) {
+    if (m.isCurrent) continue;      // mês parcial não conta como maior/menor (idem à média)
+    if (m.amountCents <= 0) continue; // mês sem gasto não é "menor mês", é ausência de gasto
+    if (!maxMonth || m.amountCents > maxMonth.amountCents) maxMonth = { month: m.month, amountCents: m.amountCents };
+    if (!minMonth || m.amountCents < minMonth.amountCents) minMonth = { month: m.month, amountCents: m.amountCents };
+  }
+
+  const totalCents = series.reduce((sum, m) => sum + m.amountCents, 0);
+
+  return { series, averageCents, currentCents, vsAveragePct, maxMonth, minMonth, totalCents };
+}
+
 /** Soma dos sinais de todas as parcelas de uma fatura = gasto reconhecido dela. */
 export function invoiceRecognizedExpense(invoice: InvoiceForSpending): number {
   return invoice.ledgerEntries.reduce((sum, entry) => sum + signedCharge(entry), 0);

@@ -2,6 +2,16 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-21 — feat: Tendência de gasto por categoria (Análise)
+
+Comparação mês a mês por categoria na Análise (ideia de um amigo do dono). Planejado e revisado com `/plan-eng-review` + `/plan-design-review` + `/frontend-design`. **Custo de leitura zero**: agrega em memória os 6 meses que a `SearchPage` já carrega — nenhuma query nova, nenhuma mudança em `firestore.rules`/functions/índices. Detalhes em `docs/history/2026-07.md`.
+
+- **Novo `CategoryTrendSheet`** (`src/components/`), aberto por um ícone `LineChart` no header da Análise, já focado na categoria destacada no donut. Chips roláveis (radiogroup) → stat-herói em texto grande (média mensal + "este mês X% acima/abaixo") → gráfico de barras dos últimos 6 meses (mês atual "em andamento", linha da média) → maior/menor mês + total.
+- **Mês parcial tratado com honestidade**: a média usa só os meses fechados (exclui o corrente); nada de projetar/estimar o mês cheio (postura anti-especulação, igual à Projeção de Fluxo apagada). Categoria com 0-1 mês de gasto mostra o que tem + aviso, não esconde.
+- **2 funções puras** em `spendingAnalysis.ts`: `spendingByCategoryAcrossMonths` (reusa `spendingByCategoryForMonth`, então os números batem com o donut) + `computeCategoryTrend` (série, média dos fechados, veredito, maior/menor/total). 7 testes novos.
+- **DRY**: `resolveCategoryColor` (duplicado em `SearchPage` e `AnnualSummarySheet`) extraído pra `src/theme/palette.ts`; as 2 cópias migradas.
+- typecheck / test (366) / build verdes. Zero mudança de backend. **Verificado ao vivo** com 8 meses de dados de teste — a verificação pegou 3 correções (truncamento de card, max/min do mês parcial, rótulo cortado).
+
 ## 2026-07-21 — Infraestrutura: 14 correções de segurança, dados e resiliência
 
 Maratona de 12h. 43 agentes de auditoria em 3 camadas (primária → secundária → terciária). 14 bugs corrigidos, 25 Cloud Functions no ar, 440 testes verdes. Detalhes em `docs/history/2026-07.md`.

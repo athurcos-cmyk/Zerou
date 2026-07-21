@@ -37,6 +37,21 @@ export const defaultCategoryColors: Record<string, string> = {
 };
 
 /**
+ * Cor de uma categoria pra gráficos/legendas: a cor escolhida pela pessoa, senão a cor fixa da
+ * categoria embutida, senão uma cor derivada do id (hash estável). Fonte única — antes estava
+ * duplicada em SearchPage e AnnualSummarySheet.
+ */
+export function resolveCategoryColor(category: { id: string; color?: string }): string {
+  if (category.color) return category.color;
+  if (defaultCategoryColors[category.id]) return defaultCategoryColors[category.id];
+  let hash = 0;
+  for (let i = 0; i < category.id.length; i += 1) {
+    hash = (hash * 31 + category.id.charCodeAt(i)) >>> 0;
+  }
+  return categoryColors[hash % categoryColors.length];
+}
+
+/**
  * Cor de marca para serviços cujo logo real é só um wordmark (ilegível espremido num tile
  * de 36px). Em vez do wordmark, o `ServiceMark` desenha um tile "ícone de app": quadrado na
  * cor da marca com as iniciais em branco (`ACCENT_FOREGROUND`). Tons escolhidos com contraste

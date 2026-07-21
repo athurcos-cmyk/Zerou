@@ -9,19 +9,9 @@ import { useMonthlyTransactions } from '../finance/useMonthlyTransactions';
 import { dedupeById } from '../finance/financeService';
 import { computeAnnualSummary } from '../finance/annualSummaryCalculations';
 import { formatMoney } from '../finance/money';
-import { categoryColors, defaultCategoryColor, defaultCategoryColors } from '../theme/palette';
+import { resolveCategoryColor } from '../theme/palette';
 import type { Transaction } from '../types/contracts';
 import type { InvoiceForSpending } from '../finance/spendingAnalysis';
-
-function resolveCategoryColor(category: { id: string; color?: string }) {
-  if (category.color) return category.color;
-  if (defaultCategoryColors[category.id]) return defaultCategoryColors[category.id];
-  let hash = 0;
-  for (let i = 0; i < category.id.length; i += 1) {
-    hash = (hash * 31 + category.id.charCodeAt(i)) >>> 0;
-  }
-  return categoryColors[hash % categoryColors.length];
-}
 
 const FULL_MONTH_NAMES: Record<string, string> = {
   'Jan': 'Janeiro', 'Fev': 'Fevereiro', 'Mar': 'Março', 'Abr': 'Abril',

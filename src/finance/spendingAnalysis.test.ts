@@ -10,6 +10,8 @@ import {
   projectedRecurringForMonth,
   recurringByCategoryForMonth,
   spendingByCategoryForMonth,
+  spendingByCategoryAcrossMonths,
+  computeCategoryTrend,
   NO_CATEGORY,
   type BillForCommitment,
   type InvoiceForSpending,
@@ -388,5 +390,87 @@ describe('projectedRecurringForMonth', () => {
     const totals = recurringByCategoryForMonth('2026-09', rules, step);
     expect(totals.get('moradia')).toBe(170000);
     expect(totals.get(NO_CATEGORY)).toBe(4000);
+  });
+});
+
+describe('spendingByCategoryAcrossMonths', () => {
+  const months = ['2026-05', '2026-06', '2026-07'];
+
+  it('soma a categoria por mês (despesa fora do cartão)', () => {
+    const txns = [
+      txn({ id: 'a', amountCents: 5000, categoryId: 'mercado', cashMonth: '2026-05', competenceMonth: '2026-05' }),
+      txn({ id: 'b', amountCents: 7000, categoryId: 'mercado', cashMonth: '2026-06', competenceMonth: '2026-06' })
+    ];
+    const byCat = spendingByCategoryAcrossMonths(months, txns, [], () => undefined);
+    expect(byCat.get('mercado')?.get('2026-05')).toBe(5000);
+    expect(byCat.get('mercado')?.get('2026-06')).toBe(7000);
+    // Mês sem gasto na categoria não entra no mapa interno (a série preenche 0 na hora de exibir).
+    expect(byCat.get('mercado')?.has('2026-07')).toBe(false);
+  });
+
+  it('espalha a parcela de cartão pelos meses das faturas (via ledger)', () => {
+    const purchaseTxn = txn({ id: 'buy', type: 'card_purchase', amountCents: 90000, categoryId: 'compras', cardId: 'card', cashMonth: '2026-05', competenceMonth: '2026-05' });
+    const invoices: InvoiceForSpending[] = months.map((month, i) => ({
+      referenceMonth: month,
+      ledgerEntries: [entry({ id: `p${i + 1}`, type: 'purchase', amountCents: 30000, sourceTransactionId: 'buy', installmentNumber: i + 1, installmentTotal: 3 })]
+    }));
+    const byCat = spendingByCategoryAcrossMonths(months, [purchaseTxn], invoices, (id) => (id === 'buy' ? 'compras' : undefined));
+    expect(byCat.get('compras')?.get('2026-05')).toBe(30000);
+    expect(byCat.get('compras')?.get('2026-06')).toBe(30000);
+    expect(byCat.get('compras')?.get('2026-07')).toBe(30000);
+  });
+
+  it('mês só de estorno (líquido ≤ 0) não vira gasto — categoria ausente naquele mês', () => {
+    const txns = [
+      txn({ id: 'c', type: 'expense', amountCents: 10000, categoryId: 'mercado', cashMonth: '2026-05', competenceMonth: '2026-05' }),
+      txn({ id: 'r', type: 'refund', amountCents: 4000, categoryId: 'mercado', cashMonth: '2026-06', competenceMonth: '2026-06' })
+    ];
+    const byCat = spendingByCategoryAcrossMonths(months, txns, [], () => undefined);
+    expect(byCat.get('mercado')?.get('2026-05')).toBe(10000);
+    expect(byCat.get('mercado')?.has('2026-06')).toBe(false); // só estorno → -4000 filtrado
+  });
+
+  it('compra no cartão sem categoria cai em NO_CATEGORY', () => {
+    const invoices: InvoiceForSpending[] = [
+      { referenceMonth: '2026-07', ledgerEntries: [entry({ id: 'p', type: 'purchase', amountCents: 30000, sourceTransactionId: 'buy', installmentTotal: 2 })] }
+    ];
+    const byCat = spendingByCategoryAcrossMonths(months, [], invoices, () => undefined);
+    expect(byCat.get(NO_CATEGORY)?.get('2026-07')).toBe(30000);
+  });
+});
+
+describe('computeCategoryTrend', () => {
+  const months = ['2026-05', '2026-06', '2026-07'];
+  const currentMonth = '2026-07';
+
+  it('média usa só os meses fechados (exclui o atual) e o veredito compara o atual a ela', () => {
+    const byCat = new Map([['mercado', new Map([['2026-05', 30000], ['2026-06', 41000], ['2026-07', 31800]])]]);
+    const trend = computeCategoryTrend('mercado', months, currentMonth, byCat);
+
+    expect(trend.averageCents).toBe(35500);          // (30000 + 41000) / 2, sem o julho parcial
+    expect(trend.currentCents).toBe(31800);
+    expect(trend.vsAveragePct).toBe(-10);            // round((31800 - 35500) / 35500 * 100)
+    expect(trend.totalCents).toBe(102800);
+    expect(trend.maxMonth).toEqual({ month: '2026-06', amountCents: 41000 });
+    expect(trend.minMonth).toEqual({ month: '2026-05', amountCents: 30000 });
+    expect(trend.series).toHaveLength(3);
+    expect(trend.series[2]).toMatchObject({ month: '2026-07', isCurrent: true });
+    expect(trend.series[0].isCurrent).toBe(false);
+  });
+
+  it('veredito positivo quando o mês atual está acima da média', () => {
+    const byCat = new Map([['mercado', new Map([['2026-05', 10000], ['2026-06', 10000], ['2026-07', 15000]])]]);
+    const trend = computeCategoryTrend('mercado', months, currentMonth, byCat);
+    expect(trend.averageCents).toBe(10000);
+    expect(trend.vsAveragePct).toBe(50);
+  });
+
+  it('sem meses fechados com gasto (categoria nova), veredito é null e a série preenche 0', () => {
+    const byCat = new Map([['mercado', new Map([['2026-07', 5000]])]]); // só o mês atual tem gasto
+    const trend = computeCategoryTrend('mercado', months, currentMonth, byCat);
+    expect(trend.vsAveragePct).toBeNull();           // sem base → não divide por ~0
+    expect(trend.currentCents).toBe(5000);
+    expect(trend.series[0].amountCents).toBe(0);     // mês sem gasto vira 0 na série
+    expect(trend.maxMonth).toBeNull();               // só o mês atual (parcial) tem gasto → sem maior/menor mês fechado
   });
 });

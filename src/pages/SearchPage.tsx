@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Calendar, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, Minus, Plus, Search, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
+import { Calendar, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, Gauge, LineChart, Minus, Plus, Search, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
 import {
   PieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from 'recharts';
 import { useAuth } from '../auth/AuthContext';
 import { AnnualSummarySheet } from '../components/AnnualSummarySheet';
+import { CategoryTrendSheet } from '../components/CategoryTrendSheet';
 import { BottomSheet } from '../components/BottomSheet';
 import { EmptyState } from '../components/EmptyState';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
@@ -32,19 +33,9 @@ import {
   type InvoiceForSpending,
   type RecurringForProjection
 } from '../finance/spendingAnalysis';
-import { categoryColors, defaultCategoryColor, defaultCategoryColors } from '../theme/palette';
+import { defaultCategoryColor, resolveCategoryColor } from '../theme/palette';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
-
-function resolveCategoryColor(category: { id: string; color?: string }) {
-  if (category.color) return category.color;
-  if (defaultCategoryColors[category.id]) return defaultCategoryColors[category.id];
-  let hash = 0;
-  for (let i = 0; i < category.id.length; i += 1) {
-    hash = (hash * 31 + category.id.charCodeAt(i)) >>> 0;
-  }
-  return categoryColors[hash % categoryColors.length];
-}
 
 function getLastNMonths(n: number): string[] {
   const months: string[] = [];
@@ -151,6 +142,7 @@ export function SearchPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [annualOpen, setAnnualOpen] = useState(false);
+  const [trendOpen, setTrendOpen] = useState(false);
   const [budgetValues, setBudgetValues] = useState<Record<string, string>>({});
 
   const expenseCategories = useMemo(
@@ -445,6 +437,9 @@ export function SearchPage() {
           <h1 className="page-title page-title--compact">Seus gastos</h1>
         </div>
         <div style={{ display: 'flex', gap: '0.25rem' }}>
+          <button className="icon-button" type="button" aria-label="Tendência por categoria" title="Tendência por categoria" onClick={() => setTrendOpen(true)}>
+            <LineChart size={18} aria-hidden="true" />
+          </button>
           <button className="icon-button" type="button" aria-label="Resumo anual" title="Resumo anual" onClick={() => setAnnualOpen(true)}>
             <Calendar size={18} aria-hidden="true" />
           </button>
@@ -535,6 +530,15 @@ export function SearchPage() {
             <p className="eyebrow">{isFutureMonth ? 'Previsto por categoria' : 'Por categoria'}</p>
             <h2>{monthTitle}</h2>
           </div>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Orçamentos por categoria"
+            title="Orçamentos por categoria"
+            onClick={() => setBudgetOpen(true)}
+          >
+            <Gauge size={18} aria-hidden="true" />
+          </button>
         </div>
 
         {isFutureMonth && (
@@ -944,6 +948,18 @@ export function SearchPage() {
         invoices={invoicesForSpending}
         categories={expenseCategories}
         currentYear={new Date().getFullYear()}
+      />
+
+      <CategoryTrendSheet
+        open={trendOpen}
+        onClose={() => setTrendOpen(false)}
+        months={last6Months}
+        currentMonth={currentMonth}
+        transactions={knownTransactions}
+        invoices={invoicesForSpending}
+        categories={expenseCategories}
+        categoryOf={(id) => (id ? txnCategoryById.get(id) : undefined)}
+        initialCategoryId={selectedCat?.categoryId ?? topCat?.categoryId ?? undefined}
       />
     </section>
   );
