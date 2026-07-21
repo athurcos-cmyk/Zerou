@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { memo, useState, type FormEvent } from 'react';
 import { Check, ChevronRight, Pencil, Plus, Settings2, Tag, Trash2, X } from 'lucide-react';
 import type { Category } from '../types/contracts';
 import { BottomSheet } from './BottomSheet';
@@ -24,7 +24,7 @@ interface CategoryFieldProps {
   onDeleteCategory?: (id: string) => Promise<void>;
 }
 
-export function CategoryField({
+export const CategoryField = memo(function CategoryField({
   label = 'Categoria',
   value,
   onChange,
@@ -200,9 +200,9 @@ export function CategoryField({
             {!editingId && filterType === 'all' && (
               <div className="field">
                 <span className="field-label">Tipo</span>
-                <div className="segmented">
+                <div className="segmented" role="radiogroup" aria-label="Tipo de categoria">
                   {(['expense', 'income', 'both'] as const).map((t) => (
-                    <button key={t} type="button" aria-pressed={type === t} onClick={() => setType(t)}>
+                    <button key={t} type="button" role="radio" aria-checked={type === t} onClick={() => setType(t)}>
                       {t === 'expense' ? 'Gasto' : t === 'income' ? 'Receita' : 'Ambos'}
                     </button>
                   ))}
@@ -212,7 +212,7 @@ export function CategoryField({
 
             <div className="field">
               <span className="field-label">Cor</span>
-              <div className="color-grid">
+              <div className="color-grid" role="radiogroup" aria-label="Cor">
                 {categoryColors.map((c) => (
                   <button
                     key={c}
@@ -220,7 +220,8 @@ export function CategoryField({
                     className={`color-dot${color === c ? ' color-dot--selected' : ''}`}
                     style={{ background: c, color: c }}
                     aria-label={`Cor ${c}`}
-                    aria-pressed={color === c}
+                    role="radio"
+                    aria-checked={color === c}
                     onClick={() => setColor(c)}
                   >
                     {color === c && <Check size={15} color={ACCENT_FOREGROUND} />}
@@ -231,14 +232,15 @@ export function CategoryField({
 
             <div className="field">
               <span className="field-label">Ícone</span>
-              <div className="icon-grid">
+              <div className="icon-grid" role="radiogroup" aria-label="Ícone">
                 {categoryIconKeys.map((key) => (
                   <button
                     key={key}
                     type="button"
                     className={`icon-cell${icon === key ? ' icon-cell--selected' : ''}`}
                     style={icon === key ? { background: color, borderColor: color, color: ACCENT_FOREGROUND } : undefined}
-                    aria-pressed={icon === key}
+                    role="radio"
+                    aria-checked={icon === key}
                     onClick={() => setIcon(key)}
                   >
                     <CategoryIcon icon={key} size={19} />
@@ -265,4 +267,4 @@ export function CategoryField({
       </BottomSheet>
     </div>
   );
-}
+});

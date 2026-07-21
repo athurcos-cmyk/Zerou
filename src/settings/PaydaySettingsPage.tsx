@@ -171,13 +171,14 @@ export function PaydaySettingsPage() {
           </div>
         </div>
 
-        <div className="choice-list" style={{ marginTop: '0.9rem' }}>
+        <div className="choice-list" style={{ marginTop: '0.9rem' }} role="radiogroup" aria-label="Modo de disponivel">
           {(Object.keys(availableModeLabels) as AvailableMode[]).map((mode) => (
             <button
               key={mode}
               type="button"
               className={`choice-card${availableMode === mode ? ' choice-card--selected' : ''}`}
-              aria-pressed={availableMode === mode}
+              role="radio"
+              aria-checked={availableMode === mode}
               onClick={() => chooseAvailableMode(mode)}
             >
               <span className="choice-card-label">
@@ -209,13 +210,14 @@ export function PaydaySettingsPage() {
             O app usa isso pra <strong>estimar quando o próximo dinheiro entra</strong> e parar de contar como
             "Comprometido" o que só vence depois disso. Nenhum valor é criado: é só uma data.
           </p>
-          <div className="choice-list">
+          <div className="choice-list" role="radiogroup" aria-label="Tipo de recebimento">
             {paydayOptions.map((option) => (
               <button
                 key={option.id}
                 type="button"
                 className={`choice-card${paydayType === option.id ? ' choice-card--selected' : ''}`}
-                aria-pressed={paydayType === option.id}
+                role="radio"
+                aria-checked={paydayType === option.id}
                 onClick={() => selectType(option.id)}
               >
                 <span className="choice-card-icon">{option.icon}</span>

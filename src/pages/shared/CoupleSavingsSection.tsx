@@ -203,9 +203,9 @@ export function CoupleSavingsSection({
           </label>
           <div className="field">
             <span className="field-label">Cor</span>
-            <div className="color-grid">
+            <div className="color-grid" role="radiogroup" aria-label="Cor do cofrinho">
               {categoryColors.map((color) => (
-                <button key={color} type="button" className={`color-dot${cofrinhoColor === color ? ' color-dot--selected' : ''}`} style={{ background: color, color }} aria-pressed={cofrinhoColor === color} aria-label={`Cor ${color}`} onClick={() => setCofrinhoColor(color)}>
+                <button key={color} type="button" className={`color-dot${cofrinhoColor === color ? ' color-dot--selected' : ''}`} style={{ background: color, color }} role="radio" aria-checked={cofrinhoColor === color} aria-label={`Cor ${color}`} onClick={() => setCofrinhoColor(color)}>
                   {cofrinhoColor === color && <Check size={15} color={ACCENT_FOREGROUND} />}
                 </button>
               ))}
@@ -224,11 +224,11 @@ export function CoupleSavingsSection({
         subtitle={guardarSign === 1 ? 'Quanto você vai guardar?' : 'Quanto você vai resgatar?'}
       >
         <form className="form-stack" onSubmit={(event) => void handleGuardar(event)}>
-          <div className="segmented">
-            <button type="button" aria-pressed={guardarSign === 1} onClick={() => setGuardarSign(1)}>
+          <div className="segmented" role="radiogroup" aria-label="Guardar ou resgatar">
+            <button type="button" role="radio" aria-checked={guardarSign === 1} onClick={() => setGuardarSign(1)}>
               <Plus size={15} aria-hidden="true" /> Guardar
             </button>
-            <button type="button" aria-pressed={guardarSign === -1} onClick={() => setGuardarSign(-1)}>
+            <button type="button" role="radio" aria-checked={guardarSign === -1} onClick={() => setGuardarSign(-1)}>
               <Minus size={15} aria-hidden="true" /> Resgatar
             </button>
           </div>

@@ -66,11 +66,11 @@ export function GoalContributeSheet({ open, workspaceId, userId, goal, accounts,
   return (
     <BottomSheet open={open} onClose={handleClose} title={goal?.name} subtitle={isDebt ? 'Registrar pagamento' : 'Guardar ou retirar valor'}>
       <div className="form-stack">
-        <div className="segmented">
-          <button type="button" aria-pressed={sign === 1} onClick={() => setSign(1)}>
+        <div className="segmented" role="radiogroup" aria-label="Guardar ou retirar">
+          <button type="button" role="radio" aria-checked={sign === 1} onClick={() => setSign(1)}>
             <Plus size={15} aria-hidden="true" /> {depositLabel}
           </button>
-          <button type="button" aria-pressed={sign === -1} onClick={() => setSign(-1)}>
+          <button type="button" role="radio" aria-checked={sign === -1} onClick={() => setSign(-1)}>
             <Minus size={15} aria-hidden="true" /> {withdrawLabel}
           </button>
         </div>

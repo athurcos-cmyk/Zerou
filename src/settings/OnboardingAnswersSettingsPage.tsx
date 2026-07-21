@@ -67,13 +67,14 @@ export function OnboardingAnswersSettingsPage() {
 
       <section className="surface surface-pad" aria-labelledby="goal-title">
         <h2 id="goal-title">Qual é seu principal objetivo?</h2>
-        <div className="choice-list">
+        <div className="choice-list" role="radiogroup" aria-label="Qual e seu principal objetivo?">
           {onboardingGoals.map((choice) => (
             <button
               key={choice.id}
               type="button"
               className={`choice-card${goal === choice.id ? ' choice-card--selected' : ''}`}
-              aria-pressed={goal === choice.id}
+              role="radio"
+              aria-checked={goal === choice.id}
               onClick={() => selectGoal(choice.id)}
             >
               <span className="choice-card-icon">{choice.icon}</span>
@@ -89,13 +90,14 @@ export function OnboardingAnswersSettingsPage() {
 
       <section className="surface surface-pad" aria-labelledby="challenge-title" style={{ marginTop: '1rem' }}>
         <h2 id="challenge-title">Qual desafio mais te atrapalha?</h2>
-        <div className="choice-list">
+        <div className="choice-list" role="radiogroup" aria-label="Qual desafio mais te atrapalha?">
           {onboardingChallenges.map((choice) => (
             <button
               key={choice.id}
               type="button"
               className={`choice-card${challenge === choice.id ? ' choice-card--selected' : ''}`}
-              aria-pressed={challenge === choice.id}
+              role="radio"
+              aria-checked={challenge === choice.id}
               onClick={() => selectChallenge(choice.id)}
             >
               <span className="choice-card-icon">{choice.icon}</span>

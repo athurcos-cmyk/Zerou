@@ -151,7 +151,7 @@ export function OnboardingPage() {
         <div className="onboard-step">
           <h1 className="onboard-title">Qual é seu principal objetivo ao usar o app?</h1>
           <p className="onboard-subtitle">Escolha a opção que mais combina com o que você procura.</p>
-          <div className="choice-list">
+          <div className="choice-list" role="radiogroup" aria-label="Qual e seu principal objetivo?">
             {goals.map((choice) => (
               <ChoiceCard key={choice.id} choice={choice} selected={goal === choice.id} onSelect={() => setGoal(choice.id)} />
             ))}
@@ -163,7 +163,7 @@ export function OnboardingPage() {
         <div className="onboard-step">
           <h1 className="onboard-title">Qual desafio mais te atrapalha no dia a dia?</h1>
           <p className="onboard-subtitle">Vamos ajustar as sugestões com base no que mais te atrapalha.</p>
-          <div className="choice-list">
+          <div className="choice-list" role="radiogroup" aria-label="Qual desafio mais te atrapalha?">
             {challenges.map((choice) => (
               <ChoiceCard key={choice.id} choice={choice} selected={challenge === choice.id} onSelect={() => setChallenge(choice.id)} />
             ))}
@@ -178,7 +178,7 @@ export function OnboardingPage() {
             Assim a Granativa sabe até quando uma fatura ou conta pode esperar antes de contar como "Comprometido" — sem
             você precisar lançar seu salário na mão toda vez.
           </p>
-          <div className="choice-list">
+          <div className="choice-list" role="radiogroup" aria-label="Quando voce recebe?">
             {paydayOptions.map((option) => (
               <ChoiceCard
                 key={option.id}
@@ -259,7 +259,7 @@ export function OnboardingPage() {
 
 function ChoiceCard({ choice, selected, onSelect }: { choice: Choice; selected: boolean; onSelect: () => void }) {
   return (
-    <button type="button" className={`choice-card${selected ? ' choice-card--selected' : ''}`} aria-pressed={selected} onClick={onSelect}>
+    <button type="button" className={`choice-card${selected ? ' choice-card--selected' : ''}`} role="radio" aria-checked={selected} onClick={onSelect}>
       <span className="choice-card-icon">{choice.icon}</span>
       <span className="choice-card-label">{choice.label}</span>
       <span className={`choice-card-radio${selected ? ' choice-card-radio--on' : ''}`} aria-hidden="true">

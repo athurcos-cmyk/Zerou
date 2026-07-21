@@ -90,7 +90,7 @@ export function AvailableModeSheet({ open, currentMode, onChoose, onClose }: Ava
           </p>
         </div>
 
-        <div className="choice-list">
+        <div className="choice-list" role="radiogroup" aria-label="Modo de disponivel">
           {(Object.keys(availableModeLabels) as AvailableMode[]).map((mode) => {
             const example = modeExample[mode];
             const isSelected = selected === mode;
@@ -100,7 +100,8 @@ export function AvailableModeSheet({ open, currentMode, onChoose, onClose }: Ava
                 key={mode}
                 type="button"
                 className={`choice-card${isSelected ? ' choice-card--selected' : ''}`}
-                aria-pressed={isSelected}
+                role="radio"
+                aria-checked={isSelected}
                 onClick={() => setSelected(mode)}
               >
                 <span className="choice-card-label">

@@ -75,11 +75,12 @@ export function GoalDeleteSheet({ open, workspaceId, userId, goal, accounts, onC
       subtitle={`Você tem ${formatMoney(goal.savedCents)} guardado nessa meta.`}
     >
       <div className="form-stack">
-        <div className="choice-list">
+        <div className="choice-list" role="radiogroup" aria-label="O que fazer com o valor guardado?">
           <button
             type="button"
             className={`choice-card${choice === 'refund' ? ' choice-card--selected' : ''}`}
-            aria-pressed={choice === 'refund'}
+            role="radio"
+            aria-checked={choice === 'refund'}
             onClick={() => setChoice('refund')}
           >
             <span className="choice-card-label">
@@ -117,7 +118,8 @@ export function GoalDeleteSheet({ open, workspaceId, userId, goal, accounts, onC
           <button
             type="button"
             className={`choice-card${choice === 'forfeit' ? ' choice-card--selected' : ''}`}
-            aria-pressed={choice === 'forfeit'}
+            role="radio"
+            aria-checked={choice === 'forfeit'}
             onClick={() => setChoice('forfeit')}
           >
             <span className="choice-card-label">

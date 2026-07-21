@@ -77,13 +77,14 @@ export function AppearanceSettingsPage() {
           <h2 id="themes-title">Temas</h2>
 
           <h3 className="theme-group-label">Claros</h3>
-          <div className="theme-grid">
+          <div className="theme-grid" role="radiogroup" aria-label="Temas claros">
             {lightThemes.map((theme) => (
               <button
                 className="theme-card"
                 type="button"
                 key={theme.id}
-                aria-pressed={preferences.themeMode === 'manual' && preferences.themeId === theme.id}
+                role="radio"
+                aria-checked={preferences.themeMode === 'manual' && preferences.themeId === theme.id}
                 onClick={() => setThemeId(theme.id)}
               >
                 <span className="theme-preview" data-preview-theme={theme.id} aria-hidden="true">
@@ -100,13 +101,14 @@ export function AppearanceSettingsPage() {
           </div>
 
           <h3 className="theme-group-label">Escuros</h3>
-          <div className="theme-grid">
+          <div className="theme-grid" role="radiogroup" aria-label="Temas escuros">
             {darkThemes.map((theme) => (
               <button
                 className="theme-card"
                 type="button"
                 key={theme.id}
-                aria-pressed={preferences.themeMode === 'manual' && preferences.themeId === theme.id}
+                role="radio"
+                aria-checked={preferences.themeMode === 'manual' && preferences.themeId === theme.id}
                 onClick={() => setThemeId(theme.id)}
               >
                 <span className="theme-preview" data-preview-theme={theme.id} aria-hidden="true">

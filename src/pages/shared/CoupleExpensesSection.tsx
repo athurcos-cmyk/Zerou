@@ -211,9 +211,9 @@ export function CoupleExpensesSection({
           </label>
           <div className="field">
             <span className="field-label">Como dividir?</span>
-            <div className="segmented">
+            <div className="segmented" role="radiogroup" aria-label="Como dividir?">
               {(['equal', 'percent', 'value'] as const).map((mode) => (
-                <button key={mode} type="button" aria-pressed={splitMode === mode} onClick={() => setSplitMode(mode)}>
+                <button key={mode} type="button" role="radio" aria-checked={splitMode === mode} onClick={() => setSplitMode(mode)}>
                   {mode === 'equal' ? 'Igual' : mode === 'percent' ? 'Porcentagem' : 'Valor'}
                 </button>
               ))}

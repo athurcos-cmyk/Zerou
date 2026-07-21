@@ -172,9 +172,9 @@ export function GoalsPage() {
 
           <div className="field">
             <span className="field-label">Objetivo</span>
-            <div className="segmented">
-              <button type="button" aria-pressed={kind === 'save'} onClick={() => setKind('save')}>Economizar</button>
-              <button type="button" aria-pressed={kind === 'debt'} onClick={() => setKind('debt')}>Quitar dívida</button>
+            <div className="segmented" role="radiogroup" aria-label="Tipo de meta">
+              <button type="button" role="radio" aria-checked={kind === 'save'} onClick={() => setKind('save')}>Economizar</button>
+              <button type="button" role="radio" aria-checked={kind === 'debt'} onClick={() => setKind('debt')}>Quitar dívida</button>
             </div>
           </div>
 
@@ -201,9 +201,9 @@ export function GoalsPage() {
 
           <div className="field">
             <span className="field-label">Cor</span>
-            <div className="color-grid">
+            <div className="color-grid" role="radiogroup" aria-label="Cor">
               {categoryColors.map((c) => (
-                <button key={c} type="button" className={`color-dot${color === c ? ' color-dot--selected' : ''}`} style={{ background: c, color: c }} aria-label={`Cor ${c}`} aria-pressed={color === c} onClick={() => setColor(c)}>
+                <button key={c} type="button" className={`color-dot${color === c ? ' color-dot--selected' : ''}`} style={{ background: c, color: c }} aria-label={`Cor ${c}`} role="radio" aria-checked={color === c} onClick={() => setColor(c)}>
                   {color === c && <Check size={15} color={ACCENT_FOREGROUND} />}
                 </button>
               ))}
@@ -212,9 +212,9 @@ export function GoalsPage() {
 
           <div className="field">
             <span className="field-label">Ícone</span>
-            <div className="icon-grid">
+            <div className="icon-grid" role="radiogroup" aria-label="Ícone">
               {categoryIconKeys.map((key) => (
-                <button key={key} type="button" className={`icon-cell${icon === key ? ' icon-cell--selected' : ''}`} style={icon === key ? { background: color, borderColor: color, color: ACCENT_FOREGROUND } : undefined} aria-pressed={icon === key} onClick={() => setIcon(key)}>
+                <button key={key} type="button" className={`icon-cell${icon === key ? ' icon-cell--selected' : ''}`} style={icon === key ? { background: color, borderColor: color, color: ACCENT_FOREGROUND } : undefined} role="radio" aria-checked={icon === key} onClick={() => setIcon(key)}>
                   <CategoryIcon icon={key} size={19} />
                 </button>
               ))}
