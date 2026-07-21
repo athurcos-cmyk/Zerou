@@ -80,11 +80,11 @@ export function AssistantPage() {
       <header className="section-heading">
         <div>
           <p className="eyebrow">Assistente</p>
-          <h1>Grazi</h1>
+          <h1 className="page-title page-title--compact">Grazi</h1>
         </div>
       </header>
 
-      <div className="assistant-chat" ref={listRef}>
+      <div className="assistant-chat" ref={listRef} aria-live="polite">
         {messages.length === 0 && !loading ? (
           <div className="assistant-welcome">
             <div className="assistant-welcome-icon">
