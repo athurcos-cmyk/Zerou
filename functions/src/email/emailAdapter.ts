@@ -21,23 +21,23 @@ export interface EmailResult {
 
 export const emailTemplates: Record<EmailKind, { subject: string; purpose: string }> = {
   welcome: {
-    subject: 'Bem-vindo a Zerou',
+    subject: 'Bem-vindo a Granativa',
     purpose: 'Recepcionar a conta e orientar primeiros passos.'
   },
   security: {
-    subject: 'Alerta de seguranca da Zerou',
+    subject: 'Alerta de seguranca da Granativa',
     purpose: 'Avisar sobre mudancas de acesso, metodos vinculados ou eventos sensiveis.'
   },
   invite: {
-    subject: 'Convite para espaco compartilhado na Zerou',
+    subject: 'Convite para espaco compartilhado na Granativa',
     purpose: 'Enviar convite de espaco compartilhado sem expor informacao financeira pessoal.'
   },
   billing_failed: {
-    subject: 'Falha de pagamento na Zerou',
+    subject: 'Falha de pagamento na Granativa',
     purpose: 'Fluxo futuro de billing. Nao usado no lancamento gratuito.'
   },
   cancellation: {
-    subject: 'Cancelamento registrado na Zerou',
+    subject: 'Cancelamento registrado na Granativa',
     purpose: 'Fluxo futuro de cancelamento de assinatura.'
   },
   privacy_request: {
