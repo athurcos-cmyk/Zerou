@@ -126,10 +126,18 @@ Registrado em `docs/planning/TODOS.md`.
 1. **Alerta de orçamento** no Google Cloud Billing (ex.: avisa em US$1 e US$5) — nunca ser
    surpreendido.
 2. **Número real** no Firebase Console → *Usage* (Firestore). Vale mais que qualquer estimativa.
-3. **Cloud Functions agendadas** (`generateRecurrences`, `sendDueReminders`, `sendBudgetAlerts`,
-   `closeInvoicesDue`, `sendDailyLogReminder`): rodam **todo dia** lendo dados de **todos** os
-   usuários, independente de abrirem o app. É o custo que cresce "sozinho" com a base — primeiro
-   lugar a otimizar quando crescer.
+3. **Cloud Functions agendadas** (rodam todo dia no relógio; o custo delas aparece como **LEITURA**,
+   não como invocação — uma função que roda 1×/dia mas lê 5 mil docs soma 5 mil na cota de leitura,
+   não em "Functions"). Verificado no código em **2026-07-21**: a maioria é **enxuta**, usa `where`
+   indexado e lê só a fatia acionável do dia, então quase não cresce com a base:
+   - `closeInvoicesDue` (`where closingDay == hoje`), `generateRecurrences` (`where nextOccurrenceAt <= agora`)
+     e `sendDueReminders` (`where dueDate` na janela) → leem só os cartões/recorrências/contas **do dia**. ✅ enxuto.
+   - `sendBudgetAlerts` → lê **todos os orçamentos ativos** + 1 consulta do gasto do mês por orçamento.
+     Cresce com quantos usuários **usam orçamento**. ⚠️ médio.
+   - **`sendDailyLogReminder`** → `collectionGroup('fcmTokens').get()` **sem filtro**: lê o token de push
+     de **todos** os usuários, todo dia, ativo ou não. **É o único que cresce linear com a base total**
+     (1.000 usuários → ~1.000 leituras/dia só nisso; 10.000 → ~10.000/dia) e o **primeiro a otimizar**
+     quando crescer — paginar, ou mandar só pra quem não lançou no dia em vez de varrer todo mundo.
 4. **DeepSeek/Grazi**: custo externo por token, fora do Firebase. Pode virar o maior custo se a IA
    for muito usada.
 
