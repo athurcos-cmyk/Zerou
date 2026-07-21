@@ -31,7 +31,8 @@ const WORKSPACE_COLLECTIONS = [
   'comments',
   'auditLogs',
   'aiUsage',
-  'budgetAlertState'
+  'budgetAlertState',
+  'whatsappTransactionUsage'
 ];
 
 async function commitDeletes(refs: DocumentReference[]) {

@@ -27,6 +27,7 @@ const WORKSPACE_COLLECTIONS = [
   'auditLogs',
   'aiUsage',
   'budgetAlertState',
+  'whatsappTransactionUsage',
 ];
 
 function assertAdmin(email: string | undefined): void {
