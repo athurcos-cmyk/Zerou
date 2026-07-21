@@ -18,8 +18,7 @@ export function WelcomeEmail({ name }: WelcomeEmailProps) {
           <Section style={content}>
             <Text style={paragraph}>
               Sua conta foi criada e seu espaço pessoal está pronto. A Granativa te ajuda
-              a saber pra onde vai seu dinheiro — no celular, com cara de app nativo,
-              mesmo offline.
+              a saber pra onde vai seu dinheiro — direto no celular, mesmo offline.
             </Text>
 
             <Text style={paragraph}>
@@ -40,6 +39,11 @@ export function WelcomeEmail({ name }: WelcomeEmailProps) {
                 <Column><Text style={stepText}>Adicione suas contas recorrentes (assinaturas, aluguel) pra não ser pego de surpresa.</Text></Column>
               </Row>
             </Section>
+
+            <Text style={paragraph}>
+              E se preferir, lance transações direto pelo WhatsApp. É só mandar uma mensagem
+              como "gastei 47 no mercado" pro número da Granativa. Rápido, sem abrir o app.
+            </Text>
 
             <Text style={paragraph}>
               Precisa de ajuda? É só responder este email ou falar com a gente em{' '}

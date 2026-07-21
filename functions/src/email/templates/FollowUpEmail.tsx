@@ -34,7 +34,12 @@ export function FollowUpEmail({ name }: FollowUpEmailProps) {
             </Section>
 
             <Text style={paragraph}>
-              Ah, e funciona offline. Se você estiver no metrô, no elevador, na praia —
+              Tem também o WhatsApp. Mande uma mensagem como "gastei 47 no mercado"
+              pro número da Granativa e pronto — lançou sem abrir o app.
+            </Text>
+
+            <Text style={paragraph}>
+              E funciona offline. Se você estiver no metrô, no elevador, na praia —
               lançou, salvou. Quando o sinal voltar, sincroniza sozinho.
             </Text>
 
