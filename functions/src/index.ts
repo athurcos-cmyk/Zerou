@@ -29,6 +29,9 @@ export { reverseCardPurchaseOnDelete } from './cards/reverseCardPurchaseOnDelete
 // ─── Emails transacionais (Resend) ──────────────────────────────────────────────
 export { onUserCreated, send3DayFollowUp, sendGoodbyeEmail } from './email/triggers.js';
 
+// ─── Auth ────────────────────────────────────────────────────────────────────
+export { forceLogoutAllDevices } from './forceLogoutAllDevices.js';
+
 // ─── Casal ───────────────────────────────────────────────────────────────────
 export { cancelCoupleWorkspace } from './cancelCoupleWorkspace.js';
 

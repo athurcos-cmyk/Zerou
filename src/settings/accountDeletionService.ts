@@ -197,10 +197,26 @@ export async function runAccountDeletion(deps: AccountDeletionDeps) {
     await deps.reauthenticateWithPassword(deps.currentPassword);
   }
 
+  // Força logout imediato em TODOS os dispositivos ANTES de apagar os dados.
+  // Sem isso, outro dispositivo com sessão ativa continua escrevendo por até 1h
+  // (token ainda válido), criando dados fantasmas depois que o Firestore foi limpo.
+  forceLogoutAllDevicesCallable();
+
   // Envia email de despedida ANTES de apagar os dados (fire-and-forget, não bloqueia)
   if (deps.userEmail) {
     sendGoodbyeEmailCallable(deps.userEmail, deps.userName);
   }
+
+/**
+ * Força logout em todos os dispositivos revogando refresh tokens.
+ */
+function forceLogoutAllDevicesCallable() {
+  const fn = httpsCallable<Record<string, never>, { success: boolean }>(
+    getFirebaseFunctions(),
+    'forceLogoutAllDevices'
+  );
+  fn({}).catch(() => undefined);
+}
 
 /**
  * Dispara o email de despedida via Cloud Function. Fire-and-forget — não bloqueia a exclusão.
