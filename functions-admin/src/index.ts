@@ -25,6 +25,8 @@ const WORKSPACE_COLLECTIONS = [
   'settlements',
   'comments',
   'auditLogs',
+  'aiUsage',
+  'budgetAlertState',
 ];
 
 function assertAdmin(email: string | undefined): void {

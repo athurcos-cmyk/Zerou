@@ -29,7 +29,9 @@ const WORKSPACE_COLLECTIONS = [
   'sharedExpenseClaims',
   'settlements',
   'comments',
-  'auditLogs'
+  'auditLogs',
+  'aiUsage',
+  'budgetAlertState'
 ];
 
 async function commitDeletes(refs: DocumentReference[]) {
