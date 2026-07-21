@@ -1,4 +1,4 @@
-import { type DocumentReference, FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
+﻿import { type DocumentReference, FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { logger } from 'firebase-functions';
@@ -77,39 +77,43 @@ export const closeInvoicesDue = onSchedule(
       .get();
 
     for (const cardDoc of cardsSnap.docs) {
-      const card = cardDoc.data() as {
-        workspaceId: string;
-        ownerUserId?: string;
-        name: string;
-      };
-      const { workspaceId, ownerUserId } = card;
-      const cardId = cardDoc.id;
+      try {
+        const card = cardDoc.data() as {
+          workspaceId: string;
+          ownerUserId?: string;
+          name: string;
+        };
+        const { workspaceId, ownerUserId } = card;
+        const cardId = cardDoc.id;
 
-      const invoicesSnap = await db
-        .collection(`workspaces/${workspaceId}/cards/${cardId}/invoices`)
-        .where('status', '==', 'open')
-        .where('referenceMonth', '<=', currentMonth)
-        .get();
+        const invoicesSnap = await db
+          .collection(`workspaces/${workspaceId}/cards/${cardId}/invoices`)
+          .where('status', '==', 'open')
+          .where('referenceMonth', '<=', currentMonth)
+          .get();
 
-      for (const invoiceDoc of invoicesSnap.docs) {
-        await invoiceDoc.ref.update({
-          status: 'closed',
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-        closed++;
+        for (const invoiceDoc of invoicesSnap.docs) {
+          await invoiceDoc.ref.update({
+            status: 'closed',
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+          closed++;
 
-        if (ownerUserId) {
-          // outstandingBalanceCents e mantido incrementalmente por
-          // invoiceLedgerEntryTrigger.ts — não precisa mais resomar o ledger aqui.
-          const outstandingCents = (invoiceDoc.data().outstandingBalanceCents as number | undefined) ?? 0;
+          if (ownerUserId) {
+            // outstandingBalanceCents e mantido incrementalmente por
+            // invoiceLedgerEntryTrigger.ts — não precisa mais resomar o ledger aqui.
+            const outstandingCents = (invoiceDoc.data().outstandingBalanceCents as number | undefined) ?? 0;
 
-          await sendPushToUser(
-            ownerUserId,
-            `Fatura ${card.name} fechada`,
-            `Valor a pagar: ${formatBRL(outstandingCents)}`,
-            'https://granativa.com.br/app/cards'
-          ).catch(() => {});
+            await sendPushToUser(
+              ownerUserId,
+              `Fatura ${card.name} fechada`,
+              `Valor a pagar: ${formatBRL(outstandingCents)}`,
+              'https://granativa.com.br/app/cards'
+            ).catch(() => {});
+          }
         }
+      } catch (err) {
+        logger.error('closeInvoicesDue: erro ao processar card — pulando', err);
       }
     }
 
@@ -138,127 +142,131 @@ export const generateRecurrences = onSchedule(
       .get();
 
     for (const ruleDoc of rulesSnap.docs) {
-      const rule = ruleDoc.data() as {
-        workspaceId: string;
-        createdBy: string;
-        description: string;
-        amountCents?: number;
-        accountId?: string;
-        categoryId?: string;
-        frequency: 'weekly' | 'monthly' | 'yearly';
-        nextOccurrenceAt: Timestamp;
-        anchorDay?: number;
-      };
-
-      const occurrenceAt = rule.nextOccurrenceAt.toDate();
-      const nextDate = nextOccurrenceDate(occurrenceAt, rule.frequency, rule.anchorDay);
-
-      // Sem valor: cria um compromisso (Bill) pendente pra pessoa preencher quando chegar.
-      if (!rule.amountCents) {
-        const billId = recurringOccurrenceTransactionId(ruleDoc.id, occurrenceAt);
-        const billRef = db.doc(`workspaces/${rule.workspaceId}/bills/${billId}`);
-        const alreadyCreatedBill = (await billRef.get()).exists;
-
-        if (!alreadyCreatedBill) {
-          await billRef.set({
-            id: billId,
-            workspaceId: rule.workspaceId,
-            description: rule.description,
-            amountCents: 0,
-            dueDate: Timestamp.fromDate(occurrenceAt),
-            status: 'pending',
-            categoryId: rule.categoryId ?? '',
-            accountId: rule.accountId ?? '',
-            recurringId: ruleDoc.id,
-            createdBy: rule.createdBy,
-            createdAt: FieldValue.serverTimestamp(),
+      try {
+        const rule = ruleDoc.data() as {
+          workspaceId: string;
+          createdBy: string;
+          description: string;
+          amountCents?: number;
+          accountId?: string;
+          categoryId?: string;
+          frequency: 'weekly' | 'monthly' | 'yearly';
+          nextOccurrenceAt: Timestamp;
+          anchorDay?: number;
+        };
+  
+        const occurrenceAt = rule.nextOccurrenceAt.toDate();
+        const nextDate = nextOccurrenceDate(occurrenceAt, rule.frequency, rule.anchorDay);
+  
+        // Sem valor: cria um compromisso (Bill) pendente pra pessoa preencher quando chegar.
+        if (!rule.amountCents) {
+          const billId = recurringOccurrenceTransactionId(ruleDoc.id, occurrenceAt);
+          const billRef = db.doc(`workspaces/${rule.workspaceId}/bills/${billId}`);
+          const alreadyCreatedBill = (await billRef.get()).exists;
+  
+          if (!alreadyCreatedBill) {
+            await billRef.set({
+              id: billId,
+              workspaceId: rule.workspaceId,
+              description: rule.description,
+              amountCents: 0,
+              dueDate: Timestamp.fromDate(occurrenceAt),
+              status: 'pending',
+              categoryId: rule.categoryId ?? '',
+              accountId: rule.accountId ?? '',
+              recurringId: ruleDoc.id,
+              createdBy: rule.createdBy,
+              createdAt: FieldValue.serverTimestamp(),
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+            generated++;
+          } else {
+            skipped++;
+          }
+  
+          await ruleDoc.ref.update({
+            nextOccurrenceAt: Timestamp.fromDate(nextDate),
             updatedAt: FieldValue.serverTimestamp(),
           });
-          generated++;
-        } else {
-          skipped++;
+          continue;
         }
-
-        await ruleDoc.ref.update({
+  
+        // Sem conta definida não há como criar a transação
+        if (!rule.accountId) {
+          await ruleDoc.ref.update({
+            nextOccurrenceAt: Timestamp.fromDate(nextDate),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+          skipped++;
+          continue;
+        }
+  
+        const txnId = recurringOccurrenceTransactionId(ruleDoc.id, occurrenceAt);
+        const txnRef = db.doc(`workspaces/${rule.workspaceId}/transactions/${txnId}`);
+  
+        // A pessoa pode ter clicado "Registrar" nesta mesma ocorrência antes das 6h. O id
+        // determinístico faz as duas escritas caírem no mesmo documento: aqui só avançamos a
+        // data (e não mandamos push), em vez de gravar a despesa de novo por cima.
+        const alreadyRecorded = (await txnRef.get()).exists;
+  
+        if (alreadyRecorded) {
+          await ruleDoc.ref.update({
+            nextOccurrenceAt: Timestamp.fromDate(nextDate),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+          skipped++;
+          continue;
+        }
+  
+        const txnPayload: Record<string, unknown> = {
+          id: txnId,
+          workspaceId: rule.workspaceId,
+          createdBy: rule.createdBy,
+          updatedBy: rule.createdBy,
+          type: 'expense',
+          amountCents: rule.amountCents,
+          description: rule.description,
+          accountId: rule.accountId,
+          date: Timestamp.fromDate(nowDate),
+          competenceMonth: monthKey,
+          cashMonth: monthKey,
+          tags: ['recorrente'],
+          isRecurring: true,
+          recurringId: ruleDoc.id,
+          clientMutationId: txnId,
+          syncStatus: 'synced',
+          version: 1,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        };
+  
+        if (rule.categoryId) {
+          txnPayload.categoryId = rule.categoryId;
+        }
+  
+        const batch = db.batch();
+        batch.set(txnRef, txnPayload);
+        batch.update(ruleDoc.ref, {
           nextOccurrenceAt: Timestamp.fromDate(nextDate),
           updatedAt: FieldValue.serverTimestamp(),
         });
-        continue;
+        for (const effect of transactionAccountEffects({ type: 'expense', amountCents: rule.amountCents, accountId: rule.accountId })) {
+          batch.update(db.doc(`workspaces/${rule.workspaceId}/accounts/${effect.accountId}`), {
+            currentBalanceCents: FieldValue.increment(effect.deltaCents),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
+        await batch.commit();
+        generated++;
+  
+        await sendPushToUser(
+          rule.createdBy,
+          `Conta recorrente: ${rule.description}`,
+          `${formatBRL(rule.amountCents)} registrado automaticamente.`
+        ).catch(() => {});
+      } catch (err) {
+        logger.error(`generateRecurrences: erro ao processar regra — pulando`, err);
       }
-
-      // Sem conta definida não há como criar a transação
-      if (!rule.accountId) {
-        await ruleDoc.ref.update({
-          nextOccurrenceAt: Timestamp.fromDate(nextDate),
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-        skipped++;
-        continue;
-      }
-
-      const txnId = recurringOccurrenceTransactionId(ruleDoc.id, occurrenceAt);
-      const txnRef = db.doc(`workspaces/${rule.workspaceId}/transactions/${txnId}`);
-
-      // A pessoa pode ter clicado "Registrar" nesta mesma ocorrência antes das 6h. O id
-      // determinístico faz as duas escritas caírem no mesmo documento: aqui só avançamos a
-      // data (e não mandamos push), em vez de gravar a despesa de novo por cima.
-      const alreadyRecorded = (await txnRef.get()).exists;
-
-      if (alreadyRecorded) {
-        await ruleDoc.ref.update({
-          nextOccurrenceAt: Timestamp.fromDate(nextDate),
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-        skipped++;
-        continue;
-      }
-
-      const txnPayload: Record<string, unknown> = {
-        id: txnId,
-        workspaceId: rule.workspaceId,
-        createdBy: rule.createdBy,
-        updatedBy: rule.createdBy,
-        type: 'expense',
-        amountCents: rule.amountCents,
-        description: rule.description,
-        accountId: rule.accountId,
-        date: Timestamp.fromDate(nowDate),
-        competenceMonth: monthKey,
-        cashMonth: monthKey,
-        tags: ['recorrente'],
-        isRecurring: true,
-        recurringId: ruleDoc.id,
-        clientMutationId: txnId,
-        syncStatus: 'synced',
-        version: 1,
-        createdAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      };
-
-      if (rule.categoryId) {
-        txnPayload.categoryId = rule.categoryId;
-      }
-
-      const batch = db.batch();
-      batch.set(txnRef, txnPayload);
-      batch.update(ruleDoc.ref, {
-        nextOccurrenceAt: Timestamp.fromDate(nextDate),
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-      for (const effect of transactionAccountEffects({ type: 'expense', amountCents: rule.amountCents, accountId: rule.accountId })) {
-        batch.update(db.doc(`workspaces/${rule.workspaceId}/accounts/${effect.accountId}`), {
-          currentBalanceCents: FieldValue.increment(effect.deltaCents),
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-      }
-      await batch.commit();
-      generated++;
-
-      await sendPushToUser(
-        rule.createdBy,
-        `Conta recorrente: ${rule.description}`,
-        `${formatBRL(rule.amountCents)} registrado automaticamente.`
-      ).catch(() => {});
     }
 
     logger.info('generate_recurrences_finished', { generated, skipped });

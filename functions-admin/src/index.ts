@@ -35,13 +35,21 @@ function assertAdmin(email: string | undefined): void {
   }
 }
 
-async function commitDeletes(refs: DocumentReference[]): Promise<void> {
+async function commitDeletes(refs: DocumentReference[]): Promise<number> {
   const db = getFirestore();
+  let processed = 0;
   for (let i = 0; i < refs.length; i += BATCH_LIMIT) {
-    const batch = db.batch();
-    refs.slice(i, i + BATCH_LIMIT).forEach((ref) => batch.delete(ref));
-    await batch.commit();
+    const slice = refs.slice(i, i + BATCH_LIMIT);
+    try {
+      const batch = db.batch();
+      slice.forEach((ref) => batch.delete(ref));
+      await batch.commit();
+      processed += slice.length;
+    } catch (err) {
+      logger.error('Falha ao comitar lote de delecao', { batchIndex: Math.floor(i / BATCH_LIMIT) + 1, err });
+    }
   }
+  return processed;
 }
 
 async function collectSubcollection(path: string): Promise<DocumentReference[]> {
@@ -119,60 +127,90 @@ export const adminDeleteUser = onCall(
     const refs: DocumentReference[] = [];
 
     const personalWorkspaceId = `personal_${userId}`;
-    refs.push(...(await collectWorkspaceTree(personalWorkspaceId)));
+    try {
+      refs.push(...(await collectWorkspaceTree(personalWorkspaceId)));
+    } catch (err) {
+      logger.error('Falha ao coletar workspace pessoal', { userId, err });
+    }
 
-    refs.push(...(await collectSubcollection(`users/${userId}/fcmTokens`)));
-    refs.push(...(await collectSubcollection(`users/${userId}/whatsappLinkCodes`)));
+    for (const subPath of [`users/${userId}/fcmTokens`, `users/${userId}/whatsappLinkCodes`]) {
+      try {
+        refs.push(...(await collectSubcollection(subPath)));
+      } catch (err) {
+        logger.error('Falha ao coletar subcolecao', { userId, subPath, err });
+      }
+    }
 
     const workspaceRefsSnap = await db.collection(`users/${userId}/workspaceRefs`).get();
 
     for (const wsRefDoc of workspaceRefsSnap.docs) {
-      const wsId = wsRefDoc.id;
-      if (wsId === personalWorkspaceId) continue;
+      let wsId = '';
+      try {
+        wsId = wsRefDoc.id;
+        if (wsId === personalWorkspaceId) continue;
 
-      const wsSnap = await db.doc(`workspaces/${wsId}`).get();
-      if (!wsSnap.exists) continue;
+        const wsSnap = await db.doc(`workspaces/${wsId}`).get();
+        if (!wsSnap.exists) continue;
 
-      const ws = wsSnap.data()!;
+        const ws = wsSnap.data()!;
 
-      if (ws.ownerUserId === userId) {
-        const invitesSnap = await db.collection('coupleInvites').where('workspaceId', '==', wsId).get();
-        refs.push(...invitesSnap.docs.map((d) => d.ref));
-        refs.push(...(await collectWorkspaceTree(wsId)));
-      } else {
-        refs.push(db.doc(`workspaces/${wsId}/members/${userId}`));
-        await db.doc(`workspaces/${wsId}`).update({
-          partnerUserId: '',
-          activeMemberCount: 1,
-          updatedAt: FieldValue.serverTimestamp(),
-        });
+        if (ws.ownerUserId === userId) {
+          const invitesSnap = await db.collection('coupleInvites').where('workspaceId', '==', wsId).get();
+          refs.push(...invitesSnap.docs.map((d) => d.ref));
+          refs.push(...(await collectWorkspaceTree(wsId)));
+        } else {
+          refs.push(db.doc(`workspaces/${wsId}/members/${userId}`));
+          await db.doc(`workspaces/${wsId}`).update({
+            partnerUserId: '',
+            activeMemberCount: 1,
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
+      } catch (err) {
+        logger.error('Falha ao processar workspaceRef', { userId, wsId, err });
       }
     }
 
     refs.push(...workspaceRefsSnap.docs.map((d) => d.ref));
 
     const billingId = `billing_${userId}`;
-    const billingSnap = await db.doc(`billingAccounts/${billingId}`).get();
-    if (billingSnap.exists) {
-      refs.push(...(await collectSubcollection(`billingAccounts/${billingId}/subscriptions`)));
-      refs.push(db.doc(`billingAccounts/${billingId}`));
+    try {
+      const billingSnap = await db.doc(`billingAccounts/${billingId}`).get();
+      if (billingSnap.exists) {
+        refs.push(...(await collectSubcollection(`billingAccounts/${billingId}/subscriptions`)));
+        refs.push(db.doc(`billingAccounts/${billingId}`));
+      }
+    } catch (err) {
+      logger.error('Falha ao coletar billing', { userId, billingId, err });
     }
 
-    const privacySnap = await db.collection('privacyRequests').where('userId', '==', userId).get();
-    refs.push(...privacySnap.docs.map((d) => d.ref));
+    try {
+      const privacySnap = await db.collection('privacyRequests').where('userId', '==', userId).get();
+      refs.push(...privacySnap.docs.map((d) => d.ref));
+    } catch (err) {
+      logger.error('Falha ao coletar privacyRequests', { userId, err });
+    }
 
     refs.push(db.doc(`users/${userId}`));
 
-    await commitDeletes(refs);
-    await auth.deleteUser(userId);
+    // Deleta do Auth primeiro. Se falhar, nada foi tocado no Firestore.
+    try {
+      await auth.deleteUser(userId);
+    } catch (err) {
+      logger.error('Falha ao deletar usuario do Firebase Auth', { userId, err });
+      throw new HttpsError('internal', 'Falha ao deletar usuario. Nenhum dado foi removido.');
+    }
+
+    const deletedCount = await commitDeletes(refs);
 
     logger.info('admin_deleted_user', {
       deletedUserId: userId,
       deletedBy: request.auth?.uid,
-      docsDeleted: refs.length,
+      totalRefsCollected: refs.length,
+      docsDeleted: deletedCount,
     });
 
-    return { success: true, docsDeleted: refs.length };
+    return { success: true, docsDeleted: deletedCount, totalRefsCollected: refs.length };
   },
 );
 
