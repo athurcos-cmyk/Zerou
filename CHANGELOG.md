@@ -2,6 +2,10 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-21 — fix: ícone das notificações push apontava pro asset Zerou antigo
+
+`functions/src/push.ts` e `automation.ts` usavam `icon`/`badge` = `/brand/zerou-app-icon-192.png`, que **não existe desde o rebrand Zerou→Granativa** — o path cai no fallback do SPA (serve `index.html`, `content-type: text/html`, não uma imagem), então **toda notificação push aparecia sem o logo**. Trocado por `granativa-app-icon-192.png`. Afeta as 5 functions de push (`closeInvoicesDue`, `generateRecurrences`, `sendDueReminders`, `sendBudgetAlerts`, `sendDailyLogReminder`) — deployadas em lote pequeno (contorno da quota de CPU, ver RUNBOOK).
+
 ## 2026-07-21 — fix: email de despedida não enviava + redesign dos emails
 
 Dois problemas de email transacional (Resend), achados pelo dono testando com login Google. Client no ar (Vercel); templates deployados no codebase `billing`. Detalhes em `docs/history/2026-07.md`.
