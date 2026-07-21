@@ -29,6 +29,12 @@ export { reverseCardPurchaseOnDelete } from './cards/reverseCardPurchaseOnDelete
 // ─── Emails transacionais (Resend) ──────────────────────────────────────────────
 export { onUserCreated, send3DayFollowUp, sendGoodbyeEmail } from './email/triggers.js';
 
+// ─── Casal ───────────────────────────────────────────────────────────────────
+export { cancelCoupleWorkspace } from './cancelCoupleWorkspace.js';
+
+// ─── Limpeza automática ───────────────────────────────────────────────────────
+export { dailyCleanup } from './cleanup.js';
+
 // ─── Admin ────────────────────────────────────────────────────────────────────
 // adminDeleteUser NÃO fica aqui — vive isolado em functions-admin/ (codebase
 // "admin"), sem dependência do Stripe, pra poder deployar independente do

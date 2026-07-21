@@ -20,7 +20,8 @@ import {
 } from 'firebase/firestore';
 import { addHours } from 'date-fns';
 import { getBillingEntitlementsForUser } from '../billing/billingService';
-import { getFirebaseDb } from '../firebase/config';
+import { httpsCallable } from 'firebase/functions';
+import { getFirebaseDb, getFirebaseFunctions } from '../firebase/config';
 import { fireWrite } from '../firebase/fireWrite';
 import { readSnapshotDoc } from '../firebase/snapshotData';
 import { getPersonalWorkspaceId } from '../workspaces/workspaceService';
@@ -406,27 +407,23 @@ export async function cancelCoupleWorkspace(workspaceId: string, userId: string,
   if (!confirmed) {
     throw new Error('Confirme que deseja cancelar o espaço compartilhado.');
   }
+  // Validação rápida no client (feedback instantâneo). A Cloud Function repete esta
+  // validação com Admin SDK e usa recursiveDelete — sem deixar subcoleções órfãs.
   const db = getFirebaseDb();
   const wsSnap = await getDoc(workspaceRef(workspaceId));
   if (wsSnap.exists() && (wsSnap.data().activeMemberCount ?? 1) > 1) {
     throw new Error('Não é possível cancelar um espaço com parceiro ativo. Remova o parceiro primeiro.');
   }
-  const batch = writeBatch(db);
-  // Deletes are allowed: member (canDeleteWorkspaceTree), workspaceRef (isSelf), workspace (ownerUserId).
-  // No audit log here — the rule requires existsAfter(currentMemberDoc) which would be false.
-  batch.delete(memberRef(workspaceId, userId));
-  batch.delete(userWorkspaceRef(userId, workspaceId));
-  batch.delete(workspaceRef(workspaceId));
-  await batch.commit();
-  // Cleanup leftover invites (non-critical, fire-and-forget)
-  getDocs(query(invitesRef(), where('workspaceId', '==', workspaceId)))
-    .then((snap) => {
-      if (snap.empty) return;
-      const b = writeBatch(db);
-      snap.docs.forEach((d) => b.delete(d.ref));
-      return b.commit();
-    })
-    .catch(() => undefined);
+
+  const fn = httpsCallable<{ workspaceId: string; confirmed: boolean }, { success: boolean }>(
+    getFirebaseFunctions(),
+    'cancelCoupleWorkspace'
+  );
+  const result = await fn({ workspaceId, confirmed });
+
+  if (!result.data.success) {
+    throw new Error('Não foi possível cancelar o espaço compartilhado.');
+  }
 }
 
 export async function leaveCoupleWorkspace(workspaceId: string, userId: string, confirmed: boolean) {
