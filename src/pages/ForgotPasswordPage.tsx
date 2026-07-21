@@ -52,8 +52,8 @@ export function ForgotPasswordPage() {
         <FormMessage type="success">{success}</FormMessage>
         <div className="field">
           <label htmlFor="email">Email</label>
-          <input className="input" id="email" type="email" autoComplete="email" {...form.register('email')} />
-          <span className="text-muted">{form.formState.errors.email?.message}</span>
+          <input className="input" id="email" type="email" autoComplete="email" aria-describedby={form.formState.errors.email ? 'email-error' : undefined} {...form.register('email')} />
+          <span className="text-muted" id="email-error">{form.formState.errors.email?.message}</span>
         </div>
         <button className="button button--primary" type="submit" disabled={busy || Boolean(firebaseError)}>
           Enviar link
