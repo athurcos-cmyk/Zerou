@@ -23,8 +23,8 @@ export async function sendPushToUser(
       notification: {
         title,
         body,
-        icon: '/brand/zerou-app-icon-192.png',
-        badge: '/brand/zerou-app-icon-192.png',
+        icon: '/brand/granativa-app-icon-192.png',
+        badge: '/brand/granativa-app-icon-192.png',
       },
       fcmOptions: { link },
     },

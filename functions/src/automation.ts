@@ -408,8 +408,8 @@ export const sendDailyLogReminder = onSchedule(
           notification: {
             title: 'Hora de registrar!',
             body,
-            icon: '/brand/zerou-app-icon-192.png',
-            badge: '/brand/zerou-app-icon-192.png',
+            icon: '/brand/granativa-app-icon-192.png',
+            badge: '/brand/granativa-app-icon-192.png',
           },
           fcmOptions: { link: 'https://granativa.com.br/app/transactions/new' },
         },
