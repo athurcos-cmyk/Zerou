@@ -1858,8 +1858,8 @@ span.service-mark--brand {
 
 .icon-button {
   display: inline-grid;
-  width: 2.15rem;
-  height: 2.15rem;
+  width: 2.75rem;
+  height: 2.75rem;
   place-items: center;
   border-radius: 999px;
   background: var(--bg-surface-subtle);
@@ -2904,9 +2904,10 @@ span.service-mark--brand {
   gap: 0.4rem;
   border: 1px solid var(--border-default);
   border-radius: 999px;
-  padding: 0.55rem 1rem;
+  padding: 0.6rem 1rem;
   font-weight: 700;
   font-size: 0.9rem;
+  min-height: 2.75rem;
   color: var(--text-secondary);
   background: var(--bg-surface);
   cursor: pointer;
@@ -3220,8 +3221,8 @@ span.service-mark--brand {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 2.75rem;
+  height: 2.75rem;
   flex-shrink: 0;
   border: none;
   border-radius: 999px;
@@ -4762,8 +4763,8 @@ span.service-mark--brand {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.85rem;
-  height: 1.85rem;
+  width: 2.75rem;
+  height: 2.75rem;
   border-radius: 6px;
   background: transparent;
   color: var(--text-muted);
