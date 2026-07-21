@@ -296,8 +296,9 @@ export const sendDueReminders = onSchedule(
       .get();
 
     for (const billDoc of billsSnap.docs) {
-      const bill = billDoc.data() as {
-        createdBy: string;
+      try {
+        const bill = billDoc.data() as {
+          createdBy: string;
         description: string;
         amountCents: number;
         dueDate: Timestamp;
@@ -315,6 +316,9 @@ export const sendDueReminders = onSchedule(
         'https://granativa.com.br/app/bills'
       ).catch(() => {});
       sent++;
+      } catch (err) {
+        logger.error('sendDueReminders: erro ao processar bill — pulando', err);
+      }
     }
 
     logger.info('due_reminders_finished', { sent });
@@ -391,7 +395,8 @@ export const sendDailyLogReminder = onSchedule(
     let staleRemoved = 0;
 
     for (const [userId, entries] of byUser) {
-      const displayName = nameByUser.get(userId) ?? DEFAULT_NAME;
+      try {
+        const displayName = nameByUser.get(userId) ?? DEFAULT_NAME;
       const name = displayName || 'você';
       const body = pickDailyMessage(name);
 
@@ -422,6 +427,9 @@ export const sendDailyLogReminder = onSchedule(
       }
 
       sentUsers++;
+      } catch (err) {
+        logger.error('sendDailyLogReminder: erro — pulando', err);
+      }
     }
 
     logger.info('daily_log_reminder_finished', { sentUsers, staleRemoved });
