@@ -24,6 +24,7 @@ const WORKSPACE_COLLECTIONS = [
     'auditLogs',
     'aiUsage',
     'budgetAlertState',
+    'whatsappTransactionUsage',
 ];
 function assertAdmin(email) {
     if (email !== ADMIN_EMAIL) {
@@ -120,36 +121,41 @@ export const adminDeleteUser = onCall({ region: REGION, maxInstances: 5 }, async
             logger.error('Falha ao coletar subcolecao', { userId, subPath, err });
         }
     }
-    const workspaceRefsSnap = await db.collection(`users/${userId}/workspaceRefs`).get();
-    for (const wsRefDoc of workspaceRefsSnap.docs) {
-        let wsId = '';
-        try {
-            wsId = wsRefDoc.id;
-            if (wsId === personalWorkspaceId)
-                continue;
-            const wsSnap = await db.doc(`workspaces/${wsId}`).get();
-            if (!wsSnap.exists)
-                continue;
-            const ws = wsSnap.data();
-            if (ws.ownerUserId === userId) {
-                const invitesSnap = await db.collection('coupleInvites').where('workspaceId', '==', wsId).get();
-                refs.push(...invitesSnap.docs.map((d) => d.ref));
-                refs.push(...(await collectWorkspaceTree(wsId)));
+    try {
+        const workspaceRefsSnap = await db.collection(`users/${userId}/workspaceRefs`).get();
+        for (const wsRefDoc of workspaceRefsSnap.docs) {
+            let wsId = '';
+            try {
+                wsId = wsRefDoc.id;
+                if (wsId === personalWorkspaceId)
+                    continue;
+                const wsSnap = await db.doc(`workspaces/${wsId}`).get();
+                if (!wsSnap.exists)
+                    continue;
+                const ws = wsSnap.data();
+                if (ws.ownerUserId === userId) {
+                    const invitesSnap = await db.collection('coupleInvites').where('workspaceId', '==', wsId).get();
+                    refs.push(...invitesSnap.docs.map((d) => d.ref));
+                    refs.push(...(await collectWorkspaceTree(wsId)));
+                }
+                else {
+                    refs.push(db.doc(`workspaces/${wsId}/members/${userId}`));
+                    await db.doc(`workspaces/${wsId}`).update({
+                        partnerUserId: '',
+                        activeMemberCount: 1,
+                        updatedAt: FieldValue.serverTimestamp(),
+                    });
+                }
             }
-            else {
-                refs.push(db.doc(`workspaces/${wsId}/members/${userId}`));
-                await db.doc(`workspaces/${wsId}`).update({
-                    partnerUserId: '',
-                    activeMemberCount: 1,
-                    updatedAt: FieldValue.serverTimestamp(),
-                });
+            catch (err) {
+                logger.error('Falha ao processar workspaceRef', { userId, wsId, err });
             }
         }
-        catch (err) {
-            logger.error('Falha ao processar workspaceRef', { userId, wsId, err });
-        }
+        refs.push(...workspaceRefsSnap.docs.map((d) => d.ref));
     }
-    refs.push(...workspaceRefsSnap.docs.map((d) => d.ref));
+    catch (err) {
+        logger.error('Falha ao consultar workspaceRefs', { userId, err });
+    }
     const billingId = `billing_${userId}`;
     try {
         const billingSnap = await db.doc(`billingAccounts/${billingId}`).get();
