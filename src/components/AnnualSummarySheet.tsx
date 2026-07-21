@@ -105,7 +105,7 @@ export function AnnualSummarySheet({ open, onClose, workspaceId, transactions, i
       {/* Hero: savings rate */}
       <article className="surface surface-pad metric-card metric-card--accent" style={{ marginBottom: '0.75rem' }}>
         <p className="eyebrow">Taxa de poupança</p>
-        <strong className="display-number" style={{ color: 'var(--on-accent-95)', fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontFamily: "'DM Sans', system-ui, sans-serif", fontWeight: 800 }}>
+        <strong className="display-number" style={{ color: 'var(--on-accent-95)', fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 800 }}>
           {summary.savingsRate}%
         </strong>
         <span className="metric-card-sub" style={{ color: 'var(--on-accent-55)' }}>

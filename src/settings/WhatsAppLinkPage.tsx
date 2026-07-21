@@ -182,7 +182,7 @@ export function WhatsAppLinkPage() {
                 gap: '0.5rem',
                 marginBottom: '1rem',
               }}>
-                <strong style={{ fontSize: '2rem', letterSpacing: '0.25rem', fontFamily: 'DM Sans, monospace' }}>
+                <strong className="display-number" style={{ fontSize: '2rem', letterSpacing: '0.25rem' }}>
                   {code}
                 </strong>
                 <button

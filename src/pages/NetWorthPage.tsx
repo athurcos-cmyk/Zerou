@@ -126,7 +126,7 @@ export function NetWorthPage() {
       {/* Hero card */}
       <article className={`surface surface-pad metric-card metric-card--accent`} style={{ marginBottom: '1rem' }}>
         <p className="eyebrow">Patrimônio atual</p>
-        <strong className="display-number" style={{ color: 'var(--on-accent-95)', fontSize: 'clamp(2rem, 4vw, 3rem)', fontFamily: "'DM Sans', system-ui, sans-serif", fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
+        <strong className="display-number" style={{ color: 'var(--on-accent-95)', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
           {formatMoney(breakdown.netWorthCents)}
         </strong>
         <span className="metric-card-sub" style={{ color: 'var(--on-accent-55)' }}>

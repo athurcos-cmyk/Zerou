@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { CalendarClock, CreditCard, Layers, Trash2 } from 'lucide-react';
+import { CalendarClock, Layers, Trash2 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { BottomSheet } from '../components/BottomSheet';
+import { EmptyState } from '../components/EmptyState';
 import { OngoingInstallmentsSheet } from '../cards/OngoingInstallmentsSheet';
 import { invoiceHasVisibleActivity } from '../cards/anticipation';
 import { useConfirm } from '../components/ConfirmDialog';
@@ -165,7 +166,7 @@ export function CardDetailPage() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
                 <div>
                   <p className="eyebrow" style={{ marginBottom: '0.15rem' }}>Fatura atual</p>
-                  <strong style={{ display: 'block', fontSize: '1.1rem', fontFamily: 'DM Sans, system-ui, sans-serif' }}>
+                  <strong className="display-number" style={{ display: 'block', fontSize: '1.1rem' }}>
                     <span className={openInvoice.outstandingBalanceCents > 0 ? 'amount--expense' : 'amount--income'}>
                       {formatMoney(openInvoice.outstandingBalanceCents)}
                     </span>
@@ -248,12 +249,11 @@ export function CardDetailPage() {
             })}
           </div>
         ) : (
-          <div className="empty-copy">
-            <span className="empty-icon">
-              <CreditCard size={24} aria-hidden="true" />
-            </span>
-            <p className="text-secondary">Nenhuma fatura ainda. Lance a primeira compra em Despesas.</p>
-          </div>
+          <EmptyState
+            illustration="cards"
+            title="Nenhuma fatura ainda"
+            description="Lance a primeira compra em Despesas."
+          />
         )}
       </article>
 
