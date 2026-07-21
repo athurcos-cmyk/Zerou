@@ -2,6 +2,19 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-21 — Infraestrutura: emails transacionais (Resend), limpeza de dados órfãos, force logout
+
+Segunda metade da maratona de pré-lançamento. Foco em backend e segurança de dados.
+
+- **Emails transacionais com Resend.** Três templates (Welcome, Goodbye, FollowUp 3 dias) com identidade Granativa. `onUserCreated` (Firestore trigger), `send3DayFollowUp` (agendado diário), `sendGoodbyeEmail` (onCall). API key no Google Secret Manager. Domínio `granativa.com.br` verificado no Resend com DNS configurado no Cloudflare.
+- **Limpeza de dados órfãos.** `dailyCleanup` (agendado 04:57 BRT): deleta workspaces couple abandonados (>7 dias sem partner), workspaces ghost (owner não existe mais), e `whatsappProcessedMessages` com >30 dias. 13 testes unitários. `cancelCoupleWorkspace` substituído por Cloud Function com `recursiveDelete` (antes deixava subcoleções órfãs). `aiUsage` e `budgetAlertState` adicionados ao `WORKSPACE_COLLECTIONS` nos dois codebases de deleção (cliente + admin).
+- **forceLogoutAllDevices.** Nova Cloud Function revoga refresh tokens ao excluir conta. Resolve o bug onde o PC continuava ativo por até 1h após exclusão no celular, criando dados fantasmas. `Promise.race` com timeout de 5s — não bloqueia a exclusão se a CF estiver offline.
+- **Firestore reset.** `scripts/resetAllData.mjs` — reset completo do banco (6 coleções zeradas). Firebase Auth preservado.
+- **Docs atualizados.** CHANGELOG, SESSAO, BUSCA_RAPIDA, DESIGN, TODOS.
+- typecheck / test (440: 359 client + 81 functions) / build verdes.
+
+## 2026-07-20 — Passada visual front-end (pré-lançamento): contraste, a11y, CSS, ARIA
+
 ## 2026-07-20 — Passada visual front-end (pré-lançamento): contraste, a11y, CSS, ARIA
 
 Fase final de polimento antes do lançamento. 21 commits na branch `frontend-design-2026-07`, mergeados direto na main. 30 agentes de auditoria + 5 meta-revisores + 4 skills de review. Zero alterações em `firestore.rules` ou `functions/` — sem necessidade de deploy Firebase. Mapa completo em `docs/design/DESIGN_VISUAL_ACHADOS.md`.
