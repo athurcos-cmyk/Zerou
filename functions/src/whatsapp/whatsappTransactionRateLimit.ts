@@ -20,7 +20,7 @@ export async function checkWhatsappTransactionUsageNotExceeded(
     const count = snap.data()?.count ?? 0;
 
     if (count >= dailyLimit) {
-      return; // caller checks count after transaction
+      throw new Error('WHATSAPP_TRANSACTION_LIMIT_EXCEEDED');
     }
 
     tx.set(usageRef, {
@@ -28,12 +28,4 @@ export async function checkWhatsappTransactionUsageNotExceeded(
       updatedAt: Timestamp.now(),
     }, { merge: true });
   });
-
-  // Re-read after transaction to check final count
-  const final = await usageRef.get();
-  const finalCount = final.data()?.count ?? 0;
-
-  if (finalCount > dailyLimit) {
-    throw new Error('WHATSAPP_TRANSACTION_LIMIT_EXCEEDED');
-  }
 }
