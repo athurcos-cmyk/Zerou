@@ -38,6 +38,10 @@ export const cancelCoupleWorkspace = onCall(
       throw new HttpsError('permission-denied', 'Só o proprietário pode cancelar o espaço.');
     }
 
+    if (wsData.type !== 'couple') {
+      throw new HttpsError('invalid-argument', 'Este espaço não é um espaço compartilhado.');
+    }
+
     if ((wsData.activeMemberCount ?? 1) > 1) {
       throw new HttpsError('failed-precondition',
         'Não é possível cancelar um espaço com parceiro ativo. Remova o parceiro primeiro.');

@@ -1,9 +1,11 @@
+import { memo } from 'react';
+
 interface FormMessageProps {
   type?: 'success' | 'danger';
   children?: string | null;
 }
 
-export function FormMessage({ type = 'danger', children }: FormMessageProps) {
+export const FormMessage = memo(function FormMessage({ type = 'danger', children }: FormMessageProps) {
   if (!children) {
     return null;
   }
@@ -13,4 +15,4 @@ export function FormMessage({ type = 'danger', children }: FormMessageProps) {
       {children}
     </div>
   );
-}
+});

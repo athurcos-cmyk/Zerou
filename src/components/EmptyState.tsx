@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { memo, type ReactNode } from 'react';
 import { ACCENT_FOREGROUND } from '../theme/palette';
 
 type Illustration = 'transactions' | 'cards' | 'wallet' | 'shared' | 'goals' | 'bills';
@@ -11,7 +11,7 @@ interface EmptyStateProps {
   compact?: boolean;
 }
 
-export function EmptyState({ illustration = 'transactions', title, description, action, compact = false }: EmptyStateProps) {
+export const EmptyState = memo(function EmptyState({ illustration = 'transactions', title, description, action, compact = false }: EmptyStateProps) {
   return (
     <div className={`empty-state${compact ? ' empty-state--compact' : ''}`}>
       <EmptyArt name={illustration} />
@@ -20,7 +20,7 @@ export function EmptyState({ illustration = 'transactions', title, description, 
       {action && <div className="empty-state-action">{action}</div>}
     </div>
   );
-}
+});
 
 function EmptyArt({ name }: { name: Illustration }) {
   return (

@@ -187,7 +187,14 @@ export const generateRecurrences = onSchedule(
       }
 
       // Sem conta definida não há como criar a transação
-      if (!rule.accountId) continue;
+      if (!rule.accountId) {
+        await ruleDoc.ref.update({
+          nextOccurrenceAt: Timestamp.fromDate(nextDate),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        skipped++;
+        continue;
+      }
 
       const txnId = recurringOccurrenceTransactionId(ruleDoc.id, occurrenceAt);
       const txnRef = db.doc(`workspaces/${rule.workspaceId}/transactions/${txnId}`);

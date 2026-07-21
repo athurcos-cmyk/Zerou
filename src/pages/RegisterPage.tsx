@@ -69,13 +69,13 @@ export function RegisterPage() {
         <FormMessage>{message}</FormMessage>
         <div className="field">
           <label htmlFor="name">Nome</label>
-          <input className="input" id="name" autoComplete="name" {...form.register('name')} />
-          <span className="text-muted">{form.formState.errors.name?.message}</span>
+          <input className="input" id="name" autoComplete="name" aria-describedby={form.formState.errors.name ? 'name-error' : undefined} {...form.register('name')} />
+          <span className="text-muted" id="name-error">{form.formState.errors.name?.message}</span>
         </div>
         <div className="field">
           <label htmlFor="email">Email</label>
-          <input className="input" id="email" type="email" autoComplete="email" {...form.register('email')} />
-          <span className="text-muted">{form.formState.errors.email?.message}</span>
+          <input className="input" id="email" type="email" autoComplete="email" aria-describedby={form.formState.errors.email ? 'email-error' : undefined} {...form.register('email')} />
+          <span className="text-muted" id="email-error">{form.formState.errors.email?.message}</span>
         </div>
         <div className="field">
           <label htmlFor="password">Senha</label>
@@ -84,18 +84,19 @@ export function RegisterPage() {
             id="password"
             type="password"
             autoComplete="new-password"
+            aria-describedby={form.formState.errors.password ? 'password-error' : undefined}
             {...form.register('password')}
           />
-          <span className="text-muted">{form.formState.errors.password?.message}</span>
+          <span className="text-muted" id="password-error">{form.formState.errors.password?.message}</span>
         </div>
         <label className="checkbox-row">
-          <input type="checkbox" {...form.register('terms')} />
+          <input id="terms" type="checkbox" aria-describedby={form.formState.errors.terms ? 'terms-error' : undefined} {...form.register('terms')} />
           <span>
             Li e aceito os <Link className="inline-link" to="/legal/terms">termos</Link> e a{' '}
             <Link className="inline-link" to="/legal/privacy">política de privacidade</Link> da Granativa.
           </span>
         </label>
-        <span className="text-muted">{form.formState.errors.terms?.message}</span>
+        <span className="text-muted" id="terms-error">{form.formState.errors.terms?.message}</span>
         <button className="button button--primary" type="submit" disabled={busy || Boolean(firebaseError)}>
           Criar conta Granativa
         </button>

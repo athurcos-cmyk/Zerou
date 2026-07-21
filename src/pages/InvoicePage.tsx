@@ -5,6 +5,7 @@ import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { BottomSheet } from '../components/BottomSheet';
+import { EmptyState } from '../components/EmptyState';
 import { SelectField } from '../components/SelectField';
 import { useConfirm } from '../components/ConfirmDialog';
 import { FormMessage } from '../components/FormMessage';
@@ -318,7 +319,7 @@ export function InvoicePage() {
             ) : hiddenEntryIds.size > 0 ? (
               <p className="text-secondary">A parcela que caía aqui foi antecipada pra uma fatura anterior.</p>
             ) : (
-              <p className="text-secondary">Nenhuma compra nesta fatura ainda.</p>
+              <EmptyState illustration="cards" title="Nenhuma compra nesta fatura ainda." compact />
             )}
           </article>
 

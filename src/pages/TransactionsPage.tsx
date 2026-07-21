@@ -362,7 +362,7 @@ export function TransactionsPage() {
         )}
 
         {!reachedEnd && loadedTransactions.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem', marginTop: '0.85rem' }}>
+          <div aria-live="polite" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem', marginTop: '0.85rem' }}>
             <button
               type="button"
               className="button button--subtle button--compact"

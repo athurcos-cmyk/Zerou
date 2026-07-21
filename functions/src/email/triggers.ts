@@ -7,7 +7,6 @@ import { resendApiKey } from './resendProvider.js';
 import { sendOperationalEmail } from './emailAdapter.js';
 
 const REGION = 'southamerica-east1';
-const db = getFirestore();
 
 // ─── Welcome email: disparado quando o documento users/{uid} é criado ────────────
 // Só envia se o perfil tiver email e defaultWorkspaceId (onboarding concluído).
@@ -47,11 +46,15 @@ export const send3DayFollowUp = onSchedule(
     timeZone: 'America/Sao_Paulo',
   },
   async () => {
-    const threeDaysAgo = new Date();
-    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-    const start = Timestamp.fromDate(new Date(threeDaysAgo.setHours(0, 0, 0, 0)));
-    const end = Timestamp.fromDate(new Date(threeDaysAgo.setHours(23, 59, 59, 999)));
+    // Calcula "3 dias atrás" no fuso BRT (America/Sao_Paulo), não UTC.
+    const brtNow = new Date(new Date().toLocaleString('en-CA', { timeZone: 'America/Sao_Paulo' }));
+    brtNow.setDate(brtNow.getDate() - 3);
+    const brtDateStr = brtNow.toISOString().slice(0, 10); // YYYY-MM-DD em BRT
 
+    const start = Timestamp.fromDate(new Date(`${brtDateStr}T00:00:00-03:00`));
+    const end = Timestamp.fromDate(new Date(`${brtDateStr}T23:59:59-03:00`));
+
+    const db = getFirestore();
     let sent = 0;
     let skipped = 0;
 
@@ -96,6 +99,11 @@ export const sendGoodbyeEmail = onCall(
     secrets: [resendApiKey],
   },
   async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) {
+      throw new HttpsError('unauthenticated', 'Entre na Granativa para continuar.');
+    }
+
     const { email, name } = request.data as { email?: string; name?: string };
 
     if (!email) {

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { memo, useState, type ReactNode } from 'react';
 import { Check, ChevronRight } from 'lucide-react';
 import { BottomSheet } from './BottomSheet';
 
@@ -23,7 +23,7 @@ interface SelectFieldProps {
   searchable?: boolean;
 }
 
-export function SelectField({
+export const SelectField = memo(function SelectField({
   label,
   value,
   onChange,
@@ -105,4 +105,4 @@ export function SelectField({
       </BottomSheet>
     </div>
   );
-}
+});

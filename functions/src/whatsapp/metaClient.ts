@@ -55,9 +55,14 @@ export async function sendWhatsAppMessage(phoneNumber: string, text: string): Pr
 
     if (!response.ok) {
       const body = await response.text().catch(() => '');
-      logger.warn('whatsapp_send_failed', { phoneNumber, status: response.status, body: body.slice(0, 300) });
+      logger.error('whatsapp_send_failed', { phoneNumber, status: response.status, body: body.slice(0, 300) });
+      throw new Error(`WhatsApp API returned ${response.status}`);
     }
   } catch (err) {
-    logger.warn('whatsapp_send_error', { phoneNumber, message: (err as Error).message });
+    const msg = (err as Error)?.message ?? '';
+    if (!msg.startsWith('WhatsApp API returned')) {
+      logger.error('whatsapp_send_network_error', { phoneNumber, message: msg });
+    }
+    throw err;
   }
 }

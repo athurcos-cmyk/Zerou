@@ -68,8 +68,8 @@ export function LoginPage() {
         <FormMessage>{message}</FormMessage>
         <div className="field">
           <label htmlFor="email">Email</label>
-          <input className="input" id="email" type="email" autoComplete="email" {...form.register('email')} />
-          <span className="text-muted">{form.formState.errors.email?.message}</span>
+          <input className="input" id="email" type="email" autoComplete="email" aria-describedby={form.formState.errors.email ? 'email-error' : undefined} {...form.register('email')} />
+          <span className="text-muted" id="email-error">{form.formState.errors.email?.message}</span>
         </div>
         <div className="field">
           <label htmlFor="password">Senha</label>
@@ -78,9 +78,10 @@ export function LoginPage() {
             id="password"
             type="password"
             autoComplete="current-password"
+            aria-describedby={form.formState.errors.password ? 'password-error' : undefined}
             {...form.register('password')}
           />
-          <span className="text-muted">{form.formState.errors.password?.message}</span>
+          <span className="text-muted" id="password-error">{form.formState.errors.password?.message}</span>
         </div>
         <button className="button button--primary" type="submit" disabled={busy || Boolean(firebaseError)}>
           Entrar na Granativa

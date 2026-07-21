@@ -58,7 +58,7 @@ export async function callDeepSeek(
       const status = response.status;
 
       // Retry once for transient errors
-      if ((status === 429 || status === 503) && !opts?.jsonMode) {
+      if (status === 429 || status === 503) {
         logger.warn('deepseek_transient_error', { status });
         await new Promise((r) => setTimeout(r, 1000));
 
