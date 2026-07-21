@@ -2,6 +2,15 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-21 — fix: email de despedida não enviava + redesign dos emails
+
+Dois problemas de email transacional (Resend), achados pelo dono testando com login Google. Client no ar (Vercel); templates deployados no codebase `billing`. Detalhes em `docs/history/2026-07.md`.
+
+- **Email de despedida não era enviado ao excluir a conta.** O `onCall sendGoodbyeEmail` (que passou a exigir auth no lote de 21/07) era chamado DEPOIS do `forceLogoutAllDevices` revogar os tokens e como fire-and-forget — o `window.location.assign('/')` do caller abortava a requisição em voo. Agora o goodbye vai **primeiro** (sessão fresca, após reautenticar) com `await` + teto de 5s. As duas chamadas viraram deps injetáveis + teste de regressão travando a ordem.
+- **Emails redesenhados.** Novo `EmailLayout` compartilhado com o **logo horizontal da Granativa** (o `<Img>` estava importado e nunca usado) numa faixa branca + faixa de saudação colorida + footer — os 4 templates pararam de duplicar ~50 linhas de estilo cada. Círculos 1/2/3 do welcome **à prova de email** (tabela isolada 30×30 em vez de `<td>` com `border-radius` sem altura, que esticava com o texto). Assunto do goodbye mais quente.
+- **Deploy:** o deploy do codebase `billing` inteiro estourou a quota de CPU do Cloud Run em `southamerica-east1`; as funções de email foram ao ar, 3 functions não-relacionadas falharam e foram reimplantadas num lote menor (contorno documentado no `docs/RUNBOOK.md`).
+- typecheck / 368 testes client / build / 81 testes functions verdes. Previews renderizados e aprovados pelo dono.
+
 ## 2026-07-21 — feat: Tendência de gasto por categoria (Análise)
 
 Comparação mês a mês por categoria na Análise (ideia de um amigo do dono). Planejado e revisado com `/plan-eng-review` + `/plan-design-review` + `/frontend-design`. **Custo de leitura zero**: agrega em memória os 6 meses que a `SearchPage` já carrega — nenhuma query nova, nenhuma mudança em `firestore.rules`/functions/índices. Detalhes em `docs/history/2026-07.md`.

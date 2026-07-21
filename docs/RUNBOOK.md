@@ -55,6 +55,12 @@ npx firebase deploy --only functions:billing --project zerou-26757
 
 **`git push` NÃO reimplanta Cloud Functions.** Só existe uma forma de colocar código de `functions/src/` no ar: rodar o `firebase deploy` acima manualmente — não há CI/CD configurado. Editar `buildFinancialContext.ts`, `webhookHandler.ts`, `automation.ts` etc., rodar testes localmente, commitar e dar push deixa tudo verde (typecheck, testes, GitHub) enquanto a função **continua rodando a versão antiga** em produção — foi exatamente isso que aconteceu em 2026-07-16 (a correção do bug "Grazi sempre reporta R$0,00 de fatura" ficou pronta e commitada, mas só foi ao ar horas depois, num deploy manual separado, porque o passo de deploy anterior tinha acontecido ANTES da correção existir). Sempre que mexer em qualquer arquivo de `functions/src/`, o deploy é parte da entrega — não termina no commit.
 
+**Qualquer mudança em `functions/src/` reimplanta o CODEBASE INTEIRO — e isso pode estourar a quota de CPU do Cloud Run.** O Firebase empacota todo o codebase junto: mudar um arquivo (ex.: um template de email) bumpa o bundle e faz TODAS as ~25 functions de `billing` tentarem criar revisão nova ao mesmo tempo. O pico de CPU simultâneo passa do teto da região e algumas falham com `Quota exceeded for total allowable CPU per project per region` / `Container Healthcheck failed` (`southamerica-east1`, aconteceu em 2026-07-21). As que passam ficam atualizadas; as que falham **mantêm a revisão anterior rodando** ("Skipping deletes"), então **nada quebra** — mas ficam fora do bundle novo. **Contorno:** reimplantar só as que falharam, em lote menor (menos revisões simultâneas = menos pico):
+```bash
+npx firebase deploy --only functions:billing:forceLogoutAllDevices,functions:billing:sendDailyLogReminder,functions:billing:stripeWebhook --project zerou-26757
+```
+Se persistir, pedir aumento da quota de CPU do Cloud Run no GCP Console (a região acumula CPU reservada por function, ainda mais as com `--no-cpu-throttling`).
+
 Depois de todo deploy que toca `whatsappWebhook`, reaplicar (Cloud Run reseta a cada deploy):
 
 ```bash
