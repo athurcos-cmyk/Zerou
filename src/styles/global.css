@@ -3105,6 +3105,11 @@ span.service-mark--brand {
   outline: none;
 }
 
+.amount-hero-input:focus-visible {
+  outline: 3px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
 .amount-hero-input::placeholder {
   color: var(--on-accent-55);
 }
@@ -3267,6 +3272,11 @@ span.service-mark--brand {
   font: inherit;
   color: inherit;
   padding: 0.15rem 0;
+}
+
+.tag-input-field:focus-visible {
+  outline: 3px solid var(--border-focus);
+  outline-offset: 2px;
 }
 
 .tag-input-field::placeholder {
@@ -4290,6 +4300,11 @@ span.service-mark--brand {
   outline: none;
 }
 
+.card-limit-hero-input:focus-visible {
+  outline: 3px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
 .card-limit-hero-input::placeholder {
   color: var(--on-accent-55);
 }
@@ -4892,6 +4907,11 @@ span.service-mark--brand {
   outline: none;
   color: var(--text-primary);
   font-size: 0.9rem;
+}
+
+.admin-search-input:focus-visible {
+  outline: 3px solid var(--border-focus);
+  outline-offset: 2px;
 }
 
 .admin-search-input::placeholder {
