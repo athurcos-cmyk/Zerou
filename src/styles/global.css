@@ -248,75 +248,6 @@ html[data-reduce-motion='true'] *::after {
   color: var(--success);
 }
 
-.app-preview {
-  display: grid;
-  gap: 1.25rem;
-  border: 1px solid var(--border-subtle);
-  border-radius: 1.4rem;
-  background:
-    linear-gradient(160deg, var(--bg-surface), var(--bg-surface-subtle)),
-    var(--bg-surface);
-  padding: clamp(1rem, 3vw, 1.5rem);
-  box-shadow: var(--shadow-md);
-}
-
-.app-preview-top {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.app-preview-top strong {
-  display: block;
-  font-size: clamp(1.35rem, 2.5vw, 2rem);
-  line-height: 1.05;
-}
-
-.app-preview-list {
-  display: grid;
-  gap: 0.7rem;
-  padding: 1rem 0;
-}
-
-.app-preview-list span {
-  height: 0.85rem;
-  border-radius: 999px;
-  background: var(--bg-surface-muted);
-}
-
-.app-preview-list span:nth-child(1) {
-  width: 82%;
-}
-
-.app-preview-list span:nth-child(2) {
-  width: 58%;
-}
-
-.app-preview-list span:nth-child(3) {
-  width: 70%;
-}
-
-.app-preview-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.8rem;
-  border: 1px solid var(--border-subtle);
-  border-radius: 1rem;
-  background: var(--bg-surface);
-  color: var(--text-secondary);
-  padding: 1rem;
-  line-height: 1.5;
-}
-
-.app-preview-card svg {
-  color: var(--action-primary);
-  flex: 0 0 auto;
-}
-
-.app-preview-card p {
-  margin: 0;
-}
-
 .public-shell {
   display: grid;
   width: min(100%, 68rem);
@@ -676,12 +607,6 @@ html[data-reduce-motion='true'] *::after {
   margin-top: 1.5rem;
 }
 
-.metric-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem;
-  margin-top: 1.5rem;
-}
 
 /* Compact dashboard summary: prominent balance + two smaller metrics */
 .dash-summary {
@@ -2063,51 +1988,11 @@ span.service-mark--brand {
   border-color: var(--danger);
 }
 
-.pricing-page {
-  align-content: start;
-  gap: 2rem;
-  padding: clamp(1rem, 4vw, 2rem);
-}
 
 .pricing-hero {
   display: grid;
   max-width: 52rem;
   gap: 0.8rem;
-}
-
-.plan-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem;
-  width: min(100%, 72rem);
-}
-
-.plan-card {
-  display: grid;
-  align-content: space-between;
-  gap: 1.25rem;
-}
-
-.entitlement-list {
-  display: grid;
-  gap: 0.75rem;
-  padding: 0;
-  margin: 0;
-  list-style: none;
-  color: var(--text-secondary);
-}
-
-.entitlement-list li {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.55rem;
-}
-
-.billing-summary {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 1rem;
-  align-items: center;
 }
 
 .status-pill {
@@ -2124,11 +2009,6 @@ span.service-mark--brand {
 .status-pill--success {
   background: var(--success-soft);
   color: var(--success);
-}
-
-.billing-actions {
-  display: grid;
-  gap: 0.6rem;
 }
 
 .theme-group-label {
@@ -2477,118 +2357,6 @@ span.service-mark--brand {
   color: var(--text-primary);
 }
 
-.launch-hero {
-  min-height: auto;
-  padding: clamp(2rem, 6vw, 4rem) 0 0;
-}
-
-.launch-hero .marketing-hero-grid {
-  perspective: 70rem;
-}
-
-.launch-headline {
-  max-width: 13ch;
-}
-
-.launch-preview {
-  position: relative;
-  z-index: 0;
-  display: grid;
-  gap: 1rem;
-  width: min(100%, 22rem);
-  justify-self: center;
-  border: 0.55rem solid var(--text-primary);
-  border-radius: 2rem;
-  background:
-    linear-gradient(150deg, var(--bg-surface), var(--bg-surface-subtle)),
-    var(--bg-surface);
-  box-shadow: var(--shadow-lg);
-  padding: 1rem;
-  transform: rotateX(8deg) rotateY(-12deg) rotateZ(2deg);
-  transform-style: preserve-3d;
-}
-
-.launch-preview::before {
-  position: absolute;
-  top: -0.2rem;
-  left: 50%;
-  width: 5.5rem;
-  height: 0.7rem;
-  border-radius: 0 0 999px 999px;
-  background: var(--text-primary);
-  content: '';
-  transform: translateX(-50%);
-}
-
-.launch-preview::after {
-  position: absolute;
-  z-index: -1;
-  right: -1.3rem;
-  bottom: -1.4rem;
-  left: 1.2rem;
-  height: 4rem;
-  border-radius: 50%;
-  background: var(--bg-overlay);
-  filter: blur(1.4rem);
-  content: '';
-  transform: translateZ(-2rem);
-}
-
-.preview-phone-top,
-.preview-grid {
-  display: grid;
-  gap: 0.75rem;
-}
-
-.preview-phone-top {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.preview-phone-top span {
-  min-height: 0.65rem;
-  border-radius: 999px;
-  background: var(--bg-surface-muted);
-}
-
-.preview-balance {
-  border: 1px solid var(--border-subtle);
-  border-radius: 1rem;
-  background: var(--bg-surface);
-  padding: 1.25rem;
-  transform: translateZ(1.25rem);
-}
-
-.preview-balance strong {
-  display: block;
-  margin-top: 0.75rem;
-  font-family: 'DM Sans', system-ui, sans-serif;
-  font-size: clamp(1.65rem, 4vw, 2.6rem);
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.05;
-}
-
-.preview-balance p:last-child {
-  color: var(--text-secondary);
-}
-
-.preview-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.preview-grid span {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  border: 1px solid var(--border-subtle);
-  border-radius: 0.9rem;
-  background: var(--bg-surface);
-  color: var(--text-secondary);
-  padding: 0.85rem;
-  font-weight: 800;
-  transform: translateZ(0.8rem);
-}
-
 .public-section {
   display: grid;
   gap: 1.25rem;
@@ -2641,21 +2409,6 @@ span.service-mark--brand {
   gap: 0.75rem;
 }
 
-.routine-card {
-  position: relative;
-}
-
-.step-pill {
-  display: inline-grid;
-  width: 2rem;
-  height: 2rem;
-  place-items: center;
-  border-radius: 999px;
-  background: var(--action-primary-soft);
-  color: var(--action-primary);
-  font-weight: 900;
-}
-
 .feature-card svg,
 .privacy-action-card svg,
 .final-cta svg {
@@ -2670,18 +2423,12 @@ span.service-mark--brand {
   line-height: 1.65;
 }
 
-.pricing-strip,
 .final-cta {
   border: 1px solid var(--border-subtle);
   border-radius: 1.25rem;
   background: var(--bg-surface);
   box-shadow: var(--shadow-sm);
   padding: clamp(1.25rem, 4vw, 2rem);
-}
-
-.pricing-strip {
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
 }
 
 .faq-grid {
@@ -2714,17 +2461,6 @@ span.service-mark--brand {
   padding: 2rem 0;
 }
 
-.footer-cookie-button,
-.cookie-link {
-  background: transparent;
-  padding: 0;
-}
-
-.public-plan-grid {
-  width: min(100%, 76rem);
-  margin: 0 auto;
-}
-
 .legal-document {
   max-width: 54rem;
 }
@@ -2748,40 +2484,6 @@ span.service-mark--brand {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-}
-
-.cookie-banner {
-  position: fixed;
-  z-index: 50;
-  right: 1rem;
-  bottom: 1rem;
-  display: grid;
-  width: min(36rem, calc(100% - 2rem));
-  gap: 1rem;
-  border: 1px solid var(--border-subtle);
-  border-radius: 1rem;
-  background: var(--bg-surface);
-  box-shadow: var(--shadow-md);
-  padding: 1rem;
-}
-
-.cookie-banner h2 {
-  margin: 0.35rem 0 0;
-}
-
-.cookie-options {
-  display: grid;
-  gap: 0.65rem;
-  border: 1px solid var(--border-subtle);
-  border-radius: 0.9rem;
-  background: var(--bg-surface-subtle);
-  padding: 0.85rem;
-}
-
-.cookie-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
 }
 
 @media (max-width: 900px) {
