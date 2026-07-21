@@ -40,9 +40,13 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
 | `EmptyState` | Estado vazio com ilustração SVG própria. 6 variantes: `transactions`, `cards`, `wallet`, `shared`, `goals`, `bills`. Sempre usar uma ilustração existente ou criar uma nova nesse padrão — nunca cair pra texto seco sem ilustração num card que tem vizinho ilustrado (inconsistência perceptível lado a lado). |
 | `categoryIcons` / `palette` | 36 ícones + paleta de cores de categoria/meta. |
 | `.metric-card` / `.metric-icon` / `.metric-strip` (`global.css`) | Cartão de métrica/KPI compacto (usado em `SearchPage.tsx`). `.metric-card--accent` para o destaque principal (mesmo tratamento gradiente do `.dash-hero`). Valor de **texto longo** (não dinheiro/porcentagem) precisa do modificador `.metric-card-value--compact` — a tipografia padrão do card é grande demais e corta nomes como "Alimentação". |
+| `.form-accordion-toggle` (`global.css`) | Botão de expandir/recolher formulário (usado em AccountsPage, BillsPage, CardsPage, ReceivablesPage). Substitui o inline style de 7 propriedades que estava duplicado 4×. |
+| Tokens de duração | `--duration-fast: 120ms`, `--duration-normal: 200ms`, `--duration-slow: 300ms` (`themes.css:root`). Usar em toda transição/animação CSS. Exceção: `.button:active` (80ms, micro-interação) e animações de loop (spinner). |
+| Tokens utilitários | `--bg-input: var(--bg-surface-subtle)`, `--text-placeholder: var(--text-muted)`, `--shadow-lg`, `--radius-md` (`themes.css:root`). Ajustam-se automaticamente por tema. |
 
 ## Padrões de UX
 
+- **Grupos de botões mutuamente exclusivos** usam `role="radiogroup"` no container + `role="radio"` + `aria-checked` em cada botão. Nunca `aria-pressed` para seleção exclusiva (toggle). CSS: seletores `.theme-card[aria-checked='true']` e `.segmented button[aria-checked='true']` em `global.css`. Exceções legítimas de `aria-pressed`: toggle "Seguir aparência do dispositivo" e estrela de conta primária.
 - Seleção (conta, categoria, bandeira, parcelas): bottom-sheet, não dropdown nativo.
 - **Lista de itens no mobile = linha inteira como alvo de toque** (`.list-row--tap`,
   extrato de Transações, 2026-07-18): nada de "Editar"/lixeira inline por linha — as ações

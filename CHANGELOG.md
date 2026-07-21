@@ -2,6 +2,18 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-20 — Passada visual front-end (pré-lançamento): contraste, a11y, CSS, ARIA
+
+Fase final de polimento antes do lançamento. 21 commits na branch `frontend-design-2026-07`, mergeados direto na main. 30 agentes de auditoria + 5 meta-revisores + 4 skills de review. Zero alterações em `firestore.rules` ou `functions/` — sem necessidade de deploy Firebase. Mapa completo em `docs/design/DESIGN_VISUAL_ACHADOS.md`.
+
+- **Contraste — 6 temas escuros corrigidos.** `--text-muted` clareado em noturno, carbono, cobalto, ametista, grafite, vinho para ≥4.5:1 AA. Bordas trocadas de hex escuro (invisível, ~1.1:1) para `rgba(255,255,255,0.08/0.13)`. `--action-primary-hover` do noturno clareado (#3789d9) para contraste ≥4.5:1 com `--text-inverse`.
+- **Acessibilidade — focus indicators, ARIA, touch targets.** 4 inputs que tinham `outline: none` sem substituto ganharam `:focus-visible` com `outline: 3px solid var(--border-focus)`. ~20 grupos de botões mutuamente exclusivos convertidos de `aria-pressed` para `role="radiogroup"` + `role="radio"` + `aria-checked` (11 arquivos). 4 touch targets ajustados para ≥44px (WCAG 2.5.8). `role="alert"` no erro do Dashboard. `aria-describedby` no ForgotPasswordPage.
+- **CSS — 280 linhas mortas removidas, durações padronizadas, tokens novos.** Classes não referenciadas (`.launch-*`, `.app-preview-*`, `.pricing-*`, `.cookie-banner`, etc.) removidas de `global.css` e `landing.css`. ~35 transições com valores mágicos (120ms, 140ms, 0.15s, 0.18s, 0.2s, 0.3s, etc.) substituídas por `var(--duration-fast/normal/slow)`. Tokens novos no `:root`: `--bg-input`, `--text-placeholder`, `--shadow-lg`, `--radius-md`. `.metric-card--accent` unificado (2 blocos → 1). `.form-accordion-toggle` extraído de 4× inline style duplicado.
+- **Reduced-motion — boot + runtime.** `theme.storage.ts` agora consulta `matchMedia('(prefers-reduced-motion: reduce)')` quando não há valor salvo em localStorage. `ThemeRuntime` ganhou listener para mudanças em tempo real da media query.
+- **Limpeza — token fantasma, classe fantasma, fonte inline.** `var(--brand-color)` inexistente no WhatsAppLinkPage trocado por `var(--action-primary)`. Classe `.amount-hero--expense` referenciada mas nunca definida removida do TSX. 4 `fontFamily` inline substituídos por `className="display-number"` (SOL-06).
+- **Headings — AssistantPage e NetWorthPage.** `AssistantPage` ganhou `className="page-title page-title--compact"` no h1. `NetWorthPage` corrigido (faltava classe base `page-title`).
+- typecheck / test (359) / build verdes. Health score 10/10.
+
 ## 2026-07-20 — Bugs: exclusão de conta (dado órfão), recorrente duplicada, mensagens WhatsApp
 
 Três correções antes da fase de front-end. Client (as duas primeiras) já no ar via Vercel; a de WhatsApp é functions e precisa de deploy manual.

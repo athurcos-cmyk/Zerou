@@ -4,22 +4,21 @@ Itens acionáveis. Fechou? Mova para "Concluído" ou remova. Detalhe histórico 
 
 ## Abertas
 
-### Front-end / Design — fase pré-lançamento (em execução pelo DeepSeek, 2026-07-20)
-Última frente grande antes do lançamento. Prompt de execução: `PROMPT_FRONTEND_DESIGN_ZEROU.md` (na área de trabalho do dono, fora do repo). Branch `frontend-design-2026-07`, sem push/deploy — o dono revisa e mescla. **Auditado no código em 2026-07-20** (o que segue reflete o estado real, não o laudo).
+### Front-end / Design — fase pré-lançamento ✅ CONCLUÍDA (2026-07-20)
 
-- [ ] **Passada visual ao vivo, tela por tela (o grosso)** — nunca foi feita; a auditoria de 2026-07-19 foi estática. Percorrer as 22 telas do app logado nos 6 temas, **prioridade máxima nos escuros `obsidian`/`midnight` (nunca vistos ao vivo)**, no browser do CLI (`preview_start`). Corrigir só dentro do sistema Sol (espaçamento, contraste de token neutro, alinhamento, EmptyState, bug de layout no escuro); identidade/marca é [DONO]. Entregável: `docs/design/DESIGN_VISUAL_ACHADOS.md`.
-- [ ] **A11Y-02/11 — focus trap** ausente: criar `useFocusTrap` (sem dependência) e aplicar no `BottomSheet` e no `WelcomeTour`. Hoje o Tab escapa do modal.
-- [ ] **A11Y-05/10 — `radiogroup`** ausente: seletor de tipo (transação/categoria) usa `role="tab"`/`aria-pressed`; trocar por `radiogroup`/`radio`.
-- [ ] **SOL-01/UX-07 — EmptyState** faltando em `InvoicePage`, `CardDetailPage`, `NewTransactionPage` (as demais já têm).
-- [ ] **SOL-05 — tokens de duração** (`--duration-fast/normal/slow`) inexistentes; durações de transição estão mágicas.
-- [ ] **PERF-10 — workbox** `maximumFileSizeToCacheInBytes` não setado em `vite.config.ts`.
-- [ ] **PERF-5 (limpeza) — `public/favicon.png` (784 KB) é peso morto**, não referenciado no `index.html` (que usa os favicons pequenos). Remover.
-- [ ] **A11Y-16 — reduced-motion no boot (JS)**: media query CSS existe, falta `data-reduce-motion` no boot + `<MotionConfig reducedMotion="user">` na landing.
-- [ ] **REACT-06/07 — `React.memo`+`useCallback`** (perf, opcional) em componentes de lista/reutilizáveis.
-- [ ] **Verificar ao vivo (podem já estar ok):** `span`→`button` no delete de categoria (A11Y-07), `focus-visible` no nav-link do menu (A11Y-08), `aria-label` em BottomSheet sem título/TagInput/busca do SelectField (A11Y-12/14/17), `<aside>`→`<nav>` na sidebar (A11Y-13), CSS morto `.custom-select-*`/`.metric-card` dup (SOL-04/08), `aria-live` no chat/"Carregar mais" (A11Y-06).
-- [ ] **LGPD-16 (opcional) — direito de oposição**: add `'opposition'` a `PrivacyRequestType` + UI + REGRA Nº1 (`firestore.rules` + `test:rules`) → precisa deploy do dono.
+21 commits na branch `frontend-design-2026-07`, mergeados na main. 30 agentes de auditoria + 5 meta-revisores. Mapa completo em `docs/design/DESIGN_VISUAL_ACHADOS.md`. Nenhuma alteração em `firestore.rules`/`functions/`.
 
-**Já feito (auditado 2026-07-20 — NÃO refazer):** ErrorBoundary (`AppErrorBoundary` em `App.tsx`); code splitting `React.lazy` em ~24 rotas (bundle −64%); A11Y-01 viewport (sem `maximum-scale`); headers de segurança/cache no `vercel.json`; assets de marca legados removidos; `PrivacyCenterPage` + export ligados; `prefers-reduced-motion` via CSS; EmptyState em `SearchPage` e seções do Casal.
+- [x] **Passada visual — 30 agentes de auditoria** (2026-07-20). Contraste dos 6 temas escuros corrigido, 280 linhas de CSS morto removidas, durações padronizadas, touch targets ajustados.
+- [x] **A11Y-02/11 — focus trap** (`f202db0`). `useFocusTrap` criado, aplicado no BottomSheet e WelcomeTour.
+- [x] **A11Y-05/10 — radiogroup** (`45a2e1a`). ~20 padrões convertidos em 11 arquivos. 2 toggles legítimos preservados.
+- [x] **SOL-01/UX-07 — EmptyState** (`anterior`). InvoicePage e CardDetailPage com EmptyState. NewTransactionPage é formulário — não aplicável.
+- [x] **SOL-05 — tokens de duração** (`b54f37e`). `--duration-fast/normal/slow` criados, ~35 valores mágicos substituídos.
+- [x] **PERF-10 — workbox** (`a247438`). `maximumFileSizeToCacheInBytes: 2MB`.
+- [x] **PERF-5 — favicon.png** (`a084eef`). Removido (784 KB).
+- [x] **A11Y-16 — reduced-motion boot + runtime** (`a6f8773`, `6fc4970`). `data-reduce-motion` no boot, `matchMedia` no `theme.storage.ts`, listener no `ThemeRuntime`.
+- [x] **REACT-06/07 — React.memo** (`anterior`). 5 componentes com `memo()`. `useCallback` não implementado (sem evidência de bottleneck).
+- [x] **Verificação de itens existentes:** Todos OK — span→button delete, focus-visible nav-link, aria-labels, aside→nav, CSS morto .custom-select-*, aria-live.
+- [ ] **LGPD-16 (opcional) — direito de oposição**: não implementado. Se for feito, precisa de `firestore.rules` + `test:rules` + deploy do dono.
 
 ### Produto / UX
 - [ ] **Contas a Receber recorrente (Fase 2)** (2026-07-19): a Fase 1 (avulso) foi implementada — anotar quem te deve, marcar recebido → vira receita, atrasados, seção no Dashboard (≤5 dias). Falta o **recorrente** ("recebo aluguel todo dia 5"). Plano (resumido aqui; seção "Recorrente"): recomendação é reusar `RecurringRule` + `generateRecurrences` com um campo `direction: 'payable'|'receivable'` roteando a ocorrência pra `bills` ou `receivables`. **Mexe em Cloud Function** (`functions/src/automation.ts`, deploy manual — `git push` não reimplanta, ver RUNBOOK) e na regra compartilhada `validRecurring*` (→ `test:rules` no mesmo commit). Por isso ficou pra depois.

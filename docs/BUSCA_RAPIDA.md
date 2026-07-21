@@ -12,6 +12,7 @@ Use este arquivo como mapa antes de abrir documentos grandes. Regra: leia o meno
 | Onde fica cada doc | `docs/README.md` | Mapa das pastas |
 | Pendências/roadmap | `docs/planning/TODOS.md` | Itens abertos |
 | Design/UI (Sol) | `docs/design/DESIGN.md` | Tokens, fontes, componentes-base |
+| Achados visuais (passada front-end) | `docs/design/DESIGN_VISUAL_ACHADOS.md` | Mapa de correções e pendências [DONO] |
 | Testes e QA | `docs/qa/TESTES.md` | Estratégia, comandos, cenários |
 | Arquitetura | `docs/ARCHITECTURE.md` | Visão técnica |
 | Segurança / privacidade | `docs/SECURITY.md`, `docs/PRIVACY.md` | Regras, LGPD |
