@@ -587,6 +587,13 @@ service cloud.firestore {
         && validTransactionAccounts(workspaceId);
     }
 
+    // Compra no cartão ao pagar: `installments` só é válido junto de `cardId` (parcelas não
+    // fazem sentido sem cartão), mesmo intervalo de `createCardPurchaseSchema` (1-24).
+    function validBillInstallments() {
+      return !request.resource.data.keys().hasAny(['installments'])
+        || (request.resource.data.installments is int && request.resource.data.installments >= 1 && request.resource.data.installments <= 24);
+    }
+
     function validBillCreate(workspaceId, billId) {
       return isActiveMember(workspaceId)
         && request.resource.data.keys().hasOnly([
@@ -598,6 +605,8 @@ service cloud.firestore {
           'status',
           'categoryId',
           'accountId',
+          'cardId',
+          'installments',
           'recurringId',
           'createdBy',
           'createdAt',
@@ -611,6 +620,9 @@ service cloud.firestore {
         && request.resource.data.status in ['pending', 'paid', 'overdue', 'cancelled']
         && validOptionalString('categoryId', 120)
         && validOptionalString('accountId', 120)
+        && validOptionalString('cardId', 120)
+        && validBillInstallments()
+        && !(request.resource.data.keys().hasAny(['accountId']) && request.resource.data.keys().hasAny(['cardId']))
         && validOptionalString('recurringId', 120)
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.createdAt == request.time
@@ -630,6 +642,8 @@ service cloud.firestore {
           'status',
           'categoryId',
           'accountId',
+          'cardId',
+          'installments',
           'recurringId',
           'updatedAt'
         ])
@@ -639,6 +653,9 @@ service cloud.firestore {
         && request.resource.data.status in ['pending', 'paid', 'overdue', 'cancelled']
         && validOptionalString('categoryId', 120)
         && validOptionalString('accountId', 120)
+        && validOptionalString('cardId', 120)
+        && validBillInstallments()
+        && !(request.resource.data.keys().hasAny(['accountId']) && request.resource.data.keys().hasAny(['cardId']))
         && validOptionalString('recurringId', 120)
         && request.resource.data.updatedAt == request.time;
     }
@@ -708,6 +725,7 @@ service cloud.firestore {
           'nextOccurrenceAt',
           'anchorDay',
           'accountId',
+          'cardId',
           'categoryId',
           'isActive',
           'createdBy',
@@ -722,6 +740,8 @@ service cloud.firestore {
         && request.resource.data.nextOccurrenceAt is timestamp
         && (!request.resource.data.keys().hasAny(['anchorDay']) || (request.resource.data.anchorDay is int && request.resource.data.anchorDay >= 1 && request.resource.data.anchorDay <= 31))
         && validOptionalString('accountId', 120)
+        && validOptionalString('cardId', 120)
+        && !(request.resource.data.keys().hasAny(['accountId']) && request.resource.data.keys().hasAny(['cardId']))
         && validOptionalString('categoryId', 120)
         && request.resource.data.isActive is bool
         && request.resource.data.createdBy == request.auth.uid
@@ -745,6 +765,7 @@ service cloud.firestore {
           // relação com o cronograma atual e a ocorrência voltaria pro dia original.
           'anchorDay',
           'accountId',
+          'cardId',
           'categoryId',
           'isActive',
           'updatedAt'
@@ -755,6 +776,8 @@ service cloud.firestore {
         && request.resource.data.nextOccurrenceAt is timestamp
         && (!request.resource.data.keys().hasAny(['anchorDay']) || (request.resource.data.anchorDay is int && request.resource.data.anchorDay >= 1 && request.resource.data.anchorDay <= 31))
         && validOptionalString('accountId', 120)
+        && validOptionalString('cardId', 120)
+        && !(request.resource.data.keys().hasAny(['accountId']) && request.resource.data.keys().hasAny(['cardId']))
         && validOptionalString('categoryId', 120)
         && request.resource.data.isActive is bool
         && request.resource.data.updatedAt == request.time;

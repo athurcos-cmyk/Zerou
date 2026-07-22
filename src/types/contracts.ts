@@ -248,6 +248,12 @@ export interface Bill {
   status: 'pending' | 'paid' | 'overdue' | 'cancelled';
   categoryId?: string;
   accountId?: string;
+  /** Cartão como forma de pagamento — mutuamente exclusivo com `accountId` (nunca os dois
+   * juntos, ver `firestore.rules`). Ao pagar, vira uma compra no cartão (ledger de fatura)
+   * em vez de débito direto numa conta. */
+  cardId?: string;
+  /** Só relevante junto com `cardId` — quantas parcelas ao pagar no cartão (1 = à vista). */
+  installments?: number;
   recurringId?: string;
   createdBy: string;
   createdAt?: Timestamp;
@@ -291,6 +297,9 @@ export interface RecurringRule {
   // com 31 dias.
   anchorDay?: number;
   accountId?: string;
+  /** Cartão como forma de pagamento — mutuamente exclusivo com `accountId`. Sem parcelamento:
+   * cada ocorrência registrada vira uma compra à vista na fatura do ciclo correspondente. */
+  cardId?: string;
   categoryId?: string;
   isActive: boolean;
   createdBy: string;

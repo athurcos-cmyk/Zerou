@@ -28,7 +28,10 @@ import { readSnapshotData, readSnapshotDoc } from '../firebase/snapshotData';
 import { startOfDay } from 'date-fns';
 import { buildDefaultCategory, defaultCategories } from './defaultCategories';
 import { monthKeyFromDate } from './financeDates';
-import { mergeAccountEffects, invertAccountEffects, transactionAccountEffects, type AccountEffect } from './financeCalculations';
+import { mergeAccountEffects, invertAccountEffects, transactionAccountEffects } from './financeCalculations';
+import { applyAccountEffectsToBatch } from './accountBatchEffects';
+import { resolvePaymentMethod } from './resolvePaymentMethod';
+import { addCardPurchaseToBatch } from '../cards/cardService';
 import {
   createAccountSchema,
   createBillSchema,
@@ -60,21 +63,6 @@ function collectionRef(workspaceId: string, collectionName: FinancialCollectionN
 
 function documentRef(workspaceId: string, collectionName: FinancialCollectionName, id: string) {
   return doc(getFirebaseDb(), 'workspaces', workspaceId, collectionName, id);
-}
-
-/** Aplica os deltas de saldo (ver `transactionAccountEffects`) num batch já existente —
- * `increment()` é atômico no servidor, funciona offline igual o resto do batch. */
-export function applyAccountEffectsToBatch(
-  batch: ReturnType<typeof writeBatch>,
-  workspaceId: string,
-  effects: AccountEffect[]
-) {
-  for (const effect of effects) {
-    batch.update(documentRef(workspaceId, 'accounts', effect.accountId), {
-      currentBalanceCents: increment(effect.deltaCents),
-      updatedAt: serverTimestamp()
-    });
-  }
 }
 
 function omitUndefined<T extends Record<string, unknown>>(value: T) {
@@ -571,6 +559,8 @@ export async function createBill(workspaceId: string, userId: string, input: Cre
     status: 'pending',
     categoryId: parsed.categoryId,
     accountId: parsed.accountId,
+    cardId: parsed.cardId,
+    installments: parsed.cardId ? parsed.installments : undefined,
     createdBy: userId,
     createdAt: now,
     updatedAt: now
@@ -596,7 +586,15 @@ export async function updateBillStatus(workspaceId: string, billId: string, stat
 export function updateBill(
   workspaceId: string,
   billId: string,
-  patch: { description?: string; amountCents?: number; dueDate?: Date; categoryId?: string | null; accountId?: string | null }
+  patch: {
+    description?: string;
+    amountCents?: number;
+    dueDate?: Date;
+    categoryId?: string | null;
+    accountId?: string | null;
+    cardId?: string | null;
+    installments?: number | null;
+  }
 ) {
   const updates: Record<string, unknown> = { updatedAt: serverTimestamp() };
   if (patch.description !== undefined) updates.description = patch.description;
@@ -604,6 +602,8 @@ export function updateBill(
   if (patch.dueDate !== undefined) updates.dueDate = Timestamp.fromDate(patch.dueDate);
   if (patch.categoryId !== undefined) updates.categoryId = patch.categoryId === null ? deleteField() : patch.categoryId;
   if (patch.accountId !== undefined) updates.accountId = patch.accountId === null ? deleteField() : patch.accountId;
+  if (patch.cardId !== undefined) updates.cardId = patch.cardId === null ? deleteField() : patch.cardId;
+  if (patch.installments !== undefined) updates.installments = patch.installments === null ? deleteField() : patch.installments;
   fireWrite(updateDoc(documentRef(workspaceId, 'bills', billId), updates));
 }
 
@@ -631,6 +631,7 @@ export async function createRecurringRule(workspaceId: string, userId: string, i
     nextOccurrenceAt: Timestamp.fromDate(parsed.nextOccurrenceAt),
     anchorDay: parsed.nextOccurrenceAt.getDate(),
     accountId: parsed.accountId,
+    cardId: parsed.cardId,
     categoryId: parsed.categoryId,
     isActive: true,
     createdBy: userId,
@@ -1001,30 +1002,44 @@ export function nextOccurrenceDate(
 // ─── payBill ──────────────────────────────────────────────────────────────────
 // Marca a conta como paga e cria uma transação de despesa na conta informada.
 // Se nenhuma conta for informada, apenas muda o status (sem débito).
-export function payBill(
+export async function payBill(
   workspaceId: string,
   userId: string,
-  bill: Pick<Bill, 'id' | 'description' | 'amountCents' | 'categoryId' | 'accountId'>,
-  opts: { accountId?: string; amountCents?: number; description?: string; categoryId?: string } = {}
+  bill: Pick<Bill, 'id' | 'description' | 'amountCents' | 'categoryId' | 'accountId' | 'cardId' | 'installments'>,
+  opts: { accountId?: string; cardId?: string; installments?: number; amountCents?: number; description?: string; categoryId?: string } = {}
 ) {
   const amount = opts.amountCents ?? bill.amountCents;
-  const acctId = opts.accountId ?? bill.accountId;
   const desc = opts.description ?? bill.description;
   const catId = opts.categoryId ?? bill.categoryId;
+  const method = resolvePaymentMethod(
+    { accountId: opts.accountId, cardId: opts.cardId },
+    { accountId: bill.accountId, cardId: bill.cardId }
+  );
   const batch = writeBatch(getFirebaseDb());
   batch.update(documentRef(workspaceId, 'bills', bill.id), { status: 'paid', updatedAt: serverTimestamp() });
-  if (acctId) {
+
+  if (method.cardId) {
+    // Mesmo batch da bill virando "paid" — ou os dois acontecem juntos, ou nenhum.
+    await addCardPurchaseToBatch(batch, workspaceId, userId, {
+      cardId: method.cardId,
+      description: desc,
+      amountCents: amount,
+      purchaseDate: new Date(),
+      categoryId: catId,
+      installments: opts.installments ?? bill.installments ?? 1
+    });
+  } else if (method.accountId) {
     const id = createId('txn');
     const now = new Date();
     batch.set(documentRef(workspaceId, 'transactions', id), omitUndefined({
       id, workspaceId, createdBy: userId, updatedBy: userId,
       type: 'expense', amountCents: amount, description: desc,
-      categoryId: catId, accountId: acctId,
+      categoryId: catId, accountId: method.accountId,
       date: Timestamp.fromDate(now), competenceMonth: monthKeyFromDate(now), cashMonth: monthKeyFromDate(now),
       tags: ['conta'], isRecurring: false, clientMutationId: id,
       syncStatus: 'synced', version: 1, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
     }));
-    applyAccountEffectsToBatch(batch, workspaceId, transactionAccountEffects({ type: 'expense', amountCents: amount, accountId: acctId }));
+    applyAccountEffectsToBatch(batch, workspaceId, transactionAccountEffects({ type: 'expense', amountCents: amount, accountId: method.accountId }));
   }
   fireWrite(batch.commit());
 }
@@ -1082,16 +1097,19 @@ export function canRegisterRecurrence(
   return earliest.getTime() <= endOfToday.getTime();
 }
 
-// Cria transação de despesa e avança nextOccurrenceAt para a próxima data.
-export function recordRecurringPayment(
+// Cria transação de despesa (ou compra no cartão) e avança nextOccurrenceAt para a próxima data.
+export async function recordRecurringPayment(
   workspaceId: string,
   userId: string,
-  rule: Pick<RecurringRule, 'id' | 'description' | 'amountCents' | 'categoryId' | 'accountId' | 'frequency' | 'nextOccurrenceAt' | 'anchorDay'>,
-  opts: { accountId?: string; amountCents?: number } = {}
+  rule: Pick<RecurringRule, 'id' | 'description' | 'amountCents' | 'categoryId' | 'accountId' | 'cardId' | 'frequency' | 'nextOccurrenceAt' | 'anchorDay'>,
+  opts: { accountId?: string; cardId?: string; amountCents?: number } = {}
 ) {
   const amount = opts.amountCents ?? rule.amountCents;
   if (amount == null) return;
-  const acctId = opts.accountId || rule.accountId;
+  const method = resolvePaymentMethod(
+    { accountId: opts.accountId, cardId: opts.cardId },
+    { accountId: rule.accountId, cardId: rule.cardId }
+  );
   const occurrenceAt = rule.nextOccurrenceAt.toDate();
   const nextDate = nextOccurrenceDate(occurrenceAt, rule.frequency, rule.anchorDay);
   const batch = writeBatch(getFirebaseDb());
@@ -1099,18 +1117,33 @@ export function recordRecurringPayment(
     nextOccurrenceAt: Timestamp.fromDate(nextDate),
     updatedAt: serverTimestamp()
   });
-  if (acctId) {
-    const id = recurringOccurrenceTransactionId(rule.id, occurrenceAt);
+
+  // Id determinístico por ocorrência (ver `recurringOccurrenceTransactionId`) — clique duplo
+  // ou retry de rede cai no mesmo documento/ledger entry e a regra do Firestore rejeita a
+  // segunda escrita (não permite update em doc já criado), desfazendo o batch inteiro sem
+  // duplicar nada. Vale pros dois métodos de pagamento.
+  const id = recurringOccurrenceTransactionId(rule.id, occurrenceAt);
+  if (method.cardId) {
+    // Mesmo batch do avanço de nextOccurrenceAt — ou os dois acontecem juntos, ou nenhum.
+    // Recorrência nunca parcela: cada ocorrência é uma compra à vista na fatura do ciclo.
+    await addCardPurchaseToBatch(
+      batch,
+      workspaceId,
+      userId,
+      { cardId: method.cardId, description: rule.description, amountCents: amount, purchaseDate: new Date(), categoryId: rule.categoryId, installments: 1 },
+      { transactionId: id }
+    );
+  } else if (method.accountId) {
     const now = new Date();
     batch.set(documentRef(workspaceId, 'transactions', id), omitUndefined({
       id, workspaceId, createdBy: userId, updatedBy: userId,
       type: 'expense', amountCents: amount, description: rule.description,
-      categoryId: rule.categoryId, accountId: acctId,
+      categoryId: rule.categoryId, accountId: method.accountId,
       date: Timestamp.fromDate(now), competenceMonth: monthKeyFromDate(now), cashMonth: monthKeyFromDate(now),
       tags: ['recorrente'], isRecurring: true, recurringId: rule.id, clientMutationId: id,
       syncStatus: 'synced', version: 1, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
     }));
-    applyAccountEffectsToBatch(batch, workspaceId, transactionAccountEffects({ type: 'expense', amountCents: amount, accountId: acctId }));
+    applyAccountEffectsToBatch(batch, workspaceId, transactionAccountEffects({ type: 'expense', amountCents: amount, accountId: method.accountId }));
   }
   fireWrite(batch.commit());
 }
@@ -1195,7 +1228,17 @@ export function subscribeRecurringRules(
 export function updateRecurringRule(
   workspaceId: string,
   ruleId: string,
-  patch: { description?: string; amountCents?: number | null; frequency?: 'weekly' | 'biweekly' | 'monthly' | 'yearly'; nextOccurrenceAt?: Date; anchorDay?: number; accountId?: string | null; categoryId?: string | null; isActive?: boolean }
+  patch: {
+    description?: string;
+    amountCents?: number | null;
+    frequency?: 'weekly' | 'biweekly' | 'monthly' | 'yearly';
+    nextOccurrenceAt?: Date;
+    anchorDay?: number;
+    accountId?: string | null;
+    cardId?: string | null;
+    categoryId?: string | null;
+    isActive?: boolean;
+  }
 ) {
   const updates: Record<string, unknown> = { updatedAt: serverTimestamp() };
   if (patch.description !== undefined) updates.description = patch.description;
@@ -1204,6 +1247,7 @@ export function updateRecurringRule(
   if (patch.anchorDay !== undefined) updates.anchorDay = patch.anchorDay;
   if (patch.nextOccurrenceAt !== undefined) updates.nextOccurrenceAt = Timestamp.fromDate(patch.nextOccurrenceAt);
   if (patch.accountId !== undefined) updates.accountId = patch.accountId === null ? deleteField() : patch.accountId;
+  if (patch.cardId !== undefined) updates.cardId = patch.cardId === null ? deleteField() : patch.cardId;
   if (patch.categoryId !== undefined) updates.categoryId = patch.categoryId === null ? deleteField() : patch.categoryId;
   if (patch.isActive !== undefined) updates.isActive = patch.isActive;
   fireWrite(updateDoc(documentRef(workspaceId, 'recurring', ruleId), updates));

@@ -3,21 +3,23 @@ import { describe, expect, it, vi } from 'vitest';
 const firestoreMocks = vi.hoisted(() => ({
   updateDoc: vi.fn().mockResolvedValue(undefined),
   doc: vi.fn().mockReturnValue({ id: 'doc-ref' }),
-  serverTimestamp: vi.fn().mockReturnValue('server-timestamp')
+  serverTimestamp: vi.fn().mockReturnValue('server-timestamp'),
+  getDoc: vi.fn()
 }));
 
 vi.mock('firebase/firestore', async (importOriginal) => ({
   ...(await importOriginal<typeof import('firebase/firestore')>()),
   doc: firestoreMocks.doc,
   updateDoc: firestoreMocks.updateDoc,
-  serverTimestamp: firestoreMocks.serverTimestamp
+  serverTimestamp: firestoreMocks.serverTimestamp,
+  getDoc: firestoreMocks.getDoc
 }));
 
 vi.mock('../firebase/config', () => ({
   getFirebaseDb: vi.fn().mockReturnValue({})
 }));
 
-const { markClosedInvoices } = await import('./cardService');
+const { addCardPurchaseToBatch, markClosedInvoices } = await import('./cardService');
 
 function invoice(id: string, status: 'open' | 'closed' | 'paid', referenceMonth: string) {
   return { id, cardId: 'card-1', status, referenceMonth };
@@ -74,5 +76,56 @@ describe('markClosedInvoices', () => {
     markClosedInvoices('workspace-1', [invoice('inv-today', 'open', currentReferenceMonth)], closingDay);
 
     expect(firestoreMocks.updateDoc).not.toHaveBeenCalled();
+  });
+});
+
+describe('addCardPurchaseToBatch', () => {
+  function fakeBatch() {
+    return { set: vi.fn(), update: vi.fn() };
+  }
+
+  function mockCardAndNoExistingInvoices() {
+    firestoreMocks.getDoc
+      // 1ª chamada: loadCard
+      .mockResolvedValueOnce({
+        exists: () => true,
+        id: 'card-1',
+        data: () => ({ closingDay: 10, dueDay: 20, name: 'Nubank', brand: 'Mastercard' })
+      })
+      // Chamadas seguintes: checagem de existência da fatura — sempre "não existe" ainda.
+      .mockResolvedValue({ exists: () => false });
+  }
+
+  it('usa o transactionId explícito quando fornecido, em vez de gerar um novo (idempotência)', async () => {
+    mockCardAndNoExistingInvoices();
+    const batch = fakeBatch();
+
+    const result = await addCardPurchaseToBatch(
+      batch as never,
+      'ws1',
+      'user1',
+      { cardId: 'card-1', description: 'Netflix', amountCents: 3990, purchaseDate: new Date(2026, 6, 5), installments: 1 },
+      { transactionId: 'custom-txn-id' }
+    );
+
+    expect(result.transactionId).toBe('custom-txn-id');
+    const transactionCall = batch.set.mock.calls.find(([, payload]) => payload.type === 'card_purchase');
+    expect(transactionCall?.[1]).toEqual(expect.objectContaining({ id: 'custom-txn-id' }));
+  });
+
+  it('gera um transactionId novo quando nenhum é fornecido', async () => {
+    mockCardAndNoExistingInvoices();
+    const batch = fakeBatch();
+
+    const result = await addCardPurchaseToBatch(batch as never, 'ws1', 'user1', {
+      cardId: 'card-1',
+      description: 'Spotify',
+      amountCents: 1990,
+      purchaseDate: new Date(2026, 6, 5),
+      installments: 1
+    });
+
+    expect(result.transactionId).toBeTruthy();
+    expect(result.transactionId).not.toBe('custom-txn-id');
   });
 });

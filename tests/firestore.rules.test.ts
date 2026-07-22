@@ -173,11 +173,40 @@ function budgetPayload(workspaceId: string, budgetId: string, uid: string, overr
   };
 }
 
+// `setDoc` lança erro no cliente se um campo vier `undefined` (Firestore não aceita) — em vez
+// de virar rejeição da regra (o que se quer testar), o teste falharia por um motivo errado.
+// Igual ao `omitUndefined` do próprio `financeService.ts`: um override `undefined` remove a
+// chave (não manda `accountId: undefined`), permitindo testar "paga no cartão, sem conta".
+function omitUndefinedOverrides<T extends Record<string, unknown>>(payload: T): T {
+  return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined)) as T;
+}
+
+// Reflete o payload REAL de `createBill` (financeService.ts) — a lição nº1 do CLAUDE.md:
+// se o payload de teste for uma versão simplificada, o teste passa com a regra desatualizada.
+function billPayload(workspaceId: string, billId: string, uid: string, overrides: Record<string, unknown> = {}) {
+  const now = serverTimestamp();
+
+  return omitUndefinedOverrides({
+    id: billId,
+    workspaceId,
+    description: 'Aluguel',
+    amountCents: 150000,
+    dueDate: Timestamp.fromDate(new Date('2026-08-10T12:00:00Z')),
+    status: 'pending',
+    categoryId: 'categoryA',
+    accountId: 'accountA',
+    createdBy: uid,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides
+  });
+}
+
 // Reflete o payload REAL de `createRecurringRule` (financeService.ts).
 function recurringPayload(workspaceId: string, recurringId: string, uid: string, overrides: Record<string, unknown> = {}) {
   const now = serverTimestamp();
 
-  return {
+  return omitUndefinedOverrides({
     id: recurringId,
     workspaceId,
     description: 'Netflix',
@@ -192,7 +221,7 @@ function recurringPayload(workspaceId: string, recurringId: string, uid: string,
     createdAt: now,
     updatedAt: now,
     ...overrides
-  };
+  });
 }
 
 // Reflete o payload REAL de `createReceivable` (financeService.ts) — a lição nº1 do CLAUDE.md:
@@ -1144,6 +1173,73 @@ describe('firestore security rules', () => {
       setDoc(
         doc(aliceDb, 'workspaces/workspaceA/recurring/rec_invalida'),
         recurringPayload('workspaceA', 'rec_invalida', 'alice', { frequency: 'daily' })
+      )
+    );
+  });
+
+  // Cartão como forma de pagamento em Bill/RecurringRule (plano revisado em /plan-eng-review) —
+  // sem isso, a feature seria rejeitada silenciosamente pelo servidor (mesmo padrão dos 2
+  // incidentes reais descritos na REGRA PRINCIPAL do CLAUDE.md).
+  it('accepts a bill paid with a card instead of a bank account, with installments', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/bills/bill_cartao'),
+        billPayload('workspaceA', 'bill_cartao', 'alice', { accountId: undefined, cardId: 'cardA', installments: 3 })
+      )
+    );
+  });
+
+  it('rejects a bill with both accountId and cardId set at once', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertFails(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/bills/bill_ambos'),
+        billPayload('workspaceA', 'bill_ambos', 'alice', { accountId: 'accountA', cardId: 'cardA' })
+      )
+    );
+  });
+
+  it('rejects a bill with installments out of the 1-24 range', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertFails(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/bills/bill_0x'),
+        billPayload('workspaceA', 'bill_0x', 'alice', { accountId: undefined, cardId: 'cardA', installments: 0 })
+      )
+    );
+    await assertFails(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/bills/bill_25x'),
+        billPayload('workspaceA', 'bill_25x', 'alice', { accountId: undefined, cardId: 'cardA', installments: 25 })
+      )
+    );
+  });
+
+  it('accepts a recurring rule paid with a card, and lets the owner switch back to a bank account', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    const ruleRef = doc(aliceDb, 'workspaces/workspaceA/recurring/rec_cartao');
+
+    await assertSucceeds(
+      setDoc(ruleRef, recurringPayload('workspaceA', 'rec_cartao', 'alice', { accountId: undefined, cardId: 'cardA' }))
+    );
+
+    // Trocar de cartão pra conta bancária precisa limpar cardId — os dois nunca coexistem.
+    await assertSucceeds(
+      updateDoc(ruleRef, { accountId: 'accountA', cardId: deleteField(), updatedAt: serverTimestamp() })
+    );
+  });
+
+  it('rejects a recurring rule with both accountId and cardId set at once', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertFails(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/recurring/rec_ambos'),
+        recurringPayload('workspaceA', 'rec_ambos', 'alice', { accountId: 'accountA', cardId: 'cardA' })
       )
     );
   });

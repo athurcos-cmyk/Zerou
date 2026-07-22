@@ -1,7 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { CalendarClock, ChevronDown, Pencil, Repeat, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
-import { useFinanceContext } from '../finance/FinanceDataContext';
+import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { CategoryField } from '../components/CategoryField';
 import { ServiceMark } from '../components/ServiceMark';
 import { findSubscriptionService, searchSubscriptionServices, type SubscriptionService } from '../finance/subscriptionServices';
@@ -12,6 +12,7 @@ import { FormMessage } from '../components/FormMessage';
 import { useConfirm } from '../components/ConfirmDialog';
 import { formatFriendlyDate, fromDateInputValue, toDateInputValue, todayInputValue } from '../finance/financeDates';
 import { billStatusLabels, recurringFrequencyLabels } from '../finance/financeLabels';
+import { CARD_PREFIX, buildAccountOrCardOptions, installmentOptions, parseAccountOrCard } from '../finance/accountOrCardOptions';
 import {
   canRegisterRecurrence,
   createBill,
@@ -49,6 +50,7 @@ export function BillsPage() {
   const { user, profile } = useAuth();
   const workspaceId = profile?.defaultWorkspaceId;
   const finance = useFinanceContext();
+  const cardsData = useCardsContext();
   const { confirm, dialog: confirmDialog } = useConfirm();
 
   // ── form state (nova conta) ──
@@ -57,6 +59,7 @@ export function BillsPage() {
   const [dueDate, setDueDate] = useState(todayInputValue());
   const [categoryId, setCategoryId] = useState('');
   const [accountId, setAccountId] = useState('');
+  const [installments, setInstallments] = useState(1);
   const [message, setMessage] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
@@ -65,6 +68,7 @@ export function BillsPage() {
   // ── pay sheet state ──
   const [payTarget, setPayTarget] = useState<PayTarget | null>(null);
   const [payAccountId, setPayAccountId] = useState('');
+  const [payInstallments, setPayInstallments] = useState(1);
   const [payAmount, setPayAmount] = useState('');
   const [payDescription, setPayDescription] = useState('');
   const [payCategoryId, setPayCategoryId] = useState('');
@@ -84,10 +88,15 @@ export function BillsPage() {
   const [editBillAmount, setEditBillAmount] = useState('');
   const [editBillCategoryId, setEditBillCategoryId] = useState('');
   const [editBillAccountId, setEditBillAccountId] = useState('');
+  const [editBillInstallments, setEditBillInstallments] = useState(1);
   const [editBillDueDate, setEditBillDueDate] = useState(todayInputValue());
 
   // ── filtro de compromissos ──
   const [billFilter, setBillFilter] = useState<BillFilterKey>('open');
+
+  // ── opções mescladas conta+cartão (reaproveitadas nos 3 selects + chip-row de pagamento) ──
+  const { accountOptions, cardOptions } = buildAccountOrCardOptions(finance.accounts, cardsData.cards);
+  const accountOrCardOptions = [...accountOptions, ...cardOptions];
 
   const recurringItems = useMemo(
     () =>
@@ -117,13 +126,14 @@ export function BillsPage() {
   // ── open pay sheet ──
   function handleOpenPay(target: PayTarget) {
     setPayTarget(target);
+    const item = target.item;
+    setPayAccountId(item.cardId ? `${CARD_PREFIX}${item.cardId}` : item.accountId ?? '');
+    setPayInstallments(target.kind === 'bill' ? target.item.installments ?? 1 : 1);
     if (target.kind === 'bill') {
-      setPayAccountId(target.item.accountId ?? '');
       setPayAmount('');
       setPayDescription(target.item.description);
       setPayCategoryId(target.item.categoryId ?? '');
     } else {
-      setPayAccountId(target.item.accountId ?? '');
       setPayAmount(target.item.amountCents ? centsToInputValue(target.item.amountCents) : '');
       setPayDescription('');
       setPayCategoryId(target.item.categoryId ?? '');
@@ -132,23 +142,29 @@ export function BillsPage() {
 
   function handleConfirmPay() {
     if (!workspaceId || !user || !payTarget) return;
+    const { accountId: payAcct, cardId: payCard } = parseAccountOrCard(payAccountId);
     if (payTarget.kind === 'bill') {
       const bill = payTarget.item as Bill;
       const amt = payAmount.trim() ? parseMoneyToCents(payAmount) : bill.amountCents;
       payBill(workspaceId, user.uid, bill, {
-        accountId: payAccountId || undefined,
+        accountId: payAcct,
+        cardId: payCard,
+        installments: payCard ? payInstallments : undefined,
         amountCents: amt,
         description: payDescription !== bill.description ? payDescription : undefined,
         categoryId: payCategoryId !== bill.categoryId ? payCategoryId : undefined,
-      });
+      }).catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível registrar o pagamento.')));
     } else {
       const rule = payTarget.item as RecurringRule;
       const amt = payAmount.trim() ? parseMoneyToCents(payAmount) : rule.amountCents;
       if (!amt) return;
-      recordRecurringPayment(workspaceId, user.uid, rule, { accountId: payAccountId || undefined, amountCents: amt });
+      recordRecurringPayment(workspaceId, user.uid, rule, { accountId: payAcct, cardId: payCard, amountCents: amt }).catch(
+        (error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível registrar o pagamento.')),
+      );
     }
     setPayTarget(null);
     setPayAccountId('');
+    setPayInstallments(1);
     setPayAmount('');
     setPayDescription('');
     setPayCategoryId('');
@@ -179,7 +195,7 @@ export function BillsPage() {
     setEditDescription(rule.description);
     setEditAmount(rule.amountCents ? centsToInputValue(rule.amountCents) : '');
     setEditFrequency(rule.frequency);
-    setEditAccountId(rule.accountId ?? '');
+    setEditAccountId(rule.cardId ? `${CARD_PREFIX}${rule.cardId}` : rule.accountId ?? '');
     setEditCategoryId(rule.categoryId ?? '');
     setEditNextOccurrenceAt(toDateInputValue(rule.nextOccurrenceAt));
   }
@@ -207,6 +223,8 @@ export function BillsPage() {
       ? editedDate.getDate()
       : undefined;
 
+    const editedMethod = parseAccountOrCard(editAccountId);
+
     updateRecurringRule(workspaceId, editingRule.id, {
       description: editDescription.trim() || editingRule.description,
       // `null` (e não `undefined`) pra LIMPAR: campo vazio aqui significa "valor varia" /
@@ -216,7 +234,10 @@ export function BillsPage() {
       frequency: editFrequency,
       nextOccurrenceAt: editedDate,
       anchorDay,
-      accountId: editAccountId || null,
+      // Sempre os dois explícitos (nunca `undefined`): trocar de conta pra cartão (ou
+      // vice-versa) precisa limpar o outro campo, senão os dois ficariam gravados juntos.
+      accountId: editedMethod.accountId ?? null,
+      cardId: editedMethod.cardId ?? null,
       categoryId: editCategoryId || null,
     });
     setEditingRule(null);
@@ -228,18 +249,24 @@ export function BillsPage() {
     setEditBillDescription(bill.description);
     setEditBillAmount(centsToInputValue(bill.amountCents));
     setEditBillCategoryId(bill.categoryId ?? '');
-    setEditBillAccountId(bill.accountId ?? '');
+    setEditBillAccountId(bill.cardId ? `${CARD_PREFIX}${bill.cardId}` : bill.accountId ?? '');
+    setEditBillInstallments(bill.installments ?? 1);
     setEditBillDueDate(toDateInputValue(bill.dueDate));
   }
 
   function handleSaveEditBill() {
     if (!workspaceId || !editingBill) return;
+    const editedMethod = parseAccountOrCard(editBillAccountId);
     updateBill(workspaceId, editingBill.id, {
       description: editBillDescription.trim() || editingBill.description,
       amountCents: editBillAmount.trim() ? parseMoneyToCents(editBillAmount) : editingBill.amountCents,
       dueDate: fromDateInputValue(editBillDueDate),
       categoryId: editBillCategoryId || null,
-      accountId: editBillAccountId || null,
+      // Sempre os dois explícitos: trocar de conta pra cartão (ou vice-versa) precisa
+      // limpar o outro campo.
+      accountId: editedMethod.accountId ?? null,
+      cardId: editedMethod.cardId ?? null,
+      installments: editedMethod.cardId ? editBillInstallments : null,
     });
     setEditingBill(null);
   }
@@ -254,13 +281,7 @@ export function BillsPage() {
     }
 
     const amountCents = amount.trim() ? parseMoneyToCents(amount) : undefined;
-    const baseData = {
-      description,
-      amountCents: amountCents ?? 0,
-      dueDate: fromDateInputValue(dueDate),
-      categoryId: categoryId || undefined,
-      accountId: accountId || undefined,
-    };
+    const method = parseAccountOrCard(accountId);
 
     if (isRecurring) {
       createRecurringRule(workspaceId, user.uid, {
@@ -268,16 +289,23 @@ export function BillsPage() {
         amountCents,
         frequency,
         nextOccurrenceAt: fromDateInputValue(dueDate),
-        accountId: accountId || undefined,
+        accountId: method.accountId,
+        cardId: method.cardId,
         categoryId: categoryId || undefined,
       }).catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar a conta recorrente.')));
       // NÃO cria um compromisso avulso aqui: a recorrente vive só na seção "Recorrentes".
       // As ocorrências viram compromissos quando vencem, materializadas pela Cloud Function
       // `generateRecurrences` — criar um bill agora duplicava a conta na lista de avulsas.
     } else {
-      createBill(workspaceId, user.uid, baseData).catch((error) =>
-        setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar a conta.')),
-      );
+      createBill(workspaceId, user.uid, {
+        description,
+        amountCents: amountCents ?? 0,
+        dueDate: fromDateInputValue(dueDate),
+        categoryId: categoryId || undefined,
+        accountId: method.accountId,
+        cardId: method.cardId,
+        installments: method.cardId ? installments : undefined,
+      }).catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar a conta.')));
     }
 
     setDescription('');
@@ -285,6 +313,7 @@ export function BillsPage() {
     setDueDate(todayInputValue());
     setCategoryId('');
     setAccountId('');
+    setInstallments(1);
     setIsRecurring(false);
     setFrequency('monthly');
     setFormOpen(false);
@@ -390,12 +419,21 @@ export function BillsPage() {
             />
 
             <SelectField
-              label="Conta de pagamento"
+              label="Conta ou cartão"
               value={accountId}
               onChange={setAccountId}
-              options={finance.accounts.map((a) => ({ value: a.id, label: a.name }))}
+              options={accountOrCardOptions}
               placeholder="Definir depois"
             />
+
+            {!isRecurring && accountId.startsWith(CARD_PREFIX) ? (
+              <SelectField
+                label="Parcelamento"
+                value={String(installments)}
+                onChange={(v) => setInstallments(Number(v))}
+                options={installmentOptions()}
+              />
+            ) : null}
 
             <button className="button button--primary" type="submit">
               {isRecurring ? 'Criar conta recorrente' : 'Criar conta'}
@@ -576,13 +614,24 @@ export function BillsPage() {
           )}
 
           <div className="field">
-            <span className="field-label">De qual conta saiu?</span>
+            <span className="field-label">Como foi pago?</span>
             <div className="chip-row">
               <button type="button" className={`chip${!payAccountId ? ' chip--active' : ''}`} onClick={() => setPayAccountId('')}>Sem débito</button>
-              {finance.accounts.map((a) => (
-                <button key={a.id} type="button" className={`chip${payAccountId === a.id ? ' chip--active' : ''}`} onClick={() => setPayAccountId(a.id)}>{a.name}</button>
+              {accountOptions.map((option) => (
+                <button key={option.value} type="button" className={`chip${payAccountId === option.value ? ' chip--active' : ''}`} onClick={() => setPayAccountId(option.value)}>{option.label}</button>
+              ))}
+              {cardOptions.map((option) => (
+                <button key={option.value} type="button" className={`chip${payAccountId === option.value ? ' chip--active' : ''}`} onClick={() => setPayAccountId(option.value)}>{option.label}</button>
               ))}
             </div>
+            {payTarget?.kind === 'bill' && payAccountId.startsWith(CARD_PREFIX) ? (
+              <SelectField
+                label="Parcelamento"
+                value={String(payInstallments)}
+                onChange={(v) => setPayInstallments(Number(v))}
+                options={installmentOptions()}
+              />
+            ) : null}
             {payTarget?.kind === 'recurring' && (
               <p className="text-muted" style={{ fontSize: '0.8rem', margin: '0.4rem 0 0' }}>
                 Próxima ocorrência avança para {formatFriendlyDate(
@@ -640,15 +689,12 @@ export function BillsPage() {
             onDeleteCategory={async (id) => { if (!workspaceId) return; await deleteCategory(workspaceId, id); }}
           />
           <SelectField
-            label="Conta de pagamento"
+            label="Conta ou cartão"
             value={editAccountId}
             onChange={setEditAccountId}
             // A opção vazia deixa o placeholder honesto: sem ela dava pra escolher uma conta
             // mas nunca voltar atrás.
-            options={[
-              { value: '', label: 'Definir depois' },
-              ...finance.accounts.map((a) => ({ value: a.id, label: a.name }))
-            ]}
+            options={[{ value: '', label: 'Definir depois' }, ...accountOrCardOptions]}
             placeholder="Definir depois"
           />
           <div className="sheet-actions">
@@ -693,15 +739,20 @@ export function BillsPage() {
             onDeleteCategory={async (id) => { if (!workspaceId) return; await deleteCategory(workspaceId, id); }}
           />
           <SelectField
-            label="Conta de pagamento"
+            label="Conta ou cartão"
             value={editBillAccountId}
             onChange={setEditBillAccountId}
-            options={[
-              { value: '', label: 'Definir depois' },
-              ...finance.accounts.map((a) => ({ value: a.id, label: a.name }))
-            ]}
+            options={[{ value: '', label: 'Definir depois' }, ...accountOrCardOptions]}
             placeholder="Definir depois"
           />
+          {editBillAccountId.startsWith(CARD_PREFIX) ? (
+            <SelectField
+              label="Parcelamento"
+              value={String(editBillInstallments)}
+              onChange={(v) => setEditBillInstallments(Number(v))}
+              options={installmentOptions()}
+            />
+          ) : null}
           <div className="sheet-actions">
             <button className="button button--primary" type="button" onClick={handleSaveEditBill}>
               Salvar alterações

@@ -20,7 +20,7 @@ import { getFirebaseDb } from '../firebase/config';
 import { fireWrite } from '../firebase/fireWrite';
 import { readSnapshotData, readSnapshotDoc } from '../firebase/snapshotData';
 import { monthKeyFromDate } from '../finance/financeDates';
-import { applyAccountEffectsToBatch } from '../finance/financeService';
+import { applyAccountEffectsToBatch } from '../finance/accountBatchEffects';
 import { transactionAccountEffects } from '../finance/financeCalculations';
 import {
   anticipateInstallmentsSchema,
@@ -199,11 +199,28 @@ export function deleteCard(workspaceId: string, cardId: string) {
   }));
 }
 
-export async function createCardPurchase(workspaceId: string, userId: string, input: CreateCardPurchaseInput) {
+/**
+ * Monta as escritas de uma compra no cartão (ledger por parcela, doc(s) de `Invoice` quando
+ * ainda não existem, a `Transaction` `card_purchase`) num `batch` já existente, sem criá-lo
+ * nem commitá-lo — permite compor com outras escritas no MESMO batch (ex.: marcar uma conta
+ * a pagar como paga, ou avançar `nextOccurrenceAt` de uma recorrência) garantindo que os dois
+ * lados aconteçam atomicamente juntos, ou nenhum. `createCardPurchase` (abaixo) é o caso
+ * simples: cria o próprio batch e commita sozinho.
+ *
+ * `opts.transactionId`: normalmente gerado aqui, mas o caller pode passar um id
+ * determinístico (ex.: `recurringOccurrenceTransactionId`) pra preservar proteção de
+ * idempotência contra clique duplo/retry de rede.
+ */
+export async function addCardPurchaseToBatch(
+  batch: ReturnType<typeof writeBatch>,
+  workspaceId: string,
+  userId: string,
+  input: CreateCardPurchaseInput,
+  opts: { transactionId?: string } = {}
+): Promise<{ transactionId: string; firstInvoiceId: string; cardId: string }> {
   const parsed = createCardPurchaseSchema.parse(input);
   const card = await loadCard(workspaceId, parsed.cardId);
-  const batch = writeBatch(getFirebaseDb());
-  const transactionId = createId('txn');
+  const transactionId = opts.transactionId ?? createId('txn');
   const installmentGroupId = parsed.installments > 1 ? createId('installments') : undefined;
   const amounts = installmentAmounts(parsed.amountCents, parsed.installments);
   const now = serverTimestamp();
@@ -282,6 +299,12 @@ export async function createCardPurchase(workspaceId: string, userId: string, in
     })
   );
 
+  return { transactionId, firstInvoiceId, cardId: card.id };
+}
+
+export async function createCardPurchase(workspaceId: string, userId: string, input: CreateCardPurchaseInput) {
+  const batch = writeBatch(getFirebaseDb());
+  const { transactionId } = await addCardPurchaseToBatch(batch, workspaceId, userId, input);
   fireWrite(batch.commit());
   return transactionId;
 }

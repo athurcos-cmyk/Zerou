@@ -67,7 +67,9 @@ export const createBillSchema = z.object({
   amountCents: moneyCentsSchema,
   dueDate: z.date(),
   categoryId: z.string().trim().max(120).optional(),
-  accountId: z.string().trim().max(120).optional()
+  accountId: z.string().trim().max(120).optional(),
+  cardId: z.string().trim().max(120).optional(),
+  installments: z.number().int().min(1).max(24).optional()
 });
 
 export const createReceivableSchema = z.object({
@@ -84,6 +86,7 @@ export const createRecurringRuleSchema = z.object({
   frequency: z.enum(recurringFrequencies),
   nextOccurrenceAt: z.date(),
   accountId: z.string().trim().max(120).optional(),
+  cardId: z.string().trim().max(120).optional(),
   categoryId: z.string().trim().max(120).optional()
 });
 

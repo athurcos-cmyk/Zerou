@@ -14,10 +14,9 @@ import { accountTypeLabels, transactionTypeLabels } from '../finance/financeLabe
 import { createCategory, createTransaction, deleteCategory, updateCategory } from '../finance/financeService';
 import { type SupportedTransactionType } from '../finance/financeSchemas';
 import { parseMoneyToCents } from '../finance/money';
+import { CARD_PREFIX, buildAccountOrCardOptions, installmentOptions, parseAccountOrCard } from '../finance/accountOrCardOptions';
 
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
-
-const CARD_PREFIX = 'card:';
 
 const primaryTypes: SupportedTransactionType[] = ['income', 'expense', 'transfer'];
 
@@ -46,23 +45,16 @@ export function NewTransactionPage() {
   const [tags, setTags] = useState<string[]>([]);
   const [message, setMessage] = useState<string | null>(null);
 
-  const activeCards = cardsData.cards.filter((card) => card.isActive !== false);
   const isCardSelected = accountId.startsWith(CARD_PREFIX);
 
-  const walletOptions = finance.accounts.map((account) => ({
-    value: account.id,
-    label: account.name,
-    description: accountTypeLabels[account.type],
+  const { accountOptions: rawAccountOptions, cardOptions: rawCardOptions } = buildAccountOrCardOptions(finance.accounts, cardsData.cards);
+  const walletOptions = rawAccountOptions.map((option) => ({
+    ...option,
+    description: accountTypeLabels[finance.accounts.find((a) => a.id === option.value)!.type],
     icon: <Wallet size={17} aria-hidden="true" />
   }));
-
   // For expenses you can pay with a card; cards become card purchases (with installments).
-  const cardOptions = activeCards.map((card) => ({
-    value: `${CARD_PREFIX}${card.id}`,
-    label: card.name,
-    description: `Cartão · ${card.brand}`,
-    icon: <CreditCard size={17} aria-hidden="true" />
-  }));
+  const cardOptions = rawCardOptions.map((option) => ({ ...option, icon: <CreditCard size={17} aria-hidden="true" /> }));
   const accountOptions = type === 'expense' ? [...walletOptions, ...cardOptions] : walletOptions;
 
   const destinationOptions = walletOptions.filter((option) => option.value !== accountId);
@@ -107,9 +99,9 @@ export function NewTransactionPage() {
 
     try {
       if (payingWithCard) {
-        const cardId = accountId.slice(CARD_PREFIX.length);
+        const { cardId } = parseAccountOrCard(accountId);
         createCardPurchase(workspaceId, user.uid, {
-          cardId,
+          cardId: cardId!,
           description,
           amountCents: parseMoneyToCents(amount),
           purchaseDate: fromDateInputValue(date),
@@ -227,10 +219,7 @@ export function NewTransactionPage() {
             label="Parcelamento"
             value={String(installments)}
             onChange={(v) => setInstallments(Number(v))}
-            options={Array.from({ length: 24 }, (_, i) => i + 1).map((n) => ({
-              value: String(n),
-              label: n === 1 ? '1x à vista' : `${n}x`
-            }))}
+            options={installmentOptions()}
           />
         ) : null}
 
