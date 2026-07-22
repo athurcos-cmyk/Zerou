@@ -2,6 +2,15 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-21 — fix (privacidade): push agendado vazava dado financeiro pra quem saiu do casal
+
+As functions agendadas rodam com Admin SDK, que **ignora o `firestore.rules`** — então a garantia da regra `isActiveMember` precisa existir **em código**, e não existia. Detalhes em `docs/history/2026-07.md`.
+
+- **O vazamento.** `leavePartnerWorkspace` marca o membro como `removed` (não apaga o documento), mas o `createdBy`/`ownerUserId` gravado nos dados continua apontando pra ele. Quem saía de um espaço de casal **seguia recebendo push com descrição e valor** de contas/orçamentos de um espaço que não pode nem abrir — contra a regra explícita do `CLAUDE.md` ("dados financeiros pessoais não vazam para o espaço do casal").
+- **Corrigido** em `sendDueReminders`, `sendBudgetAlerts` e `closeInvoicesDue`: só notifica se `members/{uid}.status == 'active'`. No `sendBudgetAlerts` a checagem vem **antes** da consulta de gastos do mês, então também economiza leitura de quem saiu.
+- **DRY:** já existia `verifyWorkspaceMembership` (callable da Grazi) fazendo a mesma checagem, com contrato diferente (lança `HttpsError`). Em vez de deixar **duas implementações da mesma checagem de segurança**, extraída a fonte única `readMembershipStatus` (`shared/activeMember.ts`); o callable virou wrapper que traduz o status em erro (preservando as duas mensagens distintas) e as agendadas usam `createActiveMemberCheck`, com cache por execução.
+- **Cuidado verificado antes de mexer:** o workspace **pessoal** também tem `members/{uid}` ativo, então a checagem **não** desliga a notificação de quem usa o app sozinho — tem teste cobrindo os dois lados. 87 testes functions (+6). Deployado.
+
 ## 2026-07-21 — feat: frequência Quinzenal + 3 correções na edição de recorrência
 
 Auditoria do botão "Editar" das recorrentes, pedida pelo dono. Achou 2 bugs reais e 1 gap. **Exige deploy de `firestore.rules`** (feito). Detalhes em `docs/history/2026-07.md`.
