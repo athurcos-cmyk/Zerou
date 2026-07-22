@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { Timestamp } from 'firebase/firestore';
+import { Timestamp, deleteField } from 'firebase/firestore';
 
 const firestoreMocks = vi.hoisted(() => ({
   updateDoc: vi.fn().mockResolvedValue(undefined),
@@ -18,7 +18,7 @@ vi.mock('../firebase/config', () => ({
   getFirebaseDb: vi.fn().mockReturnValue({})
 }));
 
-const { markOverdueBills } = await import('./financeService');
+const { markOverdueBills, updateBill } = await import('./financeService');
 
 function bill(id: string, status: 'pending' | 'paid' | 'overdue' | 'cancelled', daysFromToday: number) {
   const dueDate = new Date();
@@ -52,5 +52,36 @@ describe('markOverdueBills', () => {
     markOverdueBills('workspace-1', [bill('today-pending', 'pending', 0), bill('future-pending', 'pending', 1)]);
 
     expect(firestoreMocks.updateDoc).not.toHaveBeenCalled();
+  });
+});
+
+describe('updateBill', () => {
+  it('grava só os campos definidos no patch', () => {
+    firestoreMocks.updateDoc.mockClear();
+
+    const dueDate = new Date(2026, 7, 20);
+    updateBill('workspace-1', 'bill-1', { description: 'Aluguel novo', amountCents: 150000, dueDate });
+
+    expect(firestoreMocks.updateDoc).toHaveBeenCalledTimes(1);
+    const [, updates] = firestoreMocks.updateDoc.mock.calls[0];
+    expect(updates).toEqual(
+      expect.objectContaining({
+        description: 'Aluguel novo',
+        amountCents: 150000,
+        dueDate: Timestamp.fromDate(dueDate)
+      })
+    );
+    expect(updates).not.toHaveProperty('categoryId');
+    expect(updates).not.toHaveProperty('accountId');
+  });
+
+  it('limpa categoryId/accountId com null via deleteField(), não com a string "null"', () => {
+    firestoreMocks.updateDoc.mockClear();
+
+    updateBill('workspace-1', 'bill-1', { categoryId: null, accountId: null });
+
+    const [, updates] = firestoreMocks.updateDoc.mock.calls[0];
+    expect(updates.categoryId).toEqual(deleteField());
+    expect(updates.accountId).toEqual(deleteField());
   });
 });

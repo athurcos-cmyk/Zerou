@@ -10,7 +10,7 @@ import { BottomSheet } from '../components/BottomSheet';
 import { EmptyState } from '../components/EmptyState';
 import { FormMessage } from '../components/FormMessage';
 import { useConfirm } from '../components/ConfirmDialog';
-import { formatFriendlyDate, fromDateInputValue, todayInputValue } from '../finance/financeDates';
+import { formatFriendlyDate, fromDateInputValue, toDateInputValue, todayInputValue } from '../finance/financeDates';
 import { billStatusLabels, recurringFrequencyLabels } from '../finance/financeLabels';
 import {
   canRegisterRecurrence,
@@ -23,6 +23,7 @@ import {
   nextOccurrenceDate,
   payBill,
   recordRecurringPayment,
+  updateBill,
   updateBillStatus,
   updateCategory,
   updateRecurringRule,
@@ -75,6 +76,15 @@ export function BillsPage() {
   const [editFrequency, setEditFrequency] = useState<CreateRecurringRuleInput['frequency']>('monthly');
   const [editAccountId, setEditAccountId] = useState('');
   const [editCategoryId, setEditCategoryId] = useState('');
+  const [editNextOccurrenceAt, setEditNextOccurrenceAt] = useState(todayInputValue());
+
+  // ── edit conta avulsa sheet state ──
+  const [editingBill, setEditingBill] = useState<Bill | null>(null);
+  const [editBillDescription, setEditBillDescription] = useState('');
+  const [editBillAmount, setEditBillAmount] = useState('');
+  const [editBillCategoryId, setEditBillCategoryId] = useState('');
+  const [editBillAccountId, setEditBillAccountId] = useState('');
+  const [editBillDueDate, setEditBillDueDate] = useState(todayInputValue());
 
   // ── filtro de compromissos ──
   const [billFilter, setBillFilter] = useState<BillFilterKey>('open');
@@ -171,10 +181,15 @@ export function BillsPage() {
     setEditFrequency(rule.frequency);
     setEditAccountId(rule.accountId ?? '');
     setEditCategoryId(rule.categoryId ?? '');
+    setEditNextOccurrenceAt(toDateInputValue(rule.nextOccurrenceAt));
   }
 
   function handleSaveEditRule() {
     if (!workspaceId || !editingRule) return;
+
+    const editedDate = fromDateInputValue(editNextOccurrenceAt);
+    const dateChanged = editedDate.getTime() !== editingRule.nextOccurrenceAt.toDate().getTime();
+    const isMonthBased = editFrequency === 'monthly' || editFrequency === 'yearly';
 
     // Semanal e quinzenal andam em dias corridos, então a data vai derivando e o `anchorDay`
     // gravado na criação perde relação com o cronograma atual. Ao mudar pra mensal/anual é
@@ -186,6 +201,10 @@ export function BillsPage() {
     const becomesMonthBased = editFrequency === 'monthly' || editFrequency === 'yearly';
     const anchorDay = wasDayBased && becomesMonthBased
       ? editingRule.nextOccurrenceAt.toDate().getDate()
+      // Correção manual da data numa recorrência mensal/anual reancora no dia corrigido —
+      // senão o próximo ciclo voltaria a saltar pro dia antigo (mesma razão do caso acima).
+      : isMonthBased && dateChanged
+      ? editedDate.getDate()
       : undefined;
 
     updateRecurringRule(workspaceId, editingRule.id, {
@@ -195,11 +214,34 @@ export function BillsPage() {
       // antigo permanecia — ver updateRecurringRule.
       amountCents: editAmount.trim() ? parseMoneyToCents(editAmount) : null,
       frequency: editFrequency,
+      nextOccurrenceAt: editedDate,
       anchorDay,
       accountId: editAccountId || null,
       categoryId: editCategoryId || null,
     });
     setEditingRule(null);
+  }
+
+  // ── editar conta avulsa ──
+  function handleOpenEditBill(bill: Bill) {
+    setEditingBill(bill);
+    setEditBillDescription(bill.description);
+    setEditBillAmount(centsToInputValue(bill.amountCents));
+    setEditBillCategoryId(bill.categoryId ?? '');
+    setEditBillAccountId(bill.accountId ?? '');
+    setEditBillDueDate(toDateInputValue(bill.dueDate));
+  }
+
+  function handleSaveEditBill() {
+    if (!workspaceId || !editingBill) return;
+    updateBill(workspaceId, editingBill.id, {
+      description: editBillDescription.trim() || editingBill.description,
+      amountCents: editBillAmount.trim() ? parseMoneyToCents(editBillAmount) : editingBill.amountCents,
+      dueDate: fromDateInputValue(editBillDueDate),
+      categoryId: editBillCategoryId || null,
+      accountId: editBillAccountId || null,
+    });
+    setEditingBill(null);
   }
 
   // ── submit form (nova conta) ──
@@ -467,6 +509,9 @@ export function BillsPage() {
                           <>
                             <button className="button button--subtle button--compact" type="button" onClick={() => handleOpenPay({ kind: 'bill', item: bill })}>Pago</button>
                             <button className="button button--ghost button--compact" type="button" onClick={() => handleCancelBill(bill.id)}>Cancelar</button>
+                            <button className="icon-button" type="button" aria-label={`Editar ${bill.description}`} onClick={() => handleOpenEditBill(bill)}>
+                              <Pencil size={16} aria-hidden="true" />
+                            </button>
                           </>
                         ) : null}
                       </div>
@@ -577,6 +622,10 @@ export function BillsPage() {
             onChange={(v) => setEditFrequency(v as CreateRecurringRuleInput['frequency'])}
             options={recurringFrequencies.map((f) => ({ value: f, label: recurringFrequencyLabels[f] }))}
           />
+          <label className="field">
+            <span>Próximo vencimento</span>
+            <input className="input" type="date" value={editNextOccurrenceAt} onChange={(e) => setEditNextOccurrenceAt(e.target.value)} />
+          </label>
           <CategoryField
             value={editCategoryId}
             onChange={setEditCategoryId}
@@ -604,6 +653,57 @@ export function BillsPage() {
           />
           <div className="sheet-actions">
             <button className="button button--primary" type="button" onClick={handleSaveEditRule}>
+              Salvar alterações
+            </button>
+          </div>
+        </div>
+      </BottomSheet>
+
+      {/* ── Editar conta avulsa BottomSheet ── */}
+      <BottomSheet
+        open={Boolean(editingBill)}
+        onClose={() => setEditingBill(null)}
+        title="Editar conta"
+        subtitle={editingBill?.description}
+      >
+        <div className="form-stack">
+          <label className="field">
+            <span>Descrição</span>
+            <input className="input" value={editBillDescription} onChange={(e) => setEditBillDescription(e.target.value)} />
+          </label>
+          <label className="field">
+            <span>Valor</span>
+            <input className="input input--money" inputMode="decimal" value={editBillAmount} onChange={(e) => setEditBillAmount(e.target.value)} placeholder="0,00" />
+          </label>
+          <label className="field">
+            <span>Vencimento</span>
+            <input className="input" type="date" value={editBillDueDate} onChange={(e) => setEditBillDueDate(e.target.value)} />
+          </label>
+          <CategoryField
+            value={editBillCategoryId}
+            onChange={setEditBillCategoryId}
+            categories={finance.categories}
+            filterType="expense"
+            onCreateCategory={async (name, icon, type, color) => {
+              if (!workspaceId || !user) return;
+              const id = await createCategory(workspaceId, user.uid, { name, icon, type, color });
+              setEditBillCategoryId(id);
+            }}
+            onUpdateCategory={async (id, patch) => { if (!workspaceId) return; await updateCategory(workspaceId, id, patch); }}
+            onDeleteCategory={async (id) => { if (!workspaceId) return; await deleteCategory(workspaceId, id); }}
+          />
+          <SelectField
+            label="Conta de pagamento"
+            value={editBillAccountId}
+            onChange={setEditBillAccountId}
+            options={[
+              { value: '', label: 'Definir depois' },
+              ...finance.accounts.map((a) => ({ value: a.id, label: a.name }))
+            ]}
+            placeholder="Definir depois"
+          />
+          <div className="sheet-actions">
+            <button className="button button--primary" type="button" onClick={handleSaveEditBill}>
               Salvar alterações
             </button>
           </div>

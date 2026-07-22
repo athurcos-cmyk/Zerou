@@ -586,6 +586,27 @@ export async function updateBillStatus(workspaceId: string, billId: string, stat
   }));
 }
 
+/**
+ * Edita uma conta avulsa (descrição/valor/categoria/conta/vencimento). Não existia edição
+ * nenhuma além de status ("Pago"/"Cancelar") — só corrigir a data era impossível.
+ *
+ * `undefined` = **não mexe** no campo; `null` = **limpa** o campo (mesma convenção de
+ * `updateRecurringRule`, ver comentário lá pro porquê da distinção).
+ */
+export function updateBill(
+  workspaceId: string,
+  billId: string,
+  patch: { description?: string; amountCents?: number; dueDate?: Date; categoryId?: string | null; accountId?: string | null }
+) {
+  const updates: Record<string, unknown> = { updatedAt: serverTimestamp() };
+  if (patch.description !== undefined) updates.description = patch.description;
+  if (patch.amountCents !== undefined) updates.amountCents = patch.amountCents;
+  if (patch.dueDate !== undefined) updates.dueDate = Timestamp.fromDate(patch.dueDate);
+  if (patch.categoryId !== undefined) updates.categoryId = patch.categoryId === null ? deleteField() : patch.categoryId;
+  if (patch.accountId !== undefined) updates.accountId = patch.accountId === null ? deleteField() : patch.accountId;
+  fireWrite(updateDoc(documentRef(workspaceId, 'bills', billId), updates));
+}
+
 /** Marca como `overdue` toda bill `pending` cujo dia de vencimento já passou. Chamado a
  * cada snapshot de `subscribeBills` — silencioso, sem feedback de UI (não é ação do usuário). */
 export function markOverdueBills(workspaceId: string, bills: Array<Pick<Bill, 'id' | 'status' | 'dueDate'>>) {
