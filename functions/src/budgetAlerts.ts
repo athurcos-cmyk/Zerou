@@ -2,6 +2,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { logger } from 'firebase-functions';
 import { sendPushToUser } from './push.js';
+import { createActiveMemberCheck } from './shared/activeMember.js';
 
 const region = 'southamerica-east1';
 
@@ -35,6 +36,7 @@ export const sendBudgetAlerts = onSchedule(
   },
   async () => {
     const db = getFirestore();
+    const isActiveMember = createActiveMemberCheck();
     const month = currentYearMonth();
     const year = currentYear();
     const mon = currentMonth();
@@ -60,6 +62,12 @@ export const sendBudgetAlerts = onSchedule(
       const createdBy = budget.createdBy as string;
 
       if (!workspaceId || !categoryId || !limitCents || !createdBy) continue;
+
+      // Só notifica quem ainda é membro ativo do espaço: o Admin SDK ignora as regras, então
+      // sem isto um ex-parceiro receberia nome de categoria e valores gastos de um espaço que
+      // já não acessa (ver shared/activeMember.ts). Checar aqui, ANTES da consulta de gastos
+      // do mês, também evita a leitura cara pra quem saiu.
+      if (!(await isActiveMember(workspaceId, createdBy))) continue;
 
       // Check alert state — has this threshold been notified this month?
       const alertStateRef = db

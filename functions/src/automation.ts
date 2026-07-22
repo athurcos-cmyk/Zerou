@@ -3,6 +3,7 @@ import { getMessaging } from 'firebase-admin/messaging';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { logger } from 'firebase-functions';
 import { sendPushToUser } from './push.js';
+import { createActiveMemberCheck } from './shared/activeMember.js';
 
 const region = 'southamerica-east1';
 
@@ -38,6 +39,7 @@ export const closeInvoicesDue = onSchedule(
   { schedule: '0 0 * * *', timeZone: 'America/Sao_Paulo', region, maxInstances: 1 },
   async () => {
     const db = getFirestore();
+    const isActiveMember = createActiveMemberCheck();
     const today = nowInBRT().getDate();
     const currentMonth = currentYearMonth();
     let closed = 0;
@@ -71,7 +73,10 @@ export const closeInvoicesDue = onSchedule(
           });
           closed++;
 
-          if (ownerUserId) {
+          // Só notifica quem ainda é membro ativo: o Admin SDK ignora as regras, então
+          // sem esta checagem um ex-parceiro receberia o valor da fatura de um espaço que
+          // já não acessa. Ver shared/activeMember.ts.
+          if (ownerUserId && (await isActiveMember(workspaceId, ownerUserId))) {
             // outstandingBalanceCents e mantido incrementalmente por
             // invoiceLedgerEntryTrigger.ts — não precisa mais resomar o ledger aqui.
             const outstandingCents = (invoiceDoc.data().outstandingBalanceCents as number | undefined) ?? 0;
@@ -189,6 +194,7 @@ export const sendDueReminders = onSchedule(
   { schedule: '0 8 * * *', timeZone: 'America/Sao_Paulo', region, maxInstances: 1 },
   async () => {
     const db = getFirestore();
+    const isActiveMember = createActiveMemberCheck();
     const now = nowInBRT();
     const threeDaysAhead = new Date(now);
     threeDaysAhead.setDate(threeDaysAhead.getDate() + 3);
@@ -212,6 +218,15 @@ export const sendDueReminders = onSchedule(
         amountCents: number;
         dueDate: Timestamp;
       };
+
+      // A query é `collectionGroup`, então o bill pode vir de QUALQUER workspace — o id vem
+      // do caminho (`workspaces/{ws}/bills/{id}`). Só notifica quem ainda é membro ativo:
+      // sem isso um ex-parceiro receberia descrição e valor de uma conta de um espaço que
+      // já não acessa. Ver shared/activeMember.ts.
+      const billWorkspaceId = billDoc.ref.parent.parent?.id;
+      if (!(await isActiveMember(billWorkspaceId, bill.createdBy))) {
+        continue;
+      }
 
       const dayLabel = bill.dueDate.toDate().toLocaleDateString('pt-BR', {
         day: '2-digit',
