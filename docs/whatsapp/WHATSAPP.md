@@ -8,6 +8,8 @@ Integracao oficial com a Meta Cloud API v25.0 para controle financeiro completo 
 
 **Editar/excluir algo ja lancado nao e suportado** (intent `unsupported_action`, 2026-07-16): pedidos como "exclui essa transacao", "apaga o gasto de mercado", "corrige o valor" sao reconhecidos e respondidos com orientacao pra fazer pelo app — em vez de cair no "nao entendi" generico ou, pior, ser silenciosamente ignorado.
 
+**Criar conta a pagar/recorrencia tambem nao e suportado** (intent `bill_management_action`, 2026-07-22, achado pelo dono testando a feature de cartao como forma de pagamento no app): pedidos como "cria uma conta pra pagar o aluguel todo mes", "cadastra a Netflix como conta fixa", "poe minha academia como recorrencia mensal" sao reconhecidos e redirecionados pro app (aba *Contas a Pagar*) — antes desse intent nao existir, o risco real era o DeepSeek forcar a classificacao em `expense`/`card_purchase` (por ter valor+descricao) e o bot criar uma transacao avulsa comum no lugar de uma conta a pagar/recorrencia de verdade, sem vencimento nem repeticao nenhuma. Diferente de `unsupported_action` (que e sobre editar/excluir algo que **ja existe**) — este cobre pedido de **criar** um compromisso futuro/recorrente novo.
+
 **Cartao**: cobre so compra nova (a vista ou parcelada). Se o usuario tem mais de um cartao ativo, o bot pergunta qual usar (lista numerada) e espera a resposta por ate 3 minutos antes de descartar. Pedidos mais avancados — parcela que ja estava em andamento antes de usar o WhatsApp, antecipar parcela/fatura, renegociar — sao redirecionados pro app, nao executados pelo bot.
 
 **Conta (despesa/receita/transferencia)** (2026-07-18): quando o workspace tem mais de uma conta ativa, o bot precisa saber qual debitar/creditar. Resolucao em 3 niveis, igual pro debito/credito de uma despesa/receita e pra cada lado (origem/destino) de uma transferencia:
@@ -311,6 +313,15 @@ Atualmente DESATIVADA (comentada em `webhookHandler.ts`). Para reativar:
 Verificar logs do webhook. Erros 429/503 tem retry automatico. Outros erros resultam em mensagem "Nao consegui entender o valor" para o usuario.
 
 ## Historico
+
+### 2026-07-22 — Novo intent `bill_management_action`: pedir pra criar conta a pagar/recorrencia redireciona pro app
+
+- **Achado pelo dono** testando ao vivo a feature nova de cartao como forma de pagamento em Contas a Pagar (app): perguntou se fazia sentido a Vic tambem tratar pedido de criar conta fixa/recorrencia via mensagem. Investigacao confirmou que **nao existia nenhum intent pra isso** — nem pra criar, nem redirecionamento — diferente de `unsupported_action` (que ja cobria EDITAR/EXCLUIR conta a pagar/recorrencia existente, mas nao CRIAR uma nova).
+- **Risco real identificado**: sem uma regra explicita no prompt, um pedido tipo "cria uma conta pra pagar o aluguel todo mes" nao tinha classificacao garantida — o DeepSeek podia forcar em `expense`/`card_purchase` (por ter valor+descricao) e o bot criar uma transacao avulsa comum no lugar de uma bill/recorrencia de verdade (sem vencimento nem repeticao).
+- **Novo intent `bill_management_action`** em `interpretMessage.ts` — regra: pedido pra CRIAR/CADASTRAR conta a pagar, recorrencia, conta fixa ou assinatura recorrente (compromisso FUTURO, nao um gasto ja feito). Tratado em `webhookHandler.ts` com redirecionamento fixo pro app (aba *Contas a Pagar*), mesmo padrao (mensagem estatica, sem chamar DeepSeek de novo) de `advanced_card_action`/`unsupported_action`.
+- **Vic do app tambem ganhou reforço equivalente** (regra 12 do `SYSTEM_PROMPT`, ver `docs/ai/VIC.md`): mesmo sendo 100% consultiva (sem tools, nunca escreve no Firestore, entao nao corre risco de "executar errado"), nao havia nenhuma instrucao explicita dizendo pra ela deixar claro que nao executa acao nenhuma quando pedirem — ficava a criterio livre do modelo. Agora ela aponta a tela certa do app em vez de deixar ambiguo se algo foi salvo.
+- Sem teste automatizado novo (classificacao de intent e 100% LLM-guiada pelo prompt, sem parser de palavras-chave — mesma limitacao de cobertura de teste que os outros intents baseados em DeepSeek, `interpretMessage.test.ts` nao existe nesta pasta). `npm --prefix functions run build`/`test` (114 testes) limpos.
+- Pendente de deploy/autorizacao do dono no momento em que isso foi escrito.
 
 ### 2026-07-22 — Mensagens do bot redesenhadas: emoji coerente, negrito, listas mais claras
 

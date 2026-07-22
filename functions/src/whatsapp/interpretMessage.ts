@@ -19,6 +19,7 @@ export type MessageIntent =
   | 'card_purchase'
   | 'advanced_card_action'
   | 'unsupported_action'
+  | 'bill_management_action'
   | 'create_category'
   | 'question'
   | 'advisory_decision'
@@ -46,7 +47,7 @@ function buildSystemPrompt(): string {
   return `Voce interpreta mensagens em portugues brasileiro enviadas ao bot financeiro Granativa via WhatsApp.
 Retorne SOMENTE um JSON com este formato:
 {
-  "intent": "expense" | "income" | "transfer" | "card_purchase" | "advanced_card_action" | "unsupported_action" | "create_category" | "question" | "advisory_decision" | "unclear",
+  "intent": "expense" | "income" | "transfer" | "card_purchase" | "advanced_card_action" | "unsupported_action" | "bill_management_action" | "create_category" | "question" | "advisory_decision" | "unclear",
   "amountCents": inteiro em centavos (0 se nao aplicavel),
   "description": descricao curta (max 80 chars, "" se nao aplicavel),
   "installments": numero de parcelas (1 se nao mencionado ou compra a vista, so relevante pra card_purchase),
@@ -79,6 +80,14 @@ Como classificar intent:
   lancamentos novos. Ex.: "exclui essa transacao", "apaga o gasto de mercado", "corrige o valor pra 50",
   "muda a categoria daquela despesa", "remove a conta de luz". Diferente de advanced_card_action (que e
   so sobre fatura/parcela de cartao) — este cobre qualquer edicao/exclusao de algo ja existente.
+- bill_management_action: pedido pra CRIAR ou CADASTRAR uma conta a pagar, recorrencia, conta fixa ou
+  assinatura recorrente — um compromisso FUTURO com vencimento/repeticao, NAO um gasto que ja aconteceu.
+  Ex.: "cria uma conta pra pagar o aluguel todo mes", "quero cadastrar a Netflix como conta fixa",
+  "adiciona uma conta avulsa da internet que vence dia 10", "poe minha academia como recorrencia mensal",
+  "cadastra uma assinatura de R$40 todo mes". O bot NAO cria conta a pagar/recorrencia por mensagem, so
+  lancamentos que ja aconteceram (expense/income/card_purchase). Diferente de expense/card_purchase (que
+  registram um gasto/compra JA FEITO agora) e de unsupported_action (que e sobre editar/excluir algo que
+  JA EXISTE) — este cobre pedido de CRIAR um compromisso futuro/recorrente novo.
 - create_category: PEDIDO EXPLICITO para criar categoria (verbos "cria"/"criar"/"adiciona" + a palavra "categoria").
   NUNCA use create_category so porque a categoria ideal nao existe — nesse caso e expense/income/card_purchase
   com categoryId null.
@@ -174,7 +183,8 @@ export async function interpretMessage(
     };
 
     const validIntents: MessageIntent[] = [
-      'expense', 'income', 'transfer', 'card_purchase', 'advanced_card_action', 'unsupported_action', 'create_category', 'question', 'advisory_decision', 'unclear',
+      'expense', 'income', 'transfer', 'card_purchase', 'advanced_card_action', 'unsupported_action',
+      'bill_management_action', 'create_category', 'question', 'advisory_decision', 'unclear',
     ];
     const intent: MessageIntent = validIntents.includes(parsed.intent as MessageIntent)
       ? (parsed.intent as MessageIntent)

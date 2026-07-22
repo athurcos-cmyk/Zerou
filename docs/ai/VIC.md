@@ -19,7 +19,7 @@ Vic é a assistente de IA do Granativa. Ela responde perguntas sobre os gastos d
 | `functions/src/ai/onboardingLabels.ts` | Espelha `src/onboarding/onboardingOptions.tsx` (id → label legível, sem ícone) — Cloud Functions não importa `src/` do app cliente. Usado por `buildFinancialContext.ts` pra traduzir `onboardingGoal`/`onboardingChallenge` num texto natural. Manter em sincronia manualmente. |
 | `functions/src/ai/verifyWorkspaceMembership.ts` | Verifica `workspaces/{id}/members/{uid}` com `status == 'active'`. |
 | `functions/src/ai/financialAssistant.ts` | Cloud Function `onCall` principal. Fluxo: auth → membership → rate limit pre-check → contexto → DeepSeek → rate limit increment. |
-| `functions/src/ai/buildFinancialContext.test.ts` | 21 testes: gastos com categoria, card_purchase, fallback string vazia, deletados, bills, null dueDate, workspace vazio, payday, missing profile, budgets, goals, trend, couple goals, couple sem workspace, objetivo/desafio declarado (label legível + id desconhecido ignorado). |
+| `functions/src/ai/buildFinancialContext.test.ts` | 26 testes: gastos com categoria, card_purchase, fallback string vazia, deletados, bills, null dueDate, workspace vazio, payday, missing profile, budgets, goals, trend, couple goals, couple sem workspace, objetivo/desafio declarado (label legível + id desconhecido ignorado), + 5 sobre o cutoff dinâmico (2026-07-22): receita futura estende o Comprometido além de 30 dias, conta depois da receita não entra, modo conservador respeita `committedWindowDays` do perfil, fatura aberta além do cutoff não entra, fatura fechada sempre entra. |
 | `functions/src/ai/verifyWorkspaceMembership.test.ts` | 4 testes: ativo, inexistente, removido, dados nulos. |
 | `src/pages/AssistantPage.tsx` | UI do chat. Bolhas (usuário laranja direita, Vic cinza esquerda), sugestões iniciais, loading "Pensando...", erros amigáveis. |
 | `src/styles/global.css` | Estilos `.assistant-*` (~140 linhas no final do arquivo). Cores só com `var(--*)`. |
@@ -69,9 +69,10 @@ O contexto é dividido em até 10 seções (algumas só aparecem quando há dado
 - Top 5 categorias de gasto no mês atual com comparação vs. mês anterior
 - Conta `expense` + `card_purchase`, excluindo `deletedAt`
 
-**=== COMPROMETIDO (próximos 30 dias) ===**
-- **Contas a pagar**: unifica `bills` (status `pending`/`overdue`, vencimento em até 30 dias ou já vencidas) + `recurring` ativas com `amountCents > 0` e `nextOccurrenceAt` nos próximos 30 dias ou já passada. Recorrentes são anotadas com "(se repete)". Ordenadas: VENCIDAS primeiro, depois avulsas por data, depois recorrentes.
-- **Faturas de cartão**: `invoices` com status `open`/`closed`/`overdue`/`partial` e saldo devedor > 0. Lê `outstandingBalanceCents` direto — esse campo é mantido incrementalmente por `invoiceLedgerEntryTrigger.ts` a cada lançamento novo no ledger (ver "Bugs corrigidos")
+**=== COMPROMETIDO (até {data do cutoff}) ===`** (cabeçalho dinâmico desde 2026-07-22 — antes dizia sempre "próximos 30 dias", ver "Bugs corrigidos")
+- O cutoff usa a **mesma lógica do Dashboard** (`resolveCommittedCutoff`, portada pra `functions/src/shared/committedCutoff.ts`): modo `conservative` → janela fixa (`committedWindowDays`, padrão 30); modo `until_payday` → próxima receita já lançada, senão a data de recebimento do perfil (`payday`), senão a janela.
+- **Contas a pagar**: unifica `bills` (status `pending`/`overdue`, vencimento até o cutoff ou já vencidas) + `recurring` ativas com `amountCents > 0` e `nextOccurrenceAt` até o cutoff ou já passada. Recorrentes são anotadas com "(se repete)". Ordenadas: VENCIDAS primeiro, depois avulsas por data, depois recorrentes.
+- **Faturas de cartão**: `invoices` com status `open`/`closed`/`overdue`/`partial` e saldo devedor > 0. Fatura `closed` sempre entra; `open` só se o vencimento real cair até o cutoff (mesma regra do client) — antes de 2026-07-22 toda fatura em aberto entrava incondicionalmente. Lê `outstandingBalanceCents` direto — esse campo é mantido incrementalmente por `invoiceLedgerEntryTrigger.ts` a cada lançamento novo no ledger (ver "Bugs corrigidos")
 - Total comprometido quebrado por tipo (contas + faturas)
 
 **Coleções consultadas**: `categories`, `transactions`, `bills`, `recurring`, `cards` + `cards/*/invoices`, `accounts`
@@ -119,6 +120,7 @@ Está em `financialAssistant.ts:16-24` (constante `SYSTEM_PROMPT`). Regras:
 9. Pode usar `**negrito**` para ênfase e listas com `-` (adicionado 2026-07-14)
 10. **Decisão financeira grande ou de risco (empréstimo, financiamento, renegociar dívida, tirar cartão novo ou vale a pena a anuidade) não recebe veredito pronto nem só "procure um profissional"** (adicionado 2026-07-18, pedido do dono; refinado no mesmo dia pra incluir decisão de cartão e excluir investimento — ver regra 11): a Vic faz 1-2 perguntas objetivas usando os dados reais da pessoa (ex., empréstimo: "quanto seria a parcela? cabe no seu Livre pra Gastar?"; cartão: "a anuidade compensa com o quanto você usa os benefícios? já tem outro cartão que cobre isso?") pra ajudar a pessoa a pensar sozinha antes de opinar — só depois desse raciocínio, se ainda fizer sentido, sugere profissional qualificado como complemento, nunca nomeando produto (regra 6). Perguntas do dia a dia (gasto do mês, compra pequena) continuam respondidas direto, sem esse cuidado extra. Motivação: usuários reais vão usar a Vic pra tomar decisão de verdade — só recusar/deflectir não ajuda tanto quanto guiar o raciocínio. Depende de histórico de conversa pra funcionar bem (ida e volta) — por isso ficou só no app, que já manda `history` a cada chamada; o WhatsApp (sem histórico) redireciona pro app nesse caso em vez de tentar essa conversa (ver `docs/whatsapp/WHATSAPP.md`, intent `advisory_decision`). Existe também um disclaimer formal nos Termos de Uso (seção 9), mas ele não aparece na conversa — essa regra é o reforço comportamental.
 11. **Pergunta de investimento (onde investir, ações, tesouro direto, fundos, cripto, previdência) NÃO recebe as perguntas de reflexão da regra 10 — tratamento mais rígido** (adicionado 2026-07-18, pedido explícito do dono: "o ideal sobre investimento é nem falar sobre e falar direito pra buscar um profissional"): zero análise de produto/estratégia, mesmo se pedirem direto. Investimento é atividade regulamentada (exige profissional licenciado — CVM no Brasil), diferente de empréstimo/cartão que são só matemática de orçamento. Explica com carinho (não é recusa fria) e direciona pra profissional/consultor de investimentos qualificado — mas pode continuar ajudando com o que está no escopo dela (ex.: quanto seria um valor razoável pra reserva, com base nos gastos reais).
+12. **Nunca finge executar ação nenhuma** (adicionado 2026-07-22, achado pelo dono: pedido de "cadastra minha academia como conta fixa" não tinha regra nenhuma dizendo como reagir — ficava a critério livre do modelo). A Vic do app é 100% consultiva — sem tools/function-calling, nunca escreve no Firestore. Se pedirem pra criar/editar/excluir transação, conta a pagar, recorrência, cartão, categoria, meta ou orçamento, ela deixa claro que não executa isso no chat e aponta a tela certa do app (Contas a Pagar, Cartões, Transações, Metas/Orçamentos) — nunca deixa a pessoa achar que algo foi salvo. Espelha o mesmo cuidado que o WhatsApp já tinha (`unsupported_action`/`advanced_card_action`, ver `docs/whatsapp/WHATSAPP.md`), que também ganhou um intent novo `bill_management_action` no mesmo dia pra cobrir especificamente pedido de CRIAR conta a pagar/recorrência (antes não existia nenhum, e o risco real era o DeepSeek forçar isso em `expense`/`card_purchase` e criar um lançamento avulso comum no lugar).
 
 Para alterar o tom/persona: editar `SYSTEM_PROMPT`. Para alterar o nome: editar o prompt + `src/pages/AssistantPage.tsx` (título `<h1>`).
 
@@ -144,6 +146,7 @@ O cliente (`AssistantPage.tsx`) converte `**negrito**` → `<strong>` e `*itáli
 | 2026-07-16 | Fatura em aberto sempre reportada como R$ 0,00 | `outstandingBalanceCents` nunca era persistido de verdade no documento da fatura (nascia 0, só o client recalculava do ledger); `buildFinancialContext` lia o campo cru | `outstandingBalanceCents` passou a ser mantido incrementalmente por `invoiceLedgerEntryTrigger.ts`; `buildFinancialContext` lê o campo direto, sem heurística |
 | 2026-07-16 | Saldo de conta às vezes errado (mesma classe do bug acima) | Saldo recalculado somando só as transações dos **últimos 90 dias** — conta com movimentação antes disso ficava sub/sobre-contada | Lê `account.currentBalanceCents` (mantido incrementalmente a cada transação, sem limite de janela) |
 | 2026-07-16 | Correção acima ficou fora do ar por horas depois de commitada | `git push` não reimplanta Cloud Functions — precisa de `firebase deploy` manual, e o deploy anterior tinha rodado ANTES da correção existir | Deploy manual rodado; ver aviso permanente em `docs/RUNBOOK.md` sobre isso não ser automático |
+| 2026-07-22 | Vic podia relatar "Comprometido" diferente do Dashboard | `buildFinancialContext.ts` calculava a janela do COMPROMETIDO com `now + 30 dias` fixo, hardcoded, ignorando o `AvailableMode` (conservador/até o recebimento) e a receita futura já lançada que o Dashboard já considera via `resolveCommittedCutoff` | Portado `resolveCommittedCutoff`/`findNextIncomeDate`/`nextPaydayFrom` pra `functions/src/shared/committedCutoff.ts` (mesmo padrão de `accountEffects.ts`) e usado no lugar da janela fixa — verificado ao vivo (Vic e Dashboard reportando o mesmo valor pro mesmo workspace). Planejado com `/plan-eng-review`. Deployado (`functions:billing:financialAssistantChat`) |
 
 ### Comportamentos esperados (não são bugs)
 
@@ -160,7 +163,7 @@ O cliente (`AssistantPage.tsx`) converte `**negrito**` → `<strong>` e `*itáli
 npm --prefix functions run test
 ```
 
-21 testes em `buildFinancialContext.test.ts`:
+26 testes em `buildFinancialContext.test.ts`:
 - Gastos com categorias (expense normal)
 - `card_purchase` conta como gasto
 - Fallback `||` para `competenceMonth`/`categoryId` vazios
@@ -181,6 +184,11 @@ npm --prefix functions run test
 - Casal sem workspace não mostra seção
 - Objetivo/desafio declarado no onboarding aparece traduzido em SEU CICLO
 - Id de objetivo desconhecido/removido é ignorado, nunca vaza cru pro prompt
+- Receita futura já lançada estende o Comprometido além de 30 dias (2026-07-22)
+- Conta vencendo depois da receita futura não entra no Comprometido (2026-07-22)
+- Modo conservador respeita `committedWindowDays` do perfil, não 30 dias fixo (2026-07-22)
+- Fatura de cartão em aberto vencendo além do cutoff não entra (2026-07-22)
+- Fatura fechada sempre entra, mesmo com vencimento além do cutoff (2026-07-22)
 
 4 testes em `verifyWorkspaceMembership.test.ts`:
 - Membro ativo → resolve

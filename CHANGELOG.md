@@ -2,6 +2,28 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-22 — fix: Vic (app e WhatsApp) não tenta mais executar ação nenhuma via chat
+
+Achado testando ao vivo a feature de cartão como forma de pagamento (item abaixo): pedir pra Vic "cadastrar uma conta fixa" não tinha tratamento nenhum — nem no app, nem no WhatsApp.
+
+- WhatsApp ganha o intent `bill_management_action`: pedido de CRIAR conta a pagar/recorrência/conta fixa/assinatura é reconhecido e redirecionado pro app (aba *Contas a Pagar*) — antes não existia nenhuma regra cobrindo isso, e o risco real era o DeepSeek forçar a classificação em `expense`/`card_purchase` e criar uma transação avulsa comum no lugar de uma conta a pagar de verdade.
+- Vic do app (100% consultiva, sem tools/function-calling, nunca escreve no Firestore) ganha regra 12 explícita no `SYSTEM_PROMPT`: nunca finge executar criar/editar/excluir nada — aponta a tela certa do app em vez de deixar ambíguo se algo foi salvo.
+- Comentário da seção COMPROMETIDO no `SYSTEM_PROMPT` corrigido (ainda dizia "próximos 30 dias", desatualizado desde o fix do item abaixo).
+- Sem teste automatizado novo (classificação de intent é 100% guiada por prompt/LLM, sem parser determinístico — mesma limitação dos outros intents baseados em DeepSeek). `npm --prefix functions run build`/`test` (114) limpos.
+- Detalhe completo: `docs/ai/VIC.md`, `docs/whatsapp/WHATSAPP.md`.
+
+## 2026-07-22 — feat: cartão de crédito como forma de pagamento em Contas a Pagar + datas editáveis + fix da Vic
+
+Pedido do dono: assinatura/conta fixa paga no cartão (o caso mais comum — Netflix, plano de saúde) não tinha como ser registrada como realmente acontece — "Conta de pagamento" só listava contas bancárias. Junto, duas queixas: não dava pra corrigir a data de uma recorrência depois de criada, e conta avulsa não tinha edição nenhuma além de "Pago"/"Cancelar". Aproveitado pra revisar a lógica Disponível/Comprometido, que achou uma divergência real entre a Vic e o Dashboard.
+
+- Planejado com `/plan-eng-review` (achado: import circular entre `financeService`/`cardService`, corrigido extraindo `src/finance/accountBatchEffects.ts`; 2 achados de DRY corrigidos com `resolvePaymentMethod.ts`/`accountOrCardOptions.ts`). Entregue em 3 commits independentes por raio de impacto.
+- **Vic**: calculava "Comprometido" com janela fixa de 30 dias, ignorando o modo (conservador/até o recebimento) que o Dashboard já usa — portado `resolveCommittedCutoff` pra `functions/src/shared/committedCutoff.ts`; verificado ao vivo que Vic e Dashboard agora batem (`R$ 22.190,00` nos dois). Dashboard também ganhou o nome do modo na legenda do "Comprometido".
+- **Datas editáveis**: sheet de editar recorrência ganhou campo de vencimento (reancora o dia do mês automaticamente ao corrigir); nova `updateBill` + sheet completo de editar conta avulsa (antes só existiam os botões "Pago"/"Cancelar").
+- **Cartão como pagamento**: `Bill`/`RecurringRule` ganham `cardId` opcional (avulsa também `installments` — recorrência nunca parcela); os 3 seletores de "conta de pagamento" em `BillsPage.tsx` passam a listar cartões ativos (rótulo renomeado pra "Conta ou cartão"); `payBill`/`recordRecurringPayment` criam a compra na fatura no mesmo batch que marca a conta como paga (atômico, sem duplicar). `firestore.rules` + `test:rules` (65/65 no emulador).
+- Verificado ao vivo de ponta a ponta na conta de teste: recorrência e avulsa parcelada (3x) pagas no cartão, fatura somando certo mês a mês, Vic relatando o mesmo "Comprometido" do Dashboard.
+- Deploy autorizado pelo dono e feito: `firestore:rules` e `functions:billing:financialAssistantChat`.
+- Detalhe completo: `docs/history/2026-07.md`.
+
 ## 2026-07-22 — rename: assistente de IA "Grazi" → "Vic"
 
 Pedido do dono: renomear a assistente de IA do app. Passou primeiro por "Vitória", depois por decisão de última hora no mesmo dia virou "Vic".

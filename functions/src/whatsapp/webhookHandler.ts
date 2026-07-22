@@ -382,6 +382,15 @@ export const whatsappWebhook = onRequest(
         return;
       }
 
+      // ── Criar conta a pagar/recorrencia (compromisso futuro, nao um gasto ja feito) ──
+      if (interpretation.intent === 'bill_management_action') {
+        await sendWhatsAppMessage(
+          phone,
+          '📋 Cadastrar conta a pagar ou recorrência é melhor fazer direto pelo app, na aba *Contas a Pagar* — lá dá pra definir vencimento, frequência e até pagar no cartão.\n\nPor aqui eu só registro lançamentos que já aconteceram (gasto, receita, compra no cartão).',
+        );
+        return;
+      }
+
       // ── Decisao financeira grande (emprestimo, investir reserva, renegociar divida) —
       // redireciona pro app: a Vic por la tem historico de conversa e consegue ir e voltar
       // com a pessoa pra ajudar a pensar, o que o WhatsApp (mensagem isolada, sem memoria)
