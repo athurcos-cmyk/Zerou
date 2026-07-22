@@ -62,7 +62,10 @@ export interface DashboardSummary {
   upcomingCommitments: UpcomingCommitment[];
   recentTransactions: Transaction[];
   nextIncomeAt: Date | null;
-  /** `null` no modo conservador: não existe data de corte, tudo que se deve conta. */
+  /** Sempre um `Date` concreto — `resolveCommittedCutoff` nunca retorna `null`, nem no
+   * modo conservador (usa a janela fixa de dias como corte). O tipo aceita `null` porque
+   * `buildUpcomingCommitments` também é chamada diretamente (fora deste fluxo) com
+   * `cutoff: null` pra representar "sem data-limite, tudo que se deve conta". */
   committedCutoff: Date | null;
   committedCutoffSource: CommittedCutoffSource;
 }
@@ -293,7 +296,9 @@ export function buildUpcomingCommitments(
 }
 
 export interface CommittedCutoff {
-  /** `null` no modo conservador: não existe data-limite, tudo que se deve conta. */
+  /** `resolveCommittedCutoff` sempre devolve um `Date` concreto aqui, inclusive no modo
+   * conservador (janela fixa de dias) — `null` só é usado por quem chama
+   * `buildUpcomingCommitments` diretamente, fora deste fluxo, pra dizer "sem data-limite". */
   cutoff: Date | null;
   source: CommittedCutoffSource;
   nextIncomeAt: Date | null;

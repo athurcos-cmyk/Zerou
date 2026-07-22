@@ -418,6 +418,121 @@ describe('buildFinancialContext', () => {
     expect(context).not.toContain('SEU CICLO');
   });
 
+  it('usa o cutoff real (não mais 30 dias fixo): uma receita futura já lançada estende o Comprometido além de 30 dias', async () => {
+    // Achado do /plan-eng-review: buildFinancialContext usava uma janela fixa de 30 dias,
+    // ignorando o AvailableMode/receita futura já lançada — divergindo do Dashboard
+    // (resolveCommittedCutoff). Uma conta vencendo em 45 dias, com renda lançada em 50
+    // dias, precisa contar como comprometido (o Dashboard já faz isso).
+    const in45Days = makeDateFuture(45);
+    const in50Days = makeDateFuture(50);
+    const db = mockDb(
+      { 'users/user1': { availableMode: 'until_payday' } },
+      {
+        ...emptyCollections,
+        'workspaces/ws1/categories': [],
+        'workspaces/ws1/transactions': [
+          fakeDoc('txn_income', { type: 'income', amountCents: 300000, date: Timestamp.fromDate(in50Days) }),
+        ],
+        'workspaces/ws1/bills': [
+          fakeDoc('bill_far', { description: 'IPVA', amountCents: 90000, status: 'pending', dueDate: Timestamp.fromDate(in45Days) }),
+        ],
+        'workspaces/ws1/accounts': [],
+      },
+    );
+
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
+    expect(context).toContain('IPVA');
+    expect(context).toContain('Tem uma receita futura ja lancada');
+  });
+
+  it('conta vencendo depois da receita futura já lançada NÃO entra no Comprometido', async () => {
+    const in50Days = makeDateFuture(50);
+    const in60Days = makeDateFuture(60);
+    const db = mockDb(
+      { 'users/user1': { availableMode: 'until_payday' } },
+      {
+        ...emptyCollections,
+        'workspaces/ws1/categories': [],
+        'workspaces/ws1/transactions': [
+          fakeDoc('txn_income', { type: 'income', amountCents: 300000, date: Timestamp.fromDate(in50Days) }),
+        ],
+        'workspaces/ws1/bills': [
+          fakeDoc('bill_far', { description: 'Seguro Anual', amountCents: 50000, status: 'pending', dueDate: Timestamp.fromDate(in60Days) }),
+        ],
+        'workspaces/ws1/accounts': [],
+      },
+    );
+
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
+    expect(context).not.toContain('Seguro Anual');
+  });
+
+  it('modo conservador respeita committedWindowDays do perfil, não 30 dias fixo', async () => {
+    const in20Days = makeDateFuture(20);
+    const db = mockDb(
+      { 'users/user1': { availableMode: 'conservative', committedWindowDays: 10 } },
+      {
+        ...emptyCollections,
+        'workspaces/ws1/categories': [],
+        'workspaces/ws1/transactions': [],
+        'workspaces/ws1/bills': [
+          fakeDoc('bill_20d', { description: 'Fatura anual', amountCents: 30000, status: 'pending', dueDate: Timestamp.fromDate(in20Days) }),
+        ],
+        'workspaces/ws1/accounts': [],
+      },
+    );
+
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
+    expect(context).not.toContain('Fatura anual');
+    expect(context).toContain('Janela de 10 dias');
+  });
+
+  it('fatura de cartão em aberto vencendo além do cutoff NÃO entra no Comprometido', async () => {
+    // Antes desta correção, toda fatura com saldo devedor entrava incondicionalmente —
+    // agora só entra se `closed` (sempre) ou o vencimento real cair até o cutoff.
+    const in90Days = makeDateFuture(90);
+    const db = mockDb({}, {
+      ...emptyCollections,
+      'workspaces/ws1/categories': [],
+      'workspaces/ws1/transactions': [],
+      'workspaces/ws1/bills': [],
+      'workspaces/ws1/accounts': [],
+      'workspaces/ws1/cards': [fakeDoc('card1', { name: 'Nubank' })],
+      'workspaces/ws1/cards/card1/invoices': [
+        fakeDoc('inv_far', {
+          cardId: 'card1', referenceMonth: '2027-01', status: 'open',
+          outstandingBalanceCents: 40000, dueDate: Timestamp.fromDate(in90Days),
+        }),
+      ],
+    });
+
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
+    expect(context).not.toContain('Nubank');
+    expect(context).not.toMatch(/R\$\s*400[,.]00/);
+  });
+
+  it('fatura fechada sempre entra no Comprometido, mesmo com vencimento além do cutoff', async () => {
+    const in90Days = makeDateFuture(90);
+    const db = mockDb({}, {
+      ...emptyCollections,
+      'workspaces/ws1/categories': [],
+      'workspaces/ws1/transactions': [],
+      'workspaces/ws1/bills': [],
+      'workspaces/ws1/accounts': [],
+      'workspaces/ws1/cards': [fakeDoc('card1', { name: 'Nubank' })],
+      'workspaces/ws1/cards/card1/invoices': [
+        fakeDoc('inv_closed', {
+          cardId: 'card1', referenceMonth: '2027-01', status: 'closed',
+          outstandingBalanceCents: 40000, dueDate: Timestamp.fromDate(in90Days),
+        }),
+      ],
+    });
+
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
+    expect(context).toContain('Nubank');
+    expect(context).toMatch(/R\$\s*400[,.]00/);
+  });
+
   it('includes budget progress with percentage', async () => {
     const db = mockDb({}, {
       ...emptyCollections,

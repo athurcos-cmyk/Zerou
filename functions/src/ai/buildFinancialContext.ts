@@ -1,6 +1,7 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import { Timestamp } from 'firebase-admin/firestore';
 import { onboardingChallengeLabels, onboardingGoalLabels } from './onboardingLabels.js';
+import { resolveCommittedCutoff, type AvailableMode, type PaydayRule } from '../shared/committedCutoff.js';
 
 function nowInBRT(): Date {
   return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
@@ -97,8 +98,6 @@ export async function buildFinancialContext(
   const now = nowInBRT();
   const ninetyDaysAgo = new Date(now);
   ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-  const thirtyDaysAhead = new Date(now);
-  thirtyDaysAhead.setDate(thirtyDaysAhead.getDate() + 30);
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   const currentMonth = monthKey(now);
@@ -106,26 +105,21 @@ export async function buildFinancialContext(
   const previousMonth = monthKey(previousMonthDate);
 
   // ── User profile (payday, availableMode, objetivo/desafio do onboarding) ──
-  let paydayInfo = '';
+  // `paydayInfo` só é montado mais abaixo, depois que o cutoff real (resolveCommittedCutoff)
+  // é calculado — precisa das transações (próxima receita já lançada) pra decidir a fonte.
+  let payday: PaydayRule | undefined;
+  let availableMode: AvailableMode = 'until_payday';
+  let windowDays = 30;
   let onboardingInfo = '';
+  let hasProfile = false;
   try {
     const userDoc = await db.doc(`users/${uid}`).get();
     if (userDoc.exists) {
+      hasProfile = true;
       const profile = userDoc.data() ?? {};
-      const payday = profile.payday as Record<string, unknown> | undefined;
-      const availableMode = (profile.availableMode as string) ?? 'until_payday';
-      const windowDays = (profile.committedWindowDays as number) ?? 30;
-
-      if (availableMode === 'conservative') {
-        paydayInfo = `Modo conservador: nao assume recebimento futuro. Janela de ${windowDays} dias.`;
-      } else if (payday) {
-        if (payday.type === 'fixed_day') paydayInfo = `Recebe dia ${payday.day} (fixo).`;
-        else if (payday.type === 'business_day') paydayInfo = `Recebe ate o ${payday.day}o dia util.`;
-        else if (payday.type === 'end_of_month') paydayInfo = `Recebe no fim do mes.`;
-        else if (payday.type === 'variable_income') paydayInfo = `Renda variavel. Janela de ${windowDays} dias.`;
-      } else {
-        paydayInfo = `Nao informou data de recebimento. Janela de ${windowDays} dias.`;
-      }
+      payday = profile.payday as PaydayRule | undefined;
+      availableMode = (profile.availableMode as AvailableMode) ?? 'until_payday';
+      windowDays = (profile.committedWindowDays as number) ?? 30;
 
       // Respostas do onboarding — editaveis depois em Configuracoes > Objetivo e desafio,
       // por isso podem estar ausentes ou desatualizadas; usar so como tempero de tom, nunca
@@ -164,16 +158,21 @@ export async function buildFinancialContext(
   const spendingByCategoryThisMonth = new Map<string, number>();
   const spendingByCategoryPrevMonth = new Map<string, number>();
   const monthlyTotals = new Map<string, number>();
+  const incomeTransactions: Array<{ type: string; date: Date; tags?: string[]; deletedAt?: unknown }> = [];
 
   for (const doc of txnSnap.docs) {
     const txn = doc.data();
     if (txn.deletedAt) continue;
 
     const amount = (txn.amountCents as number) ?? 0;
-    const txnMonth = (txn.cashMonth || txn.competenceMonth || monthKey((txn.date as Timestamp).toDate())) as string;
+    const txnDate = (txn.date as Timestamp).toDate();
+    const txnMonth = (txn.cashMonth || txn.competenceMonth || monthKey(txnDate)) as string;
 
-    if (txn.type === 'income' && txnMonth === currentMonth) {
-      incomeThisMonth += amount;
+    if (txn.type === 'income') {
+      incomeTransactions.push({ type: 'income', date: txnDate, tags: txn.tags as string[] | undefined });
+      if (txnMonth === currentMonth) {
+        incomeThisMonth += amount;
+      }
     }
 
     if (!SPENDING_TYPES.has(txn.type as string)) continue;
@@ -194,6 +193,31 @@ export async function buildFinancialContext(
 
   const totalThisMonth = [...spendingByCategoryThisMonth.values()].reduce((a, b) => a + b, 0);
   const totalPrevMonth = [...spendingByCategoryPrevMonth.values()].reduce((a, b) => a + b, 0);
+
+  // ── Cutoff do Comprometido — mesma lógica do Dashboard (resolveCommittedCutoff) ──
+  const committedCutoff = resolveCommittedCutoff({
+    transactions: incomeTransactions,
+    payday,
+    committedWindowDays: windowDays,
+    availableMode,
+    now
+  });
+
+  let paydayInfo = '';
+  if (hasProfile) {
+    if (availableMode === 'conservative') {
+      paydayInfo = `Modo conservador: nao assume recebimento futuro. Janela de ${windowDays} dias.`;
+    } else if (committedCutoff.source === 'income') {
+      paydayInfo = `Tem uma receita futura ja lancada em ${friendlyDate(committedCutoff.cutoff)} — o Comprometido considera ate essa data.`;
+    } else if (payday) {
+      if (payday.type === 'fixed_day') paydayInfo = `Recebe dia ${payday.day} (fixo).`;
+      else if (payday.type === 'business_day') paydayInfo = `Recebe ate o ${payday.day}o dia util.`;
+      else if (payday.type === 'end_of_month') paydayInfo = `Recebe no fim do mes.`;
+      else if (payday.type === 'variable_income') paydayInfo = `Renda variavel. Janela de ${windowDays} dias.`;
+    } else {
+      paydayInfo = `Nao informou data de recebimento. Janela de ${windowDays} dias.`;
+    }
+  }
 
   // ── Top 5 categories ──────────────────────────────────────────────────────
   const topCategories = [...spendingByCategoryThisMonth.entries()]
@@ -235,8 +259,8 @@ export async function buildFinancialContext(
     const amount = bill.amountCents as number;
     const isOverdue = bill.status === 'overdue' || dueDate < todayStart;
 
-    // Bills vencidas ou que vencem nos próximos 30 dias contam como comprometido
-    if (isOverdue || (dueDate >= todayStart && dueDate <= thirtyDaysAhead)) {
+    // Bills vencidas ou que vencem até o cutoff (mesmo corte do Comprometido do Dashboard)
+    if (isOverdue || (dueDate >= todayStart && dueDate <= committedCutoff.cutoff)) {
       billsCommitted += amount;
       upcomingBills.push({
         description: sanitize((bill.description as string) ?? ''),
@@ -269,9 +293,9 @@ export async function buildFinancialContext(
     const nextDate = rule.nextOccurrenceAt.toDate();
     if (isNaN(nextDate.getTime())) continue;
 
-    // Conta como comprometido se a proxima ocorrencia cai nos proximos 30 dias
-    // ou ja passou (esta devendo registrar)
-    if (nextDate <= thirtyDaysAhead) {
+    // Conta como comprometido se a proxima ocorrencia cai até o cutoff (ou já passou —
+    // está devendo registrar)
+    if (nextDate <= committedCutoff.cutoff) {
       recurringCommitted += rule.amountCents;
       upcomingRecurring.push({
         description: sanitize(rule.description ?? ''),
@@ -310,6 +334,10 @@ export async function buildFinancialContext(
 
       const dueDate = inv.dueDate.toDate();
       if (isNaN(dueDate.getTime())) continue;
+
+      // Fatura fechada sempre conta (pagamento iminente); em aberto só se o vencimento
+      // real cair até o cutoff — mesma regra de buildUpcomingCommitments no client.
+      if (inv.status !== 'closed' && dueDate > committedCutoff.cutoff) continue;
 
       invoiceCommitted += outstanding;
       activeInvoices.push({
@@ -496,7 +524,7 @@ export async function buildFinancialContext(
 
   // COMPROMETIDO — Contas a Pagar (avulsas + recorrentes) + Faturas
   const totalBills = upcomingBills.length + upcomingRecurring.length;
-  lines.push('=== COMPROMETIDO (proximos 30 dias) ===');
+  lines.push(`=== COMPROMETIDO (ate ${friendlyDate(committedCutoff.cutoff)}) ===`);
 
   if (totalBills > 0) {
     lines.push(`Contas a pagar (${totalBills}):`);
@@ -508,7 +536,7 @@ export async function buildFinancialContext(
       lines.push(`- ${rec.description}: ${formatBRL(rec.amountCents)} (prox. ${rec.nextDate}, se repete)`);
     }
   } else {
-    lines.push('Nenhuma conta a pagar nos proximos 30 dias.');
+    lines.push(`Nenhuma conta a pagar ate ${friendlyDate(committedCutoff.cutoff)}.`);
   }
 
   if (activeInvoices.length > 0) {

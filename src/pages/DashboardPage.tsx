@@ -9,7 +9,7 @@ import type { AvailableMode, TransactionType } from '../types/contracts';
 
 import { calculateDashboardSummary, buildUpcomingReceivables } from '../finance/financeCalculations';
 import { useCompleteCurrentMonth } from '../finance/useMonthlyTransactions';
-import { defaultAvailableMode } from '../finance/availableMode';
+import { availableModeLabels, defaultAvailableMode } from '../finance/availableMode';
 import {
   readCachedDashboardView,
   saveCachedDashboardView,
@@ -101,12 +101,15 @@ export function DashboardPage() {
     committedWindowDays: profile?.committedWindowDays,
     availableMode: profile?.availableMode
   });
+  // Nomeia o modo ativo na legenda (antes só aparecia dentro do tutorial) — pedido do
+  // dono pra deixar a escolha visível toda vez que a pessoa olha o Dashboard.
+  const activeModeLabel = availableModeLabels[profile?.availableMode ?? defaultAvailableMode];
   const committedCaption =
     dashboard.committedCutoffSource === 'income'
-      ? `Considerando sua receita de ${formatFriendlyDate(dashboard.committedCutoff!)}`
+      ? `${activeModeLabel} · Considerando sua receita de ${formatFriendlyDate(dashboard.committedCutoff!)}`
       : dashboard.committedCutoffSource === 'payday'
-      ? `Considerando seu recebimento em ${formatFriendlyDate(dashboard.committedCutoff!)}`
-      : `Considerando os próximos ${profile?.committedWindowDays ?? 30} dias`;
+      ? `${activeModeLabel} · Considerando seu recebimento em ${formatFriendlyDate(dashboard.committedCutoff!)}`
+      : `${activeModeLabel} · Considerando os próximos ${profile?.committedWindowDays ?? 30} dias`;
 
   // Só depois que o perfil carregou (senão o sheet pisca antes de sabermos a escolha) e
   // depois que o tour de boas-vindas fechou — pra não empilhar dois modais no primeiro acesso.
