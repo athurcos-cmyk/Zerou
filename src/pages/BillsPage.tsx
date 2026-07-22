@@ -177,10 +177,13 @@ export function BillsPage() {
     if (!workspaceId || !editingRule) return;
     updateRecurringRule(workspaceId, editingRule.id, {
       description: editDescription.trim() || editingRule.description,
-      amountCents: editAmount.trim() ? parseMoneyToCents(editAmount) : undefined,
+      // `null` (e não `undefined`) pra LIMPAR: campo vazio aqui significa "valor varia" /
+      // "sem conta" / "sem categoria". Com `undefined` a gravação era pulada e o valor
+      // antigo permanecia — ver updateRecurringRule.
+      amountCents: editAmount.trim() ? parseMoneyToCents(editAmount) : null,
       frequency: editFrequency,
-      accountId: editAccountId || undefined,
-      categoryId: editCategoryId || undefined,
+      accountId: editAccountId || null,
+      categoryId: editCategoryId || null,
     });
     setEditingRule(null);
   }
@@ -577,7 +580,12 @@ export function BillsPage() {
             label="Conta de pagamento"
             value={editAccountId}
             onChange={setEditAccountId}
-            options={finance.accounts.map((a) => ({ value: a.id, label: a.name }))}
+            // A opção vazia deixa o placeholder honesto: sem ela dava pra escolher uma conta
+            // mas nunca voltar atrás.
+            options={[
+              { value: '', label: 'Definir depois' },
+              ...finance.accounts.map((a) => ({ value: a.id, label: a.name }))
+            ]}
             placeholder="Definir depois"
           />
           <div className="sheet-actions">

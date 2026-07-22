@@ -1158,18 +1158,28 @@ export function subscribeRecurringRules(
   );
 }
 
+/**
+ * Edita uma regra de recorrência.
+ *
+ * `undefined` = **não mexe** no campo; `null` = **limpa** o campo (vira "valor variável" /
+ * sem conta / sem categoria). Sem essa distinção, apagar o campo no formulário era
+ * silenciosamente ignorado — o `if (!== undefined)` pulava a gravação e o valor antigo
+ * continuava lá, contrariando a própria dica da UI ("Deixe em branco se o valor varia").
+ * `deleteField()` é aceito pela regra: `amountCents`/`accountId`/`categoryId` estão em
+ * `affectedKeys` e suas validações são condicionais à existência do campo.
+ */
 export function updateRecurringRule(
   workspaceId: string,
   ruleId: string,
-  patch: { description?: string; amountCents?: number; frequency?: 'weekly' | 'monthly' | 'yearly'; nextOccurrenceAt?: Date; accountId?: string; categoryId?: string; isActive?: boolean }
+  patch: { description?: string; amountCents?: number | null; frequency?: 'weekly' | 'monthly' | 'yearly'; nextOccurrenceAt?: Date; accountId?: string | null; categoryId?: string | null; isActive?: boolean }
 ) {
   const updates: Record<string, unknown> = { updatedAt: serverTimestamp() };
   if (patch.description !== undefined) updates.description = patch.description;
-  if (patch.amountCents !== undefined) updates.amountCents = patch.amountCents;
+  if (patch.amountCents !== undefined) updates.amountCents = patch.amountCents === null ? deleteField() : patch.amountCents;
   if (patch.frequency !== undefined) updates.frequency = patch.frequency;
   if (patch.nextOccurrenceAt !== undefined) updates.nextOccurrenceAt = Timestamp.fromDate(patch.nextOccurrenceAt);
-  if (patch.accountId !== undefined) updates.accountId = patch.accountId;
-  if (patch.categoryId !== undefined) updates.categoryId = patch.categoryId;
+  if (patch.accountId !== undefined) updates.accountId = patch.accountId === null ? deleteField() : patch.accountId;
+  if (patch.categoryId !== undefined) updates.categoryId = patch.categoryId === null ? deleteField() : patch.categoryId;
   if (patch.isActive !== undefined) updates.isActive = patch.isActive;
   fireWrite(updateDoc(documentRef(workspaceId, 'recurring', ruleId), updates));
 }

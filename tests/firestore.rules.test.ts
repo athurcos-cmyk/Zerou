@@ -173,6 +173,28 @@ function budgetPayload(workspaceId: string, budgetId: string, uid: string, overr
   };
 }
 
+// Reflete o payload REAL de `createRecurringRule` (financeService.ts).
+function recurringPayload(workspaceId: string, recurringId: string, uid: string, overrides: Record<string, unknown> = {}) {
+  const now = serverTimestamp();
+
+  return {
+    id: recurringId,
+    workspaceId,
+    description: 'Netflix',
+    amountCents: 4000,
+    frequency: 'monthly',
+    nextOccurrenceAt: Timestamp.fromDate(new Date('2026-08-21T12:00:00Z')),
+    anchorDay: 21,
+    accountId: 'accountA',
+    categoryId: 'categoryA',
+    isActive: true,
+    createdBy: uid,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides
+  };
+}
+
 // Reflete o payload REAL de `createReceivable` (financeService.ts) — a lição nº1 do CLAUDE.md:
 // se o payload de teste for uma versão simplificada, o teste passa com a regra desatualizada.
 function receivablePayload(workspaceId: string, receivableId: string, uid: string, overrides: Record<string, unknown> = {}) {
@@ -1071,11 +1093,41 @@ describe('firestore security rules', () => {
     );
   });
 
+  // Regra de recorrência: o formulário de edição precisa conseguir LIMPAR os campos
+  // opcionais, não só trocá-los. A UI promete "deixe em branco se o valor varia todo mês" —
+  // antes o cliente mandava `undefined`, que `updateRecurringRule` pulava, e o valor antigo
+  // continuava gravado. Hoje manda `deleteField()`, e este teste prova que a regra aceita.
+  it('lets the owner edit a recurring rule and CLEAR its optional fields, but never its anchorDay', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    const ruleRef = doc(aliceDb, 'workspaces/workspaceA/recurring/rec_netflix');
+
+    await assertSucceeds(setDoc(ruleRef, recurringPayload('workspaceA', 'rec_netflix', 'alice')));
+
+    // Editar os campos comuns: permitido.
+    await assertSucceeds(
+      updateDoc(ruleRef, { description: 'Netflix família', frequency: 'weekly', updatedAt: serverTimestamp() })
+    );
+
+    // Limpar o valor (vira "valor variável"): precisa passar.
+    await assertSucceeds(updateDoc(ruleRef, { amountCents: deleteField(), updatedAt: serverTimestamp() }));
+
+    // Limpar conta e categoria: mesmo caminho.
+    await assertSucceeds(
+      updateDoc(ruleRef, { accountId: deleteField(), categoryId: deleteField(), updatedAt: serverTimestamp() })
+    );
+
+    // `anchorDay` NÃO está em `affectedKeys` do update: o dia-âncora é imutável depois da
+    // criação. É por isso que trocar a frequência não consegue reancorar o dia do mês
+    // (ver docs/history/2026-07.md).
+    await assertFails(updateDoc(ruleRef, { anchorDay: 5, updatedAt: serverTimestamp() }));
+  });
+
   // Esta rejeição é o que torna seguro o id determinístico das recorrências
-  // (`recurringOccurrenceTransactionId`): a Cloud Function `generateRecurrences` e o botão
-  // "Registrar" gravam no MESMO documento para a mesma ocorrência, e a segunda escrita —
-  // um payload de create, com `version: 1` e `createdAt` novo — bate na regra de update e
-  // é negada. Sem isso, a despesa sairia em dobro.
+  // (`recurringOccurrenceTransactionId`): duas escritas para a MESMA ocorrência caem no
+  // mesmo documento, e a segunda — um payload de create, com `version: 1` e `createdAt`
+  // novo — bate na regra de update e é negada. Protege contra registrar a mesma ocorrência
+  // duas vezes (ex.: toque duplo no botão "Registrar"). Desde 2026-07-21 a Cloud Function
+  // não grava mais transação nenhuma (virou só lembrete), então hoje o único escritor é o app.
   it('rejects re-creating an existing transaction with the same id (recurrence idempotency)', async () => {
     const aliceDb = testEnv.authenticatedContext('alice').firestore();
     const occurrenceId = 'rec_abc_2026-07-09';
