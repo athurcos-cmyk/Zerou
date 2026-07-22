@@ -80,7 +80,7 @@ export function AssistantPage() {
       <header className="section-heading">
         <div>
           <p className="eyebrow">Assistente</p>
-          <h1 className="page-title page-title--compact">Grazi</h1>
+          <h1 className="page-title page-title--compact">Vic</h1>
         </div>
       </header>
 

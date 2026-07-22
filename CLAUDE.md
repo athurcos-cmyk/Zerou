@@ -130,7 +130,7 @@ Cada arquivo tem uma função. Não duplique histórico no `SESSAO.md`.
 | `docs/history/YYYY-MM.md` | A sessão precisa de mais de 8 bullets, tem contexto de decisão, auditoria, plano ou detalhe útil depois | Mudança pequena que cabe no changelog | Registro por mês, título datado, detalhes técnicos/produto |
 | `docs/BUSCA_RAPIDA.md` | Mudaram caminhos, nomes, pastas, assuntos ou comandos de busca | Feature comum que não muda onde procurar | Mapa de navegação, tabelas e comandos `rg` |
 | `docs/planning/TODOS.md` | Abriu, fechou ou repriorizou pendência | A tarefa já entrou no changelog e não gerou pendência | Item acionável ou concluído, critério claro |
-| `docs/ai/GRAZI.md` | **SEMPRE** que mexer na assistente Grazi — prompt, modelo, rate limit, UI, fluxo, secrets, bug, correção, nova capacidade | Feature que não toca na IA | Documento canônico da feature; toda informação relevante vive lá, não espalhada |
+| `docs/ai/VIC.md` | **SEMPRE** que mexer na assistente Vic — prompt, modelo, rate limit, UI, fluxo, secrets, bug, correção, nova capacidade | Feature que não toca na IA | Documento canônico da feature; toda informação relevante vive lá, não espalhada |
 | `docs/design/DESIGN.md` | Mudou token, fonte, componente-base ou regra visual | Ajuste de conteúdo sem mudar o sistema | Sistema vivo: tokens, layout, componentes |
 | `README.md` | Mudou setup, comandos ou entrada do projeto | Mudança interna sem impacto pra quem entra no repo | Onboarding curto |
 

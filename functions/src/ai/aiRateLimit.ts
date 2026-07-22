@@ -1,7 +1,7 @@
 import { FieldValue, type DocumentReference, type Firestore } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 
-/** Compartilhado entre Grazi (financialAssistantChat) e as perguntas financeiras via WhatsApp — mesmo orçamento de DeepSeek por workspace, independente do canal. */
+/** Compartilhado entre Vic (financialAssistantChat) e as perguntas financeiras via WhatsApp — mesmo orçamento de DeepSeek por workspace, independente do canal. */
 export function todayKeyBRT(): string {
   const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

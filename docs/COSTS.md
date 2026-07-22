@@ -16,7 +16,7 @@
 - Passando disso, o custo é **minúsculo**: ~US$ 5/mês por 1.000 ativos/dia; ~US$ 50–60/mês por
   10.000. Custo por usuário < 1 centavo de dólar/mês.
 - Os custos que pesam **antes** do Firestore: domínio, Vercel (se precisar do Pro) e sobretudo
-  o **DeepSeek/Grazi** (cobrado por token, fora do Firebase).
+  o **DeepSeek/Vic** (cobrado por token, fora do Firebase).
 
 ## 1. Os dois caches locais (e por que não incham)
 
@@ -101,7 +101,7 @@ Custo marginal por usuário (< 1 centavo de dólar/mês):
 Firebase quase não é o problema. Cobrir 1.000 ativos (~US$5/mês) exige **5 pessoas pagando
 ~R$5/mês** ou **30 pagando R$1/mês**. Um apoio simbólico (**R$5–10/ano** de quem quiser) já
 cobre uma base grande de usuários grátis. Os custos fixos (domínio ~R$40/ano, Vercel, e o
-**DeepSeek/Grazi** por token) pesam mais que o Firestore — manter o rate limit de 60 msgs/dia por
+**DeepSeek/Vic** por token) pesam mais que o Firestore — manter o rate limit de 60 msgs/dia por
 workspace é o que segura o custo da IA.
 
 ## 6. Limitação atual: só as 300 transações mais recentes aparecem
@@ -138,7 +138,7 @@ Registrado em `docs/planning/TODOS.md`.
      de **todos** os usuários, todo dia, ativo ou não. **É o único que cresce linear com a base total**
      (1.000 usuários → ~1.000 leituras/dia só nisso; 10.000 → ~10.000/dia) e o **primeiro a otimizar**
      quando crescer — paginar, ou mandar só pra quem não lançou no dia em vez de varrer todo mundo.
-4. **DeepSeek/Grazi**: custo externo por token, fora do Firebase. Pode virar o maior custo se a IA
+4. **DeepSeek/Vic**: custo externo por token, fora do Firebase. Pode virar o maior custo se a IA
    for muito usada.
 
 ## Fontes

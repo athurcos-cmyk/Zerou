@@ -174,7 +174,7 @@ export interface Account {
   /** Saldo corrente, mantido incrementalmente (increment() a cada lançamento) —
    * ausente em contas criadas antes do backfill; consumidores usam `?? openingBalanceCents`. */
   currentBalanceCents?: MoneyCents;
-  /** Conta padrão pra débito/crédito quando a Grazi (WhatsApp) não identifica a conta na
+  /** Conta padrão pra débito/crédito quando a Vic (WhatsApp) não identifica a conta na
    * mensagem. No máximo uma por workspace — exclusividade garantida pelo client (batch em
    * `setPrimaryAccount`), não pela regra do Firestore. */
   isPrimary?: boolean;

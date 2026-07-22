@@ -61,7 +61,7 @@ export function OnboardingAnswersSettingsPage() {
         )}
       </div>
       <p className="page-description">
-        As respostas que você deu no cadastro. A Grazi usa isso pra deixar o tom das respostas mais próximo da sua
+        As respostas que você deu no cadastro. A Vic usa isso pra deixar o tom das respostas mais próximo da sua
         situação — dá pra mudar quando quiser, sua prioridade pode não ser mais a mesma de quando você começou.
       </p>
 

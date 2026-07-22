@@ -25,7 +25,7 @@ describe('readMembershipStatus', () => {
     await expect(readMembershipStatus(db, 'ws', 'user')).resolves.toBe('active');
   });
 
-  // O callable da Grazi mostra mensagens diferentes pra cada caso, por isso o status
+  // O callable da Vic mostra mensagens diferentes pra cada caso, por isso o status
   // é devolvido em vez de um booleano.
   it('distingue quem nunca foi membro de quem saiu/foi removido', async () => {
     await expect(readMembershipStatus(fakeDb({ exists: false }), 'ws', 'user')).resolves.toBe('not-member');

@@ -383,7 +383,7 @@ export const whatsappWebhook = onRequest(
       }
 
       // ── Decisao financeira grande (emprestimo, investir reserva, renegociar divida) —
-      // redireciona pro app: a Grazi por la tem historico de conversa e consegue ir e voltar
+      // redireciona pro app: a Vic por la tem historico de conversa e consegue ir e voltar
       // com a pessoa pra ajudar a pensar, o que o WhatsApp (mensagem isolada, sem memoria)
       // nao faz direito. O WhatsApp fica focado em lancamento e pergunta rapida do dia a dia.
       if (interpretation.intent === 'advisory_decision') {
@@ -416,7 +416,7 @@ export const whatsappWebhook = onRequest(
         return;
       }
 
-      // ── Pergunta financeira (paridade com a Grazi do app) ───────────
+      // ── Pergunta financeira (paridade com a Vic do app) ───────────
       if (interpretation.intent === 'question') {
         let usageRef;
         try {
@@ -424,7 +424,7 @@ export const whatsappWebhook = onRequest(
         } catch {
           await sendWhatsAppMessage(
             phone,
-            '⏳ Você atingiu o limite diário de perguntas para a Grazi.\n\nVolte amanhã ou pergunte pelo app.',
+            '⏳ Você atingiu o limite diário de perguntas para a Vic.\n\nVolte amanhã ou pergunte pelo app.',
           );
           return;
         }

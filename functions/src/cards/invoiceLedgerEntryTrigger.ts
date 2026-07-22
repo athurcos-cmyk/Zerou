@@ -8,7 +8,7 @@ import { invoiceTotalsDeltaForEntry, outstandingFromTotals } from './invoiceTota
  * feesTotalCents, outstandingBalanceCents, overpaidCreditCents) sempre prontos, incrementados
  * a cada entrada nova de ledger — em vez de recalcular somando o ledger inteiro toda vez que o
  * app abre (o que hoje custa até 1.500+ leituras por reabertura e nunca populou de verdade
- * `outstandingBalanceCents`, fazendo a Grazi/WhatsApp sempre reportar R$ 0,00).
+ * `outstandingBalanceCents`, fazendo a Vic/WhatsApp sempre reportar R$ 0,00).
  *
  * Idempotente contra reentrega do gatilho: `processedLedgerEntryIds` guarda os ids já
  * processados, checado dentro de uma transação (mesmo padrão de

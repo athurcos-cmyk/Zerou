@@ -22,7 +22,7 @@ Use este arquivo como mapa antes de abrir documentos grandes. Regra: leia o meno
 | Setup de infra manual | `docs/MANUAL_SETUP_REQUIRED.md` | Passos fora do código |
 | Instruções pra agentes | `CLAUDE.md` | Regra de docs e restrições |
 | Contas de teste (login p/ navegador) | `TEST_ACCOUNTS.local.md` (raiz, local, fora do git) | Só existe se criado na máquina |
-| Assistente de IA (Grazi) | `docs/ai/GRAZI.md` | Documento canonico — tudo sobre a feature |
+| Assistente de IA (Vic) | `docs/ai/VIC.md` | Documento canonico — tudo sobre a feature |
 | WhatsApp (bot de lancamentos) | `docs/whatsapp/WHATSAPP.md` | Documento canonico — URLs, IDs, fluxo, config |
 | Emails transacionais (Resend) | `functions/src/email/` | Templates, provider, triggers, adapter |
 | Limpeza de dados orfaos | `functions/src/cleanup.ts` | `dailyCleanup` (04:57 BRT), `scripts/listOrphanWorkspaces.mjs` |
@@ -36,7 +36,7 @@ Use este arquivo como mapa antes de abrir documentos grandes. Regra: leia o meno
 |---|---|
 | Telas autenticadas | `src/pages/` |
 | Shell + nav inferior/FAB | `src/layout/AppShell.tsx` |
-| Onboarding (questionário) | `src/onboarding/OnboardingPage.tsx`, opções compartilhadas em `src/onboarding/onboardingOptions.tsx`. Objetivo/desafio editável depois em `/app/settings/onboarding` (`src/settings/OnboardingAnswersSettingsPage.tsx`) — alimenta a Grazi via `functions/src/ai/onboardingLabels.ts` |
+| Onboarding (questionário) | `src/onboarding/OnboardingPage.tsx`, opções compartilhadas em `src/onboarding/onboardingOptions.tsx`. Objetivo/desafio editável depois em `/app/settings/onboarding` (`src/settings/OnboardingAnswersSettingsPage.tsx`) — alimenta a Vic via `functions/src/ai/onboardingLabels.ts` |
 | Componentes-base de UX | `src/components/` (`BottomSheet`, `SelectField`, `CategoryField`, `ConfirmDialog`, `EmptyState`) |
 | Ícones + cores de categoria | `src/components/categoryIcons.tsx`, `src/theme/palette.ts` |
 | Serviço financeiro | `src/finance/financeService.ts` |

@@ -165,7 +165,7 @@ export async function deleteAccount(workspaceId: string, accountId: string) {
   fireWrite(deleteDoc(documentRef(workspaceId, 'accounts', accountId)));
 }
 
-/** Marca `accountId` como conta principal (usada pela Grazi/WhatsApp quando a mensagem não
+/** Marca `accountId` como conta principal (usada pela Vic/WhatsApp quando a mensagem não
  * identifica a conta). No máximo uma por workspace — desmarca `currentPrimaryId` no mesmo
  * batch, se houver. */
 export async function setPrimaryAccount(workspaceId: string, accountId: string, currentPrimaryId?: string | null) {

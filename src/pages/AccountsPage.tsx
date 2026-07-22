@@ -144,7 +144,7 @@ export function AccountsPage() {
 
       {finance.accountBalances.length > 1 && (
         <p className="settings-hint">
-          Marque uma conta principal (<Star size={13} aria-hidden="true" style={{ verticalAlign: '-2px' }} />) — é nela que a Grazi
+          Marque uma conta principal (<Star size={13} aria-hidden="true" style={{ verticalAlign: '-2px' }} />) — é nela que a Vic
           debita ou credita pelo WhatsApp quando a mensagem não deixa clara a conta.
         </p>
       )}

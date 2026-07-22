@@ -1,12 +1,12 @@
-# Grazi — Assistente de IA financeira
+# Vic — Assistente de IA financeira
 
-> **Regra permanente**: toda mudança na Grazi (prompt, modelo, rate limit, UI, fluxo, secrets, correção de bug, nova capacidade) **precisa ser registrada neste documento**. Não existe outro lugar para documentação da Grazi — o histórico mensal (`docs/history/`) e o `CHANGELOG.md` recebem só o resumo + link pra cá.
+> **Regra permanente**: toda mudança na Vic (prompt, modelo, rate limit, UI, fluxo, secrets, correção de bug, nova capacidade) **precisa ser registrada neste documento**. Não existe outro lugar para documentação da Vic — o histórico mensal (`docs/history/`) e o `CHANGELOG.md` recebem só o resumo + link pra cá.
 
 ## Visão geral
 
-Grazi é a assistente de IA do Granativa. Ela responde perguntas sobre os gastos do usuário com base nos dados reais do workspace dele, mais dicas de educação financeira. Roda como Cloud Function do Firebase (`southamerica-east1`) e usa o modelo `deepseek-chat` da DeepSeek.
+Vic é a assistente de IA do Granativa. Ela responde perguntas sobre os gastos do usuário com base nos dados reais do workspace dele, mais dicas de educação financeira. Roda como Cloud Function do Firebase (`southamerica-east1`) e usa o modelo `deepseek-chat` da DeepSeek.
 
-**Nome**: Grazi (derivado de Granativa). Feminino, duas sílabas, tom de amiga organizada — não de gerente de banco.
+**Nome**: Vic. Feminino, tom de amiga organizada — não de gerente de banco. (Renomeada de "Grazi" para "Vitória" e, no mesmo dia, de "Vitória" para "Vic" em 2026-07-22, a pedido do dono — troca só do nome exibido/prompt de identidade; persona, regras e comportamento não mudaram.)
 
 **Persona**: amiga que sabe de finanças mas não dá lição de moral. Tom leve, direto, zero economês. Nunca inventa números que não estão nos dados. Entende expressões brasileiras ("gastei uns 10 conto", "tá caro", "valeu").
 
@@ -21,7 +21,7 @@ Grazi é a assistente de IA do Granativa. Ela responde perguntas sobre os gastos
 | `functions/src/ai/financialAssistant.ts` | Cloud Function `onCall` principal. Fluxo: auth → membership → rate limit pre-check → contexto → DeepSeek → rate limit increment. |
 | `functions/src/ai/buildFinancialContext.test.ts` | 21 testes: gastos com categoria, card_purchase, fallback string vazia, deletados, bills, null dueDate, workspace vazio, payday, missing profile, budgets, goals, trend, couple goals, couple sem workspace, objetivo/desafio declarado (label legível + id desconhecido ignorado). |
 | `functions/src/ai/verifyWorkspaceMembership.test.ts` | 4 testes: ativo, inexistente, removido, dados nulos. |
-| `src/pages/AssistantPage.tsx` | UI do chat. Bolhas (usuário laranja direita, Grazi cinza esquerda), sugestões iniciais, loading "Pensando...", erros amigáveis. |
+| `src/pages/AssistantPage.tsx` | UI do chat. Bolhas (usuário laranja direita, Vic cinza esquerda), sugestões iniciais, loading "Pensando...", erros amigáveis. |
 | `src/styles/global.css` | Estilos `.assistant-*` (~140 linhas no final do arquivo). Cores só com `var(--*)`. |
 | `src/App.tsx` | Rota `/app/assistant` dentro de `<RequireAuth>` → `<RequireOnboardingComplete>` → `<FinanceDataProvider>`. |
 | `src/layout/AppShell.tsx` | Link "Assistente" (ícone `Bot`) na sidebar e menu mobile. |
@@ -55,7 +55,7 @@ O contexto é dividido em até 10 seções (algumas só aparecem quando há dado
 
 **=== SEU CICLO ===** (2026-07-17)
 - Como o usuário recebe (`payday`/`availableMode`/`committedWindowDays` do perfil).
-- **Objetivo e desafio declarados no onboarding** (`onboardingGoal`/`onboardingChallenge`), traduzidos pra um label legível via `onboardingLabels.ts` (id desconhecido/stale é ignorado silenciosamente, nunca vaza o id cru pro prompt). Editável a qualquer momento em `/app/settings/onboarding` — a Grazi é instruída a usar só como tempero de tom, nunca como fato garantido, já que pode estar desatualizado.
+- **Objetivo e desafio declarados no onboarding** (`onboardingGoal`/`onboardingChallenge`), traduzidos pra um label legível via `onboardingLabels.ts` (id desconhecido/stale é ignorado silenciosamente, nunca vaza o id cru pro prompt). Editável a qualquer momento em `/app/settings/onboarding` — a Vic é instruída a usar só como tempero de tom, nunca como fato garantido, já que pode estar desatualizado.
 
 **=== RESUMO ===**
 - Mês atual e anterior (`yyyy-MM`)
@@ -117,7 +117,7 @@ Está em `financialAssistant.ts:16-24` (constante `SYSTEM_PROMPT`). Regras:
 7. Tom encorajador, não informal demais
 8. Se houver objetivo/desafio declarado (SEU CICLO), deixa influenciar sutilmente o tom/sugestões, sem forçar a menção nem tratar como verdade absoluta (adicionado 2026-07-17)
 9. Pode usar `**negrito**` para ênfase e listas com `-` (adicionado 2026-07-14)
-10. **Decisão financeira grande ou de risco (empréstimo, financiamento, renegociar dívida, tirar cartão novo ou vale a pena a anuidade) não recebe veredito pronto nem só "procure um profissional"** (adicionado 2026-07-18, pedido do dono; refinado no mesmo dia pra incluir decisão de cartão e excluir investimento — ver regra 11): a Grazi faz 1-2 perguntas objetivas usando os dados reais da pessoa (ex., empréstimo: "quanto seria a parcela? cabe no seu Livre pra Gastar?"; cartão: "a anuidade compensa com o quanto você usa os benefícios? já tem outro cartão que cobre isso?") pra ajudar a pessoa a pensar sozinha antes de opinar — só depois desse raciocínio, se ainda fizer sentido, sugere profissional qualificado como complemento, nunca nomeando produto (regra 6). Perguntas do dia a dia (gasto do mês, compra pequena) continuam respondidas direto, sem esse cuidado extra. Motivação: usuários reais vão usar a Grazi pra tomar decisão de verdade — só recusar/deflectir não ajuda tanto quanto guiar o raciocínio. Depende de histórico de conversa pra funcionar bem (ida e volta) — por isso ficou só no app, que já manda `history` a cada chamada; o WhatsApp (sem histórico) redireciona pro app nesse caso em vez de tentar essa conversa (ver `docs/whatsapp/WHATSAPP.md`, intent `advisory_decision`). Existe também um disclaimer formal nos Termos de Uso (seção 9), mas ele não aparece na conversa — essa regra é o reforço comportamental.
+10. **Decisão financeira grande ou de risco (empréstimo, financiamento, renegociar dívida, tirar cartão novo ou vale a pena a anuidade) não recebe veredito pronto nem só "procure um profissional"** (adicionado 2026-07-18, pedido do dono; refinado no mesmo dia pra incluir decisão de cartão e excluir investimento — ver regra 11): a Vic faz 1-2 perguntas objetivas usando os dados reais da pessoa (ex., empréstimo: "quanto seria a parcela? cabe no seu Livre pra Gastar?"; cartão: "a anuidade compensa com o quanto você usa os benefícios? já tem outro cartão que cobre isso?") pra ajudar a pessoa a pensar sozinha antes de opinar — só depois desse raciocínio, se ainda fizer sentido, sugere profissional qualificado como complemento, nunca nomeando produto (regra 6). Perguntas do dia a dia (gasto do mês, compra pequena) continuam respondidas direto, sem esse cuidado extra. Motivação: usuários reais vão usar a Vic pra tomar decisão de verdade — só recusar/deflectir não ajuda tanto quanto guiar o raciocínio. Depende de histórico de conversa pra funcionar bem (ida e volta) — por isso ficou só no app, que já manda `history` a cada chamada; o WhatsApp (sem histórico) redireciona pro app nesse caso em vez de tentar essa conversa (ver `docs/whatsapp/WHATSAPP.md`, intent `advisory_decision`). Existe também um disclaimer formal nos Termos de Uso (seção 9), mas ele não aparece na conversa — essa regra é o reforço comportamental.
 11. **Pergunta de investimento (onde investir, ações, tesouro direto, fundos, cripto, previdência) NÃO recebe as perguntas de reflexão da regra 10 — tratamento mais rígido** (adicionado 2026-07-18, pedido explícito do dono: "o ideal sobre investimento é nem falar sobre e falar direito pra buscar um profissional"): zero análise de produto/estratégia, mesmo se pedirem direto. Investimento é atividade regulamentada (exige profissional licenciado — CVM no Brasil), diferente de empréstimo/cartão que são só matemática de orçamento. Explica com carinho (não é recusa fria) e direciona pra profissional/consultor de investimentos qualificado — mas pode continuar ajudando com o que está no escopo dela (ex.: quanto seria um valor razoável pra reserva, com base nos gastos reais).
 
 Para alterar o tom/persona: editar `SYSTEM_PROMPT`. Para alterar o nome: editar o prompt + `src/pages/AssistantPage.tsx` (título `<h1>`).
@@ -190,7 +190,7 @@ npm --prefix functions run test
 
 ### Manual (pré-requisitos para considerar pronto)
 
-- [ ] Testar com workspace que **só tem compras no cartão** (zero `expense`) — Grazi deve ver os gastos.
+- [ ] Testar com workspace que **só tem compras no cartão** (zero `expense`) — Vic deve ver os gastos.
 - [ ] Testar às 22h BRT no último dia do mês — mês atual deve estar correto.
 - [ ] Testar com workspace vazio (recém-criado) — não pode crashar.
 - [ ] Enviar 61 mensagens no mesmo dia — a 61ª deve ser rejeitada com "Limite diário".

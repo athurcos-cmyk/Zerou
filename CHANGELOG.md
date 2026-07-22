@@ -2,6 +2,17 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-22 — rename: assistente de IA "Grazi" → "Vic"
+
+Pedido do dono: renomear a assistente de IA do app. Passou primeiro por "Vitória", depois por decisão de última hora no mesmo dia virou "Vic".
+
+- Trocado em todo lugar onde o nome aparece: `SYSTEM_PROMPT` da IA (`financialAssistant.ts`, `answerFinancialQuestion.ts`), UI (`AssistantPage.tsx`, `OnboardingAnswersSettingsPage.tsx`, `AccountsPage.tsx`), Termos de Uso/Política de Privacidade (`LegalPages.tsx`, seções 8, 9, 13, 16), comentários em `functions/src/` e `src/`, e docs vivos (`CLAUDE.md`, `SESSAO.md`, `docs/BUSCA_RAPIDA.md`, `docs/COSTS.md`, `docs/planning/TODOS.md`, `docs/whatsapp/WHATSAPP.md`).
+- Doc canônico da feature renomeado: `docs/ai/GRAZI.md` → `docs/ai/VIC.md`.
+- **Sem risco de Firestore**: confirmado que "Grazi" nunca foi um campo/coleção/valor de enum persistido — é só texto (prompt, UI, comentário), então a regra do projeto sobre enum novo em payload do Firestore não se aplica aqui.
+- **Deliberadamente não tocado**: registros históricos datados (`CHANGELOG.md` anterior, `docs/history/2026-07.md`, auditorias de segurança de 19/07 incl. `05-grazi.md`/`review-05-grazi.md` com achados `GRAZI-1..8` referenciados por ID em 4 outros documentos, docs de auditoria visual, a menção única em `docs/RUNBOOK.md`, e os itens já concluídos em `docs/planning/TODOS.md`) — mesma lógica de não reescrever um commit antigo.
+- Validado: `npm run typecheck`/`test` (377), `npm --prefix functions run build`/`test` (97), `npm run build`, e checagem visual dos Termos de Uso e da página do Assistente no build de produção.
+- **Pendente**: deploy manual das Cloud Functions (`npx firebase deploy --only functions --project zerou-26757`) — o `SYSTEM_PROMPT` novo só entra no ar depois disso; `git push` não reimplanta functions.
+
 ## 2026-07-22 — fix: layout quebrado em Safari antigo (iPhone 8 Plus e outros < 16.4)
 
 Relato: amiga do dono viu o site inteiro quebrado no Safari de um iPhone 8 Plus (menu lateral de desktop sempre visível, cards e texto cortados na borda da tela), enquanto iPhones mais novos (12, 16) funcionavam normal.

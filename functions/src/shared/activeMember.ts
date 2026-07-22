@@ -9,7 +9,7 @@ export type MembershipStatus = 'active' | 'not-member' | 'inactive';
  * com `status == 'active'`. Precisa existir em código porque o Admin SDK **ignora** as regras.
  *
  * Devolve o status em vez de um booleano pra quem chama poder distinguir "nunca foi membro"
- * de "saiu/foi removido" — o callable da Grazi mostra mensagens diferentes pra cada caso.
+ * de "saiu/foi removido" — o callable da Vic mostra mensagens diferentes pra cada caso.
  */
 export async function readMembershipStatus(
   db: Firestore,

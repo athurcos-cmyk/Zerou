@@ -60,7 +60,7 @@ Itens acionáveis. Fechou? Mova para "Concluído" ou remova. Detalhe histórico 
 ### Negócio / legal
 - [ ] Revisão jurídica antes de escala pública maior.
 - [ ] Billing real (Stripe) — só com decisão explícita de produto (hoje 100% gratuito).
-- [ ] **Se/quando o produto tiver plano pago, revisar o rate limit generoso da Grazi** (2026-07-18): 60 mensagens/dia por workspace, hoje pensado pro produto 100% gratuito. Decidir se vira benefício exclusivo do plano pago, se o gratuito ganha teto mais baixo, ou se fica como está. Ver `docs/ai/GRAZI.md` (seção Rate limit / Pendências futuras) pro detalhe técnico.
+- [ ] **Se/quando o produto tiver plano pago, revisar o rate limit generoso da Vic** (2026-07-18): 60 mensagens/dia por workspace, hoje pensado pro produto 100% gratuito. Decidir se vira benefício exclusivo do plano pago, se o gratuito ganha teto mais baixo, ou se fica como está. Ver `docs/ai/VIC.md` (seção Rate limit / Pendências futuras) pro detalhe técnico.
 
 ## Concluído (recente)
 - [x] **Fatura de cartão travava "Aberta" além do fechamento + parcela à vista antecipável** (2026-07-18, achado ao vivo pelo dono, `/investigate` → `/code-review` → `/qa`): fatura só fechava via Cloud Scheduler diário, sem fallback client-side — nova `markClosedInvoices` fecha isso a cada snapshot (mesmo padrão de `markOverdueBills`). Filtro de antecipação (`anticipation.ts`) não checava se a compra tinha mais de 1 parcela — corrigido. `/code-review` no próprio fix achou e corrigiu uma regressão real (fechamento ancorado ao meio-dia em vez do dia inteiro). Testado ao vivo: antecipar a única parcela de uma fatura futura faz ela sumir do histórico (comportamento por design). Ver `docs/history/2026-07.md`.
