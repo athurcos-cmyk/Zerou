@@ -2705,6 +2705,14 @@ span.service-mark--brand {
     grid-template-columns: 1fr;
   }
 
+  /* Cabecalho cujo elemento a direita e so um icon-button (nao um botao de texto
+     largo) nao precisa empilhar — empilhado sobra uma linha inteira vazia so pro
+     icone, desperdicando espaco vertical logo no topo da tela. */
+  .page-heading-row--icon-trailing {
+    flex-direction: row;
+    align-items: center;
+  }
+
   .list-row--with-icon {
     flex-direction: row;
     align-items: center;

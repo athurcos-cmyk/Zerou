@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Calendar, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, Gauge, LineChart, Minus, Plus, Search, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
+import { Calendar, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, EllipsisVertical, Gauge, LineChart, Minus, Plus, Search, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
 import {
   PieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -143,6 +143,7 @@ export function SearchPage() {
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [annualOpen, setAnnualOpen] = useState(false);
   const [trendOpen, setTrendOpen] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
   const [budgetValues, setBudgetValues] = useState<Record<string, string>>({});
 
   const expenseCategories = useMemo(
@@ -431,25 +432,14 @@ export function SearchPage() {
 
   return (
     <section className="page-content page-content--narrow">
-      <div className="page-heading-row page-heading-row--tight">
+      <div className="page-heading-row page-heading-row--tight page-heading-row--icon-trailing">
         <div>
           <p className="eyebrow">Análise</p>
           <h1 className="page-title page-title--compact">Seus gastos</h1>
         </div>
-        <div style={{ display: 'flex', gap: '0.25rem' }}>
-          <button className="icon-button" type="button" aria-label="Tendência por categoria" title="Tendência por categoria" onClick={() => setTrendOpen(true)}>
-            <LineChart size={18} aria-hidden="true" />
-          </button>
-          <button className="icon-button" type="button" aria-label="Resumo anual" title="Resumo anual" onClick={() => setAnnualOpen(true)}>
-            <Calendar size={18} aria-hidden="true" />
-          </button>
-          <button className="icon-button" type="button" aria-label="Exportar CSV" onClick={handleExportCsv}>
-            <Download size={18} aria-hidden="true" />
-          </button>
-          <button className="icon-button" type="button" aria-label="Buscar" onClick={() => setSearchOpen(true)}>
-            <Search size={18} aria-hidden="true" />
-          </button>
-        </div>
+        <button className="icon-button" type="button" aria-label="Mais ações" title="Mais ações" onClick={() => setActionsOpen(true)}>
+          <EllipsisVertical size={18} aria-hidden="true" />
+        </button>
       </div>
 
       {/* ── Seletor de mês ─────────────────────────────────────────────────── */}
@@ -530,15 +520,6 @@ export function SearchPage() {
             <p className="eyebrow">{isFutureMonth ? 'Previsto por categoria' : 'Por categoria'}</p>
             <h2>{monthTitle}</h2>
           </div>
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="Orçamentos por categoria"
-            title="Orçamentos por categoria"
-            onClick={() => setBudgetOpen(true)}
-          >
-            <Gauge size={18} aria-hidden="true" />
-          </button>
         </div>
 
         {isFutureMonth && (
@@ -844,6 +825,68 @@ export function SearchPage() {
           />
         )}
       </article>
+
+      {/* ── Mais ações: agrupa os atalhos que antes eram ícones soltos no cabeçalho —
+          sem rótulo visível, ficava impossível saber o que cada um fazia sem tocar. */}
+      <BottomSheet open={actionsOpen} onClose={() => setActionsOpen(false)} title="Mais ações">
+        <div className="sheet-option-list">
+          <button
+            className="sheet-option"
+            type="button"
+            onClick={() => { setActionsOpen(false); setBudgetOpen(true); }}
+          >
+            <span className="sheet-option-icon" aria-hidden="true"><Gauge size={18} /></span>
+            <span className="sheet-option-text">
+              <span className="sheet-option-label">Orçamentos por categoria</span>
+              <span className="sheet-option-desc">Trave um limite mensal de gasto por categoria</span>
+            </span>
+          </button>
+          <button
+            className="sheet-option"
+            type="button"
+            onClick={() => { setActionsOpen(false); setTrendOpen(true); }}
+          >
+            <span className="sheet-option-icon" aria-hidden="true"><LineChart size={18} /></span>
+            <span className="sheet-option-text">
+              <span className="sheet-option-label">Tendência por categoria</span>
+              <span className="sheet-option-desc">Veja a evolução de uma categoria mês a mês</span>
+            </span>
+          </button>
+          <button
+            className="sheet-option"
+            type="button"
+            onClick={() => { setActionsOpen(false); setAnnualOpen(true); }}
+          >
+            <span className="sheet-option-icon" aria-hidden="true"><Calendar size={18} /></span>
+            <span className="sheet-option-text">
+              <span className="sheet-option-label">Resumo anual</span>
+              <span className="sheet-option-desc">Visão consolidada dos 12 meses</span>
+            </span>
+          </button>
+          <button
+            className="sheet-option"
+            type="button"
+            onClick={() => { setActionsOpen(false); handleExportCsv(); }}
+          >
+            <span className="sheet-option-icon" aria-hidden="true"><Download size={18} /></span>
+            <span className="sheet-option-text">
+              <span className="sheet-option-label">Exportar CSV</span>
+              <span className="sheet-option-desc">Baixa as transações deste mês em planilha</span>
+            </span>
+          </button>
+          <button
+            className="sheet-option"
+            type="button"
+            onClick={() => { setActionsOpen(false); setSearchOpen(true); }}
+          >
+            <span className="sheet-option-icon" aria-hidden="true"><Search size={18} /></span>
+            <span className="sheet-option-text">
+              <span className="sheet-option-label">Buscar</span>
+              <span className="sheet-option-desc">Encontre uma transação, conta ou compromisso</span>
+            </span>
+          </button>
+        </div>
+      </BottomSheet>
 
       {/* ── Busca por texto ────────────────────────────────────────────────── */}
       <BottomSheet open={searchOpen} onClose={() => setSearchOpen(false)} title="Buscar" subtitle="Transações, contas e contas a pagar">

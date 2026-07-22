@@ -2,6 +2,14 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-22 — design: cabeçalho da Análise ganha "Mais ações" (menos ícones crípticos)
+
+Pedido do dono: os 4 ícones soltos no topo de Análise (Tendência, Resumo anual, Exportar CSV, Buscar) não tinham como saber o que faziam sem tocar, e um deles (o orçamento por categoria, numa seção mais abaixo) tinha o mesmo problema.
+
+- Os 4 ícones do cabeçalho e o de "Orçamentos por categoria" viraram um único botão "⋮ Mais ações", que abre um sheet com ícone + título + descrição por opção — mesmo padrão `.sheet-option` já usado em `SelectField`.
+- Novo modificador `.page-heading-row--icon-trailing`: no mobile, um cabeçalho cujo lado direito é só um ícone agora fica na mesma linha do título, em vez de quebrar pra linha própria (a regra genérica de empilhar no mobile é pensada pra botões de texto largos, não pra um ícone sozinho — sem o modificador sobrava uma linha inteira vazia no topo da tela).
+- Escopo só em `SearchPage.tsx`; a classe nova não afeta nenhuma outra página.
+
 ## 2026-07-22 — feat: mensagens do bot do WhatsApp redesenhadas (emoji, negrito, listas)
 
 Pedido do dono: deixar as mensagens da Grazi no WhatsApp mais bonitas e coerentes. Detalhes em `docs/whatsapp/WHATSAPP.md`.
