@@ -2,6 +2,14 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-22 — design: menu mobile reorganizado (grade compacta em vez de lista empilhada)
+
+Pedido do dono: "Sua conta" virou um bloco único empilhado, sem cabê-lo na tela sem arrastar.
+
+- "Sua conta" virou grade de tiles (mesmo padrão de "Ir para") em vez de lista vertical de 6 linhas — cabe em 2 linhas.
+- "Sair" saiu da grade: vira uma barra fina separada por um divisor, em vermelho (`--danger`), sempre visível no fim do menu.
+- O menu inteiro passou a caber na tela sem precisar rolar (verificado em viewport mobile 375×812).
+
 ## 2026-07-22 — fix: navegador fechado durante a exclusão abria "logado" e inerte
 
 Continuação direta do fix abaixo, com o caso que ele **não** cobria, achado pelo dono ao vivo: logado nos dois aparelhos, **navegador do PC fechado**, conta excluída no celular. Ao reabrir, o PC subia como se estivesse logado, mas nada funcionava — nenhuma transação, nenhum workspace no Firestore. Detalhes em `docs/history/2026-07.md`.

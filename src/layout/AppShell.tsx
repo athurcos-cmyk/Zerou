@@ -188,29 +188,34 @@ export function AppShell() {
           </div>
 
           <p className="eyebrow">Sua conta</p>
-          <div className="menu-account-list">
-            <NavLink className={getNavClass} to="/app/settings/payday" onClick={() => setMobileMenuOpen(false)}>
-              <Banknote size={17} aria-hidden="true" /> Recebimento
+          <div className="menu-tiles menu-tiles--compact">
+            <NavLink className={getTileClass} to="/app/settings/payday" onClick={() => setMobileMenuOpen(false)}>
+              <Banknote size={18} aria-hidden="true" /> <span>Recebimento</span>
             </NavLink>
-            <NavLink className={getNavClass} to="/app/settings/onboarding" onClick={() => setMobileMenuOpen(false)}>
-              <Compass size={17} aria-hidden="true" /> Objetivo e desafio
+            <NavLink className={getTileClass} to="/app/settings/onboarding" onClick={() => setMobileMenuOpen(false)}>
+              <Compass size={18} aria-hidden="true" /> <span>Objetivo e desafio</span>
             </NavLink>
-            <NavLink className={getNavClass} to="/app/settings/appearance" onClick={() => setMobileMenuOpen(false)}>
-              <Palette size={17} aria-hidden="true" /> Aparência
+            <NavLink className={getTileClass} to="/app/settings/appearance" onClick={() => setMobileMenuOpen(false)}>
+              <Palette size={18} aria-hidden="true" /> <span>Aparência</span>
             </NavLink>
-            <NavLink className={getNavClass} to="/app/settings/whatsapp" onClick={() => setMobileMenuOpen(false)}>
-              <MessageCircle size={17} aria-hidden="true" /> WhatsApp
+            <NavLink className={getTileClass} to="/app/settings/whatsapp" onClick={() => setMobileMenuOpen(false)}>
+              <MessageCircle size={18} aria-hidden="true" /> <span>WhatsApp</span>
             </NavLink>
-            <NavLink className={getNavClass} to="/app/settings/security/login-methods" onClick={() => setMobileMenuOpen(false)}>
-              <Shield size={17} aria-hidden="true" /> Segurança
+            <NavLink className={getTileClass} to="/app/settings/security/login-methods" onClick={() => setMobileMenuOpen(false)}>
+              <Shield size={18} aria-hidden="true" /> <span>Segurança</span>
             </NavLink>
-            <button className="nav-link" type="button" onClick={() => { setMobileMenuOpen(false); openTour(); }}>
-              <HelpCircle size={17} aria-hidden="true" /> Como funciona
-            </button>
-            <button className="nav-link" type="button" onClick={() => { setMobileMenuOpen(false); void handleLogout(); }}>
-              <LogOut size={17} aria-hidden="true" /> Sair
+            <button className="menu-tile" type="button" onClick={() => { setMobileMenuOpen(false); openTour(); }}>
+              <HelpCircle size={18} aria-hidden="true" /> <span>Como funciona</span>
             </button>
           </div>
+
+          <button
+            className="menu-signout"
+            type="button"
+            onClick={() => { setMobileMenuOpen(false); void handleLogout(); }}
+          >
+            <LogOut size={17} aria-hidden="true" /> Sair
+          </button>
         </div>
       </BottomSheet>
 

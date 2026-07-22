@@ -2311,14 +2311,33 @@ span.service-mark--brand {
   color: var(--text-primary);
 }
 
-/* Zona "Sua conta": lista vertical — layout certo pra rótulos longos. */
-.menu-account-list {
-  display: grid;
+/* Zona "Sua conta": mesma grade de tiles de "Ir para", só que compacta — cabe tudo sem
+   precisar rolar o sheet. Rótulo curto pra não estourar a altura reservada de 2 linhas. */
+.menu-tiles--compact .menu-tile {
+  padding: 0.6rem 0.3rem 0.55rem;
+  font-size: 0.72rem;
 }
 
-.menu-account-list .nav-link {
+.menu-tiles--compact .menu-tile span {
+  min-height: 1.7em;
+}
+
+/* "Sair" fica sozinho, fora da grade — ação distinta, não um destino. */
+.menu-signout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.1rem;
+  padding: 0.6rem;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--danger);
+  font-weight: 800;
   font-size: 0.9rem;
-  padding: 0.6rem 0.55rem;
+}
+
+.menu-signout:hover {
+  background: var(--danger-soft);
 }
 
 .menu-sheet button.nav-link:focus-visible {
