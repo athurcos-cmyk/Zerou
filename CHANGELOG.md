@@ -2,6 +2,16 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-21 — feat: frequência Quinzenal + 3 correções na edição de recorrência
+
+Auditoria do botão "Editar" das recorrentes, pedida pelo dono. Achou 2 bugs reais e 1 gap. **Exige deploy de `firestore.rules`** (feito). Detalhes em `docs/history/2026-07.md`.
+
+- **Quinzenal (`biweekly`).** Valor novo de enum, sincronizado nos **9 pontos no mesmo commit** como manda a REGRA PRINCIPAL: `recurringFrequencies`, labels, `RecurringRule`, `nextOccurrenceDate` (+14 dias), `updateRecurringRule`, `Frequency` da Análise, o tipo do contexto da Grazi, e o `in [...]` das **duas** regras (create e update). Com teste de regra cobrindo o valor novo e rejeitando um inválido.
+- **BUG: `anchorDay` congelado.** Ele era gravado na criação e a regra **não permitia alterá-lo**. Como semanal/quinzenal andam em dias corridos, a data ia derivando e o âncora ficava obsoleto — ao mudar pra mensal/anual a ocorrência **saltava de volta pro dia da criação** (criada semanal dia 21, já no dia 11, virar mensal jogava pro dia 21). Agora `anchorDay` entra em `affectedKeys` do update (com a validação 1-31 do create) e a UI **reancora no dia da próxima ocorrência apenas ao sair de semanal/quinzenal para mensal/anual** — nos demais casos o âncora original é mantido, que é o que faz a data "voltar" pro dia 31 depois de um mês curto.
+- **BUG: não dava pra limpar o valor.** A dica dizia "deixe em branco se o valor varia todo mês", mas apagar o campo não fazia nada: o cliente mandava `undefined` e `updateRecurringRule` tratava `undefined` como "não mexe", pulando a gravação. Agora `undefined` = não mexe e `null` = limpar (via `deleteField()`).
+- **Gap: não dava pra remover a conta.** O seletor só listava contas; ganhou a opção "Definir depois", deixando o placeholder honesto.
+- **Primeiro teste de regras da coleção `recurring`** (não existia nenhum). typecheck / 370 testes client / 60 testes de regras no emulador / build functions. Verificado ao vivo: valor limpo virou "valor variável", conta virou "Definir depois", frequência virou QUINZENAL — tudo persistindo.
+
 ## 2026-07-21 — mudança de produto: recorrência NÃO debita mais sozinha, só avisa
 
 Decisão do dono: **dinheiro só se move quando a pessoa confirma.** O débito automático podia tirar dinheiro de uma assinatura já cancelada que a pessoa esqueceu de desativar no app — risco assimétrico (economiza um toque, custa um saldo errado). Detalhes em `docs/history/2026-07.md`.
