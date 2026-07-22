@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, PiggyBank, Scale, Wallet } from 'lucide-react';
 import { BottomSheet } from '../components/BottomSheet';
 import { formatMoney } from './money';
-import { availableModeLabels, availableModeSummaries, defaultAvailableMode } from './availableMode';
+import { availableModeLabels, defaultAvailableMode } from './availableMode';
 import type { AvailableMode } from '../types/contracts';
 
 interface AvailableModeSheetProps {
@@ -12,24 +12,6 @@ interface AvailableModeSheetProps {
   onChoose: (mode: AvailableMode) => void;
   onClose: () => void;
 }
-
-const steps = [
-  {
-    icon: <Wallet size={22} aria-hidden="true" />,
-    title: 'Saldo total',
-    body: 'É a soma do que existe nas suas contas agora. Não desconta nada.'
-  },
-  {
-    icon: <Scale size={22} aria-hidden="true" />,
-    title: 'Comprometido',
-    body: 'É o que já tem dono: contas a pagar, recorrências e faturas do cartão. Você escolhe abaixo o que entra nessa conta.'
-  },
-  {
-    icon: <PiggyBank size={22} aria-hidden="true" />,
-    title: 'Disponível',
-    body: 'É o Saldo total menos o Comprometido. É o número que responde "posso gastar isso sem me enrolar?".'
-  }
-];
 
 // Exemplo fixo: R$ 1.000 na conta e uma parcela de cartão de R$ 300 que vence em ~3
 // semanas, com o próximo salário caindo antes disso. É o caso que separa os dois modos.
@@ -69,24 +51,29 @@ export function AvailableModeSheet({ open, currentMode, onChoose, onClose }: Ava
       subtitle="Três números, e uma escolha sua no final."
     >
       <div className="form-stack">
-        <ol className="available-mode-steps">
-          {steps.map((step) => (
-            <li key={step.title}>
-              <span className="available-mode-step-icon">{step.icon}</span>
-              <div>
-                <strong>{step.title}</strong>
-                <span className="text-secondary">{step.body}</span>
-              </div>
-            </li>
-          ))}
-        </ol>
+        <div className="available-mode-formula">
+          <span className="available-mode-term">
+            <Wallet size={18} aria-hidden="true" />
+            Saldo total
+          </span>
+          <span className="available-mode-operator" aria-hidden="true">−</span>
+          <span className="available-mode-term">
+            <Scale size={18} aria-hidden="true" />
+            Comprometido
+          </span>
+          <span className="available-mode-operator" aria-hidden="true">=</span>
+          <span className="available-mode-term">
+            <PiggyBank size={18} aria-hidden="true" />
+            Disponível
+          </span>
+        </div>
 
         <div className="available-mode-example">
-          <p className="eyebrow">Um exemplo</p>
+          <p className="eyebrow">Exemplo (não é seu dado real)</p>
           <p className="text-secondary">
-            Você tem <strong>{formatMoney(exampleBalanceCents)}</strong> na conta e uma parcela de cartão de{' '}
-            <strong>{formatMoney(exampleInstallmentCents)}</strong> que vence em umas 3 semanas — mas seu próximo salário
-            cai antes disso. Quanto o app deve dizer que está disponível?
+            Você tem <strong>{formatMoney(exampleBalanceCents)}</strong> na conta. Uma parcela de{' '}
+            <strong>{formatMoney(exampleInstallmentCents)}</strong> vence em 3 semanas, mas seu próximo salário cai antes
+            disso. Ela já deveria pesar no seu Disponível agora, ou só quando estiver mais perto?
           </p>
         </div>
 
@@ -105,12 +92,11 @@ export function AvailableModeSheet({ open, currentMode, onChoose, onClose }: Ava
                 onClick={() => setSelected(mode)}
               >
                 <span className="choice-card-label">
-                  <strong>{availableModeLabels[mode]}</strong>
-                  <span className="text-secondary">{availableModeSummaries[mode]}</span>
-                  <span className="available-mode-preview">
-                    Disponível: <strong>{formatMoney(exampleBalanceCents - example.committedCents)}</strong>
-                    {' · '}
-                    Comprometido: <strong>{formatMoney(example.committedCents)}</strong>
+                  <span className="available-mode-result">
+                    <strong>{availableModeLabels[mode]}</strong>
+                    <span className="available-mode-preview">
+                      Disponível <strong>{formatMoney(exampleBalanceCents - example.committedCents)}</strong>
+                    </span>
                   </span>
                   <span className="text-muted available-mode-caption">{example.caption}</span>
                 </span>
