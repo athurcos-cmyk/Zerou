@@ -19,6 +19,17 @@ function formatBRL(amountCents: number): string {
   return (amountCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+// 'YYYY-MM-DD' no fuso de São Paulo (`en-CA` já sai nesse formato). Comparar a CHAVE de dia,
+// e não o instante, evita erro de fuso: a function roda em UTC e o app grava em BRT.
+function brtDateKey(d: Date): string {
+  return d.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+}
+
+// '20/07' no fuso de São Paulo.
+function brtDayMonth(d: Date): string {
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' });
+}
+
 // ─── closeInvoicesDue ─────────────────────────────────────────────────────────
 // Roda todo dia à meia-noite (BRT). Fecha as faturas de cartões cujo
 // dia de fechamento é hoje. Sem isso, o fechamento depende do usuário
@@ -139,9 +150,18 @@ export const generateRecurrences = onSchedule(
         // na hora de registrar) — só não dá pra dizer quanto é.
         const valuePrefix = rule.amountCents ? `${formatBRL(rule.amountCents)} · ` : '';
 
+        // "vence hoje" só quando é hoje de verdade. Se a ocorrência já passou (ex.: a regra foi
+        // criada depois das 6h, então o primeiro aviso só sai na manhã seguinte), dizer "vence
+        // hoje" seria mentira — nesse caso mostra a data em que venceu.
+        const occurrenceDate = rule.nextOccurrenceAt.toDate();
+        const venceHoje = brtDateKey(occurrenceDate) === brtDateKey(new Date());
+        const titulo = venceHoje
+          ? `${rule.description} vence hoje`
+          : `${rule.description} venceu em ${brtDayMonth(occurrenceDate)}`;
+
         await sendPushToUser(
           rule.createdBy,
-          `${rule.description} vence hoje`,
+          titulo,
           `${valuePrefix}nada foi debitado — não se esqueça de registrar`,
           'https://granativa.com.br/app/bills'
         ).catch(() => {});
