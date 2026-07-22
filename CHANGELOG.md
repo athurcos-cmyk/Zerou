@@ -2,6 +2,16 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-21 — mudança de produto: recorrência NÃO debita mais sozinha, só avisa
+
+Decisão do dono: **dinheiro só se move quando a pessoa confirma.** O débito automático podia tirar dinheiro de uma assinatura já cancelada que a pessoa esqueceu de desativar no app — risco assimétrico (economiza um toque, custa um saldo errado). Detalhes em `docs/history/2026-07.md`.
+
+- **`generateRecurrences` virou um LEMBRETE.** Não cria transação, não debita conta, não gera conta a pagar e **não avança `nextOccurrenceAt`**. Só manda push. Quem registra é a pessoa, pelo botão "Registrar"/"Pagar adiantado" da tela Contas a Pagar (`recordRecurringPayment`) — que já pedia valor e conta, e é quem avança a data.
+- **Unificou 3 comportamentos imprevisíveis em 1.** Antes, dependendo do que a pessoa preenchia: com valor+conta debitava sozinho; sem valor virava conta a pagar; com valor e sem conta não fazia nada. Agora é sempre o mesmo: avisa.
+- **Um aviso por ocorrência.** Como a data não avança mais, a regra seguiria "vencida" todo dia e o push repetiria — o estado de "já avisei" vai num doc à parte (`recurringNotifyState/{ruleId}`), no molde do `budgetAlertState`: escrito só pela função (Admin SDK), **sem regra nova em `firestore.rules`** e sem acesso do cliente.
+- **Texto novo do push:** `{descrição} vence hoje` / `R$ X · nada foi debitado — não se esqueça de registrar` (antes dizia "registrado automaticamente", que era o oposto do que queremos).
+- Zero mudança no client (a UI já tinha campo de valor, escolha de conta e o botão liberado perto do vencimento). Código morto removido (`nextOccurrenceDate`, `recurringOccurrenceTransactionId` e o import de `transactionAccountEffects` no `automation.ts`). 81 testes functions verdes.
+
 ## 2026-07-21 — fix: ícone das notificações push apontava pro asset Zerou antigo
 
 `functions/src/push.ts` e `automation.ts` usavam `icon`/`badge` = `/brand/zerou-app-icon-192.png`, que **não existe desde o rebrand Zerou→Granativa** — o path cai no fallback do SPA (serve `index.html`, `content-type: text/html`, não uma imagem), então **toda notificação push aparecia sem o logo**. Trocado por `granativa-app-icon-192.png`. Afeta as 5 functions de push (`closeInvoicesDue`, `generateRecurrences`, `sendDueReminders`, `sendBudgetAlerts`, `sendDailyLogReminder`) — deployadas em lote pequeno (contorno da quota de CPU, ver RUNBOOK).

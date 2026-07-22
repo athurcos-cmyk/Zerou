@@ -3,7 +3,6 @@ import { getMessaging } from 'firebase-admin/messaging';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { logger } from 'firebase-functions';
 import { sendPushToUser } from './push.js';
-import { transactionAccountEffects } from './shared/accountEffects.js';
 
 const region = 'southamerica-east1';
 
@@ -14,44 +13,6 @@ function nowInBRT(): Date {
 function currentYearMonth(): string {
   const d = nowInBRT();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-
-// Mantido em sincronia com nextOccurrenceDate em src/finance/financeService.ts —
-// setMonth/setFullYear transbordam quando o mês alvo é mais curto (31/jan viraria
-// 3/mar, pulando fevereiro). Em vez disso, clampamos no último dia válido do mês
-// alvo, usando anchorDay (dia originalmente pretendido) quando disponível, para
-// que a ocorrência "volte" pro dia 31 assim que um mês de 31 dias aparecer.
-function nextOccurrenceDate(current: Date, frequency: 'weekly' | 'monthly' | 'yearly', anchorDay?: number): Date {
-  if (frequency === 'weekly') {
-    const next = new Date(current);
-    next.setDate(next.getDate() + 7);
-    return next;
-  }
-
-  const day = anchorDay ?? current.getDate();
-  const targetYear = frequency === 'yearly' ? current.getFullYear() + 1 : current.getFullYear();
-  const targetMonth = frequency === 'yearly' ? current.getMonth() : current.getMonth() + 1;
-  const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
-  const clampedDay = Math.min(day, daysInTargetMonth);
-
-  return new Date(
-    targetYear,
-    targetMonth,
-    clampedDay,
-    current.getHours(),
-    current.getMinutes(),
-    current.getSeconds(),
-    current.getMilliseconds()
-  );
-}
-
-// Mantido em sincronia com `recurringOccurrenceTransactionId` em src/finance/financeService.ts.
-// Id determinístico por (regra, ocorrência): faz o "Registrar" do app e esta função
-// gravarem no MESMO documento, em vez de criarem duas despesas para a mesma ocorrência.
-// A data sai em UTC (`toISOString`) porque o app roda em BRT e esta função em UTC — ler o
-// dia no fuso local daria chaves diferentes para o mesmo instante.
-function recurringOccurrenceTransactionId(ruleId: string, occurrenceAt: Date): string {
-  return `${ruleId}_${occurrenceAt.toISOString().slice(0, 10)}`;
 }
 
 function formatBRL(amountCents: number): string {
@@ -121,18 +82,28 @@ export const closeInvoicesDue = onSchedule(
   }
 );
 
-// ─── generateRecurrences ──────────────────────────────────────────────────────
-// Roda todo dia às 6h (BRT). Busca todas as regras de recorrência vencidas e
-// cria as transações automaticamente. Sem isso, o usuário precisa abrir o app
-// e clicar "Registrar" em cada recorrência.
+// ─── generateRecurrences (hoje é LEMBRETE, não gerador) ───────────────────────
+// Roda todo dia às 6h (BRT). NÃO debita e NÃO cria nada: só AVISA que a recorrência
+// venceu. Decisão de produto (2026-07-21): dinheiro só se move quando a pessoa confirma
+// — o débito automático podia tirar dinheiro de uma assinatura já cancelada que a pessoa
+// esqueceu de desativar aqui. Quem registra é a pessoa, pelo botão "Registrar" da tela
+// Contas a Pagar (`recordRecurringPayment`), que é quem avança `nextOccurrenceAt`.
+//
+// Por isso a data NUNCA é tocada aqui: enquanto a ocorrência não for registrada ela
+// segue vencida e o botão segue liberado. Como a regra continuaria "vencida" todo dia, o
+// push repetiria — então guardamos a última ocorrência avisada num doc à parte
+// (`recurringNotifyState/{ruleId}`), no mesmo molde do `budgetAlertState` do
+// `sendBudgetAlerts`: coleção escrita só por esta função (Admin SDK), sem regra em
+// `firestore.rules` e sem acesso do cliente. Cada ocorrência gera no máximo UM aviso.
+//
+// O nome `generateRecurrences` ficou por compatibilidade de deploy — renomear apagaria e
+// recriaria a function e o job do Cloud Scheduler.
 export const generateRecurrences = onSchedule(
   { schedule: '0 6 * * *', timeZone: 'America/Sao_Paulo', region, maxInstances: 1 },
   async () => {
     const db = getFirestore();
     const now = Timestamp.now();
-    const nowDate = nowInBRT();
-    const monthKey = currentYearMonth();
-    let generated = 0;
+    let notified = 0;
     let skipped = 0;
 
     const rulesSnap = await db
@@ -148,128 +119,46 @@ export const generateRecurrences = onSchedule(
           createdBy: string;
           description: string;
           amountCents?: number;
-          accountId?: string;
-          categoryId?: string;
-          frequency: 'weekly' | 'monthly' | 'yearly';
           nextOccurrenceAt: Timestamp;
-          anchorDay?: number;
         };
-  
-        const occurrenceAt = rule.nextOccurrenceAt.toDate();
-        const nextDate = nextOccurrenceDate(occurrenceAt, rule.frequency, rule.anchorDay);
-  
-        // Sem valor: cria um compromisso (Bill) pendente pra pessoa preencher quando chegar.
-        if (!rule.amountCents) {
-          const billId = recurringOccurrenceTransactionId(ruleDoc.id, occurrenceAt);
-          const billRef = db.doc(`workspaces/${rule.workspaceId}/bills/${billId}`);
-          const alreadyCreatedBill = (await billRef.get()).exists;
-  
-          if (!alreadyCreatedBill) {
-            await billRef.set({
-              id: billId,
-              workspaceId: rule.workspaceId,
-              description: rule.description,
-              amountCents: 0,
-              dueDate: Timestamp.fromDate(occurrenceAt),
-              status: 'pending',
-              categoryId: rule.categoryId ?? '',
-              accountId: rule.accountId ?? '',
-              recurringId: ruleDoc.id,
-              createdBy: rule.createdBy,
-              createdAt: FieldValue.serverTimestamp(),
-              updatedAt: FieldValue.serverTimestamp(),
-            });
-            generated++;
-          } else {
-            skipped++;
-          }
-  
-          await ruleDoc.ref.update({
-            nextOccurrenceAt: Timestamp.fromDate(nextDate),
-            updatedAt: FieldValue.serverTimestamp(),
-          });
-          continue;
-        }
-  
-        // Sem conta definida não há como criar a transação
-        if (!rule.accountId) {
-          await ruleDoc.ref.update({
-            nextOccurrenceAt: Timestamp.fromDate(nextDate),
-            updatedAt: FieldValue.serverTimestamp(),
-          });
+
+        const stateRef = db.doc(
+          `workspaces/${rule.workspaceId}/recurringNotifyState/${ruleDoc.id}`
+        );
+        const lastNotified = (await stateRef.get()).data()?.lastNotifiedOccurrenceAt as
+          | Timestamp
+          | undefined;
+
+        // Já avisamos desta MESMA ocorrência — não repete enquanto não for registrada.
+        if (lastNotified && lastNotified.isEqual(rule.nextOccurrenceAt)) {
           skipped++;
           continue;
         }
-  
-        const txnId = recurringOccurrenceTransactionId(ruleDoc.id, occurrenceAt);
-        const txnRef = db.doc(`workspaces/${rule.workspaceId}/transactions/${txnId}`);
-  
-        // A pessoa pode ter clicado "Registrar" nesta mesma ocorrência antes das 6h. O id
-        // determinístico faz as duas escritas caírem no mesmo documento: aqui só avançamos a
-        // data (e não mandamos push), em vez de gravar a despesa de novo por cima.
-        const alreadyRecorded = (await txnRef.get()).exists;
-  
-        if (alreadyRecorded) {
-          await ruleDoc.ref.update({
-            nextOccurrenceAt: Timestamp.fromDate(nextDate),
-            updatedAt: FieldValue.serverTimestamp(),
-          });
-          skipped++;
-          continue;
-        }
-  
-        const txnPayload: Record<string, unknown> = {
-          id: txnId,
-          workspaceId: rule.workspaceId,
-          createdBy: rule.createdBy,
-          updatedBy: rule.createdBy,
-          type: 'expense',
-          amountCents: rule.amountCents,
-          description: rule.description,
-          accountId: rule.accountId,
-          date: Timestamp.fromDate(nowDate),
-          competenceMonth: monthKey,
-          cashMonth: monthKey,
-          tags: ['recorrente'],
-          isRecurring: true,
-          recurringId: ruleDoc.id,
-          clientMutationId: txnId,
-          syncStatus: 'synced',
-          version: 1,
-          createdAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp(),
-        };
-  
-        if (rule.categoryId) {
-          txnPayload.categoryId = rule.categoryId;
-        }
-  
-        const batch = db.batch();
-        batch.set(txnRef, txnPayload);
-        batch.update(ruleDoc.ref, {
-          nextOccurrenceAt: Timestamp.fromDate(nextDate),
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-        for (const effect of transactionAccountEffects({ type: 'expense', amountCents: rule.amountCents, accountId: rule.accountId })) {
-          batch.update(db.doc(`workspaces/${rule.workspaceId}/accounts/${effect.accountId}`), {
-            currentBalanceCents: FieldValue.increment(effect.deltaCents),
-            updatedAt: FieldValue.serverTimestamp(),
-          });
-        }
-        await batch.commit();
-        generated++;
-  
+
+        // Sem valor definido a recorrência ainda merece o aviso (a pessoa informa o valor
+        // na hora de registrar) — só não dá pra dizer quanto é.
+        const valuePrefix = rule.amountCents ? `${formatBRL(rule.amountCents)} · ` : '';
+
         await sendPushToUser(
           rule.createdBy,
-          `Conta recorrente: ${rule.description}`,
-          `${formatBRL(rule.amountCents)} registrado automaticamente.`
+          `${rule.description} vence hoje`,
+          `${valuePrefix}nada foi debitado — não se esqueça de registrar`,
+          'https://granativa.com.br/app/bills'
         ).catch(() => {});
+
+        await stateRef.set({
+          ruleId: ruleDoc.id,
+          workspaceId: rule.workspaceId,
+          lastNotifiedOccurrenceAt: rule.nextOccurrenceAt,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        notified++;
       } catch (err) {
-        logger.error(`generateRecurrences: erro ao processar regra — pulando`, err);
+        logger.error('generateRecurrences: erro ao processar regra — pulando', err);
       }
     }
 
-    logger.info('generate_recurrences_finished', { generated, skipped });
+    logger.info('recurrence_reminders_finished', { notified, skipped });
   }
 );
 
