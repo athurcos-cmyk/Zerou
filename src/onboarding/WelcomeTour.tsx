@@ -1,18 +1,12 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  ArrowLeft, ArrowRight, CalendarClock, PieChart, ReceiptText, Sparkles, WalletCards, Wallet
+  CalendarClock, PieChart, ReceiptText, Sparkles, WalletCards, Wallet
 } from 'lucide-react';
+import { useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { useFocusTrap } from '../utils/useFocusTrap';
+import { SlideTour, type TourSlide } from './SlideTour';
 import { useWelcomeTour } from './welcomeTour.store';
 
-interface Slide {
-  icon: ReactNode;
-  title: string;
-  text: string;
-}
-
-const slides: Slide[] = [
+const slides: TourSlide[] = [
   {
     icon: <Sparkles size={26} aria-hidden="true" />,
     title: 'Bem-vindo à Granativa',
@@ -54,62 +48,13 @@ const slides: Slide[] = [
 export function WelcomeTour() {
   const { profile } = useAuth();
   const { open, seen, openTour, closeTour } = useWelcomeTour();
-  const [index, setIndex] = useState(0);
-  const tourRef = useRef<HTMLDivElement | null>(null);
-
-  useFocusTrap(open, tourRef);
 
   // Abre sozinho uma vez quando o espaço já está pronto (onboarding concluído).
   useEffect(() => {
     if (!seen && profile?.defaultWorkspaceId) openTour();
   }, [seen, profile?.defaultWorkspaceId, openTour]);
 
-  // Sempre começa do primeiro slide ao (re)abrir.
-  useEffect(() => {
-    if (open) setIndex(0);
-  }, [open]);
-
-  if (!open) return null;
-
-  const slide = slides[index];
-  const isLast = index === slides.length - 1;
-
   return (
-    <div className="welcome-tour" role="dialog" aria-modal="true" aria-label="Boas-vindas à Granativa" ref={tourRef}>
-      <div className="welcome-tour-card">
-        <button className="welcome-tour-skip" type="button" onClick={closeTour}>
-          Pular
-        </button>
-
-        <div className="welcome-tour-icon" aria-hidden="true">{slide.icon}</div>
-        <h2 className="welcome-tour-title">{slide.title}</h2>
-        <p className="welcome-tour-text">{slide.text}</p>
-
-        <div className="welcome-tour-dots" aria-hidden="true">
-          {slides.map((item, i) => (
-            <span key={item.title} className={`welcome-tour-dot${i === index ? ' welcome-tour-dot--active' : ''}`} />
-          ))}
-        </div>
-
-        <div className="welcome-tour-nav">
-          {index > 0 ? (
-            <button className="button button--subtle" type="button" onClick={() => setIndex((i) => i - 1)}>
-              <ArrowLeft size={18} aria-hidden="true" /> Voltar
-            </button>
-          ) : (
-            <span />
-          )}
-          {isLast ? (
-            <button className="button button--primary" type="button" onClick={closeTour}>
-              Começar
-            </button>
-          ) : (
-            <button className="button button--primary" type="button" onClick={() => setIndex((i) => i + 1)}>
-              Próximo <ArrowRight size={18} aria-hidden="true" />
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
+    <SlideTour open={open} slides={slides} ariaLabel="Boas-vindas à Granativa" onClose={closeTour} lastLabel="Começar" />
   );
 }

@@ -2,6 +2,15 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-22 — feat: tour de boas-vindas da tela de Análise
+
+Pedido do dono: um tutorial na primeira vez que a pessoa abre a Análise, igual o que já existe no Dashboard, explicando como a tela funciona e quais ações dá pra fazer.
+
+- `SlideTour.tsx` (novo): o carrossel de slides do `WelcomeTour` (global) foi extraído num componente reusável — mesmo visual (`.welcome-tour*`, já existente), zero CSS novo. `WelcomeTour.tsx` virou um wrapper fino em cima dele.
+- `AnalysisTour.tsx` + `analysisTour.store.ts` (novos, mesmo padrão do tour global): 4 slides — navegação por mês/comparação, gasto por categoria, histórico mensal, e o menu "Mais ações". Abre sozinho na primeira visita à Análise, só depois que o tour global já foi visto (`useWelcomeTour().seen`) pra não empilhar dois modais. "Já viu" fica no localStorage (`zerou.analysisTourSeen`), por aparelho.
+- Reabrível a qualquer momento pelo item "Como funciona a Análise" no sheet "Mais ações".
+- `npm run typecheck`/`test` limpos (377 testes, sem regressão no `WelcomeTour` do Dashboard). Verificado ao vivo: abre sozinho na primeira visita, navega entre os 4 slides, fecha e marca como visto, reabre pelo menu.
+
 ## 2026-07-22 — design: cabeçalho da Análise ganha "Mais ações" (menos ícones crípticos)
 
 Pedido do dono: os 4 ícones soltos no topo de Análise (Tendência, Resumo anual, Exportar CSV, Buscar) não tinham como saber o que faziam sem tocar, e um deles (o orçamento por categoria, numa seção mais abaixo) tinha o mesmo problema.

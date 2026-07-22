@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Calendar, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, EllipsisVertical, Gauge, LineChart, Minus, Plus, Search, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
+import { Calendar, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, EllipsisVertical, Gauge, HelpCircle, LineChart, Minus, Plus, Search, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
 import {
   PieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from 'recharts';
 import { useAuth } from '../auth/AuthContext';
+import { AnalysisTour } from '../onboarding/AnalysisTour';
+import { useAnalysisTour } from '../onboarding/analysisTour.store';
 import { AnnualSummarySheet } from '../components/AnnualSummarySheet';
 import { CategoryTrendSheet } from '../components/CategoryTrendSheet';
 import { BottomSheet } from '../components/BottomSheet';
@@ -145,6 +147,7 @@ export function SearchPage() {
   const [trendOpen, setTrendOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [budgetValues, setBudgetValues] = useState<Record<string, string>>({});
+  const openAnalysisTour = useAnalysisTour((state) => state.openTour);
 
   const expenseCategories = useMemo(
     () => finance.categories.filter((c) => c.type === 'expense' || c.type === 'both'),
@@ -885,8 +888,21 @@ export function SearchPage() {
               <span className="sheet-option-desc">Encontre uma transação, conta ou compromisso</span>
             </span>
           </button>
+          <button
+            className="sheet-option"
+            type="button"
+            onClick={() => { setActionsOpen(false); openAnalysisTour(); }}
+          >
+            <span className="sheet-option-icon" aria-hidden="true"><HelpCircle size={18} /></span>
+            <span className="sheet-option-text">
+              <span className="sheet-option-label">Como funciona a Análise</span>
+              <span className="sheet-option-desc">Reveja o tutorial desta tela</span>
+            </span>
+          </button>
         </div>
       </BottomSheet>
+
+      <AnalysisTour />
 
       {/* ── Busca por texto ────────────────────────────────────────────────── */}
       <BottomSheet open={searchOpen} onClose={() => setSearchOpen(false)} title="Buscar" subtitle="Transações, contas e contas a pagar">
