@@ -2,6 +2,15 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-22 — fix: navegador fechado durante a exclusão abria "logado" e inerte
+
+Continuação direta do fix abaixo, com o caso que ele **não** cobria, achado pelo dono ao vivo: logado nos dois aparelhos, **navegador do PC fechado**, conta excluída no celular. Ao reabrir, o PC subia como se estivesse logado, mas nada funcionava — nenhuma transação, nenhum workspace no Firestore. Detalhes em `docs/history/2026-07.md`.
+
+- **Por que escapou.** O fix anterior agia no caminho de **sucesso** do `onSnapshot` do perfil (`!snapshot.exists()` vindo do servidor). Com o navegador fechado, ao reabrir o token já não vale: o listener **não diz "não existe", ele é rejeitado** com `permission-denied`. E o handler de erro fazia `applyProfile(readCachedProfile(uid))` em silêncio — **ressuscitando o perfil do cache local**, o que fazia o app parecer logado enquanto toda escrita batia na regra.
+- **Fix:** o mesmo `handleProfileUnavailable` agora está nos **dois** caminhos do listener. No de erro, só reage a `permission-denied`/`unauthenticated`; `unavailable` (offline) fica **de propósito** de fora, senão quem está sem internet seria deslogado.
+- **Tela dedicada** (`AccountDeletedScreen`), pedida pelo dono: em vez de redirecionar em silêncio, explica "Esta conta foi excluída" com um botão "Voltar ao início". Fica **acima das `Routes`**, porque os guards mandariam pro `/login` — e o problema não é falta de login, é que a conta não existe mais. O botão usa `location.assign('/')` (reload completo) pra não sobrar estado da sessão morta.
+- 377 testes client (+2 na tela nova). Verificado que a sessão válida **não** dispara a tela.
+
 ## 2026-07-22 — fix: excluir conta num aparelho agora desloga os outros (e não vira onboarding)
 
 Dois bugs do mesmo cenário, achados pelo dono ao vivo: conta logada no celular **e** no computador, exclusão feita no celular. Detalhes em `docs/history/2026-07.md`.

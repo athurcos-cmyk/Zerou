@@ -1,6 +1,7 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, type ReactNode } from 'react';
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthContext';
+import { AccountDeletedScreen } from './auth/AccountDeletedScreen';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { FinanceDataProvider } from './finance/FinanceDataContext';
 import { SharedDataProvider } from './shared/SharedDataContext';
@@ -59,6 +60,17 @@ function LazyFallback() {
   return <div className="public-page">Carregando…</div>;
 }
 
+/**
+ * Conta excluída não cai em rota nenhuma: substitui o app inteiro pela explicação. Precisa
+ * ficar ACIMA das `Routes` porque, sem sessão, os guards mandariam pro /login — e o problema
+ * não é falta de login, é que a conta não existe mais.
+ */
+function AppRoutesOrDeletedNotice({ children }: { children: ReactNode }) {
+  const { accountDeleted } = useAuth();
+  if (accountDeleted) return <AccountDeletedScreen />;
+  return <>{children}</>;
+}
+
 export function App() {
   return (
     <AuthProvider>
@@ -67,6 +79,7 @@ export function App() {
       <ScrollToTop />
 
       <AppErrorBoundary>
+      <AppRoutesOrDeletedNotice>
       <Routes>
         <Route path="/" element={<RootRoute />} />
         <Route path="/pricing" element={<Navigate to="/" replace />} />
@@ -125,6 +138,7 @@ export function App() {
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </AppRoutesOrDeletedNotice>
       </AppErrorBoundary>
     </AuthProvider>
   );

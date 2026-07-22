@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { FirebaseConfigurationError, getFirebaseAuth, getFirebaseDb, isFirebaseConfigured } from '../firebase/config';
@@ -16,33 +16,15 @@ interface AuthContextValue {
   profileLoading: boolean;
   authFromCache: boolean;
   firebaseError: string | null;
+  /** A conta desta sessão foi excluída (possivelmente em outro aparelho). */
+  accountDeleted: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-// O `onSnapshot` pode reemitir a ausência do perfil várias vezes; uma trava simples evita
-// disparar N renovações de token em paralelo.
-let accountCheckInFlight = false;
-
-/**
- * O perfil sumiu do SERVIDOR. Antes de tratar como "usuário novo → onboarding", confirma se a
- * conta ainda existe: se foi excluída (inclusive em OUTRO aparelho), sai da sessão e volta pro
- * início, em vez de oferecer onboarding — que recriaria `users/{uid}` como conta fantasma.
- */
-async function signOutIfAccountWasDeleted(user: User) {
-  // O aparelho que está excluindo cuida do próprio fluxo — e um signOut aqui poderia abortar
-  // o `deleteUser()` em andamento.
-  if (useAccountDeletion.getState().isDeleting || accountCheckInFlight) return;
-
-  accountCheckInFlight = true;
-  try {
-    if (await isAccountStillValid(user)) return; // usuário novo de verdade: segue pro onboarding
-    await logout({ clearLocalCache: true });
-    window.location.assign('/');
-  } finally {
-    accountCheckInFlight = false;
-  }
-}
+// Erros do listener que significam "esta sessão não vale mais" — e NÃO "está sem internet".
+// Offline no Firestore vem como `unavailable`, que de propósito não entra aqui.
+const SESSION_INVALID_CODES = new Set(['permission-denied', 'unauthenticated']);
 // Tempo máximo para esperar o Firebase Auth responder antes de assumir sem sessão.
 // Se o usuário tem cache local, o boot já é instantâneo e esse timeout raramente dispara.
 const AUTH_BOOT_TIMEOUT_MS = 500;
@@ -92,8 +74,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profileLoading, setProfileLoading] = useState(false);
   const [authFromCache, setAuthFromCache] = useState(() => isFirebaseConfigured && Boolean(readLastCachedProfile()));
   const [firebaseError, setFirebaseError] = useState<string | null>(null);
+  const [accountDeleted, setAccountDeleted] = useState(false);
+  // Evita disparar N renovações de token em paralelo (o listener pode reemitir várias vezes).
+  const accountCheckInFlight = useRef(false);
   const hydrateFromProfile = useAppearanceStore((state) => state.hydrateFromProfile);
   const resetLocalOverride = useAppearanceStore((state) => state.resetLocalOverride);
+
+  /**
+   * O perfil não veio do servidor — ou porque não existe, ou porque o listener foi rejeitado.
+   * Os dois casos são ambíguos: podem ser "conta excluída" OU "usuário novo sem onboarding"
+   * (e, no erro, "sessão inválida"). Quem desempata é `isAccountStillValid`, que força a
+   * renovação do token.
+   *
+   * Confirmada a exclusão, encerra a sessão e levanta `accountDeleted` — a tela dedicada
+   * explica o que aconteceu, em vez de deixar a pessoa num app que não responde a nada.
+   */
+  const handleProfileUnavailable = useCallback(async (currentUser: User) => {
+    // O aparelho que está excluindo cuida do próprio fluxo — e um signOut aqui poderia
+    // abortar o `deleteUser()` em andamento.
+    if (useAccountDeletion.getState().isDeleting || accountCheckInFlight.current) return;
+
+    accountCheckInFlight.current = true;
+    try {
+      if (await isAccountStillValid(currentUser)) return; // usuário novo/queda de rede: segue normal
+      try {
+        await logout({ clearLocalCache: true });
+      } finally {
+        setAccountDeleted(true);
+      }
+    } finally {
+      accountCheckInFlight.current = false;
+    }
+  }, []);
 
   const applyProfile = useCallback((nextProfile: UserProfile | null) => {
     setProfile(nextProfile);
@@ -241,13 +253,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Só age quando o SERVIDOR confirma que o perfil não existe. Vindo do cache seria um
         // falso negativo offline, e deslogar quem só está sem rede seria bem pior que o bug.
         if (!snapshot.exists() && !snapshot.metadata.fromCache) {
-          void signOutIfAccountWasDeleted(user);
+          void handleProfileUnavailable(user);
         }
       },
-      () => {
+      (error) => {
         window.clearTimeout(profileTimeout);
         applyProfile(readCachedProfile(user.uid));
         setProfileLoading(false);
+
+        // Caminho do navegador que estava FECHADO durante a exclusão: ao reabrir, o listener
+        // é rejeitado (token de um usuário que não existe mais) em vez de dizer "não existe".
+        // Sem isto o fallback de cache acima ressuscitava o perfil local e o app abria
+        // "logado", mas inerte — nenhuma escrita passava.
+        if (SESSION_INVALID_CODES.has(error.code)) {
+          void handleProfileUnavailable(user);
+        }
       }
     );
 
@@ -255,11 +275,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(profileTimeout);
       unsubscribe();
     };
-  }, [applyProfile, firebaseError, user, resetLocalOverride]);
+  }, [applyProfile, firebaseError, user, resetLocalOverride, handleProfileUnavailable]);
 
   const value = useMemo(
-    () => ({ user, profile, loading, profileLoading, authFromCache, firebaseError }),
-    [user, profile, loading, profileLoading, authFromCache, firebaseError]
+    () => ({ user, profile, loading, profileLoading, authFromCache, firebaseError, accountDeleted }),
+    [user, profile, loading, profileLoading, authFromCache, firebaseError, accountDeleted]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
