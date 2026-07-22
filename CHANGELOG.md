@@ -2,6 +2,15 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-22 — fix: layout quebrado em Safari antigo (iPhone 8 Plus e outros < 16.4)
+
+Relato: amiga do dono viu o site inteiro quebrado no Safari de um iPhone 8 Plus (menu lateral de desktop sempre visível, cards e texto cortados na borda da tela), enquanto iPhones mais novos (12, 16) funcionavam normal.
+
+- Causa: o Tailwind v4 compila **todos** os breakpoints responsivos com a sintaxe moderna de media query "range" (`@media (width<=900px)`), suportada só a partir do Safari 16.4/Chrome 104/Firefox 63. Em navegadores mais antigos o bloco `@media` inteiro é descartado como inválido — nenhuma regra responsiva é aplicada, então o app renderiza só a versão "base" (larga), cortando tudo que passa da tela.
+- Fix em `vite.config.ts`: `build.cssTarget: ['safari13', 'ios13']` (+ `cssMinify: 'lightningcss'` explícito) faz o Lightning CSS — já o minificador de CSS padrão do Vite em produção — reescrever a sintaxe moderna de volta pro clássico `min-width`/`max-width` no build final. Nenhuma classe Tailwind ou CSS autoral mudou.
+- `package.json` ganhou `browserslist` (`Safari >= 13`, `iOS >= 13`) pra manter o `autoprefixer` alinhado ao mesmo piso de compatibilidade.
+- Verificado: `dist/assets/index-*.css` sem nenhuma ocorrência de `width<=`/`width>=` após o build; `npm run typecheck` e `npm test` (377 testes) limpos; conferido visualmente via preview do build de produção em viewport 414×896 (largura do iPhone 8 Plus) sem regressão.
+
 ## 2026-07-22 — feat: tour de boas-vindas da tela de Análise
 
 Pedido do dono: um tutorial na primeira vez que a pessoa abre a Análise, igual o que já existe no Dashboard, explicando como a tela funciona e quais ações dá pra fazer.

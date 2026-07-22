@@ -122,6 +122,14 @@ export default defineConfig(({ mode }) => {
       }),
       generateFirebaseMessagingSW(env),
     ],
+    build: {
+      // Sem isso, o Lightning CSS (minificador de CSS do Vite) assume um baseline
+      // moderno e compila os breakpoints do Tailwind v4 com a sintaxe de media query
+      // "width <= Npx", que Safari < 16.4 descarta como inválida (quebra toda a
+      // responsividade em silêncio). cssTarget força o downlevel pro min/max-width clássico.
+      cssTarget: ['safari13', 'ios13'],
+      cssMinify: 'lightningcss',
+    },
     test: {
       environment: 'jsdom',
       globals: true,

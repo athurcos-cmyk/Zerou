@@ -25,6 +25,12 @@
   "engines": {
     "node": ">=22.0.0"
   },
+  "browserslist": [
+    "defaults",
+    "Safari >= 13",
+    "iOS >= 13",
+    "not dead"
+  ],
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
     "date-fns": "^4.4.0",
