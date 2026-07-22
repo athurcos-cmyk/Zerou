@@ -2,6 +2,15 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-22 — fix: excluir conta num aparelho agora desloga os outros (e não vira onboarding)
+
+Dois bugs do mesmo cenário, achados pelo dono ao vivo: conta logada no celular **e** no computador, exclusão feita no celular. Detalhes em `docs/history/2026-07.md`.
+
+- **O outro aparelho ia pro ONBOARDING em vez do landing.** O guard não consegue distinguir dois estados idênticos: "conta excluída" e "usuário novo sem onboarding" são ambos *autenticado, sem perfil*. O único desempate era a flag `isDeletingAccount` — Zustand **em memória**, que só existe no aparelho que exclui. Pior: parado no onboarding, se a pessoa concluísse, `ensurePersonalFoundation` **recriava** `users/{uid}` (conta fantasma), porque o ID token segue criptograficamente válido e as regras do Firestore não têm como saber que o usuário do Auth não existe mais.
+- **Fix:** quando o **servidor** confirma que o perfil sumiu, o `AuthContext` chama `isAccountStillValid()`, que força `getIdToken(true)`. Falhou → conta excluída/revogada → logout + landing. Sucesso → usuário novo mesmo → onboarding. Age só em snapshot do servidor (do cache seria falso negativo offline) e **falha de rede não conta como conta excluída** — deslogar quem só está sem internet seria pior que o bug.
+- **A conta não era excluída do Firebase Auth.** `forceLogoutAllDevices()` rodava **antes** do `deleteUser()`: revogar os refresh tokens faz o backend rejeitar o token em uso (anterior ao `validSince`) numa operação sensível como `deleteUser` — os dados sumiam e a conta do Auth sobrevivia. E ele nem cumpria o objetivo, já que revogar não derruba o ID token dos outros aparelhos (válido por ~1h — era por isso que o computador continuava logado). **Removido do fluxo** (autorizado pelo dono); a Cloud Function continua existindo, só não é mais chamada.
+- 375 testes client (+5 cobrindo a lógica do token, inclusive o falso positivo de offline). Verificado ao vivo que a sessão existente **não** é deslogada por engano.
+
 ## 2026-07-21 — fix (privacidade): push agendado vazava dado financeiro pra quem saiu do casal
 
 As functions agendadas rodam com Admin SDK, que **ignora o `firestore.rules`** — então a garantia da regra `isActiveMember` precisa existir **em código**, e não existia. Detalhes em `docs/history/2026-07.md`.
