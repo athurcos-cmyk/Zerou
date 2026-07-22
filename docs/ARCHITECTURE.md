@@ -8,7 +8,7 @@ Zerou is a React, TypeScript, Vite and Firebase PWA for personal and couple fina
 - Auth: Firebase Auth with Email/Password and Google.
 - Data: Cloud Firestore with client-side writes constrained by Security Rules.
 - Storage: configured with closed rules until a feature needs uploads.
-- Functions: Firebase Cloud Functions (`southamerica-east1`). Billing scaffold (Stripe, desativado). Automação server-side (fechamento de faturas, recorrências, lembretes push). Assistente de IA financeiro (`financialAssistantChat` via DeepSeek `deepseek-chat`). Admin (`adminDeleteUser`, `adminForceLogout` em codebase isolado `functions-admin/`).
+- Functions: Firebase Cloud Functions (`southamerica-east1`). Billing scaffold (Stripe, desativado). Automação server-side (fechamento de faturas, lembrete de recorrências vencidas — **não** as lança, ver 2026-07-21 no history —, lembretes push). Assistente de IA financeiro (`financialAssistantChat` via DeepSeek `deepseek-chat`). Admin (`adminDeleteUser`, `adminForceLogout` em codebase isolado `functions-admin/`).
 - PWA: Vite PWA service worker with auto-update and no-cache headers for `sw.js` and Workbox assets.
 
 ## Data Boundaries
