@@ -166,8 +166,6 @@ export interface AccountDeletionDeps {
   reauthenticateWithPassword: (password: string) => Promise<unknown>;
   /** Email de despedida (já vinculado a email/nome pelo caller). Injetado pra ordem ser testável. */
   sendGoodbyeEmail: () => Promise<unknown>;
-  /** Revoga refresh tokens em todos os dispositivos. Injetado pra ordem ser testável. */
-  forceLogoutAllDevices: () => Promise<unknown>;
   deleteAccountData: () => Promise<unknown>;
   deleteAuthenticatedUser: () => Promise<unknown>;
   logout: () => Promise<unknown>;
@@ -214,12 +212,18 @@ export async function runAccountDeletion(deps: AccountDeletionDeps) {
     ]);
   }
 
-  // Só depois revoga os refresh tokens em todos os dispositivos (idem, teto de 5s).
-  await Promise.race([
-    deps.forceLogoutAllDevices(),
-    new Promise<void>(resolve => setTimeout(resolve, 5000))
-  ]);
-
+  // NÃO revogar refresh tokens aqui. Havia um `forceLogoutAllDevices()` neste ponto (21/07) e
+  // ele fazia mais mal que bem, por dois motivos:
+  //
+  // 1. SABOTAVA A PRÓPRIA EXCLUSÃO. `deleteUser()` é operação sensível: o backend valida o ID
+  //    token contra o `validSince` do usuário. Revogando antes, o token em uso passa a ser
+  //    anterior à revogação e `deleteUser()` é rejeitado — os dados sumiam mas a conta do
+  //    Firebase Auth sobrevivia.
+  // 2. NÃO CUMPRIA O OBJETIVO. Revogar invalida só o refresh token; o ID token dos OUTROS
+  //    aparelhos continua válido por até 1h, então eles seguiam "logados" mesmo assim.
+  //
+  // Quem resolve os dois lados é `deleteUser()` (invalida tudo de verdade) somado à checagem
+  // em `AuthContext.signOutIfAccountWasDeleted`, que faz o outro aparelho perceber na hora.
   await deps.deleteAccountData();
 
   try {
@@ -227,21 +231,6 @@ export async function runAccountDeletion(deps: AccountDeletionDeps) {
   } catch (error) {
     await deps.logout();
     throw error;
-  }
-}
-
-/**
- * Força logout em todos os dispositivos revogando refresh tokens.
- */
-export async function forceLogoutAllDevicesCallable() {
-  const fn = httpsCallable<Record<string, never>, { success: boolean }>(
-    getFirebaseFunctions(),
-    'forceLogoutAllDevices'
-  );
-  try {
-    await fn({});
-  } catch {
-    // Se falhar, deleteUser posterior ainda invalida os tokens
   }
 }
 

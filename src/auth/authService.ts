@@ -112,6 +112,34 @@ export async function unlinkProvider(user: User, providerId: string) {
   await unlink(user, providerId);
 }
 
+/**
+ * A conta deste usuário ainda existe no Firebase Auth?
+ *
+ * Serve pra desempatar dois estados que são IDÊNTICOS aos olhos do app — "autenticado, sem
+ * perfil no Firestore" pode ser (a) conta excluída, possivelmente em OUTRO aparelho, ou
+ * (b) usuário novo que ainda não fez onboarding. Quem desempata é o token: `getIdToken(true)`
+ * força a renovação e **falha** se o usuário foi deletado ou teve os refresh tokens revogados.
+ *
+ * É preciso forçar: o ID token em memória continua criptograficamente válido por até 1h depois
+ * da conta ser apagada, então o SDK segue achando que há sessão. Era exatamente isso que fazia
+ * o outro aparelho cair no onboarding — e, se a pessoa concluísse, **recriar** `users/{uid}`
+ * (conta fantasma), já que as regras do Firestore não têm como saber que o usuário do Auth
+ * não existe mais.
+ *
+ * Falha de rede devolve `true` de propósito: quem está sem internet não pode ser deslogado
+ * como se a conta tivesse sido excluída.
+ */
+export async function isAccountStillValid(user: User): Promise<boolean> {
+  try {
+    await user.getIdToken(true);
+    return true;
+  } catch (error) {
+    const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : '';
+    if (code === 'auth/network-request-failed') return true;
+    return false;
+  }
+}
+
 export async function deleteAuthenticatedUser(user: User) {
   // Limpa cache e marca o sign-out ANTES do deleteUser: ele dispara
   // `onAuthStateChanged(null)` na hora, e sem isso o AuthContext ressuscitaria um

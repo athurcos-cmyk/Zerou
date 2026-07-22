@@ -11,7 +11,6 @@ function makeDeps(overrides: Partial<AccountDeletionDeps> = {}): AccountDeletion
     reauthenticateWithGoogle: vi.fn().mockResolvedValue(undefined),
     reauthenticateWithPassword: vi.fn().mockResolvedValue(undefined),
     sendGoodbyeEmail: vi.fn().mockResolvedValue(undefined),
-    forceLogoutAllDevices: vi.fn().mockResolvedValue(undefined),
     deleteAccountData: vi.fn().mockResolvedValue(undefined),
     deleteAuthenticatedUser: vi.fn().mockResolvedValue(undefined),
     logout: vi.fn().mockResolvedValue(undefined),
@@ -34,20 +33,25 @@ describe('runAccountDeletion', () => {
     expect(deps.logout).not.toHaveBeenCalled();
   });
 
-  it('regression: sends the goodbye email BEFORE revoking tokens and BEFORE wiping data (bug: goodbye fired AFTER forceLogout revoked tokens and was fire-and-forget, so the auth-required onCall lost its session and the page reload aborted the in-flight request — the email never went out)', async () => {
+  // A ordem aqui carrega DOIS bugs corrigidos. (1) O goodbye vinha depois de revogar tokens e
+  // era fire-and-forget: o onCall (que exige auth) perdia a sessão e o reload da página abortava
+  // a requisição — o email nunca saía. (2) Havia um `forceLogoutAllDevices()` entre o goodbye e
+  // o wipe; revogar os tokens ANTES fazia o `deleteUser()` ser rejeitado (token anterior ao
+  // `validSince`), então os dados sumiam mas a conta do Auth sobrevivia. Ele foi removido: o
+  // próprio `deleteUser()` invalida tudo, e o outro aparelho percebe via AuthContext.
+  it('regression: reauth → goodbye → wipe → delete auth user, with nothing revoking tokens in between', async () => {
     const calls: string[] = [];
     const deps = makeDeps({
       userEmail: 'user@example.com',
       reauthenticateWithGoogle: vi.fn(async () => { calls.push('reauth'); }),
       sendGoodbyeEmail: vi.fn(async () => { calls.push('goodbye'); }),
-      forceLogoutAllDevices: vi.fn(async () => { calls.push('forcelogout'); }),
       deleteAccountData: vi.fn(async () => { calls.push('data'); }),
       deleteAuthenticatedUser: vi.fn(async () => { calls.push('auth'); })
     });
 
     await runAccountDeletion(deps);
 
-    expect(calls).toEqual(['reauth', 'goodbye', 'forcelogout', 'data', 'auth']);
+    expect(calls).toEqual(['reauth', 'goodbye', 'data', 'auth']);
   });
 
   it('skips the goodbye email when the account has no email on file', async () => {

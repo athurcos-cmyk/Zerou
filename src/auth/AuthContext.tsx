@@ -6,6 +6,8 @@ import { useAppearanceStore } from '../theme/appearance.store';
 import type { UserProfile } from '../types/contracts';
 import { readCachedProfile, readLastCachedProfile, saveCachedProfile, clearCachedProfiles } from './profileCache';
 import { clearIntentionalSignOut, isIntentionalSignOut } from './authSession';
+import { isAccountStillValid, logout } from './authService';
+import { useAccountDeletion } from '../settings/accountDeletion.store';
 
 interface AuthContextValue {
   user: User | null;
@@ -17,6 +19,30 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+// O `onSnapshot` pode reemitir a ausência do perfil várias vezes; uma trava simples evita
+// disparar N renovações de token em paralelo.
+let accountCheckInFlight = false;
+
+/**
+ * O perfil sumiu do SERVIDOR. Antes de tratar como "usuário novo → onboarding", confirma se a
+ * conta ainda existe: se foi excluída (inclusive em OUTRO aparelho), sai da sessão e volta pro
+ * início, em vez de oferecer onboarding — que recriaria `users/{uid}` como conta fantasma.
+ */
+async function signOutIfAccountWasDeleted(user: User) {
+  // O aparelho que está excluindo cuida do próprio fluxo — e um signOut aqui poderia abortar
+  // o `deleteUser()` em andamento.
+  if (useAccountDeletion.getState().isDeleting || accountCheckInFlight) return;
+
+  accountCheckInFlight = true;
+  try {
+    if (await isAccountStillValid(user)) return; // usuário novo de verdade: segue pro onboarding
+    await logout({ clearLocalCache: true });
+    window.location.assign('/');
+  } finally {
+    accountCheckInFlight = false;
+  }
+}
 // Tempo máximo para esperar o Firebase Auth responder antes de assumir sem sessão.
 // Se o usuário tem cache local, o boot já é instantâneo e esse timeout raramente dispara.
 const AUTH_BOOT_TIMEOUT_MS = 500;
@@ -211,6 +237,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const nextProfile = snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() } as UserProfile) : null;
         applyProfile(nextProfile);
         setProfileLoading(false);
+
+        // Só age quando o SERVIDOR confirma que o perfil não existe. Vindo do cache seria um
+        // falso negativo offline, e deslogar quem só está sem rede seria bem pior que o bug.
+        if (!snapshot.exists() && !snapshot.metadata.fromCache) {
+          void signOutIfAccountWasDeleted(user);
+        }
       },
       () => {
         window.clearTimeout(profileTimeout);

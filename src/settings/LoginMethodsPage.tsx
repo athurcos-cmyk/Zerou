@@ -12,7 +12,7 @@ import {
 } from '../auth/authService';
 import { getAuthErrorMessage } from '../auth/authErrors';
 import { FormMessage } from '../components/FormMessage';
-import { deleteAccountData, runAccountDeletion, sendGoodbyeEmailCallable, forceLogoutAllDevicesCallable } from './accountDeletionService';
+import { deleteAccountData, runAccountDeletion, sendGoodbyeEmailCallable } from './accountDeletionService';
 import { useAccountDeletion } from './accountDeletion.store';
 
 const providerLabels: Record<string, string> = {
@@ -96,7 +96,6 @@ export function LoginMethodsPage() {
         reauthenticateWithGoogle: () => reauthenticateWithGoogle(user),
         reauthenticateWithPassword: (password) => reauthenticateWithPassword(user, password),
         sendGoodbyeEmail: () => sendGoodbyeEmailCallable(user.email ?? '', user.displayName ?? ''),
-        forceLogoutAllDevices: () => forceLogoutAllDevicesCallable(),
         deleteAccountData: () => deleteAccountData(user.uid),
         deleteAuthenticatedUser: () => deleteAuthenticatedUser(user),
         // clearLocalCache: se deleteUser falhar depois dos dados já apagados, limpa
