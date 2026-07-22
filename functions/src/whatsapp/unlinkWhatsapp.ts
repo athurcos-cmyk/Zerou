@@ -44,7 +44,7 @@ export const unlinkWhatsapp = onCall(
     }
 
     try {
-      await sendWhatsAppMessage(phone, 'Seu WhatsApp foi desvinculado do Granativa.');
+      await sendWhatsAppMessage(phone, '🔗 Seu WhatsApp foi desvinculado do Granativa.');
     } catch (err) {
       logger.warn('whatsapp_unlink_confirmation_failed', { phone, error: String(err) });
     }

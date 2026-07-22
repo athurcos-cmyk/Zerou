@@ -2,6 +2,15 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-22 — feat: mensagens do bot do WhatsApp redesenhadas (emoji, negrito, listas)
+
+Pedido do dono: deixar as mensagens da Grazi no WhatsApp mais bonitas e coerentes. Detalhes em `docs/whatsapp/WHATSAPP.md`.
+
+- Convenção de emoji fixada num único módulo novo (`messageFormat.ts`) em vez de espalhada: 💸 despesa · 💰 receita · 🔄 transferência · 💳 cartão · 🏷️ categoria · 🏦 conta.
+- Confirmações de despesa/receita agora mostram categoria **e** conta usada; transferência mostra a rota (`Nubank → Itaú`) quando os dois nomes estão disponíveis sem leitura extra.
+- Prompts de escolha (cartão/conta/transferência) e a mensagem de "não entendi" ganharam o mesmo formato visual (negrito na pergunta, lista numerada, instrução em itálico).
+- Nenhuma mudança de lógica — só como as mensagens são construídas. 10 testes novos (`messageFormat.test.ts`), suite de functions 87→97.
+
 ## 2026-07-22 — design: menu mobile reorganizado (grade compacta em vez de lista empilhada)
 
 Pedido do dono: "Sua conta" virou um bloco único empilhado, sem cabê-lo na tela sem arrastar.

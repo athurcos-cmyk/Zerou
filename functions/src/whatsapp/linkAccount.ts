@@ -83,7 +83,7 @@ export async function processLinkCode(
     .get();
 
   if (codesSnap.empty) {
-    return 'Código não encontrado ou já expirado. Gere um novo no app Granativa.';
+    return '🔑 Código não encontrado ou já expirado.\n\nGere um novo no app Granativa.';
   }
 
   const codeDoc = codesSnap.docs[0];
@@ -95,16 +95,16 @@ export async function processLinkCode(
 
   if (data.expiresAt.toDate() < new Date()) {
     await codeDoc.ref.delete();
-    return 'Esse código expirou. Gere um novo no app Granativa.';
+    return '🔑 Esse código expirou.\n\nGere um novo no app Granativa.';
   }
 
   const uid = codeDoc.ref.parent.parent?.id;
-  if (!uid) return 'Erro ao processar vínculo. Tente de novo.';
+  if (!uid) return '⚠️ Erro ao processar vínculo. Tente de novo.';
 
   // Verifica se o número já está vinculado a algum workspace
   const existingLink = await db.doc(`whatsappPhoneIndex/${phoneNumber}`).get();
   if (existingLink.exists) {
-    return 'Este número de WhatsApp já está vinculado a uma conta Granativa.';
+    return '🔗 Este número de WhatsApp já está vinculado a uma conta Granativa.';
   }
 
   // Grava o vínculo
@@ -125,7 +125,10 @@ export async function processLinkCode(
   await batch.commit();
 
   // Confirma pro usuário
-  await sendWhatsAppMessage(phoneNumber, '✅ WhatsApp vinculado com sucesso à sua conta Granativa! Agora você pode mandar seus gastos por aqui. Ex: "gastei 15 reais no mercado".');
+  await sendWhatsAppMessage(
+    phoneNumber,
+    '✅ *WhatsApp vinculado com sucesso!*\n\nAgora você pode mandar seus gastos por aqui. Ex: _"gastei 15 reais no mercado"_',
+  );
 
   return ''; // Empty string = already handled (confirmation sent)
 }

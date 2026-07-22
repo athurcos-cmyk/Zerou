@@ -20,12 +20,17 @@ import { resolveDebitCreditAccount, resolveTransferSide, accountCandidates, type
 import { deepseekApiKey } from '../ai/deepseekClient.js';
 import { checkAiUsageNotExceeded, incrementAiUsage } from '../ai/aiRateLimit.js';
 import { checkWhatsappTransactionUsageNotExceeded } from './whatsappTransactionRateLimit.js';
+import {
+  confirmExpense,
+  confirmIncome,
+  confirmTransfer,
+  confirmCardPurchase,
+  categoryCreatedMessage,
+  categoryAlreadyExistsMessage,
+  pendingChoicePrompt,
+} from './messageFormat.js';
 
 const region = 'southamerica-east1';
-
-function formatBRL(amountCents: number): string {
-  return (amountCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
 
 /**
  * Resolve a categoria de um lancamento: prioriza a mais especifica entre as existentes
@@ -177,7 +182,7 @@ export const whatsappWebhook = onRequest(
       if (!indexDoc.exists) {
         await sendWhatsAppMessage(
           phone,
-          'Seu WhatsApp ainda não está vinculado ao Granativa. Vá em Configurações > WhatsApp no app para conectar.',
+          '🔗 Seu WhatsApp ainda não está vinculado ao Granativa.\n\nVá em *Configurações > WhatsApp* no app pra conectar.',
         );
         return;
       }
@@ -196,7 +201,7 @@ export const whatsappWebhook = onRequest(
       if (!memberDoc.exists) {
         await sendWhatsAppMessage(
           phone,
-          'Seu vínculo do WhatsApp não está mais ativo. Vá em Configurações > WhatsApp no app para reconectar.',
+          '🔗 Seu vínculo do WhatsApp não está mais ativo.\n\nVá em *Configurações > WhatsApp* no app pra reconectar.',
         );
         return;
       }
@@ -207,7 +212,7 @@ export const whatsappWebhook = onRequest(
       } catch {
         await sendWhatsAppMessage(
           phone,
-          'Você atingiu o limite diário de lançamentos pelo WhatsApp. Volte amanhã ou cadastre pelo app.',
+          '⏳ Você atingiu o limite diário de lançamentos pelo WhatsApp.\n\nVolte amanhã ou cadastre pelo app.',
         );
         return;
       }
@@ -231,11 +236,15 @@ export const whatsappWebhook = onRequest(
               purchaseDate: new Date(),
             });
 
-            const catSuffix = result.categoryName ? ` (${result.categoryName})` : '';
-            const installmentSuffix = pending.installments > 1 ? ` em ${pending.installments}x` : '';
             await sendWhatsAppMessage(
               phone,
-              `✅ Compra registrada no ${result.cardName}${installmentSuffix}: ${formatBRL(result.amountCents)} — ${result.description}${catSuffix}`,
+              confirmCardPurchase({
+                amountCents: result.amountCents,
+                description: result.description,
+                categoryName: result.categoryName,
+                cardName: result.cardName,
+                installments: pending.installments,
+              }),
             );
             return;
           }
@@ -255,11 +264,17 @@ export const whatsappWebhook = onRequest(
               source: 'whatsapp',
             });
 
-            const catSuffix = result.categoryName ? ` (${result.categoryName})` : '';
-            const confirmation = pending.type === 'income'
-              ? `💰 Receita registrada: ${formatBRL(result.amountCents)} — ${result.description}${catSuffix}`
-              : `✅ Registrado: ${formatBRL(result.amountCents)} — ${result.description}${catSuffix}`;
-            await sendWhatsAppMessage(phone, confirmation);
+            const accountName = pending.candidates.find((c) => c.id === resolvedAccountId)?.label;
+            const confirm = pending.type === 'income' ? confirmIncome : confirmExpense;
+            await sendWhatsAppMessage(
+              phone,
+              confirm({
+                amountCents: result.amountCents,
+                description: result.description,
+                categoryName: result.categoryName,
+                accountName,
+              }),
+            );
             return;
           }
         } else if (pending.kind === 'transfer') {
@@ -291,9 +306,20 @@ export const whatsappWebhook = onRequest(
               source: 'whatsapp',
             });
 
+            // Nome dos dois lados só sai de graça quando os dois estavam entre os candidatos
+            // apresentados (caso `missing: 'both'`) — nos outros dois casos o lado já conhecido
+            // não tem nome em mãos sem uma leitura extra, e a rota fica de fora da mensagem.
+            const sourceAccountName = pending.candidates.find((c) => c.id === sourceAccountId)?.label;
+            const destinationAccountName = pending.candidates.find((c) => c.id === destinationAccountId)?.label;
+
             await sendWhatsAppMessage(
               phone,
-              `🔄 Transferência registrada: ${formatBRL(result.amountCents)} — ${result.description}`,
+              confirmTransfer({
+                amountCents: result.amountCents,
+                description: result.description,
+                sourceAccountName,
+                destinationAccountName,
+              }),
             );
             return;
           }
@@ -333,7 +359,7 @@ export const whatsappWebhook = onRequest(
       if (!interpretation || interpretation.intent === 'unclear') {
         await sendWhatsAppMessage(
           phone,
-          'Não entendi. Você pode:\n- Registrar um gasto: "gastei 15 reais no mercado"\n- Registrar uma receita: "recebi 200 reais de freela"\n- Registrar compra no cartão: "gastei 300 no cartão em 3x"\n- Transferir entre contas: "transfere 50 do nubank pro itaú"\n- Criar categoria: "cria uma categoria chamada Pet"\n- Perguntar sobre suas finanças: "quanto gastei esse mês?"',
+          '🤔 *Não entendi essa mensagem.*\n\nAqui está o que eu sei fazer:\n💸 Gasto — _"gastei 15 reais no mercado"_\n💰 Receita — _"recebi 200 reais de freela"_\n💳 Compra no cartão — _"gastei 300 no cartão em 3x"_\n🔄 Transferência — _"transfere 50 do nubank pro itaú"_\n🏷️ Categoria nova — _"cria uma categoria chamada Pet"_\n❓ Pergunta financeira — _"quanto gastei esse mês?"_',
         );
         return;
       }
@@ -342,7 +368,7 @@ export const whatsappWebhook = onRequest(
       if (interpretation.intent === 'advanced_card_action') {
         await sendWhatsAppMessage(
           phone,
-          'Isso aqui é mais avançado — dá uma olhada em Cartões no app pra fazer isso (parcela que já estava em andamento, antecipar parcela/fatura, renegociar).',
+          '🧭 Isso aqui é mais avançado — dá uma olhada em *Cartões* no app pra fazer isso (parcela que já estava em andamento, antecipar parcela/fatura, renegociar).',
         );
         return;
       }
@@ -351,7 +377,7 @@ export const whatsappWebhook = onRequest(
       if (interpretation.intent === 'unsupported_action') {
         await sendWhatsAppMessage(
           phone,
-          'Editar ou excluir algo que você já lançou é melhor fazer direto pelo app — evita eu mexer na coisa errada sem querer. Por aqui eu só crio lançamentos novos e respondo perguntas.',
+          '✋ Editar ou excluir algo que você já lançou é melhor fazer direto pelo app — evita eu mexer na coisa errada sem querer.\n\nPor aqui eu só crio lançamentos novos e respondo perguntas.',
         );
         return;
       }
@@ -363,7 +389,7 @@ export const whatsappWebhook = onRequest(
       if (interpretation.intent === 'advisory_decision') {
         await sendWhatsAppMessage(
           phone,
-          'Essa é uma decisão grande — vale mais a pena pensar nela com calma comigo lá no app, na aba Assistente. Lá a gente consegue ir e voltar na conversa direito. Por aqui eu foco em lançamentos e perguntas rápidas do dia a dia. 💛',
+          '🧠 Essa é uma decisão grande — vale mais a pena pensar nela com calma comigo lá no app, na aba *Assistente*. Lá a gente consegue ir e voltar na conversa direito.\n\nPor aqui eu foco em lançamentos e perguntas rápidas do dia a dia. 💛',
         );
         return;
       }
@@ -371,7 +397,7 @@ export const whatsappWebhook = onRequest(
       // ── Criar categoria (pedido explicito, nunca cria transacao junto) ──
       if (interpretation.intent === 'create_category') {
         if (!interpretation.newCategoryName) {
-          await sendWhatsAppMessage(phone, 'Não entendi o nome da categoria. Ex: "cria uma categoria chamada Pet".');
+          await sendWhatsAppMessage(phone, '🤔 Não entendi o nome da categoria.\n\nEx: _"cria uma categoria chamada Pet"_');
           return;
         }
 
@@ -385,9 +411,7 @@ export const whatsappWebhook = onRequest(
 
         await sendWhatsAppMessage(
           phone,
-          result.created
-            ? `✅ Categoria "${result.name}" criada.`
-            : `Você já tem uma categoria chamada "${result.name}".`,
+          result.created ? categoryCreatedMessage(result.name) : categoryAlreadyExistsMessage(result.name),
         );
         return;
       }
@@ -400,7 +424,7 @@ export const whatsappWebhook = onRequest(
         } catch {
           await sendWhatsAppMessage(
             phone,
-            'Você atingiu o limite diário de perguntas para a Grazi. Volte amanhã ou pergunte pelo app.',
+            '⏳ Você atingiu o limite diário de perguntas para a Grazi.\n\nVolte amanhã ou pergunte pelo app.',
           );
           return;
         }
@@ -416,7 +440,7 @@ export const whatsappWebhook = onRequest(
         if (interpretation.confidence === 'low' || interpretation.amountCents <= 0) {
           await sendWhatsAppMessage(
             phone,
-            'Não consegui entender o valor. Pode reformular? Ex: "gastei 300 no cartão em 3x"',
+            '🤔 Não consegui entender o valor.\n\nPode reformular? Ex: _"gastei 300 no cartão em 3x"_',
           );
           return;
         }
@@ -430,7 +454,7 @@ export const whatsappWebhook = onRequest(
           .map((d) => ({ id: d.id, label: d.data().name as string }));
 
         if (activeCards.length === 0) {
-          await sendWhatsAppMessage(phone, 'Você ainda não tem cartão cadastrado. Cadastre um no app primeiro.');
+          await sendWhatsAppMessage(phone, '💳 Você ainda não tem cartão cadastrado.\n\nCadastre um no app primeiro.');
           return;
         }
 
@@ -448,11 +472,15 @@ export const whatsappWebhook = onRequest(
             purchaseDate: new Date(),
           });
 
-          const catSuffix = result.categoryName ? ` (${result.categoryName})` : '';
-          const installmentSuffix = interpretation.installments > 1 ? ` em ${interpretation.installments}x` : '';
           await sendWhatsAppMessage(
             phone,
-            `✅ Compra registrada no ${result.cardName}${installmentSuffix}: ${formatBRL(result.amountCents)} — ${result.description}${catSuffix}`,
+            confirmCardPurchase({
+              amountCents: result.amountCents,
+              description: result.description,
+              categoryName: result.categoryName,
+              cardName: result.cardName,
+              installments: interpretation.installments,
+            }),
           );
           return;
         }
@@ -468,10 +496,14 @@ export const whatsappWebhook = onRequest(
           candidates: activeCards,
         });
 
-        const list = activeCards.map((c, i) => `${i + 1} - ${c.label}`).join('\n');
         await sendWhatsAppMessage(
           phone,
-          `Você tem mais de um cartão. Qual usar?\n${list}\n\nResponda com o número em até 3 minutos.`,
+          pendingChoicePrompt({
+            emoji: '💳',
+            question: 'Qual cartão usar?',
+            labels: activeCards.map((c) => c.label),
+            instructions: 'Responda com o número em até 3 minutos.',
+          }),
         );
         return;
       }
@@ -481,7 +513,7 @@ export const whatsappWebhook = onRequest(
         if (interpretation.confidence === 'low' || interpretation.amountCents <= 0) {
           await sendWhatsAppMessage(
             phone,
-            'Não consegui entender o valor da transferência. Pode reformular? Ex: "transfere 100 do nubank pro itaú"',
+            '🤔 Não consegui entender o valor da transferência.\n\nPode reformular? Ex: _"transfere 100 do nubank pro itaú"_',
           );
           return;
         }
@@ -489,7 +521,7 @@ export const whatsappWebhook = onRequest(
         if (accounts.length < 2) {
           await sendWhatsAppMessage(
             phone,
-            'Pra transferir você precisa de pelo menos duas contas (carteira, banco, dinheiro...) cadastradas. Cadastre outra pelo app primeiro.',
+            '🏦 Pra transferir você precisa de pelo menos duas contas (carteira, banco, dinheiro...) cadastradas.\n\nCadastre outra pelo app primeiro.',
           );
           return;
         }
@@ -522,7 +554,12 @@ export const whatsappWebhook = onRequest(
 
           await sendWhatsAppMessage(
             phone,
-            `🔄 Transferência registrada: ${formatBRL(result.amountCents)} — ${result.description}`,
+            confirmTransfer({
+              amountCents: result.amountCents,
+              description: result.description,
+              sourceAccountName: accounts.find((a) => a.id === sourceAccountId)?.name,
+              destinationAccountName: accounts.find((a) => a.id === destinationAccountId)?.name,
+            }),
           );
 
           logger.info('whatsapp_transaction_created', {
@@ -555,14 +592,19 @@ export const whatsappWebhook = onRequest(
           candidates,
         });
 
-        const list = candidates.map((c, i) => `${i + 1} - ${c.label}`).join('\n');
         const question = missing === 'both'
-          ? `Você tem mais de uma conta. De qual conta sai e pra qual vai a transferência?\n${list}\n\nResponda com dois números, tipo "1 2" (sai da 1, vai pra 2), em até 3 minutos.`
+          ? 'De qual conta sai e pra qual vai a transferência?'
           : missing === 'source'
-          ? `Você tem mais de uma conta. De qual conta sai a transferência?\n${list}\n\nResponda com o número em até 3 minutos.`
-          : `Você tem mais de uma conta. Pra qual conta vai a transferência?\n${list}\n\nResponda com o número em até 3 minutos.`;
+          ? 'De qual conta sai a transferência?'
+          : 'Pra qual conta vai a transferência?';
+        const instructions = missing === 'both'
+          ? 'Responda com dois números, tipo "1 2" (sai da 1, vai pra 2), em até 3 minutos.'
+          : 'Responda com o número em até 3 minutos.';
 
-        await sendWhatsAppMessage(phone, question);
+        await sendWhatsAppMessage(
+          phone,
+          pendingChoicePrompt({ emoji: '🔄', question, labels: candidates.map((c) => c.label), instructions }),
+        );
         return;
       }
 
@@ -570,7 +612,7 @@ export const whatsappWebhook = onRequest(
       if (interpretation.confidence === 'low' || interpretation.amountCents <= 0) {
         await sendWhatsAppMessage(
           phone,
-          'Não consegui entender o valor. Pode reformular? Ex: "gastei 15 reais no mercado"',
+          '🤔 Não consegui entender o valor.\n\nPode reformular? Ex: _"gastei 15 reais no mercado"_',
         );
         return;
       }
@@ -578,7 +620,7 @@ export const whatsappWebhook = onRequest(
       if (accounts.length === 0) {
         await sendWhatsAppMessage(
           phone,
-          'Você ainda não cadastrou nenhuma conta (carteira, banco, dinheiro...) no Granativa. Crie uma pelo app antes de registrar gastos por aqui.',
+          '🏦 Você ainda não cadastrou nenhuma conta (carteira, banco, dinheiro...) no Granativa.\n\nCrie uma pelo app antes de registrar gastos por aqui.',
         );
         return;
       }
@@ -599,11 +641,15 @@ export const whatsappWebhook = onRequest(
           candidates: accountCandidates(accounts),
         });
 
-        const list = accountCandidates(accounts).map((c, i) => `${i + 1} - ${c.label}`).join('\n');
         const verb = interpretation.intent === 'income' ? 'entra' : 'sai';
         await sendWhatsAppMessage(
           phone,
-          `Você tem mais de uma conta. De qual conta ${verb} esse valor?\n${list}\n\nResponda com o número em até 3 minutos.`,
+          pendingChoicePrompt({
+            emoji: interpretation.intent === 'income' ? '💰' : '💸',
+            question: `De qual conta ${verb} esse valor?`,
+            labels: accountCandidates(accounts).map((c) => c.label),
+            instructions: 'Responda com o número em até 3 minutos.',
+          }),
         );
         return;
       }
@@ -620,12 +666,17 @@ export const whatsappWebhook = onRequest(
         source: 'whatsapp',
       });
 
-      const catSuffix = result.categoryName ? ` (${result.categoryName})` : '';
-      const confirmation = interpretation.intent === 'income'
-        ? `💰 Receita registrada: ${formatBRL(result.amountCents)} — ${result.description}${catSuffix}`
-        : `✅ Registrado: ${formatBRL(result.amountCents)} — ${result.description}${catSuffix}`;
-
-      await sendWhatsAppMessage(phone, confirmation);
+      const accountName = accounts.find((a) => a.id === accountId)?.name;
+      const confirm = interpretation.intent === 'income' ? confirmIncome : confirmExpense;
+      await sendWhatsAppMessage(
+        phone,
+        confirm({
+          amountCents: result.amountCents,
+          description: result.description,
+          categoryName: result.categoryName,
+          accountName,
+        }),
+      );
 
       logger.info('whatsapp_transaction_created', {
         phone,
