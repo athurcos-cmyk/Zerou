@@ -1097,7 +1097,7 @@ describe('firestore security rules', () => {
   // opcionais, não só trocá-los. A UI promete "deixe em branco se o valor varia todo mês" —
   // antes o cliente mandava `undefined`, que `updateRecurringRule` pulava, e o valor antigo
   // continuava gravado. Hoje manda `deleteField()`, e este teste prova que a regra aceita.
-  it('lets the owner edit a recurring rule and CLEAR its optional fields, but never its anchorDay', async () => {
+  it('lets the owner edit a recurring rule: clear optional fields, re-anchor the day, and use the biweekly frequency', async () => {
     const aliceDb = testEnv.authenticatedContext('alice').firestore();
     const ruleRef = doc(aliceDb, 'workspaces/workspaceA/recurring/rec_netflix');
 
@@ -1116,10 +1116,36 @@ describe('firestore security rules', () => {
       updateDoc(ruleRef, { accountId: deleteField(), categoryId: deleteField(), updatedAt: serverTimestamp() })
     );
 
-    // `anchorDay` NÃO está em `affectedKeys` do update: o dia-âncora é imutável depois da
-    // criação. É por isso que trocar a frequência não consegue reancorar o dia do mês
-    // (ver docs/history/2026-07.md).
-    await assertFails(updateDoc(ruleRef, { anchorDay: 5, updatedAt: serverTimestamp() }));
+    // `anchorDay` passou a ser editável (2026-07-21): ao trocar de semanal/quinzenal (que
+    // andam em dias corridos) pra mensal/anual, o dia-âncora da criação perde relação com o
+    // cronograma e precisa ser reancorado, senão a ocorrência salta de volta pro dia original.
+    await assertSucceeds(updateDoc(ruleRef, { anchorDay: 5, updatedAt: serverTimestamp() }));
+
+    // ...mas continua validado: dia fora de 1-31 é rejeitado.
+    await assertFails(updateDoc(ruleRef, { anchorDay: 0, updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(ruleRef, { anchorDay: 32, updatedAt: serverTimestamp() }));
+
+    // `biweekly` (Quinzenal) é valor válido do enum — a regra precisa estar em sincronia com
+    // `recurringFrequencies` do TypeScript, senão a feature é rejeitada em silêncio.
+    await assertSucceeds(updateDoc(ruleRef, { frequency: 'biweekly', updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(ruleRef, { frequency: 'daily', updatedAt: serverTimestamp() }));
+  });
+
+  it('accepts creating a recurring rule with the biweekly frequency', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/recurring/rec_quinzenal'),
+        recurringPayload('workspaceA', 'rec_quinzenal', 'alice', { frequency: 'biweekly' })
+      )
+    );
+    await assertFails(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/recurring/rec_invalida'),
+        recurringPayload('workspaceA', 'rec_invalida', 'alice', { frequency: 'daily' })
+      )
+    );
   });
 
   // Esta rejeição é o que torna seguro o id determinístico das recorrências

@@ -37,6 +37,7 @@ export const receivableStatusLabels = {
 
 export const recurringFrequencyLabels = {
   weekly: 'Semanal',
+  biweekly: 'Quinzenal',
   monthly: 'Mensal',
   yearly: 'Anual'
 } as const;

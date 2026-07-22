@@ -282,7 +282,7 @@ export interface RecurringRule {
   workspaceId: string;
   description: string;
   amountCents?: MoneyCents;
-  frequency: 'weekly' | 'monthly' | 'yearly';
+  frequency: 'weekly' | 'biweekly' | 'monthly' | 'yearly';
   nextOccurrenceAt: Timestamp;
   // Dia do mês (1-31) pretendido originalmente pelo usuário, capturado na criação.
   // Usado por nextOccurrenceDate para recalcular a próxima ocorrência sempre a

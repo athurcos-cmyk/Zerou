@@ -19,10 +19,10 @@ import {
 } from './spendingAnalysis';
 
 // Stepper espelhando `nextOccurrenceDate` de financeService (evita importar firebase no teste).
-function step(date: Date, frequency: 'weekly' | 'monthly' | 'yearly', anchorDay?: number): Date {
-  if (frequency === 'weekly') {
+function step(date: Date, frequency: 'weekly' | 'biweekly' | 'monthly' | 'yearly', anchorDay?: number): Date {
+  if (frequency === 'weekly' || frequency === 'biweekly') {
     const next = new Date(date);
-    next.setDate(next.getDate() + 7);
+    next.setDate(next.getDate() + (frequency === 'weekly' ? 7 : 14));
     return next;
   }
   const day = anchorDay ?? date.getDate();

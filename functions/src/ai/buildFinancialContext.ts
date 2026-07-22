@@ -72,7 +72,7 @@ interface RecurringRuleData {
   id: string;
   description: string;
   amountCents?: number;
-  frequency: 'weekly' | 'monthly' | 'yearly';
+  frequency: 'weekly' | 'biweekly' | 'monthly' | 'yearly';
   nextOccurrenceAt: Timestamp;
   categoryId?: string;
   isActive: boolean;

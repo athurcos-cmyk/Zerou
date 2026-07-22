@@ -9,7 +9,7 @@ export const billStatuses = ['pending', 'paid', 'overdue', 'cancelled'] as const
 
 export const receivableStatuses = ['pending', 'received', 'overdue', 'cancelled'] as const;
 
-export const recurringFrequencies = ['weekly', 'monthly', 'yearly'] as const;
+export const recurringFrequencies = ['weekly', 'biweekly', 'monthly', 'yearly'] as const;
 
 const moneyCentsSchema = z
   .number()

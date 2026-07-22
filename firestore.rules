@@ -718,7 +718,7 @@ service cloud.firestore {
         && request.resource.data.workspaceId == workspaceId
         && validShortText(request.resource.data.description, 2, 120)
         && (!request.resource.data.keys().hasAny(['amountCents']) || validMoneyCents(request.resource.data.amountCents))
-        && request.resource.data.frequency in ['weekly', 'monthly', 'yearly']
+        && request.resource.data.frequency in ['weekly', 'biweekly', 'monthly', 'yearly']
         && request.resource.data.nextOccurrenceAt is timestamp
         && (!request.resource.data.keys().hasAny(['anchorDay']) || (request.resource.data.anchorDay is int && request.resource.data.anchorDay >= 1 && request.resource.data.anchorDay <= 31))
         && validOptionalString('accountId', 120)
@@ -740,6 +740,10 @@ service cloud.firestore {
           'amountCents',
           'frequency',
           'nextOccurrenceAt',
+          // `anchorDay` precisa ser editável: ao trocar de semanal/quinzenal (que andam em
+          // dias corridos) para mensal/anual, o dia-âncora gravado na criação não tem mais
+          // relação com o cronograma atual e a ocorrência voltaria pro dia original.
+          'anchorDay',
           'accountId',
           'categoryId',
           'isActive',
@@ -747,8 +751,9 @@ service cloud.firestore {
         ])
         && validShortText(request.resource.data.description, 2, 120)
         && (!request.resource.data.keys().hasAny(['amountCents']) || validMoneyCents(request.resource.data.amountCents))
-        && request.resource.data.frequency in ['weekly', 'monthly', 'yearly']
+        && request.resource.data.frequency in ['weekly', 'biweekly', 'monthly', 'yearly']
         && request.resource.data.nextOccurrenceAt is timestamp
+        && (!request.resource.data.keys().hasAny(['anchorDay']) || (request.resource.data.anchorDay is int && request.resource.data.anchorDay >= 1 && request.resource.data.anchorDay <= 31))
         && validOptionalString('accountId', 120)
         && validOptionalString('categoryId', 120)
         && request.resource.data.isActive is bool

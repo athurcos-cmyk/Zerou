@@ -175,6 +175,19 @@ export function BillsPage() {
 
   function handleSaveEditRule() {
     if (!workspaceId || !editingRule) return;
+
+    // Semanal e quinzenal andam em dias corridos, então a data vai derivando e o `anchorDay`
+    // gravado na criação perde relação com o cronograma atual. Ao mudar pra mensal/anual é
+    // preciso reancorar no dia da PRÓXIMA ocorrência — senão a recorrência saltaria de volta
+    // pro dia em que foi criada (ex.: criada semanal no dia 21, já andou pro dia 11, virar
+    // mensal a jogava pro dia 21 de novo). Nos demais casos o âncora original é mantido: é
+    // ele que faz a data "voltar" pro dia 31 depois de passar por um mês curto.
+    const wasDayBased = editingRule.frequency === 'weekly' || editingRule.frequency === 'biweekly';
+    const becomesMonthBased = editFrequency === 'monthly' || editFrequency === 'yearly';
+    const anchorDay = wasDayBased && becomesMonthBased
+      ? editingRule.nextOccurrenceAt.toDate().getDate()
+      : undefined;
+
     updateRecurringRule(workspaceId, editingRule.id, {
       description: editDescription.trim() || editingRule.description,
       // `null` (e não `undefined`) pra LIMPAR: campo vazio aqui significa "valor varia" /
@@ -182,6 +195,7 @@ export function BillsPage() {
       // antigo permanecia — ver updateRecurringRule.
       amountCents: editAmount.trim() ? parseMoneyToCents(editAmount) : null,
       frequency: editFrequency,
+      anchorDay,
       accountId: editAccountId || null,
       categoryId: editCategoryId || null,
     });

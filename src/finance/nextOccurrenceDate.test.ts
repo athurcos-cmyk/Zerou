@@ -10,6 +10,17 @@ describe('nextOccurrenceDate', () => {
     expect(iso(nextOccurrenceDate(new Date(2025, 11, 25, 12), 'weekly'))).toBe('2026-01-01');
   });
 
+  it('advances a biweekly rule by exactly 14 days, even across a month boundary', () => {
+    expect(iso(nextOccurrenceDate(new Date(2026, 6, 21, 12), 'biweekly'))).toBe('2026-08-04');
+  });
+
+  // Semanal/quinzenal andam em dias corridos: o anchorDay não pode interferir, senão a data
+  // saltaria pro dia-âncora em vez de somar os dias.
+  it('ignores anchorDay on day-based frequencies (weekly and biweekly)', () => {
+    expect(iso(nextOccurrenceDate(new Date(2026, 7, 11, 12), 'weekly', 21))).toBe('2026-08-18');
+    expect(iso(nextOccurrenceDate(new Date(2026, 7, 11, 12), 'biweekly', 21))).toBe('2026-08-25');
+  });
+
   it('advances a monthly rule to the same day next month in the common case', () => {
     expect(iso(nextOccurrenceDate(new Date(2026, 0, 15, 12), 'monthly'))).toBe('2026-02-15');
   });

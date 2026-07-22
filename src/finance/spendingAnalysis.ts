@@ -405,7 +405,7 @@ export function lastCommittedMonth(
 // previsão, não como dado firme. Só faz sentido pra meses futuros: no mês corrente e nos
 // passados a Análise usa transações reais, e projetar duplicaria o que a automação lançou.
 
-type Frequency = 'weekly' | 'monthly' | 'yearly';
+type Frequency = 'weekly' | 'biweekly' | 'monthly' | 'yearly';
 
 /** Regra de recorrência reduzida ao que a projeção precisa (nextOccurrenceAt já como Date). */
 export interface RecurringForProjection {

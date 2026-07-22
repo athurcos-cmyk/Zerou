@@ -941,12 +941,15 @@ export function markReceivableReceived(
 
 export function nextOccurrenceDate(
   current: Date,
-  frequency: 'weekly' | 'monthly' | 'yearly',
+  frequency: 'weekly' | 'biweekly' | 'monthly' | 'yearly',
   anchorDay?: number
 ): Date {
-  if (frequency === 'weekly') {
+  // Semanal e quinzenal andam em dias corridos — não têm dia-do-mês fixo, então
+  // `anchorDay` não se aplica (é por isso que sair de uma delas pra mensal/anual
+  // precisa reancorar o dia; ver `handleSaveEditRule` em BillsPage).
+  if (frequency === 'weekly' || frequency === 'biweekly') {
     const next = new Date(current);
-    next.setDate(next.getDate() + 7);
+    next.setDate(next.getDate() + (frequency === 'weekly' ? 7 : 14));
     return next;
   }
 
@@ -1171,12 +1174,13 @@ export function subscribeRecurringRules(
 export function updateRecurringRule(
   workspaceId: string,
   ruleId: string,
-  patch: { description?: string; amountCents?: number | null; frequency?: 'weekly' | 'monthly' | 'yearly'; nextOccurrenceAt?: Date; accountId?: string | null; categoryId?: string | null; isActive?: boolean }
+  patch: { description?: string; amountCents?: number | null; frequency?: 'weekly' | 'biweekly' | 'monthly' | 'yearly'; nextOccurrenceAt?: Date; anchorDay?: number; accountId?: string | null; categoryId?: string | null; isActive?: boolean }
 ) {
   const updates: Record<string, unknown> = { updatedAt: serverTimestamp() };
   if (patch.description !== undefined) updates.description = patch.description;
   if (patch.amountCents !== undefined) updates.amountCents = patch.amountCents === null ? deleteField() : patch.amountCents;
   if (patch.frequency !== undefined) updates.frequency = patch.frequency;
+  if (patch.anchorDay !== undefined) updates.anchorDay = patch.anchorDay;
   if (patch.nextOccurrenceAt !== undefined) updates.nextOccurrenceAt = Timestamp.fromDate(patch.nextOccurrenceAt);
   if (patch.accountId !== undefined) updates.accountId = patch.accountId === null ? deleteField() : patch.accountId;
   if (patch.categoryId !== undefined) updates.categoryId = patch.categoryId === null ? deleteField() : patch.categoryId;
