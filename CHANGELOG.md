@@ -2,6 +2,14 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-23 — fix: categoria errada no Resumo Anual + ordem de compras na fatura
+
+Duas queixas reais investigadas com `/investigate`.
+
+- **Resumo Anual mostrava texto técnico no lugar do nome da categoria** (`annualSummaryCalculations.ts`): usuária relatou "erro relacionado a categoria" sem conseguir descrever onde. Achado: (1) categoria vazia aparecia como `__none__` em vez de "Sem categoria"; (2) mais grave, compra parcelada categorizada aparecia com o **id cru da transação** (`txn_...`) no lugar do nome — a função recebia um resolvedor "fake" (`(id) => id`) em vez do resolvedor de verdade que liga parcela → transação-mãe → categoria (mesmo padrão que a Análise principal já usava certo). Corrigido; 2 testes de regressão novos, cada um comprovadamente falha sem o fix.
+- **Compras no cartão não vinham em ordem do mais recente pro mais antigo na fatura**: a query do ledger (`subscribeInvoiceLedger`, `cardService.ts`) ordenava `asc` (mais antigo primeiro) e nada reordenava depois — afeta qualquer compra, avulsa ou parcelada. Trocado pra `desc`. Teste de regressão novo.
+- Ambos verificados ao vivo criando dados de teste reais (compra sem categoria, compra parcelada categorizada, 3 compras avulsas em datas diferentes) e depois removidos. `typecheck` limpo, 406 testes. 100% client-side, zero mudança de regra/function.
+
 ## 2026-07-23 — design: Cartão, Fatura e Cartões ganham o mesmo hero visual do Dashboard
 
 O dono achou as telas de cartão de crédito "feias, poludas, pouco sofisticadas" perto do Dashboard. Pesquisa de referência (Copilot Money, Monarch Money, Monzo) + auditoria do próprio design system apontaram pro mesmo diagnóstico: tudo era `surface` branco sem hierarquia, descumprindo uma regra que o `docs/design/DESIGN.md` já mandava ("header de valor gigante colorido por contexto") mas nunca tinha sido aplicada. Três telas, uma de cada vez, cada uma aprovada antes de seguir pra próxima.

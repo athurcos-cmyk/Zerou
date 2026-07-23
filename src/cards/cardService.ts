@@ -792,8 +792,11 @@ export function subscribeInvoiceLedger(
   onNext: (items: Array<LocalCardSynced<InvoiceLedgerEntry>>) => void,
   onError: (error: Error) => void
 ): Unsubscribe {
+  // 'desc' (mais recente primeiro) — usuária relatou que "Compras" na fatura não vinha em
+  // ordem de data. Nenhum outro consumidor deste ledger (SearchPage, CardDetailPage) depende
+  // de posição no array, só filtra/soma por tipo — seguro mudar a direção aqui na fonte.
   return onSnapshot(
-    query(ledgerRef(workspaceId, cardId, invoiceId), orderBy('effectiveAt', 'asc')),
+    query(ledgerRef(workspaceId, cardId, invoiceId), orderBy('effectiveAt', 'desc')),
     { includeMetadataChanges: true },
     (snapshot) => onNext(snapshot.docs.map((item) => withLocalSync<InvoiceLedgerEntry>(item))),
     onError

@@ -7,7 +7,11 @@ const firestoreMocks = vi.hoisted(() => ({
   serverTimestamp: vi.fn().mockReturnValue('server-timestamp'),
   getDoc: vi.fn(),
   batch: { set: vi.fn(), update: vi.fn(), commit: vi.fn().mockResolvedValue(undefined) },
-  writeBatch: vi.fn()
+  writeBatch: vi.fn(),
+  collection: vi.fn().mockReturnValue({ id: 'collection-ref' }),
+  query: vi.fn((...args: unknown[]) => ({ __query: args })),
+  orderBy: vi.fn((field: string, dir: string) => ({ __orderBy: field, __dir: dir })),
+  onSnapshot: vi.fn().mockReturnValue(() => undefined)
 }));
 
 firestoreMocks.writeBatch.mockReturnValue(firestoreMocks.batch);
@@ -18,14 +22,18 @@ vi.mock('firebase/firestore', async (importOriginal) => ({
   updateDoc: firestoreMocks.updateDoc,
   serverTimestamp: firestoreMocks.serverTimestamp,
   getDoc: firestoreMocks.getDoc,
-  writeBatch: firestoreMocks.writeBatch
+  writeBatch: firestoreMocks.writeBatch,
+  collection: firestoreMocks.collection,
+  query: firestoreMocks.query,
+  orderBy: firestoreMocks.orderBy,
+  onSnapshot: firestoreMocks.onSnapshot
 }));
 
 vi.mock('../firebase/config', () => ({
   getFirebaseDb: vi.fn().mockReturnValue({})
 }));
 
-const { addCardPurchaseToBatch, markClosedInvoices, registerOngoingInstallments, updateCardPurchase } = await import('./cardService');
+const { addCardPurchaseToBatch, markClosedInvoices, registerOngoingInstallments, subscribeInvoiceLedger, updateCardPurchase } = await import('./cardService');
 
 function invoice(id: string, status: 'open' | 'closed' | 'paid', referenceMonth: string) {
   return { id, cardId: 'card-1', status, referenceMonth };
@@ -235,5 +243,16 @@ describe('updateCardPurchase', () => {
     await expect(
       updateCardPurchase('ws1', 'user1', 'txn-expense', { description: 'x' })
     ).rejects.toThrow();
+  });
+});
+
+describe('subscribeInvoiceLedger', () => {
+  // Regressão: usuária relatou que "Compras" na fatura não vinha em ordem de data
+  // (mais recente pro mais antigo). A query ordenava 'asc' (mais antiga primeiro) e
+  // nada na tela reordenava depois — corrigido pra 'desc' na própria query.
+  it('ordena o ledger por effectiveAt decrescente (mais recente primeiro)', () => {
+    firestoreMocks.orderBy.mockClear();
+    subscribeInvoiceLedger('ws1', 'card1', 'inv1', () => undefined, () => undefined);
+    expect(firestoreMocks.orderBy).toHaveBeenCalledWith('effectiveAt', 'desc');
   });
 });

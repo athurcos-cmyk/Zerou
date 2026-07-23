@@ -1,4 +1,4 @@
-import { monthlyTotals, spendingByCategoryForMonth, type InvoiceForSpending } from './spendingAnalysis';
+import { monthlyTotals, spendingByCategoryForMonth, NO_CATEGORY, type InvoiceForSpending } from './spendingAnalysis';
 import type { Transaction } from '../types/contracts';
 
 export interface AnnualSummary {
@@ -44,10 +44,17 @@ export function computeAnnualSummary(
   const savingsCents = totalIncomeCents - totalExpenseCents;
   const savingsRate = totalIncomeCents > 0 ? Math.round((savingsCents / totalIncomeCents) * 100) : 0;
 
+  // Parcela de cartão resolve a categoria dinamicamente pela transação-mãe (sourceTransactionId),
+  // nunca fica gravada no próprio lançamento do ledger — mesmo padrão de SearchPage.tsx
+  // (txnCategoryById). Sem esse mapa, `spendingByCategoryForMonth` receberia o id da
+  // TRANSAÇÃO como se fosse o id da CATEGORIA, e uma compra parcelada categorizada aparecia
+  // no "Top categorias" com um `txn_...` cru no lugar do nome.
+  const categoryByTransactionId = new Map(transactions.map((t) => [t.id, t.categoryId]));
+
   // Aggregate spending by category across all 12 months
   const categoryTotals = new Map<string, number>();
   for (const month of months) {
-    const byCat = spendingByCategoryForMonth(month, transactions, invoices, (id) => id);
+    const byCat = spendingByCategoryForMonth(month, transactions, invoices, (id) => (id ? categoryByTransactionId.get(id) : undefined));
     for (const [catId, cents] of byCat) {
       if (cents <= 0) continue;
       categoryTotals.set(catId, (categoryTotals.get(catId) ?? 0) + cents);
@@ -56,7 +63,7 @@ export function computeAnnualSummary(
 
   const topCategories = Array.from(categoryTotals.entries())
     .map(([categoryId, amountCents]) => ({
-      name: categoryNames.get(categoryId) ?? categoryId,
+      name: categoryId === NO_CATEGORY ? 'Sem categoria' : (categoryNames.get(categoryId) ?? categoryId),
       categoryId,
       amountCents,
       percentage: totalExpenseCents > 0 ? Math.round((amountCents / totalExpenseCents) * 100) : 0,
