@@ -204,7 +204,9 @@ export function SearchPage() {
     () =>
       mergeInvoicesWithLedger(cardsData.invoices, ledgerEntries).map((inv) => ({
         referenceMonth: inv.referenceMonth,
-        ledgerEntries: inv.ledgerEntries
+        ledgerEntries: inv.ledgerEntries,
+        status: inv.status,
+        outstandingBalanceCents: inv.outstandingBalanceCents
       })),
     [cardsData.invoices, ledgerEntries]
   );

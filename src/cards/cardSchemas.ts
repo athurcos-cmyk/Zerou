@@ -15,6 +15,13 @@ export const createCreditCardSchema = z.object({
   colorToken: z.string().trim().min(3).max(40).default('chart-1')
 });
 
+// Fase 1 do editar cartão: só limite e nome. Bandeira/últimos 4 dígitos exigem excluir e
+// recriar; closingDay/dueDay ficam pra Fase 2 (mudar impacta faturas já geradas).
+export const updateCardSchema = z.object({
+  limitCents: moneyCentsSchema.optional(),
+  name: z.string().trim().min(2, 'Informe o nome do cartão.').max(80).optional()
+});
+
 export const createCardPurchaseSchema = z.object({
   cardId: z.string().trim().min(1),
   description: z.string().trim().min(2).max(120),
@@ -61,8 +68,12 @@ export const registerOngoingInstallmentsSchema = z
     installmentValueCents: moneyCentsSchema.refine((v) => v > 0, 'Informe o valor da parcela.'),
     currentInstallment: z.number().int().min(1).max(72),
     totalInstallments: z.number().int().min(2).max(72),
-    // Primeiro dia do mês em que a PRÓXIMA parcela é cobrada.
+    // Primeiro dia do mês em que a PRÓXIMA parcela é cobrada — usado só pra calcular em qual
+    // fatura cada parcela cai (`planOngoingInstallments`), nunca vira data de transaction/ledger.
     nextDueMonth: z.date(),
+    // Data real da compra original, informada pela pessoa — vira `date` da transaction e
+    // `effectiveAt` de cada ledger entry (ver Pendência 2b/3 do plano de correção).
+    purchaseDate: z.date(),
     categoryId: z.string().trim().max(120).optional()
   })
   .refine((v) => v.currentInstallment <= v.totalInstallments, {
@@ -92,6 +103,7 @@ export const reconcileInvoiceSchema = z.object({
 });
 
 export type CreateCreditCardInput = z.infer<typeof createCreditCardSchema>;
+export type UpdateCardInput = z.infer<typeof updateCardSchema>;
 export type CreateCardPurchaseInput = z.infer<typeof createCardPurchaseSchema>;
 export type RecordInvoicePaymentInput = z.infer<typeof recordInvoicePaymentSchema>;
 export type RecordInvoiceCreditInput = z.infer<typeof recordInvoiceCreditSchema>;

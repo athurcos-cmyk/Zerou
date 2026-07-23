@@ -16,7 +16,11 @@ export type InvoiceLedgerEntryType =
   | 'fee'
   | 'installment_anticipation'
   | 'installment_anticipation_credit'
-  | 'purchase_reversal';
+  | 'purchase_reversal'
+  // Reversão de um `installment_anticipation_credit` — precisa entrar como débito
+  // (`purchasesTotalCents`), não crédito, porque o que está revertendo já era um crédito.
+  // Ver `reverseCardPurchaseOnDelete.ts`.
+  | 'anticipation_credit_reversal';
 
 const debitTypes = new Set(['purchase', 'manual_debit']);
 const feeTypes = new Set(['interest', 'fine', 'iof', 'fee']);
@@ -39,7 +43,7 @@ export function invoiceTotalsDeltaForEntry(type: InvoiceLedgerEntryType, amountC
     feesTotalCents: 0,
   };
 
-  if (debitTypes.has(type) || type === 'installment_anticipation') {
+  if (debitTypes.has(type) || type === 'installment_anticipation' || type === 'anticipation_credit_reversal') {
     return { ...zero, purchasesTotalCents: amountCents };
   }
 

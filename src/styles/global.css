@@ -948,6 +948,21 @@ html[data-reduce-motion='true'] *::after {
   gap: 0.75rem;
 }
 
+/* "Ver todas/Ver menos" no fim de uma lista colapsada (ex.: compras de uma fatura longa). */
+.list-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.75rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--action-primary);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
 .list-row {
   display: flex;
   align-items: center;
@@ -1551,6 +1566,11 @@ span.service-mark--brand {
   margin-bottom: 1.25rem;
 }
 
+.card-invoice-current {
+  display: grid;
+  gap: 0.75rem;
+}
+
 .card-limit-bar-track {
   overflow: hidden;
   height: 0.55rem;
@@ -1593,11 +1613,15 @@ span.service-mark--brand {
   display: grid;
   gap: 0.5rem;
   margin-bottom: 1.5rem;
-  border: 1px solid var(--border-subtle);
+  border-color: transparent;
   border-radius: 1rem;
-  background: var(--bg-surface);
+  background: var(--gradient-brand);
   padding: 1.25rem 1.5rem;
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--shadow-brand-26);
+}
+
+.invoice-hero .eyebrow {
+  color: var(--on-accent-85);
 }
 
 .invoice-hero-amount {
@@ -1606,16 +1630,33 @@ span.service-mark--brand {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   line-height: 1;
-  color: var(--text-primary);
+  color: var(--on-accent-95);
 }
 
 .invoice-hero-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;
-  color: var(--text-secondary);
+  color: var(--on-accent-82);
   font-size: 0.86rem;
 }
+
+.invoice-hero p.text-secondary,
+.invoice-hero p.text-muted {
+  color: var(--on-accent-82);
+}
+
+/* Pílula branca com texto na cor semântica — o fundo pastel padrão do .sync-badge
+   some sobre o gradiente da marca. */
+.invoice-hero .sync-badge--synced,
+.invoice-hero .sync-badge--pending,
+.invoice-hero .sync-badge--failed {
+  background: var(--accent-foreground);
+}
+
+.invoice-hero .sync-badge--synced { color: var(--success); }
+.invoice-hero .sync-badge--pending { color: var(--warning); }
+.invoice-hero .sync-badge--failed { color: var(--danger); }
 
 .invoice-breakdown {
   display: flex;
@@ -1627,6 +1668,11 @@ span.service-mark--brand {
   margin: 0.75rem 0 1.25rem;
   font-size: 0.86rem;
   color: var(--text-secondary);
+}
+
+.invoice-hero .invoice-breakdown {
+  border-color: var(--on-accent-25);
+  color: var(--on-accent-82);
 }
 
 .invoice-breakdown span {
@@ -1641,6 +1687,21 @@ span.service-mark--brand {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--text-primary);
+}
+
+/* :not() pra não pisar no amount--income/--expense dos valores de Créditos/Juros/
+   Pagamentos, que devem manter a cor semântica própria mesmo sobre o gradiente. */
+.invoice-hero .invoice-breakdown strong:not(.amount--income):not(.amount--expense) {
+  color: var(--on-accent-95);
+}
+
+.button--invoice-cta {
+  background: var(--accent-foreground);
+  color: var(--action-primary);
+}
+
+.button--invoice-cta:hover {
+  background: var(--on-accent-90);
 }
 
 /* Respiro entre as seções empilhadas da fatura. Sem margem, superfícies de mesma
@@ -4046,6 +4107,93 @@ span.service-mark--brand {
 
 .card-limit-hero-input::placeholder {
   color: var(--on-accent-55);
+}
+
+/* Card limit hero (read-only display — CardDetailPage) */
+.card-limit-hero-display {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1.1rem 1.25rem;
+  border-radius: 1.1rem;
+  background: var(--gradient-brand);
+  box-shadow: var(--shadow-card-limit);
+  margin-bottom: 1.25rem;
+}
+
+.card-limit-hero-display-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.card-limit-hero-display-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--on-accent-85);
+  margin: 0 0 0.3rem;
+}
+
+.card-limit-hero-display-value {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(1.9rem, 7vw, 2.4rem);
+  line-height: 1.05;
+  color: var(--on-accent-95);
+}
+
+.card-limit-hero-display-of {
+  font-size: 0.86rem;
+  color: var(--on-accent-82);
+  font-weight: 500;
+}
+
+.card-limit-hero-display-edit {
+  color: var(--on-accent-90) !important;
+}
+
+.card-limit-hero-display-edit:hover {
+  background: var(--on-accent-16) !important;
+}
+
+.card-limit-hero-display-secondary {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.card-limit-hero-display-secondary-value {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.15rem;
+  color: var(--on-accent-90);
+}
+
+.card-limit-hero-display-track {
+  overflow: hidden;
+  height: 0.55rem;
+  border-radius: 0 4px 4px 0;
+  background: var(--on-accent-25);
+}
+
+.card-limit-hero-display-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--on-accent-95);
+  transition: width var(--duration-slow) ease;
+}
+
+.card-limit-hero-display-fill--warning { background: var(--warning); }
+.card-limit-hero-display-fill--danger { background: var(--danger); }
+
+.card-limit-hero-display-note {
+  font-size: 0.82rem;
+  color: var(--on-accent-82);
+  margin: 0;
 }
 
 /* ============================================================

@@ -10,6 +10,7 @@ import { TagInput } from '../components/TagInput';
 import { fromDateInputValue, toDateInputValue } from '../finance/financeDates';
 import { accountTypeLabels, transactionTypeLabels } from '../finance/financeLabels';
 import { createCategory, deleteCategory, updateCategory, updateTransaction } from '../finance/financeService';
+import { updateCardPurchase } from '../cards/cardService';
 import { type SupportedTransactionType } from '../finance/financeSchemas';
 import { centsToInputValue, parseMoneyToCents } from '../finance/money';
 
@@ -30,6 +31,7 @@ export function EditTransactionPage() {
   const workspaceId = profile?.defaultWorkspaceId;
   const finance = useFinanceContext();
   const transaction = finance.transactions.find((item) => item.id === transactionId);
+  const isCardPurchase = transaction?.type === 'card_purchase';
   const [type, setType] = useState<SupportedTransactionType>('expense');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
@@ -47,7 +49,7 @@ export function EditTransactionPage() {
       return;
     }
 
-    setType(transaction.type as SupportedTransactionType);
+    setType(transaction.type === 'card_purchase' ? 'expense' : (transaction.type as SupportedTransactionType));
     setAmount(centsToInputValue(transaction.amountCents));
     setDescription(transaction.description);
     setCategoryId(transaction.categoryId ?? '');
@@ -66,7 +68,7 @@ export function EditTransactionPage() {
     icon: <Wallet size={17} aria-hidden="true" />
   }));
   const destinationOptions = accountOptions.filter((option) => option.value !== accountId);
-  const categoryFilterType = type === 'income' ? 'income' : type === 'expense' ? 'expense' : 'all';
+  const categoryFilterType = isCardPurchase ? 'expense' : type === 'income' ? 'income' : type === 'expense' ? 'expense' : 'all';
   const moodClass = type === 'income' ? 'amount-hero--income' : type === 'transfer' ? 'amount-hero--transfer' : '';
 
   const today = toDateInputValue(new Date());
@@ -95,6 +97,19 @@ export function EditTransactionPage() {
 
     if (!workspaceId || !user || !transactionId || !transaction) {
       setMessage('Não foi possível localizar a transação.');
+      return;
+    }
+
+    if (isCardPurchase) {
+      try {
+        await updateCardPurchase(workspaceId, user.uid, transactionId, {
+          description,
+          categoryId: categoryId || undefined
+        });
+        navigate('/app/transactions');
+      } catch (error) {
+        setMessage(getUserFacingErrorMessage(error, 'Não foi possível atualizar a compra agora.'));
+      }
       return;
     }
 
@@ -135,19 +150,6 @@ export function EditTransactionPage() {
     );
   }
 
-  if (transaction?.type === 'card_purchase') {
-    return (
-      <section className="page-content page-content--narrow">
-        <p className="eyebrow">Editar transação</p>
-        <h1 className="page-title">Compras no cartão ainda não podem ser editadas.</h1>
-        <p className="text-secondary">Para corrigir, exclua a compra no Extrato e lance de novo.</p>
-        <Link className="button button--secondary" to="/app/transactions">
-          Voltar
-        </Link>
-      </section>
-    );
-  }
-
   return (
     <div className="entry-screen">
       <header className={`amount-hero ${moodClass}`}>
@@ -155,56 +157,73 @@ export function EditTransactionPage() {
           <Link className="amount-hero-back" to="/app/transactions" aria-label="Voltar">
             <ArrowLeft size={20} aria-hidden="true" />
           </Link>
-          <div className="type-switch" role="radiogroup" aria-label="Tipo de transação">
-            {primaryTypes.map((option) => (
-              <button
-                key={option}
-                type="button"
-                role="radio"
-                aria-checked={type === option}
-                className={`type-switch-btn${type === option ? ' type-switch-btn--active' : ''}`}
-                onClick={() => { setType(option); }}
-              >
-                {transactionTypeLabels[option]}
-              </button>
-            ))}
-          </div>
+          {!isCardPurchase && (
+            <div className="type-switch" role="radiogroup" aria-label="Tipo de transação">
+              {primaryTypes.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  role="radio"
+                  aria-checked={type === option}
+                  className={`type-switch-btn${type === option ? ' type-switch-btn--active' : ''}`}
+                  onClick={() => { setType(option); }}
+                >
+                  {transactionTypeLabels[option]}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <label className="amount-hero-field">
           <span className="amount-hero-label">Valor</span>
-          <span className="amount-hero-input-wrap">
-            <span className="amount-hero-currency">R$</span>
-            <input
-              className="amount-hero-input"
-              inputMode="decimal"
-              value={amount}
-              onChange={(event) => setAmount(event.target.value)}
-              placeholder="0,00"
-              aria-label="Valor da transação"
-            />
-          </span>
+          {isCardPurchase ? (
+            <span className="amount-hero-input-wrap" aria-label="Valor da compra (não editável)">
+              <span className="amount-hero-currency">R$</span>
+              <span className="amount-hero-input">{centsToInputValue(transaction?.amountCents ?? 0)}</span>
+            </span>
+          ) : (
+            <span className="amount-hero-input-wrap">
+              <span className="amount-hero-currency">R$</span>
+              <input
+                className="amount-hero-input"
+                inputMode="decimal"
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+                placeholder="0,00"
+                aria-label="Valor da transação"
+              />
+            </span>
+          )}
         </label>
       </header>
 
       <form className="entry-form" onSubmit={handleSubmit}>
         <FormMessage>{message}</FormMessage>
 
+        {isCardPurchase && (
+          <p className="text-secondary" style={{ margin: '-0.5rem 0 0', fontSize: '0.86rem' }}>
+            Compra no cartão — só descrição e categoria podem ser editadas aqui. Valor errado, data, parcelas ou cartão errado exigem excluir e lançar de novo.
+          </p>
+        )}
+
         <label className="field">
           <span>Título</span>
           <input className="input" value={description} onChange={(event) => setDescription(event.target.value)} />
         </label>
 
-        <div className="field">
-          <span className="field-label">Data</span>
-          <div className="chip-row">
-            <button type="button" className={`chip${datePreset === 'today' ? ' chip--active' : ''}`} onClick={() => setDate(today)}>Hoje</button>
-            <button type="button" className={`chip${datePreset === 'yesterday' ? ' chip--active' : ''}`} onClick={() => setDate(yesterday)}>Ontem</button>
-            <label className={`chip chip--date${datePreset === 'other' ? ' chip--active' : ''}`}>
-              {datePreset === 'other' && date ? date.split('-').reverse().join('/') : 'Outra'}
-              <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
-            </label>
+        {!isCardPurchase && (
+          <div className="field">
+            <span className="field-label">Data</span>
+            <div className="chip-row">
+              <button type="button" className={`chip${datePreset === 'today' ? ' chip--active' : ''}`} onClick={() => setDate(today)}>Hoje</button>
+              <button type="button" className={`chip${datePreset === 'yesterday' ? ' chip--active' : ''}`} onClick={() => setDate(yesterday)}>Ontem</button>
+              <label className={`chip chip--date${datePreset === 'other' ? ' chip--active' : ''}`}>
+                {datePreset === 'other' && date ? date.split('-').reverse().join('/') : 'Outra'}
+                <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+              </label>
+            </div>
           </div>
-        </div>
+        )}
 
         <CategoryField
           value={categoryId}
@@ -216,15 +235,17 @@ export function EditTransactionPage() {
           onDeleteCategory={handleDeleteCategory}
         />
 
-        <SelectField
-          label={type === 'transfer' ? 'Conta de origem' : 'Conta'}
-          value={accountId}
-          onChange={setAccountId}
-          options={accountOptions}
-          placeholder="Escolha uma conta"
-        />
+        {!isCardPurchase && (
+          <SelectField
+            label={type === 'transfer' ? 'Conta de origem' : 'Conta'}
+            value={accountId}
+            onChange={setAccountId}
+            options={accountOptions}
+            placeholder="Escolha uma conta"
+          />
+        )}
 
-        {type === 'transfer' ? (
+        {!isCardPurchase && type === 'transfer' ? (
           <SelectField
             label="Conta de destino"
             value={destinationAccountId}
@@ -234,23 +255,25 @@ export function EditTransactionPage() {
           />
         ) : null}
 
-        <details className="advanced-panel">
-          <summary>Mais detalhes</summary>
-          <div className="form-stack">
-            <label className="field">
-              <span>Estabelecimento</span>
-              <input className="input" value={merchant} onChange={(event) => setMerchant(event.target.value)} />
-            </label>
-            <label className="field">
-              <span>Tags</span>
-              <TagInput value={tags} onChange={setTags} />
-            </label>
-            <label className="field">
-              <span>Notas</span>
-              <textarea className="input textarea" value={notes} onChange={(event) => setNotes(event.target.value)} />
-            </label>
-          </div>
-        </details>
+        {!isCardPurchase && (
+          <details className="advanced-panel">
+            <summary>Mais detalhes</summary>
+            <div className="form-stack">
+              <label className="field">
+                <span>Estabelecimento</span>
+                <input className="input" value={merchant} onChange={(event) => setMerchant(event.target.value)} />
+              </label>
+              <label className="field">
+                <span>Tags</span>
+                <TagInput value={tags} onChange={setTags} />
+              </label>
+              <label className="field">
+                <span>Notas</span>
+                <textarea className="input textarea" value={notes} onChange={(event) => setNotes(event.target.value)} />
+              </label>
+            </div>
+          </details>
+        )}
 
         <div className="entry-actions">
           <button className="button button--primary button--block" type="submit">

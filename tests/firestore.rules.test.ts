@@ -361,7 +361,12 @@ function ledgerPayload(
   };
 }
 
-function cardPurchaseTransactionPayload(workspaceId: string, transactionId: string, uid: string) {
+function cardPurchaseTransactionPayload(
+  workspaceId: string,
+  transactionId: string,
+  uid: string,
+  overrides: Record<string, unknown> = {}
+) {
   const now = serverTimestamp();
 
   return {
@@ -381,11 +386,16 @@ function cardPurchaseTransactionPayload(workspaceId: string, transactionId: stri
     tags: [],
     isRecurring: false,
     installmentGroupId: '',
+    // Quantas parcelas ficam no ledger pra esta transação (`updateCardPurchase`, Pendência 1b,
+    // usa isso pra recriar o mesmo número numa edição — ver REGRA PRINCIPAL do CLAUDE.md: o
+    // payload de teste precisa refletir o payload real do cliente, `addCardPurchaseToBatch`).
+    installments: 1,
     clientMutationId: transactionId,
     syncStatus: 'synced',
     version: 1,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    ...overrides
   };
 }
 
@@ -1356,6 +1366,47 @@ describe('firestore security rules', () => {
     await assertSucceeds(batch.commit());
   });
 
+  // Regressão (plano de correção de cartão, Pendência 1b): `installments` na transação
+  // `card_purchase` — quantas entries `purchase` existem hoje no ledger pra ela — precisa estar
+  // em `validTransactionCreate` (`hasOnly` + tipo/range) no mesmo commit que o cliente passou a
+  // gravar esse campo. Mesmo padrão dos 2 incidentes reais já documentados na REGRA PRINCIPAL do
+  // CLAUDE.md (campo novo sem regra correspondente = rejeição silenciosa em produção).
+  it('allows a card_purchase transaction carrying installments (1-72)', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(setDoc(doc(aliceDb, 'workspaces/workspaceA/cards/cardA'), cardPayload('workspaceA', 'cardA', 'alice')));
+    await assertSucceeds(
+      setDoc(doc(aliceDb, 'workspaces/workspaceA/cards/cardA/invoices/cardA_2026-06'), invoicePayload('workspaceA', 'cardA', 'cardA_2026-06'))
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/transactions/txnWithInstallments'),
+        cardPurchaseTransactionPayload('workspaceA', 'txnWithInstallments', 'alice', { installments: 10 })
+      )
+    );
+  });
+
+  it('rejects a card_purchase transaction with installments out of range', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(setDoc(doc(aliceDb, 'workspaces/workspaceA/cards/cardA'), cardPayload('workspaceA', 'cardA', 'alice')));
+    await assertSucceeds(
+      setDoc(doc(aliceDb, 'workspaces/workspaceA/cards/cardA/invoices/cardA_2026-06'), invoicePayload('workspaceA', 'cardA', 'cardA_2026-06'))
+    );
+    await assertFails(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/transactions/txnBadInstallments'),
+        cardPurchaseTransactionPayload('workspaceA', 'txnBadInstallments', 'alice', { installments: 0 })
+      )
+    );
+    await assertFails(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/transactions/txnBadInstallments2'),
+        cardPurchaseTransactionPayload('workspaceA', 'txnBadInstallments2', 'alice', { installments: 73 })
+      )
+    );
+  });
+
   // Rótulo "7/10" na fatura, tanto pra compra nova quanto pra uma compra parcelada que já
   // estava em andamento (`registerOngoingInstallments`). Os campos são opcionais e int 1..72.
   it('allows a purchase ledger entry carrying installmentNumber/installmentTotal', async () => {
@@ -1474,6 +1525,37 @@ describe('firestore security rules', () => {
       )
     );
   });
+
+  // Regressão do achado #14/#16 (auditoria de 2026-07-22, plano de correção de cartão): tipo
+  // novo `anticipation_credit_reversal`, usado por `reverseCardPurchaseOnDelete` (Cloud
+  // Function) pra reverter corretamente um `installment_anticipation_credit` já existente
+  // (que é ele mesmo um crédito — revertê-lo com outro crédito dobrava o valor em vez de
+  // cancelar). Mesmo padrão do teste acima: sem este valor em `validInvoiceLedgerEntryType`,
+  // a Cloud Function ficaria com o mesmo bug de rejeição silenciosa que já aconteceu 2 vezes
+  // neste projeto — mesmo sendo só a CF (Admin SDK) quem grava esse tipo, o projeto mantém
+  // `firestore.rules` em sincronia com o enum por consistência (mesmo padrão já usado pra
+  // `purchase_reversal`, também só escrito via Admin SDK).
+  it('allows creating an anticipation_credit_reversal ledger entry (reversing a prior anticipation credit)', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(setDoc(doc(aliceDb, 'workspaces/workspaceA/cards/cardA'), cardPayload('workspaceA', 'cardA', 'alice')));
+    await assertSucceeds(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/cards/cardA/invoices/cardA_2026-08'),
+        invoicePayload('workspaceA', 'cardA', 'cardA_2026-08')
+      )
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/cards/cardA/invoices/cardA_2026-08/ledger/anticipationCreditReversalA'),
+        ledgerPayload('workspaceA', 'cardA', 'cardA_2026-08', 'anticipationCreditReversalA', 'alice', {
+          type: 'anticipation_credit_reversal',
+          sourceTransactionId: 'txnOriginalInstallmentPurchase'
+        })
+      )
+    );
+  });
+
 
   it('validates goal documents and goal contributions', async () => {
     const aliceDb = testEnv.authenticatedContext('alice').firestore();

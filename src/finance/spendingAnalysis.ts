@@ -1,4 +1,4 @@
-import type { InvoiceLedgerEntry, InvoiceLedgerEntryType, Transaction } from '../types/contracts';
+import type { InvoiceLedgerEntry, InvoiceLedgerEntryType, InvoiceStatus, Transaction } from '../types/contracts';
 
 /**
  * Análise de gastos em **regime de caixa (por parcela)**.
@@ -50,6 +50,12 @@ export function signedCharge(entry: Pick<InvoiceLedgerEntry, 'type' | 'amountCen
 export interface InvoiceForSpending {
   referenceMonth: string;
   ledgerEntries: InvoiceLedgerEntry[];
+  /** Ambos opcionais pra não quebrar quem já montava esse shape sem eles (ex.: testes antigos). */
+  status?: InvoiceStatus;
+  /** Sinal real de "fatura paga": pagar não muda `status` (só `reconcileInvoice`, manual, muda —
+   * fluxo comum de pagar fatura nunca passa por ali), quem reflete pagamento de verdade é esse
+   * saldo, mantido incrementalmente pela Cloud Function a cada lançamento do ledger. */
+  outstandingBalanceCents?: number;
 }
 
 const refundLikeTypes = new Set<Transaction['type']>(['refund', 'reimbursement', 'adjustment']);
@@ -246,7 +252,7 @@ export interface OngoingInstallmentPurchase {
   installmentValueCents: number;
   /** Valor cheio da compra = total de parcelas × valor da parcela (vale mesmo pra compra em andamento). */
   fullAmountCents: number;
-  /** Parcelas que ainda vão cair (fatura no mês atual ou à frente), já líquidas de antecipação. */
+  /** Parcelas ainda não pagas (fatura no mês atual ou à frente) — antecipar muda QUANDO, não SE. */
   remainingCount: number;
   remainingCents: number;
 }
@@ -255,11 +261,16 @@ export interface OngoingInstallmentPurchase {
  * Compras parceladas ainda em andamento (têm parcela caindo no mês atual ou à frente),
  * pra dar visibilidade ao valor cheio ("R$3.000 em 10x") que a visão por parcela dilui.
  *
- * "Restante" olha só faturas de `referenceMonth >= currentMonth` e soma o líquido do ledger
- * por mês (parcela `purchase` positiva, crédito de antecipação negativo). Uma parcela já
- * antecipada some do mês de origem (o crédito zera o líquido daquele mês), então ela deixa
- * de contar como restante — igual ao cartão de verdade, onde antecipar reduz as parcelas
- * que faltam. Parcelas cujo mês já passou são consideradas pagas e não entram.
+ * "Restante" = dinheiro que ainda não saiu de fato (nenhuma fatura foi paga por ele), não
+ * "parcelas ainda não antecipadas". Antecipar só reagenda a cobrança pra fatura atual — não
+ * quita nada — então uma parcela antecipada (`installment_anticipation`, na fatura atual)
+ * continua contando como restante; só a parcela ORIGINAL futura que ela substitui deixa de
+ * contar (o crédito `installment_anticipation_credit` cancela especificamente aquele mês, pra
+ * não contar a mesma dívida duas vezes). Parcelas cujo mês já passou são consideradas
+ * resolvidas e não entram — e uma fatura já paga (`outstandingBalanceCents <= 0`, ou
+ * `status` manualmente reconciliado pra `'paid'`/`'overpaid'`) também sai da conta na hora,
+ * mesmo que o mês dela ainda não tenha virado: pagar a fatura é o que realmente resolve a
+ * dívida, não só o calendário passar.
  */
 export function ongoingInstallmentPurchases(
   currentMonth: string,
@@ -269,58 +280,70 @@ export function ongoingInstallmentPurchases(
   interface Group {
     installmentTotal: number;
     installmentValueCents: number;
-    // Líquido restante por mês futuro (>= currentMonth): parcela soma, crédito de antecipação abate.
-    remainingByMonth: Map<string, number>;
+    // Meses futuros cuja parcela original foi antecipada (crédito cancela — vira débito na
+    // fatura atual, contado à parte, sem duplicar).
+    canceledMonths: Set<string>;
+    remainingCents: number;
+    remainingCount: number;
   }
   const groups = new Map<string, Group>();
   const groupFor = (id: string) => {
     let group = groups.get(id);
     if (!group) {
-      group = { installmentTotal: 0, installmentValueCents: 0, remainingByMonth: new Map() };
+      group = { installmentTotal: 0, installmentValueCents: 0, canceledMonths: new Set(), remainingCents: 0, remainingCount: 0 };
       groups.set(id, group);
     }
     return group;
   };
 
+  // 1ª passada: total/valor da parcela (de qualquer parcela, passada ou futura) e quais meses
+  // futuros foram antecipados — precisa ver todo mundo antes de decidir o que conta como restante.
   for (const invoice of invoices) {
-    const isFuture = invoice.referenceMonth >= currentMonth;
     for (const entry of invoice.ledgerEntries) {
       if (!entry.sourceTransactionId) continue;
-      const isParcel = entry.type === 'purchase' && (entry.installmentTotal ?? 0) > 1;
-      const isAnticipationCredit = entry.type === 'installment_anticipation_credit';
-      if (!isParcel && !isAnticipationCredit) continue;
-
-      const group = groupFor(entry.sourceTransactionId);
-      if (isParcel) {
+      if (entry.type === 'purchase' && (entry.installmentTotal ?? 0) > 1) {
+        const group = groupFor(entry.sourceTransactionId);
         group.installmentTotal = entry.installmentTotal ?? group.installmentTotal;
         group.installmentValueCents = entry.amountCents;
+      } else if (entry.type === 'installment_anticipation_credit') {
+        groupFor(entry.sourceTransactionId).canceledMonths.add(invoice.referenceMonth);
       }
-      if (isFuture) {
-        const month = invoice.referenceMonth;
-        group.remainingByMonth.set(month, (group.remainingByMonth.get(month) ?? 0) + signedCharge(entry));
+    }
+  }
+
+  // 2ª passada: soma o que ainda não foi pago. Parcela original só conta se o mês dela não
+  // foi antecipado; débito de antecipação sempre conta (é a mesma dívida, só que cobrada agora).
+  for (const invoice of invoices) {
+    if (invoice.referenceMonth < currentMonth) continue;
+    if (invoice.outstandingBalanceCents !== undefined && invoice.outstandingBalanceCents <= 0) continue;
+    if (invoice.status === 'paid' || invoice.status === 'overpaid') continue;
+    for (const entry of invoice.ledgerEntries) {
+      if (!entry.sourceTransactionId) continue;
+      const group = groups.get(entry.sourceTransactionId);
+      if (!group || group.installmentTotal <= 1) continue;
+
+      if (entry.type === 'purchase' && (entry.installmentTotal ?? 0) > 1) {
+        if (group.canceledMonths.has(invoice.referenceMonth)) continue;
+        group.remainingCents += entry.amountCents;
+        group.remainingCount += 1;
+      } else if (entry.type === 'installment_anticipation') {
+        group.remainingCents += entry.amountCents;
+        group.remainingCount += 1;
       }
     }
   }
 
   const result: OngoingInstallmentPurchase[] = [];
   for (const [sourceTransactionId, group] of groups) {
-    if (group.installmentTotal <= 1) continue;
-    let remainingCents = 0;
-    let remainingCount = 0;
-    for (const monthNet of group.remainingByMonth.values()) {
-      if (monthNet <= 0) continue; // mês antecipado (líquido 0) ou sem cobrança não conta
-      remainingCents += monthNet;
-      remainingCount += 1;
-    }
-    if (remainingCents <= 0) continue;
+    if (group.installmentTotal <= 1 || group.remainingCents <= 0) continue;
     result.push({
       sourceTransactionId,
       description: descriptionOfTransaction(sourceTransactionId) ?? 'Compra parcelada',
       installmentTotal: group.installmentTotal,
       installmentValueCents: group.installmentValueCents,
       fullAmountCents: group.installmentTotal * group.installmentValueCents,
-      remainingCount,
-      remainingCents
+      remainingCount: group.remainingCount,
+      remainingCents: group.remainingCents
     });
   }
 

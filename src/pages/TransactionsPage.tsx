@@ -345,7 +345,11 @@ export function TransactionsPage() {
                       <CategoryMark category={category} fallback={fallback} />
                       <div className="list-row-body">
                         <strong>{transaction.description}</strong>
-                        <span className="text-secondary">{transactionTypeLabels[transaction.type]}</span>
+                        <span className="text-secondary">
+                          {transaction.type === 'card_purchase' && transaction.installments && transaction.installments > 1
+                            ? `${transaction.installments}x de ${formatMoney(Math.round(transaction.amountCents / transaction.installments))}`
+                            : transactionTypeLabels[transaction.type]}
+                        </span>
                       </div>
                       <div className="list-row-end">
                         <strong className={amountClass}>
@@ -452,11 +456,9 @@ export function TransactionsPage() {
                 >
                   <Trash2 size={16} aria-hidden="true" /> Excluir
                 </button>
-                {t.type !== 'card_purchase' ? (
-                  <Link className="button button--primary" to={`/app/transactions/${t.id}/edit`}>
-                    Editar
-                  </Link>
-                ) : null}
+                <Link className="button button--primary" to={`/app/transactions/${t.id}/edit`}>
+                  Editar
+                </Link>
               </div>
             </div>
           </BottomSheet>

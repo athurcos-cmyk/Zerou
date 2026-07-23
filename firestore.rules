@@ -323,7 +323,8 @@ service cloud.firestore {
         'fee',
         'installment_anticipation',
         'installment_anticipation_credit',
-        'purchase_reversal'
+        'purchase_reversal',
+        'anticipation_credit_reversal'
       ];
     }
 
@@ -501,6 +502,7 @@ service cloud.firestore {
           'isRecurring',
           'recurringId',
           'installmentGroupId',
+          'installments',
           'clientMutationId',
           'syncStatus',
           'version',
@@ -520,6 +522,8 @@ service cloud.firestore {
         && validOptionalString('notes', 500)
         && validOptionalString('recurringId', 120)
         && validOptionalString('installmentGroupId', 120)
+        && (!request.resource.data.keys().hasAny(['installments'])
+            || (request.resource.data.installments is int && request.resource.data.installments >= 1 && request.resource.data.installments <= 72))
         && request.resource.data.date is timestamp
         && validMonthKey(request.resource.data.competenceMonth)
         && validMonthKey(request.resource.data.cashMonth)

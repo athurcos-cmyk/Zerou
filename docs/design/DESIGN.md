@@ -27,7 +27,7 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
 
 - Shell: `AppShell.tsx`. Desktop = sidebar; mobile = **nav inferior com FAB central** elevado (tangerina) para "Lançar".
 - Header do app logado: sem logo persistente; a tela deve priorizar a tarefa.
-- Telas de lançamento (transação, cartão): **header de valor gigante** colorido por contexto, com o valor em DM Sans 800. Tipo via segmented "type-switch".
+- Telas de lançamento (transação, cartão): **header de valor gigante** colorido por contexto, com o valor em DM Sans 800. Tipo via segmented "type-switch". Mesmo tratamento (gradiente `--gradient-brand` + `--shadow-brand-26`, texto em tokens `--on-accent-*`) já replicado em `CardDetailPage.tsx` (limite disponível) e `InvoicePage.tsx` (valor a pagar) desde 2026-07-23 — referência viva de como aplicar em qualquer tela nova que precise do mesmo destaque.
 
 ## Componentes-base (reutilizar sempre)
 
@@ -41,6 +41,8 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
 | `categoryIcons` / `palette` | 36 ícones + paleta de cores de categoria/meta. |
 | `.metric-card` / `.metric-icon` / `.metric-strip` (`global.css`) | Cartão de métrica/KPI compacto (usado em `SearchPage.tsx`). `.metric-card--accent` para o destaque principal (mesmo tratamento gradiente do `.dash-hero`). Valor de **texto longo** (não dinheiro/porcentagem) precisa do modificador `.metric-card-value--compact` — a tipografia padrão do card é grande demais e corta nomes como "Alimentação". |
 | `.form-accordion-toggle` (`global.css`) | Botão de expandir/recolher formulário (usado em AccountsPage, BillsPage, CardsPage, ReceivablesPage). Substitui o inline style de 7 propriedades que estava duplicado 4×. |
+| `.list-toggle` (`global.css`, 2026-07-23) | "Ver todas as N / Ver menos" no fim de uma lista `.item-list` colapsada (ex.: Compras de uma fatura longa em `InvoicePage.tsx`, limite de 5 linhas). Link discreto (`--action-primary`), não botão cheio. |
+| `.icon-button` (`global.css`) | Botão circular 2.75rem só com ícone — não é só destrutivo: também usado pra "voltar" (`InvoicePage.tsx`) e editar (`CardDetailPage.tsx`). Hover vermelho é o padrão, mas não obrigatório semanticamente. |
 | Tokens de duração | `--duration-fast: 120ms`, `--duration-normal: 200ms`, `--duration-slow: 300ms` (`themes.css:root`). Usar em toda transição/animação CSS. Exceção: `.button:active` (80ms, micro-interação) e animações de loop (spinner). |
 | Tokens utilitários | `--bg-input: var(--bg-surface-subtle)`, `--text-placeholder: var(--text-muted)`, `--shadow-lg`, `--radius-md` (`themes.css:root`). Ajustam-se automaticamente por tema. |
 

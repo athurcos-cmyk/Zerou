@@ -39,7 +39,12 @@ export type InvoiceLedgerEntryType =
   | 'fee'
   | 'installment_anticipation'
   | 'installment_anticipation_credit'
-  | 'purchase_reversal';
+  | 'purchase_reversal'
+  // Reversão de um `installment_anticipation_credit` (ex.: editar/excluir uma compra que já
+  // tinha parcela antecipada). Diferente de `purchase_reversal` — que sempre entra como crédito
+  // (cancela um débito) — este precisa entrar como DÉBITO (`purchasesTotalCents`), porque o que
+  // está revertendo já era, ele mesmo, um crédito. Ver `reverseCardPurchaseOnDelete.ts`.
+  | 'anticipation_credit_reversal';
 
 // Quando a pessoa recebe (salário/renda) — usado pra saber até quando "Comprometido"
 // deve olhar sem precisar que ela lance uma receita futura manualmente.
@@ -231,6 +236,13 @@ export interface Transaction {
   isRecurring: boolean;
   recurringId?: string;
   installmentGroupId?: string;
+  /** Só em `card_purchase`: quantas entries `purchase` existem HOJE no ledger pra esta
+   * transação (não o total original da compra) — permite `updateCardPurchase` (edição)
+   * recriar exatamente o mesmo número de parcelas sem precisar consultar o ledger via
+   * collection group query (que o Firestore rejeita do lado do cliente quando a regra de
+   * leitura depende de `get()`/`exists()`, como `isActiveMember`). Ausente em transações
+   * criadas antes desta feature. */
+  installments?: number;
   clientMutationId: string;
   syncStatus: SyncStatus;
   version: number;

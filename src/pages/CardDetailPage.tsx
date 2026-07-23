@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { CalendarClock, Layers, Trash2 } from 'lucide-react';
+import { CalendarClock, ChevronRight, Layers, Pencil, Trash2 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { BottomSheet } from '../components/BottomSheet';
@@ -10,12 +10,12 @@ import { invoiceHasVisibleActivity } from '../cards/anticipation';
 import { useConfirm } from '../components/ConfirmDialog';
 import { FormMessage } from '../components/FormMessage';
 import { invoiceStatusLabels } from '../cards/cardLabels';
-import { deleteCard, recordInvoicePayment } from '../cards/cardService';
+import { deleteCard, recordInvoicePayment, updateCard } from '../cards/cardService';
 import { pickCurrentInvoice } from '../cards/cardDates';
 import { mergeInvoicesWithLedger, useInvoiceLedger } from '../cards/useInvoiceLedger';
 
 import { formatFriendlyDate, formatFriendlyMonth } from '../finance/financeDates';
-import { formatMoney, parseMoneyToCents } from '../finance/money';
+import { centsToInputValue, formatMoney, parseMoneyToCents } from '../finance/money';
 
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
 
@@ -42,6 +42,9 @@ export function CardDetailPage() {
   const [payAmount, setPayAmount] = useState('');
   const [payAccountId, setPayAccountId] = useState('');
   const [ongoingSheetOpen, setOngoingSheetOpen] = useState(false);
+  const [editSheetOpen, setEditSheetOpen] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editLimit, setEditLimit] = useState('');
 
   // Destaque pra trazer compras existentes: logo após criar o cartão (`?novo=1`) ou
   // enquanto ele ainda não tem nenhuma compra lançada.
@@ -52,6 +55,22 @@ export function CardDetailPage() {
     setPayAmount('');
     setPayAccountId('');
     setPaySheetOpen(true);
+  }
+
+  function handleOpenEditSheet() {
+    if (!card) return;
+    setEditName(card.name);
+    setEditLimit(centsToInputValue(card.limitCents));
+    setEditSheetOpen(true);
+  }
+
+  function handleSaveEdit() {
+    if (!workspaceId || !cardId || !editName.trim() || !editLimit.trim()) return;
+    setEditSheetOpen(false);
+    updateCard(workspaceId, cardId, {
+      name: editName.trim(),
+      limitCents: parseMoneyToCents(editLimit)
+    }).catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível salvar as alterações do cartão.')));
   }
 
   async function handleDeleteCard() {
@@ -110,9 +129,9 @@ export function CardDetailPage() {
   const usedCents = activeInvoices.reduce((total, invoice) => total + invoice.outstandingBalanceCents, 0);
   const availableCents = card ? Math.max(0, card.limitCents - usedCents) : 0;
   const usedPercent = card && card.limitCents > 0 ? Math.min(100, Math.round((usedCents / card.limitCents) * 100)) : 0;
-  const barClass =
-    usedPercent >= 90 ? 'card-limit-bar-fill--danger' :
-    usedPercent >= 70 ? 'card-limit-bar-fill--warning' : '';
+  const heroBarClass =
+    usedPercent >= 90 ? 'card-limit-hero-display-fill--danger' :
+    usedPercent >= 70 ? 'card-limit-hero-display-fill--warning' : '';
 
   return (
     <section className="page-content">
@@ -128,7 +147,7 @@ export function CardDetailPage() {
           <Link className="button button--secondary" to="/app/cards">
             Todos os cartões
           </Link>
-          <button className="button button--ghost" type="button" onClick={() => void handleDeleteCard()} aria-label="Excluir cartão">
+          <button className="icon-button" type="button" onClick={() => void handleDeleteCard()} aria-label="Excluir cartão">
             <Trash2 size={17} aria-hidden="true" />
           </button>
         </div>
@@ -136,33 +155,43 @@ export function CardDetailPage() {
 
       {card ? (
         <>
-          <div className="surface surface-pad card-limit-block">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.75rem' }}>
+          <div className="card-limit-hero-display">
+            <div className="card-limit-hero-display-top">
               <div>
-                <p className="eyebrow" style={{ marginBottom: '0.25rem' }}>Limite disponível</p>
-                <span className="card-limit-available">{formatMoney(availableCents)}</span>
-                <span className="text-secondary" style={{ marginLeft: '0.5rem', fontSize: '0.86rem' }}>de {formatMoney(card.limitCents)}</span>
+                <p className="card-limit-hero-display-label">Limite disponível</p>
+                <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: '0.4rem' }}>
+                  <span className="card-limit-hero-display-value">{formatMoney(availableCents)}</span>
+                  <span className="card-limit-hero-display-of">de {formatMoney(card.limitCents)}</span>
+                  <button
+                    className="button button--ghost button--compact card-limit-hero-display-edit"
+                    type="button"
+                    onClick={handleOpenEditSheet}
+                    aria-label="Editar limite e nome do cartão"
+                  >
+                    <Pencil size={15} aria-hidden="true" />
+                  </button>
+                </div>
               </div>
-              <div style={{ textAlign: 'right' }}>
+              <div className="card-limit-hero-display-secondary">
                 {/* `usedCents` soma TODAS as faturas em aberto/fechadas (inclusive parcelas
                     de meses futuros), não só a fatura atual — chamar isso de "fatura em
                     aberto" fazia o número não bater com a fatura logo abaixo. */}
-                <p className="eyebrow" style={{ marginBottom: '0.25rem' }}>Limite usado</p>
-                <span className="card-limit-available amount--expense">{formatMoney(usedCents)}</span>
+                <p className="card-limit-hero-display-label">Limite usado</p>
+                <span className="card-limit-hero-display-secondary-value">{formatMoney(usedCents)}</span>
               </div>
             </div>
-            <div className="card-limit-bar-track" aria-label={`${usedPercent}% do limite usado`}>
-              <div className={`card-limit-bar-fill ${barClass}`} style={{ width: `${Math.max(2, usedPercent)}%` }} />
+            <div className="card-limit-hero-display-track" aria-label={`${usedPercent}% do limite usado`}>
+              <div className={`card-limit-hero-display-fill ${heroBarClass}`} style={{ width: `${Math.max(2, usedPercent)}%` }} />
             </div>
             {usedPercent >= 70 && (
-              <p className="text-secondary" style={{ marginTop: '0.5rem', fontSize: '0.82rem' }}>
+              <p className="card-limit-hero-display-note">
                 {usedPercent >= 90 ? 'Limite quase esgotado.' : 'Mais de 70% do limite em uso.'}
               </p>
             )}
           </div>
 
           {openInvoice ? (
-            <div className="surface surface-pad" style={{ borderRadius: '1rem', display: 'grid', gap: '0.75rem' }}>
+            <div className="surface surface-pad card-invoice-current">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
                 <div>
                   <p className="eyebrow" style={{ marginBottom: '0.15rem' }}>Fatura atual</p>
@@ -210,10 +239,6 @@ export function CardDetailPage() {
             <Layers size={17} aria-hidden="true" /> Adicionar parcelas em andamento
           </button>
         </article>
-      ) : card ? (
-        <button className="button button--subtle button--block" type="button" onClick={() => setOngoingSheetOpen(true)}>
-          <Layers size={17} aria-hidden="true" /> Lançar compra parcelada que já começou
-        </button>
       ) : null}
 
       <article className="surface surface-pad">
@@ -224,8 +249,21 @@ export function CardDetailPage() {
           </div>
           <CalendarClock size={22} aria-hidden="true" />
         </div>
-        {visibleInvoices.length > 0 ? (
+        {(card && !showOnboardingCallout) || visibleInvoices.length > 0 ? (
           <div className="item-list">
+            {card && !showOnboardingCallout && (
+              <button
+                type="button"
+                className="list-row list-row--tap list-row--with-icon"
+                onClick={() => setOngoingSheetOpen(true)}
+              >
+                <div className="list-row-body" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <Layers size={17} aria-hidden="true" />
+                  <strong>Lançar compra parcelada que já começou</strong>
+                </div>
+                <ChevronRight size={16} aria-hidden="true" className="text-secondary" />
+              </button>
+            )}
             {visibleInvoices.map((invoice) => {
               const isPaid = invoice.status === 'paid' || invoice.status === 'overpaid';
               return (
@@ -315,12 +353,48 @@ export function CardDetailPage() {
         </div>
       </BottomSheet>
 
+      <BottomSheet
+        open={editSheetOpen}
+        onClose={() => setEditSheetOpen(false)}
+        title="Editar cartão"
+        subtitle="Ajustar limite ou nome"
+      >
+        <div className="form-stack">
+          <label className="field">
+            <span>Nome do cartão</span>
+            <input className="input" value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus />
+          </label>
+          <label className="field">
+            <span>Limite</span>
+            <input
+              className="input input--money"
+              inputMode="decimal"
+              value={editLimit}
+              onChange={(e) => setEditLimit(e.target.value)}
+              placeholder="0,00"
+            />
+            <span className="field-hint">Ajuste quando o banco aumentar ou reduzir seu limite.</span>
+          </label>
+          <div className="sheet-actions">
+            <button
+              className="button button--primary"
+              type="button"
+              disabled={!editName.trim() || !editLimit.trim()}
+              onClick={handleSaveEdit}
+            >
+              Salvar
+            </button>
+          </div>
+        </div>
+      </BottomSheet>
+
       {card ? (
         <OngoingInstallmentsSheet
           open={ongoingSheetOpen}
           workspaceId={workspaceId}
           userId={user?.uid}
           card={card}
+          categories={finance.categories}
           onClose={() => setOngoingSheetOpen(false)}
         />
       ) : null}

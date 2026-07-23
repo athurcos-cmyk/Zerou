@@ -2,6 +2,26 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-23 — design: Cartão e Fatura ganham o mesmo hero visual do Dashboard
+
+O dono achou as telas de Cartão e Fatura "feias, poludas, pouco sofisticadas" perto do Dashboard. Pesquisa de referência (Copilot Money, Monarch Money, Monzo) + auditoria do próprio design system apontaram pro mesmo diagnóstico: tudo era `surface` branco sem hierarquia, descumprindo uma regra que o `docs/design/DESIGN.md` já mandava ("header de valor gigante colorido por contexto") mas nunca tinha sido aplicada nessas duas telas.
+
+- **`CardDetailPage.tsx`**: "Limite disponível" ganhou o hero com gradiente de marca (mesmo tratamento do Dashboard); botão de excluir virou `.icon-button` circular; "Lançar compra parcelada" deixou de ser um botão solto entre cards e virou uma linha dentro do histórico de faturas.
+- **`InvoicePage.tsx`**: "Valor a pagar" ganhou o mesmo hero gradiente; botão "Voltar" virou ícone circular; **bug de brinde corrigido** — o badge de status mostrava sempre verde ("Aberta", "Vencida", tudo igual), agora mapeia pra âmbar/vermelho/verde de verdade. Lista "Compras" (podia chegar a 10+ linhas numa compra parcelada antecipada) ganhou colapso em 5 linhas com "Ver todas" e um campo de busca por nome (só aparece com mais de 8 compras).
+- 100% CSS/JSX — zero mudança em `firestore.rules`, Cloud Functions ou lógica de cálculo. `typecheck`, `npm test` (403) e `build` verdes; verificado ao vivo em 2 temas (claro/escuro) e mobile 375px.
+- Análise (`SearchPage.tsx`) tinha o mesmo problema e chegou a ser explorada por engano antes de o dono apontar a tela certa — pesquisa/plano ficaram represados, não implementados. Ver `docs/planning/TODOS.md`.
+
+## 2026-07-23 — fix+feat: 4 pendências de cartão (editar compra/limite, categoria e data em compra em andamento) + bug crítico de limite fantasma
+
+Quatro queixas reais de usuárias em cartão de crédito, planejadas em 6 rodadas de auditoria antes de codar.
+
+- **Editar compra no cartão** (nunca existia — só dava pra excluir e relançar): agora dá pra editar descrição/categoria. Valor foi implementado primeiro (soft-delete + recriação das parcelas) mas **removido de propósito** depois: editar o valor de uma parcela numa fatura já paga reabria saldo devedor nela — bug real, achado ao vivo. Igual na vida real, mudou o valor ou a data? Exclui e lança de novo; descrição/categoria são só metadado de exibição e nunca tocam o ledger.
+- **Editar limite/nome do cartão**: novo botão na página do cartão, zero mudança de regra.
+- **Compra parcelada em andamento**: ganhou campo de categoria (faltava na UI) e a data corrigida — antes toda compra lançada por esse fluxo caía sempre no dia 1º do mês, ignorando a data informada.
+- **Bug crítico achado e corrigido**: excluir/editar uma compra com parcela já antecipada podia dobrar um crédito na fatura futura em vez de cancelar (`reverseCardPurchaseOnDelete`), e — achado só depois, testando com múltiplas parcelas antecipadas de uma vez — os ids de estorno podiam colidir por truncamento de string, deixando limite usado fantasma na fatura. Os dois corrigidos e deployados; reproduzido o cenário relatado do zero pra confirmar.
+- Extrato ganhou um subtítulo ("10x de R$ 100,00") na linha de compra parcelada — só clareza visual, a Análise já calculava por parcela.
+- `npm test` (401), `npm --prefix functions test` (121), `npm run test:rules` (68) — todos verdes. Detalhe completo: `docs/history/2026-07.md`.
+
 ## 2026-07-22 — fix: Vic (app e WhatsApp) não tenta mais executar ação nenhuma via chat
 
 Achado testando ao vivo a feature de cartão como forma de pagamento (item abaixo): pedir pra Vic "cadastrar uma conta fixa" não tinha tratamento nenhum — nem no app, nem no WhatsApp.

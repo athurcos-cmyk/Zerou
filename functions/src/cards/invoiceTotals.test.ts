@@ -17,6 +17,10 @@ describe('invoiceTotalsDeltaForEntry', () => {
     expect(invoiceTotalsDeltaForEntry('chargeback_credit', 1000).creditsTotalCents).toBe(1000);
     expect(invoiceTotalsDeltaForEntry('manual_credit', 1000).creditsTotalCents).toBe(1000);
     expect(invoiceTotalsDeltaForEntry('purchase_reversal', 1000).creditsTotalCents).toBe(1000);
+    // Regressão do achado #14/#16 da auditoria: reverter um `installment_anticipation_credit`
+    // (que já é crédito) com outro crédito dobrava o valor em vez de cancelar. Esta entrada
+    // precisa ir pro bucket OPOSTO (débito), não crédito.
+    expect(invoiceTotalsDeltaForEntry('anticipation_credit_reversal', 1000).purchasesTotalCents).toBe(1000);
   });
 });
 

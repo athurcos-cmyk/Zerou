@@ -244,7 +244,7 @@ describe('ongoingInstallmentPurchases', () => {
     expect(purchase.description).toBe('Notebook');
   });
 
-  it('não conta parcela já antecipada como restante', () => {
+  it('conta parcela antecipada como ainda não paga (só reagendou, não quitou), sem duplicar a parcela original que ela substituiu', () => {
     const invoices: InvoiceForSpending[] = [
       { referenceMonth: '2026-07', ledgerEntries: [
         entry({ id: 'p1', type: 'purchase', amountCents: 30000, sourceTransactionId: 'buy', installmentNumber: 1, installmentTotal: 3 }),
@@ -258,10 +258,12 @@ describe('ongoingInstallmentPurchases', () => {
         entry({ id: 'cred', type: 'installment_anticipation_credit', amountCents: 30000, sourceTransactionId: 'buy' })
       ] }
     ];
-    // Set/2026 foi antecipada (crédito zera o mês); restam jul e ago = R$600, 2 parcelas.
+    // Set/2026 foi antecipada (crédito cancela SÓ a parcela 3 original, sem duplicar) — mas o
+    // débito de antecipação (jul) continua contando: nada foi pago, só reagendado. Resta:
+    // parcela 1 (jul) + antecipação da parcela 3 (jul) + parcela 2 (ago) = R$900, 3 parcelas.
     const [purchase] = ongoingInstallmentPurchases('2026-07', invoices, () => 'Óculos');
-    expect(purchase.remainingCents).toBe(60000);
-    expect(purchase.remainingCount).toBe(2);
+    expect(purchase.remainingCents).toBe(90000);
+    expect(purchase.remainingCount).toBe(3);
   });
 
   it('ignora compra à vista (1x)', () => {
@@ -277,6 +279,39 @@ describe('ongoingInstallmentPurchases', () => {
       { referenceMonth: '2026-02', ledgerEntries: [entry({ id: 'p2', type: 'purchase', amountCents: 30000, sourceTransactionId: 'buy', installmentTotal: 2 })] }
     ];
     expect(ongoingInstallmentPurchases('2026-07', invoices, () => 'Antiga')).toHaveLength(0);
+  });
+
+  // Regressão: pagar a fatura no app NUNCA muda `status` (só `reconcileInvoice`, manual,
+  // faz isso — o fluxo normal de "pagar fatura" só zera `outstandingBalanceCents` via Cloud
+  // Function). Sem olhar esse saldo, "andamento" só sumia quando o calendário passava do mês
+  // da fatura — nunca quando a pessoa de fato pagava.
+  it('some da lista assim que outstandingBalanceCents zera (fatura paga de verdade), mesmo antes do mês virar', () => {
+    const invoices: InvoiceForSpending[] = [
+      { referenceMonth: '2026-07', outstandingBalanceCents: 0, ledgerEntries: [
+        entry({ id: 'p1', type: 'purchase', amountCents: 30000, sourceTransactionId: 'buy', installmentNumber: 1, installmentTotal: 3 }),
+        entry({ id: 'ant', type: 'installment_anticipation', amountCents: 60000, sourceTransactionId: 'buy' })
+      ] }
+    ];
+    expect(ongoingInstallmentPurchases('2026-07', invoices, () => 'Tênis')).toHaveLength(0);
+  });
+
+  it('some da lista se status foi reconciliado manualmente pra paid/overpaid', () => {
+    const invoices: InvoiceForSpending[] = [
+      { referenceMonth: '2026-07', status: 'paid', ledgerEntries: [
+        entry({ id: 'p1', type: 'purchase', amountCents: 30000, sourceTransactionId: 'buy', installmentNumber: 1, installmentTotal: 3 })
+      ] }
+    ];
+    expect(ongoingInstallmentPurchases('2026-07', invoices, () => 'Tênis')).toHaveLength(0);
+  });
+
+  it('continua contando fatura fechada mas com saldo ainda em aberto', () => {
+    const invoices: InvoiceForSpending[] = [
+      { referenceMonth: '2026-07', status: 'closed', outstandingBalanceCents: 30000, ledgerEntries: [
+        entry({ id: 'p1', type: 'purchase', amountCents: 30000, sourceTransactionId: 'buy', installmentNumber: 1, installmentTotal: 3 })
+      ] }
+    ];
+    const [purchase] = ongoingInstallmentPurchases('2026-07', invoices, () => 'Tênis');
+    expect(purchase.remainingCents).toBe(30000);
   });
 });
 

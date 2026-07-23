@@ -2,19 +2,22 @@ import { useMemo, useState } from 'react';
 import { addMonths, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { BottomSheet } from '../components/BottomSheet';
+import { CategoryField } from '../components/CategoryField';
 import { FormMessage } from '../components/FormMessage';
 import { registerOngoingInstallments } from './cardService';
 import { resolveInstallmentCycle } from './cardDates';
+import { createCategory, deleteCategory, updateCategory } from '../finance/financeService';
 import { fromDateInputValue, todayInputValue } from '../finance/financeDates';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
-import type { CreditCard } from '../types/contracts';
+import type { Category, CreditCard } from '../types/contracts';
 
 interface OngoingInstallmentsSheetProps {
   open: boolean;
   workspaceId?: string;
   userId?: string;
   card: Pick<CreditCard, 'id' | 'closingDay' | 'dueDay'>;
+  categories: Category[];
   onClose: () => void;
 }
 
@@ -30,12 +33,20 @@ function firstDayOfReferenceMonth(referenceMonth: string) {
  * `resolveInstallmentCycle`, usando o fechamento/vencimento já cadastrados do cartão)
  * e cria só as parcelas que faltam, rotuladas corretamente (ex.: 7/10…10/10).
  */
-export function OngoingInstallmentsSheet({ open, workspaceId, userId, card, onClose }: OngoingInstallmentsSheetProps) {
+export function OngoingInstallmentsSheet({
+  open,
+  workspaceId,
+  userId,
+  card,
+  categories,
+  onClose
+}: OngoingInstallmentsSheetProps) {
   const [description, setDescription] = useState('');
   const [value, setValue] = useState('');
   const [purchaseDate, setPurchaseDate] = useState(todayInputValue());
   const [total, setTotal] = useState('2');
   const [alreadyPaid, setAlreadyPaid] = useState('0');
+  const [categoryId, setCategoryId] = useState('');
   const [message, setMessage] = useState<string | null>(null);
 
   const totalNum = Number(total) || 0;
@@ -74,12 +85,29 @@ export function OngoingInstallmentsSheet({ open, workspaceId, userId, card, onCl
     alreadyPaidNum < totalNum &&
     Boolean(nextCycle);
 
+  async function handleCreateCategory(name: string, icon: string, catType: 'income' | 'expense' | 'both', color: string) {
+    if (!workspaceId || !userId) return;
+    const id = await createCategory(workspaceId, userId, { name, icon, type: catType, color });
+    setCategoryId(id);
+  }
+
+  async function handleUpdateCategory(id: string, patch: { name?: string; icon?: string; color?: string }) {
+    if (!workspaceId) return;
+    await updateCategory(workspaceId, id, patch);
+  }
+
+  async function handleDeleteCategory(id: string) {
+    if (!workspaceId) return;
+    await deleteCategory(workspaceId, id);
+  }
+
   function reset() {
     setDescription('');
     setValue('');
     setPurchaseDate(todayInputValue());
     setTotal('2');
     setAlreadyPaid('0');
+    setCategoryId('');
   }
 
   function handleSubmit() {
@@ -92,7 +120,9 @@ export function OngoingInstallmentsSheet({ open, workspaceId, userId, card, onCl
       installmentValueCents: valueCents,
       currentInstallment: currentNum,
       totalInstallments: totalNum,
-      nextDueMonth: firstDayOfReferenceMonth(nextCycle.referenceMonth)
+      nextDueMonth: firstDayOfReferenceMonth(nextCycle.referenceMonth),
+      purchaseDate: fromDateInputValue(purchaseDate),
+      categoryId: categoryId || undefined
     }).catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível lançar a compra agora.')));
     reset();
   }
@@ -127,6 +157,16 @@ export function OngoingInstallmentsSheet({ open, workspaceId, userId, card, onCl
             <span>Quando você comprou?</span>
             <input className="input" type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} />
           </label>
+
+          <CategoryField
+            value={categoryId}
+            onChange={setCategoryId}
+            categories={categories}
+            filterType="expense"
+            onCreateCategory={handleCreateCategory}
+            onUpdateCategory={handleUpdateCategory}
+            onDeleteCategory={handleDeleteCategory}
+          />
 
           <div className="form-grid-2">
             <label className="field">

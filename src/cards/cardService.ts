@@ -3,6 +3,7 @@ import {
   collection,
   doc,
   getDoc,
+  increment,
   limit,
   onSnapshot,
   orderBy,
@@ -31,6 +32,7 @@ import {
   recordInvoiceFeeSchema,
   recordInvoicePaymentSchema,
   registerOngoingInstallmentsSchema,
+  updateCardSchema,
   type AnticipateInstallmentsInput,
   type CreateCardPurchaseInput,
   type CreateCreditCardInput,
@@ -38,10 +40,11 @@ import {
   type RecordInvoiceCreditInput,
   type RecordInvoiceFeeInput,
   type RecordInvoicePaymentInput,
-  type RegisterOngoingInstallmentsInput
+  type RegisterOngoingInstallmentsInput,
+  type UpdateCardInput
 } from './cardSchemas';
 import { invoiceClosingDateForReferenceMonth, invoiceDueDateForReferenceMonth, invoiceIdFor, resolveInstallmentCycle } from './cardDates';
-import type { CreditCard, Invoice, InvoiceLedgerEntry, InvoiceLedgerEntryType, SyncStatus } from '../types/contracts';
+import type { CreditCard, Invoice, InvoiceLedgerEntry, InvoiceLedgerEntryType, SyncStatus, Transaction } from '../types/contracts';
 
 export type LocalCardSynced<T> = T & {
   localSyncStatus: SyncStatus;
@@ -192,6 +195,20 @@ export async function createCreditCard(workspaceId: string, userId: string, inpu
   return id;
 }
 
+/**
+ * Fase 1: só limite e nome (`updateCardSchema`). `undefined` = não mexe no campo —
+ * mesma convenção de `updateBill`/`updateRecurringRule` em `financeService.ts`.
+ */
+export async function updateCard(workspaceId: string, cardId: string, patch: UpdateCardInput) {
+  const parsed = updateCardSchema.parse(patch);
+  const updates: Record<string, unknown> = { updatedAt: serverTimestamp() };
+
+  if (parsed.limitCents !== undefined) updates.limitCents = parsed.limitCents;
+  if (parsed.name !== undefined) updates.name = parsed.name;
+
+  fireWrite(updateDoc(cardRef(workspaceId, cardId), updates));
+}
+
 export function deleteCard(workspaceId: string, cardId: string) {
   fireWrite(updateDoc(cardRef(workspaceId, cardId), {
     isActive: false,
@@ -210,13 +227,23 @@ export function deleteCard(workspaceId: string, cardId: string) {
  * `opts.transactionId`: normalmente gerado aqui, mas o caller pode passar um id
  * determinístico (ex.: `recurringOccurrenceTransactionId`) pra preservar proteção de
  * idempotência contra clique duplo/retry de rede.
+ *
+ * `opts.skipInvoiceCheck`: pula o `getDoc` que verifica se cada fatura já existe (abaixo).
+ * Só é seguro quando o caller sabe, de antemão, que as faturas já existem — é o caso de
+ * `updateCardPurchase` (edição), que consulta o ledger antigo antes de chamar isto e reusa
+ * exatamente a mesma `purchaseDate` (edição não permite mudar a data — ver `EditTransactionPage`),
+ * então `resolveInstallmentCycle` recalcula sempre as MESMAS faturas de origem, que já têm os
+ * entries antigos dentro. Sem essa leitura, o batch comita offline via cache local em vez de
+ * esperar rede — se uma fatura realmente não existir mais, a regra `validInvoiceLedgerCreate`
+ * (exige `existsAfter(invoiceDoc)`) rejeita o batch inteiro. `createCardPurchase` mantém o
+ * default `false`, sem mudança de comportamento.
  */
 export async function addCardPurchaseToBatch(
   batch: ReturnType<typeof writeBatch>,
   workspaceId: string,
   userId: string,
   input: CreateCardPurchaseInput,
-  opts: { transactionId?: string } = {}
+  opts: { transactionId?: string; skipInvoiceCheck?: boolean } = {}
 ): Promise<{ transactionId: string; firstInvoiceId: string; cardId: string }> {
   const parsed = createCardPurchaseSchema.parse(input);
   const card = await loadCard(workspaceId, parsed.cardId);
@@ -282,6 +309,7 @@ export async function addCardPurchaseToBatch(
     tags: [],
     isRecurring: false,
     installmentGroupId: installmentGroupId ?? '',
+    installments: parsed.installments,
     clientMutationId: transactionId,
     syncStatus: 'synced',
     version: 1,
@@ -289,15 +317,17 @@ export async function addCardPurchaseToBatch(
     updatedAt: now
   });
 
-  await Promise.all(
-    Array.from(invoicesToCreate.values()).map(async (invoiceCreate) => {
-      const snapshot = await getDoc(invoiceCreate.reference);
+  if (!opts.skipInvoiceCheck) {
+    await Promise.all(
+      Array.from(invoicesToCreate.values()).map(async (invoiceCreate) => {
+        const snapshot = await getDoc(invoiceCreate.reference);
 
-      if (!snapshot.exists()) {
-        batch.set(invoiceCreate.reference, invoiceCreate.payload);
-      }
-    })
-  );
+        if (!snapshot.exists()) {
+          batch.set(invoiceCreate.reference, invoiceCreate.payload);
+        }
+      })
+    );
+  }
 
   return { transactionId, firstInvoiceId, cardId: card.id };
 }
@@ -307,6 +337,52 @@ export async function createCardPurchase(workspaceId: string, userId: string, in
   const { transactionId } = await addCardPurchaseToBatch(batch, workspaceId, userId, input);
   fireWrite(batch.commit());
   return transactionId;
+}
+
+/**
+ * Edita descrição, categoria e valor de uma compra no cartão — campos que a edição normal de
+ * transação (`updateTransaction`) já cobre pra conta bancária, mas nunca existiu pra
+ * `card_purchase`.
+ *
+ * **Só descrição e categoria — nunca valor.** Os dois são puro metadado de exibição: nenhum
+ * ledger entry guarda `description`/`categoryId` própria, a fatura e a Análise sempre resolvem
+ * os dois ao vivo a partir da transação via `sourceTransactionId` (`txnDescriptions`/
+ * `categoryOfTransaction` em `InvoicePage.tsx`/`spendingAnalysis.ts`) — por isso um simples
+ * `updateDoc` na transação já existente já reflete em toda parcela, passada ou futura, sem
+ * tocar em nenhum ledger entry.
+ *
+ * **Por que valor NÃO é editável** (era, numa versão anterior desta função — achado ao vivo,
+ * 2026-07-23): mudar o valor exigia reverter e recriar as N parcelas (soft-delete + recreate),
+ * e isso não distinguia parcela futura de parcela já numa fatura FECHADA/PAGA — editar o valor
+ * de uma compra com uma parcela já paga reabria a fatura com saldo devedor (o pagamento já
+ * registrado não mudava, mas o valor da parcela recriada sim). Na vida real, o valor de uma
+ * parcela já cobrada no cartão não muda. Se a pessoa errou o valor (ou a data, ou o número de
+ * parcelas, ou o cartão), o caminho é excluir e lançar de novo — igual já vale pra esses
+ * outros campos.
+ */
+export async function updateCardPurchase(
+  workspaceId: string,
+  userId: string,
+  transactionId: string,
+  patch: { description: string; categoryId?: string }
+): Promise<void> {
+  const transactionSnapshot = await getDoc(transactionRef(workspaceId, transactionId));
+  if (!transactionSnapshot.exists()) {
+    throw new Error('Transação não encontrada.');
+  }
+
+  const transaction = { id: transactionSnapshot.id, ...transactionSnapshot.data() } as Transaction;
+  if (transaction.type !== 'card_purchase') {
+    throw new Error('Esta transação não é uma compra no cartão.');
+  }
+
+  fireWrite(updateDoc(transactionRef(workspaceId, transactionId), {
+    description: patch.description,
+    categoryId: patch.categoryId ?? '',
+    updatedBy: userId,
+    version: increment(1),
+    updatedAt: serverTimestamp()
+  }));
 }
 
 export interface OngoingInstallmentPlanItem {
@@ -390,7 +466,11 @@ export async function registerOngoingInstallments(
         invoiceId,
         type: 'purchase',
         amountCents: item.amountCents,
-        effectiveAt: item.dueDate,
+        // Data real da compra, não o vencimento da fatura — mesmo padrão de `addCardPurchaseToBatch`,
+        // onde todas as parcelas de uma compra compartilham o mesmo `effectiveAt` (a data da compra).
+        // Antes usava `item.dueDate`, que é igual pra toda parcela da mesma fatura e fazia a tela de
+        // detalhes da fatura mostrar o dia de vencimento do cartão como se fosse a data da compra.
+        effectiveAt: parsed.purchaseDate,
         idempotencyKey,
         createdBy: userId,
         sourceTransactionId: transactionId,
@@ -400,8 +480,7 @@ export async function registerOngoingInstallments(
     );
   }
 
-  const firstMonth = new Date(parsed.nextDueMonth.getFullYear(), parsed.nextDueMonth.getMonth(), 1, 12, 0, 0);
-  const monthKey = monthKeyFromDate(firstMonth);
+  const monthKey = monthKeyFromDate(parsed.purchaseDate);
   batch.set(transactionRef(workspaceId, transactionId), {
     id: transactionId,
     workspaceId,
@@ -414,12 +493,20 @@ export async function registerOngoingInstallments(
     categoryId: parsed.categoryId ?? '',
     cardId: card.id,
     invoiceId: firstInvoiceId,
-    date: Timestamp.fromDate(firstMonth),
+    // Data real da compra (não mais o 1º dia do mês da PRÓXIMA parcela) — antes toda compra
+    // lançada por este fluxo caía sempre no dia 1º do mês de `nextDueMonth`, ignorando a data
+    // informada pela pessoa.
+    date: Timestamp.fromDate(parsed.purchaseDate),
     competenceMonth: monthKey,
     cashMonth: monthKey,
     tags: [],
     isRecurring: false,
     installmentGroupId,
+    // Quantas parcelas ficam no ledger a partir de agora (as recriadas, `plan.length`) — não
+    // o total original da compra (`totalInstallments`, que inclui as já pagas e nunca recriadas
+    // aqui). É esse número que `updateCardPurchase` precisa pra recriar a mesma quantidade
+    // numa edição futura.
+    installments: plan.length,
     clientMutationId: transactionId,
     syncStatus: 'synced',
     version: 1,

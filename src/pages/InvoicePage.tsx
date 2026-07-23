@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { ArrowLeft, ChevronDown, ChevronUp, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../auth/AuthContext';
@@ -22,13 +23,20 @@ import { mergeInvoicesWithLedger, useInvoiceLedger } from '../cards/useInvoiceLe
 import { formatFriendlyDate, formatFriendlyMonth, fromDateInputValue, todayInputValue } from '../finance/financeDates';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 
-import type { InvoiceLedgerEntryType } from '../types/contracts';
+import type { InvoiceLedgerEntryType, InvoiceStatus } from '../types/contracts';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
 
 /** "fev", "fev e mar", "fev, mar e abr" */
 function formatList(items: string[]) {
   if (items.length <= 1) return items[0] ?? '';
   return `${items.slice(0, -1).join(', ')} e ${items[items.length - 1]}`;
+}
+
+/** Mapeia os 7 status de fatura pras 3 variantes semânticas que `.sync-badge` já tem. */
+function statusBadgeVariant(status: InvoiceStatus): 'synced' | 'pending' | 'failed' {
+  if (status === 'paid' || status === 'overpaid') return 'synced';
+  if (status === 'overdue') return 'failed';
+  return 'pending';
 }
 
 export function InvoicePage() {
@@ -57,6 +65,15 @@ export function InvoicePage() {
   // Quantas das ÚLTIMAS parcelas antecipar, por compra (sourceTransactionId → N).
   const [anticipateCounts, setAnticipateCounts] = useState<Record<string, number>>({});
   const [message, setMessage] = useState<string | null>(null);
+
+  // Lista de Compras: colapsada além de 5 linhas, com busca por nome só quando há
+  // muitas compras diferentes na fatura (não ajuda quando é a mesma compra parcelada
+  // repetida — nesse caso o "ver todas" já resolve).
+  const [showAllPurchases, setShowAllPurchases] = useState(false);
+  const [purchaseSearchOpen, setPurchaseSearchOpen] = useState(false);
+  const [purchaseQuery, setPurchaseQuery] = useState('');
+  const PURCHASES_COLLAPSE_THRESHOLD = 5;
+  const PURCHASES_SEARCH_THRESHOLD = 8;
 
   const txnDescriptions = new Map(
     finance.transactions
@@ -203,6 +220,26 @@ export function InvoicePage() {
   );
   const payments = invoice?.ledgerEntries.filter((e) => e.type === 'payment' || e.type === 'advance_payment') ?? [];
 
+  // Label + prefixo ("parcela 8/10 antecipada") resolvidos uma vez só, pra poder
+  // filtrar por nome e colapsar sem duplicar essa lógica no JSX.
+  const purchaseRows = purchases.map((entry) => {
+    const label = txnDescriptions.get(entry.sourceTransactionId ?? '') ?? ledgerTypeLabels[entry.type as InvoiceLedgerEntryType];
+    const isAnticipated = entry.type === 'installment_anticipation';
+    const installment =
+      entry.installmentNumber && entry.installmentTotal ? `parcela ${entry.installmentNumber}/${entry.installmentTotal}` : null;
+    const prefix = isAnticipated ? (installment ? `${installment} antecipada` : 'Parcela antecipada') : installment;
+    return { entry, label, prefix };
+  });
+  const normalizedPurchaseQuery = purchaseQuery.trim().toLocaleLowerCase('pt-BR');
+  const isSearchingPurchases = purchaseSearchOpen && normalizedPurchaseQuery.length > 0;
+  const filteredPurchaseRows = isSearchingPurchases
+    ? purchaseRows.filter((row) => row.label.toLocaleLowerCase('pt-BR').includes(normalizedPurchaseQuery))
+    : purchaseRows;
+  // Buscando, mostra todo mundo que bateu (a pessoa já filtrou pelo que queria ver).
+  // Sem busca, respeita o colapso — "ver todas" existe justamente pra não repetir isso.
+  const visiblePurchaseRows =
+    isSearchingPurchases || showAllPurchases ? filteredPurchaseRows : filteredPurchaseRows.slice(0, PURCHASES_COLLAPSE_THRESHOLD);
+
   // Números do resumo (hero) descontando o par antecipado/anulado — senão "Compras: R$300"
   // ficaria contradizendo a lista logo abaixo, que não mostra mais essa parcela.
   const hiddenPurchaseCents =
@@ -221,13 +258,13 @@ export function InvoicePage() {
 
   return (
     <section className="page-content page-content--narrow invoice-page">
-      <div className="page-heading-row">
+      <div className="page-heading-row page-heading-row--icon-trailing">
         <div>
           <p className="eyebrow">Fatura · {card?.name ?? ''}</p>
           <h1 className="page-title">{invoice ? formatFriendlyMonth(invoice.referenceMonth) : 'Carregando…'}</h1>
         </div>
-        <Link className="button button--secondary" to={`/app/cards/${cardId ?? ''}`}>
-          Voltar
+        <Link className="icon-button" to={`/app/cards/${cardId ?? ''}`} aria-label="Voltar ao cartão">
+          <ArrowLeft size={18} aria-hidden="true" />
         </Link>
       </div>
 
@@ -242,7 +279,7 @@ export function InvoicePage() {
                 <p className="eyebrow" style={{ marginBottom: '0.35rem' }}>
                   {isPaid ? 'Fatura paga' : 'Valor a pagar'}
                 </p>
-                <span className={`invoice-hero-amount ${isPaid ? 'amount--income' : 'amount--expense'}`}>
+                <span className="invoice-hero-amount">
                   {formatMoney(invoice.outstandingBalanceCents)}
                 </span>
                 <p className="text-secondary" style={{ marginTop: '0.35rem', fontSize: '0.86rem' }}>
@@ -250,7 +287,7 @@ export function InvoicePage() {
                   {isOpen ? ' · fatura ainda aberta' : ''}
                 </p>
               </div>
-              <span className="sync-badge sync-badge--synced">{invoiceStatusLabels[invoice.status]}</span>
+              <span className={`sync-badge sync-badge--${statusBadgeVariant(invoice.status)}`}>{invoiceStatusLabels[invoice.status]}</span>
             </div>
 
             {hasVisibleBreakdown && (
@@ -272,7 +309,7 @@ export function InvoicePage() {
 
             {!isPaid && (
               <>
-                <button className="button button--primary" type="button" onClick={handleOpenPaySheet}>
+                <button className="button button--invoice-cta" type="button" onClick={handleOpenPaySheet}>
                   {isOpen ? 'Antecipar fatura (pagar antes de fechar)' : 'Pagar fatura'}
                 </button>
                 {isOpen && (
@@ -288,38 +325,63 @@ export function InvoicePage() {
 
           {/* Compras desta fatura */}
           <article className="surface surface-pad">
-            <p className="eyebrow" style={{ marginBottom: '0.5rem' }}>Compras</p>
-            {purchases.length > 0 ? (
+            <div className="section-heading">
+              <p className="eyebrow" style={{ margin: 0 }}>Compras</p>
+              {purchases.length > PURCHASES_SEARCH_THRESHOLD && (
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label={purchaseSearchOpen ? 'Fechar busca' : 'Buscar compra por nome'}
+                  onClick={() => {
+                    setPurchaseSearchOpen((v) => !v);
+                    setPurchaseQuery('');
+                  }}
+                >
+                  <Search size={16} aria-hidden="true" />
+                </button>
+              )}
+            </div>
+            {purchaseSearchOpen && (
+              <input
+                className="input"
+                type="text"
+                value={purchaseQuery}
+                onChange={(e) => setPurchaseQuery(e.target.value)}
+                placeholder="Buscar por nome..."
+                autoFocus
+                style={{ marginBottom: '0.75rem' }}
+              />
+            )}
+            {visiblePurchaseRows.length > 0 ? (
               <div className="item-list">
-                {purchases.map((entry) => {
-                  const label = txnDescriptions.get(entry.sourceTransactionId ?? '') ?? ledgerTypeLabels[entry.type as InvoiceLedgerEntryType];
-                  const isAnticipated = entry.type === 'installment_anticipation';
-                  const installment =
-                    entry.installmentNumber && entry.installmentTotal
-                      ? `parcela ${entry.installmentNumber}/${entry.installmentTotal}`
-                      : null;
-                  // "parcela 8/10 antecipada" quando sabemos o número (deixa claro que 8, 9 e 10
-                  // vieram pra cá, sem parecer que sumiu parcela). Antecipação antiga sem o número
-                  // guardado (de antes desse fix) cai no genérico "Parcela antecipada".
-                  const prefix = isAnticipated ? (installment ? `${installment} antecipada` : 'Parcela antecipada') : installment;
-                  return (
-                    <div className="list-row" key={entry.id}>
-                      <div>
-                        <strong>{label}</strong>
-                        <span className="text-secondary">
-                          {prefix ? `${prefix} · ` : ''}
-                          {formatFriendlyDate(entry.effectiveAt)}
-                        </span>
-                      </div>
-                      <strong className="amount--expense">{formatMoney(entry.amountCents)}</strong>
+                {visiblePurchaseRows.map(({ entry, label, prefix }) => (
+                  <div className="list-row" key={entry.id}>
+                    <div>
+                      <strong>{label}</strong>
+                      <span className="text-secondary">
+                        {prefix ? `${prefix} · ` : ''}
+                        {formatFriendlyDate(entry.effectiveAt)}
+                      </span>
                     </div>
-                  );
-                })}
+                    <strong className="amount--expense">{formatMoney(entry.amountCents)}</strong>
+                  </div>
+                ))}
               </div>
+            ) : isSearchingPurchases ? (
+              <p className="text-secondary">Nenhuma compra encontrada para "{purchaseQuery.trim()}".</p>
             ) : hiddenEntryIds.size > 0 ? (
               <p className="text-secondary">A parcela que caía aqui foi antecipada pra uma fatura anterior.</p>
             ) : (
               <EmptyState illustration="cards" title="Nenhuma compra nesta fatura ainda." compact />
+            )}
+            {!isSearchingPurchases && filteredPurchaseRows.length > PURCHASES_COLLAPSE_THRESHOLD && (
+              <button type="button" className="list-toggle" onClick={() => setShowAllPurchases((v) => !v)}>
+                {showAllPurchases ? (
+                  <>Ver menos <ChevronUp size={14} aria-hidden="true" /></>
+                ) : (
+                  <>Ver todas as {filteredPurchaseRows.length} compras <ChevronDown size={14} aria-hidden="true" /></>
+                )}
+              </button>
             )}
           </article>
 

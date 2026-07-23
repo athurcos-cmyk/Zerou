@@ -24,5 +24,6 @@ export const ledgerTypeLabels: Record<InvoiceLedgerEntryType, string> = {
   fee: 'Tarifa',
   installment_anticipation: 'Antecipação',
   installment_anticipation_credit: 'Crédito de antecipação',
-  purchase_reversal: 'Estorno de compra'
+  purchase_reversal: 'Estorno de compra',
+  anticipation_credit_reversal: 'Reversão de antecipação'
 };
