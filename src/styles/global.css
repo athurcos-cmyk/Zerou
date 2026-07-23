@@ -1560,6 +1560,115 @@ span.service-mark--brand {
 
 /* ── Card / Invoice UI ───────────────────────────────── */
 
+/* Cartão premium na LISTA de cartões (CardsPage) — mesma receita de
+   `.account-card-hero*` (AccountsPage): gradiente sóbrio (`--gradient-slate`,
+   não o `--gradient-brand` vívido do hero de detalhe) pra funcionar
+   empilhado com vários itens sem competir cor com cor. Classes duplicadas
+   de propósito (não reaproveitadas direto) pra não acoplar CardsPage a uma
+   classe chamada "account" nem mexer numa tela já publicada. */
+.card-list-hero {
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+.card-list-hero-inner {
+  padding: 1.1rem 1.25rem 1.25rem;
+  background: var(--gradient-slate);
+  display: grid;
+  gap: 0.65rem;
+}
+
+.card-list-hero-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.card-list-hero-icon {
+  color: var(--on-accent-55);
+  flex-shrink: 0;
+}
+
+.card-list-hero-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--on-accent-55);
+  display: block;
+}
+
+.card-list-hero-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--on-accent-90);
+  display: block;
+  margin-top: 0.15rem;
+}
+
+.card-list-hero-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--on-accent-85);
+  display: block;
+  margin-bottom: 0.2rem;
+}
+
+.card-list-hero-balance {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(1.5rem, 4.5vw, 1.9rem);
+  color: var(--on-accent-95);
+  line-height: 1;
+}
+
+.card-list-hero-of {
+  font-size: 0.8rem;
+  color: var(--on-accent-82);
+  margin-left: 0.4rem;
+}
+
+.card-list-hero-track {
+  height: 0.5rem;
+  border-radius: 0 4px 4px 0;
+  background: var(--on-accent-25);
+  overflow: hidden;
+}
+
+.card-list-hero-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--on-accent-95);
+  transition: width var(--duration-slow) ease;
+}
+
+.card-list-hero-fill--warning { background: var(--warning); }
+.card-list-hero-fill--danger { background: var(--danger); }
+
+.card-list-hero-footer {
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-subtle);
+  padding: 0.65rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.card-list-hero-meta {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.card-list-hero-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
 .card-limit-block {
   display: grid;
   gap: 0.55rem;

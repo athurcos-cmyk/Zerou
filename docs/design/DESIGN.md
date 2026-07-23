@@ -28,6 +28,7 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
 - Shell: `AppShell.tsx`. Desktop = sidebar; mobile = **nav inferior com FAB central** elevado (tangerina) para "Lançar".
 - Header do app logado: sem logo persistente; a tela deve priorizar a tarefa.
 - Telas de lançamento (transação, cartão): **header de valor gigante** colorido por contexto, com o valor em DM Sans 800. Tipo via segmented "type-switch". Mesmo tratamento (gradiente `--gradient-brand` + `--shadow-brand-26`, texto em tokens `--on-accent-*`) já replicado em `CardDetailPage.tsx` (limite disponível) e `InvoicePage.tsx` (valor a pagar) desde 2026-07-23 — referência viva de como aplicar em qualquer tela nova que precise do mesmo destaque.
+- **Hero cheio (`--gradient-brand`) é só pra tela de UMA entidade (detalhe).** Numa **lista** de várias entidades (cartões, contas), usar a versão "calma": gradiente sóbrio `--gradient-slate` + rodapé branco pra metadado/ação (`.account-card-hero*` em `AccountsPage.tsx`, `.card-list-hero*` em `CardsPage.tsx` desde 2026-07-23 — mesma receita, classes duplicadas por tela de propósito, ver `docs/history/2026-07.md`). Gradiente vívido repetido em 2+ cards de uma lista compete cor com cor e com o FAB.
 
 ## Componentes-base (reutilizar sempre)
 
@@ -43,6 +44,7 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
 | `.form-accordion-toggle` (`global.css`) | Botão de expandir/recolher formulário (usado em AccountsPage, BillsPage, CardsPage, ReceivablesPage). Substitui o inline style de 7 propriedades que estava duplicado 4×. |
 | `.list-toggle` (`global.css`, 2026-07-23) | "Ver todas as N / Ver menos" no fim de uma lista `.item-list` colapsada (ex.: Compras de uma fatura longa em `InvoicePage.tsx`, limite de 5 linhas). Link discreto (`--action-primary`), não botão cheio. |
 | `.icon-button` (`global.css`) | Botão circular 2.75rem só com ícone — não é só destrutivo: também usado pra "voltar" (`InvoicePage.tsx`) e editar (`CardDetailPage.tsx`). Hover vermelho é o padrão, mas não obrigatório semanticamente. |
+| `.account-card-hero*` / `.card-list-hero*` (`global.css`) | Hero "calmo" pra **lista** de entidades (gradiente `--gradient-slate` + rodapé branco), usado em `AccountsPage.tsx` e `CardsPage.tsx` (2026-07-23). Ver nota acima sobre quando usar essa versão em vez do gradiente vívido de detalhe. |
 | Tokens de duração | `--duration-fast: 120ms`, `--duration-normal: 200ms`, `--duration-slow: 300ms` (`themes.css:root`). Usar em toda transição/animação CSS. Exceção: `.button:active` (80ms, micro-interação) e animações de loop (spinner). |
 | Tokens utilitários | `--bg-input: var(--bg-surface-subtle)`, `--text-placeholder: var(--text-muted)`, `--shadow-lg`, `--radius-md` (`themes.css:root`). Ajustam-se automaticamente por tema. |
 

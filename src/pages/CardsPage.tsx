@@ -76,7 +76,7 @@ export function CardsPage() {
           <p className="eyebrow">Seus cartões</p>
           <h2 style={{ margin: '0.25rem 0 1rem' }}>Cartões ativos</h2>
           {cardsData.cards.length > 0 ? (
-            <div className="item-list">
+            <div className="card-list-hero-list">
               {cardsData.cards.map((card) => {
                 const activeInvoices = cardsData.invoices.filter(
                   (invoice) => invoice.cardId === card.id && (invoice.status === 'open' || invoice.status === 'closed')
@@ -86,41 +86,38 @@ export function CardsPage() {
                 const availableCents = Math.max(0, card.limitCents - usedCents);
                 const usedPercent = card.limitCents > 0 ? Math.min(100, Math.round((usedCents / card.limitCents) * 100)) : 0;
                 const barClass =
-                  usedPercent >= 90 ? 'card-limit-bar-fill--danger' :
-                  usedPercent >= 70 ? 'card-limit-bar-fill--warning' : '';
+                  usedPercent >= 90 ? 'card-list-hero-fill--danger' :
+                  usedPercent >= 70 ? 'card-list-hero-fill--warning' : '';
 
                 return (
-                  <Link className="list-row list-row--link" to={`/app/cards/${card.id}`} key={card.id}>
-                    <div className="card-list-item" style={{ flex: 1 }}>
-                      <div className="card-list-item-top">
+                  <Link className="card-list-hero" to={`/app/cards/${card.id}`} key={card.id}>
+                    <div className="card-list-hero-inner">
+                      <div className="card-list-hero-header">
                         <div>
-                          <strong>{card.name}</strong>
-                          <span className="text-secondary">
+                          <span className="card-list-hero-eyebrow">
                             {card.brand} ···· {card.lastFour} · fecha dia {card.closingDay}
                           </span>
+                          <strong className="card-list-hero-name">{card.name}</strong>
                         </div>
-                        <CreditCard size={20} aria-hidden="true" />
+                        <CreditCard size={20} aria-hidden="true" className="card-list-hero-icon" />
                       </div>
-                      <div className="card-limit-block" style={{ marginBottom: 0 }}>
-                        <div className="card-limit-bar-track" aria-hidden="true">
-                          <div className={`card-limit-bar-fill ${barClass}`} style={{ width: `${usedPercent}%` }} />
-                        </div>
-                        <div className="card-limit-row">
-                          <span className="text-secondary">
-                            Disponível: <strong className="card-limit-available">{formatMoney(availableCents)}</strong>
-                          </span>
-                          <span className="text-secondary">de {formatMoney(card.limitCents)}</span>
-                        </div>
-                        {openInvoice && openInvoice.outstandingBalanceCents > 0 && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: '0.3rem', fontSize: '0.82rem' }}>
-                            <span className="text-secondary">
-                              Fatura {formatFriendlyMonth(openInvoice.referenceMonth)} · vence {formatFriendlyDate(openInvoice.dueDate)}
-                            </span>
-                            <strong className="amount--expense">{formatMoney(openInvoice.outstandingBalanceCents)}</strong>
-                          </div>
-                        )}
+                      <div>
+                        <span className="card-list-hero-label">Disponível</span>
+                        <strong className="card-list-hero-balance">{formatMoney(availableCents)}</strong>
+                        <span className="card-list-hero-of">de {formatMoney(card.limitCents)}</span>
+                      </div>
+                      <div className="card-list-hero-track" aria-label={`${usedPercent}% do limite usado`}>
+                        <div className={`card-list-hero-fill ${barClass}`} style={{ width: `${Math.max(2, usedPercent)}%` }} />
                       </div>
                     </div>
+                    {openInvoice && openInvoice.outstandingBalanceCents > 0 && (
+                      <div className="card-list-hero-footer">
+                        <span className="card-list-hero-meta">
+                          Fatura {formatFriendlyMonth(openInvoice.referenceMonth)} · vence {formatFriendlyDate(openInvoice.dueDate)}
+                        </span>
+                        <strong className="amount--expense">{formatMoney(openInvoice.outstandingBalanceCents)}</strong>
+                      </div>
+                    )}
                   </Link>
                 );
               })}

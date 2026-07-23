@@ -2,13 +2,14 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
-## 2026-07-23 — design: Cartão e Fatura ganham o mesmo hero visual do Dashboard
+## 2026-07-23 — design: Cartão, Fatura e Cartões ganham o mesmo hero visual do Dashboard
 
-O dono achou as telas de Cartão e Fatura "feias, poludas, pouco sofisticadas" perto do Dashboard. Pesquisa de referência (Copilot Money, Monarch Money, Monzo) + auditoria do próprio design system apontaram pro mesmo diagnóstico: tudo era `surface` branco sem hierarquia, descumprindo uma regra que o `docs/design/DESIGN.md` já mandava ("header de valor gigante colorido por contexto") mas nunca tinha sido aplicada nessas duas telas.
+O dono achou as telas de cartão de crédito "feias, poludas, pouco sofisticadas" perto do Dashboard. Pesquisa de referência (Copilot Money, Monarch Money, Monzo) + auditoria do próprio design system apontaram pro mesmo diagnóstico: tudo era `surface` branco sem hierarquia, descumprindo uma regra que o `docs/design/DESIGN.md` já mandava ("header de valor gigante colorido por contexto") mas nunca tinha sido aplicada. Três telas, uma de cada vez, cada uma aprovada antes de seguir pra próxima.
 
 - **`CardDetailPage.tsx`**: "Limite disponível" ganhou o hero com gradiente de marca (mesmo tratamento do Dashboard); botão de excluir virou `.icon-button` circular; "Lançar compra parcelada" deixou de ser um botão solto entre cards e virou uma linha dentro do histórico de faturas.
 - **`InvoicePage.tsx`**: "Valor a pagar" ganhou o mesmo hero gradiente; botão "Voltar" virou ícone circular; **bug de brinde corrigido** — o badge de status mostrava sempre verde ("Aberta", "Vencida", tudo igual), agora mapeia pra âmbar/vermelho/verde de verdade. Lista "Compras" (podia chegar a 10+ linhas numa compra parcelada antecipada) ganhou colapso em 5 linhas com "Ver todas" e um campo de busca por nome (só aparece com mais de 8 compras).
-- 100% CSS/JSX — zero mudança em `firestore.rules`, Cloud Functions ou lógica de cálculo. `typecheck`, `npm test` (403) e `build` verdes; verificado ao vivo em 2 temas (claro/escuro) e mobile 375px.
+- **`CardsPage.tsx`** (lista de cartões): diferente das duas de cima (uma entidade só), aqui é lista — hero cheio em cada linha ficaria pesado com 2+ cartões. Reaproveitada a receita que o app já usa em `AccountsPage.tsx` (`.account-card-hero`): gradiente sóbrio (`--gradient-slate`) em vez do vívido, com rodapé branco mostrando a fatura em aberto só quando existe.
+- 100% CSS/JSX — zero mudança em `firestore.rules`, Cloud Functions ou lógica de cálculo. `typecheck`, `npm test` (403) e `build` verdes em cada entrega; verificado ao vivo em 2 temas (claro/escuro) e mobile 375px.
 - Análise (`SearchPage.tsx`) tinha o mesmo problema e chegou a ser explorada por engano antes de o dono apontar a tela certa — pesquisa/plano ficaram represados, não implementados. Ver `docs/planning/TODOS.md`.
 
 ## 2026-07-23 — fix+feat: 4 pendências de cartão (editar compra/limite, categoria e data em compra em andamento) + bug crítico de limite fantasma
