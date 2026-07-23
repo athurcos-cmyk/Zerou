@@ -99,6 +99,53 @@ describe('useInvoiceLedger', () => {
     expect(result.current.find((e) => e.id === 'credit-1')).toBeUndefined();
   });
 
+  // Regressão: excluir uma compra no cartão dispara `reverseCardPurchaseOnDelete`, que cria um
+  // `purchase_reversal` no próprio ledger (mesmo sourceTransactionId da compra apagada) — ele
+  // cancela a compra matematicamente (Valor a pagar fecha certo), mas o filtro de órfão daqui
+  // escondia OS DOIS antes de `anticipatedAwayEntryIds` (InvoicePage) ter a chance de parear o
+  // par e escondê-lo junto. Resultado: a linha sumia da lista, mas "Compras"/"Créditos" no
+  // resumo ficavam inflados pra sempre com o valor da compra excluída.
+  it('mantém visíveis a compra e seu estorno quando a exclusão já foi revertida no ledger', () => {
+    cardMocks.subscribeInvoiceLedger.mockImplementation((_workspaceId, _cardId, _invoiceId, onNext) => {
+      onNext([
+        ledgerEntry({ id: 'purchase-1', type: 'purchase', sourceTransactionId: 'txn-1', amountCents: 15000 }),
+        ledgerEntry({ id: 'reversal-1', type: 'purchase_reversal', sourceTransactionId: 'txn-1', amountCents: 15000 })
+      ]);
+      return vi.fn();
+    });
+
+    const { result, rerender } = renderHook(
+      ({ transactionIndex }: { transactionIndex: TransactionDeletionIndex }) =>
+        useInvoiceLedger('ws-1', oneInvoice, transactionIndex),
+      { initialProps: { transactionIndex: index() } }
+    );
+
+    rerender({ transactionIndex: index(['txn-1']) });
+
+    expect(result.current.map((e) => e.id).sort()).toEqual(['purchase-1', 'reversal-1']);
+  });
+
+  // Sem estorno no ledger (dado antigo, ou exclusão que aconteceu antes de
+  // `reverseCardPurchaseOnDelete` existir), o órfão continua escondido — não tem par pra
+  // `anticipatedAwayEntryIds` esconder, então mostrar a compra sozinha voltaria a inflar
+  // "Compras" sem nunca cancelar.
+  it('continua escondendo o órfão quando não há estorno correspondente no ledger', () => {
+    cardMocks.subscribeInvoiceLedger.mockImplementation((_workspaceId, _cardId, _invoiceId, onNext) => {
+      onNext([ledgerEntry({ id: 'purchase-1', type: 'purchase', sourceTransactionId: 'txn-1', amountCents: 15000 })]);
+      return vi.fn();
+    });
+
+    const { result, rerender } = renderHook(
+      ({ transactionIndex }: { transactionIndex: TransactionDeletionIndex }) =>
+        useInvoiceLedger('ws-1', oneInvoice, transactionIndex),
+      { initialProps: { transactionIndex: index() } }
+    );
+
+    rerender({ transactionIndex: index(['txn-1']) });
+
+    expect(result.current).toEqual([]);
+  });
+
   describe('compra excluída fora da janela de `subscribeTransactions` (limit 300)', () => {
     beforeEach(() => {
       cardMocks.subscribeInvoiceLedger.mockImplementation((_workspaceId, _cardId, _invoiceId, onNext) => {

@@ -2,6 +2,14 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-23 — fix: "Compras"/"Créditos" da fatura ficavam inflados pra sempre depois de excluir uma compra no cartão
+
+Achado pelo dono testando ao vivo: excluir uma compra no cartão fechava "Valor a pagar" certo (zerava), mas "Compras"/"Créditos" no resumo da fatura continuavam contando a compra excluída pra sempre — a linha sumia da lista, o resumo não.
+
+- **Causa raiz**: excluir uma compra dispara `reverseCardPurchaseOnDelete` (Cloud Function), que cria um estorno (`purchase_reversal`) no próprio ledger — imutável, não dá pra apagar — pra cancelar a compra matematicamente. `anticipatedAwayEntryIds` (`anticipation.ts`) já sabia esconder esse PAR (compra + estorno) da exibição, mas o filtro de órfão em `useInvoiceLedger.ts` escondia os dois lançamentos ANTES dessa função rodar — nunca chegavam a ser pareados, e os totais brutos do servidor (`purchasesTotalCents`/`creditsTotalCents`, mantidos incrementalmente, nunca recalculados do zero) ficavam inflados pra sempre.
+- **Fix**: o filtro de órfão só esconde um lançamento quando **não há** estorno correspondente no ledger; havendo, os dois ficam visíveis pra `anticipatedAwayEntryIds` esconder o par. `InvoicePage.tsx` passou a descontar `purchase_reversal` (antes só `installment_anticipation_credit`) do total de "Créditos" exibido.
+- 2 testes de regressão novos, cada um comprovadamente falha sem o fix. Verificado ao vivo criando e excluindo uma compra de R$150 — "Compras" volta certinho, sem sobra em "Créditos"; de brinde, o fix limpou retroativamente um resíduo de R$130 que já existia de exclusões de teste anteriores nesta mesma sessão. `npm test` (408), `typecheck` limpo. 100% client-side, zero mudança de regra/function. Detalhe: `docs/history/2026-07.md`.
+
 ## 2026-07-23 — fix: categoria errada no Resumo Anual + ordem de compras na fatura
 
 Duas queixas reais investigadas com `/investigate`.

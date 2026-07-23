@@ -125,9 +125,25 @@ export function useInvoiceLedger(
     // membro comum apague/edite o ledger da fatura) ficam órfãs para sempre — filtradas
     // aqui em vez de removidas, para não depender de regra nova.
     if (deletedTransactionIds.size === 0) return ledgerEntries;
-    return ledgerEntries.filter(
-      (entry) => !entry.sourceTransactionId || !deletedTransactionIds.has(entry.sourceTransactionId)
+
+    // Exceção: se a Cloud Function `reverseCardPurchaseOnDelete` já criou um estorno
+    // (`purchase_reversal`/`anticipation_credit_reversal`) pra essa transação, o lançamento
+    // original e o estorno ficam VISÍVEIS aqui — pra `anticipatedAwayEntryIds` (InvoicePage)
+    // esconder o PAR certinho (linha da lista + números de "Compras"/"Créditos" do resumo).
+    // Escondendo os dois aqui, como antes, o estorno nunca chegava a ser pareado: a linha
+    // sumia da lista, mas "Compras"/"Créditos" ficavam inflados pra sempre com o par excluído.
+    // Sem estorno (dado antigo, de antes dessa Cloud Function existir), continua escondido.
+    const reversalTypes = new Set(['purchase_reversal', 'anticipation_credit_reversal']);
+    const reversedTransactionIds = new Set(
+      ledgerEntries
+        .filter((entry) => reversalTypes.has(entry.type) && entry.sourceTransactionId)
+        .map((entry) => entry.sourceTransactionId as string)
     );
+
+    return ledgerEntries.filter((entry) => {
+      if (!entry.sourceTransactionId || !deletedTransactionIds.has(entry.sourceTransactionId)) return true;
+      return reversedTransactionIds.has(entry.sourceTransactionId);
+    });
   }, [ledgerEntries, deletedTransactionIds]);
 }
 

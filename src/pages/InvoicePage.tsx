@@ -244,9 +244,14 @@ export function InvoicePage() {
   // ficaria contradizendo a lista logo abaixo, que não mostra mais essa parcela.
   const hiddenPurchaseCents =
     invoice?.ledgerEntries.filter((e) => e.type === 'purchase' && hiddenEntryIds.has(e.id)).reduce((s, e) => s + e.amountCents, 0) ?? 0;
+  // 'purchase_reversal' entra aqui de propósito: é o estorno de uma compra excluída no
+  // Extrato (reverseCardPurchaseOnDelete) — soma em `creditsTotalCents` igual a uma
+  // antecipação, e sem contar aqui o par escondido ficava com "Créditos" inflado pra sempre.
   const hiddenCreditCents =
     invoice?.ledgerEntries
-      .filter((e) => e.type === 'installment_anticipation_credit' && hiddenEntryIds.has(e.id))
+      .filter(
+        (e) => (e.type === 'installment_anticipation_credit' || e.type === 'purchase_reversal') && hiddenEntryIds.has(e.id)
+      )
       .reduce((s, e) => s + e.amountCents, 0) ?? 0;
   const displayPurchasesTotalCents = (invoice?.purchasesTotalCents ?? 0) - hiddenPurchaseCents;
   const displayCreditsTotalCents = (invoice?.creditsTotalCents ?? 0) - hiddenCreditCents;
