@@ -2,6 +2,12 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-24 — fix+feat: botão "Pago" em recorrência vencida + totais em Contas a Pagar
+
+- **Label "Registrar" → "Pago"**: recorrência que já venceu ou vence hoje agora mostra "Pago" (igual contas avulsas), em vez de "Registrar". "Pagar adiantado" (≤7 dias) e "Em dia" (+7 dias) continuam iguais.
+- **Totais por seção**: headings "Recorrentes" e "Compromissos" agora mostram a soma em R$ além da contagem (ex.: "Recorrentes · 5 · R$ 450,00"). O total de compromissos respeita o filtro ativo (Em aberto/Vencidas/Pagas/Todas).
+- `npm test` (408), `typecheck` limpo.
+
 ## 2026-07-24 — fix: histórico de faturas no cartão agora vai da mais antiga pra mais recente
 
 - `subscribeInvoices` (`cardService.ts`) usava `orderBy('referenceMonth', 'desc')` — a fatura mais distante no futuro (ex.: set 2027) aparecia primeiro, obrigando a rolar até o fim pra ver o histórico. Trocado pra `asc`: ordem cronológica (ago 2026 → set 2027).

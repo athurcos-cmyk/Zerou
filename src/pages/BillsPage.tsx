@@ -107,12 +107,19 @@ export function BillsPage() {
     [finance.recurringRules]
   );
 
+  const recurringTotalCents = useMemo(
+    () => recurringItems.reduce((sum, r) => sum + (r.amountCents ?? 0), 0),
+    [recurringItems]
+  );
+
   const visibleBills = useMemo(() => {
     const sorted = finance.bills.slice().sort((a, b) => a.dueDate.toMillis() - b.dueDate.toMillis());
     if (billFilter === 'all') return sorted;
     if (billFilter === 'open') return sorted.filter((b) => b.status === 'pending' || b.status === 'overdue');
     return sorted.filter((b) => b.status === billFilter);
   }, [finance.bills, billFilter]);
+
+  const billsTotalCents = useMemo(() => visibleBills.reduce((sum, b) => sum + b.amountCents, 0), [visibleBills]);
 
   const serviceSuggestions = searchSubscriptionServices(description);
 
@@ -446,7 +453,7 @@ export function BillsPage() {
           <div className="section-heading">
             <div>
               <p className="eyebrow">Assinaturas e contas fixas</p>
-              <h2>Recorrentes{hasRecurring ? ` · ${recurringItems.length}` : ''}</h2>
+              <h2>Recorrentes{hasRecurring ? ` · ${recurringItems.length} · ${formatMoney(recurringTotalCents)}` : ''}</h2>
             </div>
             <Repeat size={22} aria-hidden="true" style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
           </div>
@@ -456,7 +463,7 @@ export function BillsPage() {
               {recurringItems.map((rule) => {
                 const due = isRecurrenceDue(rule.nextOccurrenceAt.toDate());
                 const canPayEarly = canRegisterRecurrence(rule.nextOccurrenceAt.toDate());
-                const actionLabel = due ? 'Registrar' : canPayEarly ? 'Pagar adiantado' : null;
+                const actionLabel = due ? 'Pago' : canPayEarly ? 'Pagar adiantado' : null;
                 const dateClassName = due ? 'amount--expense' : 'text-secondary';
 
                 return (
@@ -509,7 +516,7 @@ export function BillsPage() {
           <div className="section-heading">
             <div>
               <p className="eyebrow">Contas avulsas</p>
-              <h2>Compromissos{hasBills ? ` · ${visibleBills.length}` : ''}</h2>
+              <h2>Compromissos{hasBills ? ` · ${visibleBills.length} · ${formatMoney(billsTotalCents)}` : ''}</h2>
             </div>
             <CalendarClock size={22} aria-hidden="true" style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
           </div>
