@@ -155,6 +155,37 @@ function parseList<T>(value: unknown, parseItem: (item: unknown) => T | null): T
   return parsed;
 }
 
+function readMiniCache(workspaceId: string): CachedDashboardView | null {
+  try {
+    const raw = window.localStorage.getItem(CACHE_KEY_PREFIX + workspaceId + '.mini');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (
+      !isFiniteNumber(parsed.totalBalanceCents) ||
+      !isFiniteNumber(parsed.freeToSpendCents) ||
+      !isFiniteNumber(parsed.committedCents) ||
+      typeof parsed.availableCaption !== 'string' ||
+      typeof parsed.committedCaption !== 'string' ||
+      (parsed.spendingVariationPct !== null && !isFiniteNumber(parsed.spendingVariationPct))
+    ) {
+      return null;
+    }
+    return {
+      totalBalanceCents: parsed.totalBalanceCents,
+      freeToSpendCents: parsed.freeToSpendCents,
+      committedCents: parsed.committedCents,
+      availableCaption: parsed.availableCaption,
+      committedCaption: parsed.committedCaption,
+      spendingVariationPct: parsed.spendingVariationPct as number | null,
+      spending: [],
+      commitments: [],
+      recentTransactions: []
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function readCachedDashboardView(workspaceId?: string | null): CachedDashboardView | null {
   if (!canUseStorage() || !workspaceId) {
     return null;
@@ -163,7 +194,7 @@ export function readCachedDashboardView(workspaceId?: string | null): CachedDash
   try {
     const raw = window.localStorage.getItem(CACHE_KEY_PREFIX + workspaceId);
     if (!raw) {
-      return null;
+      return readMiniCache(workspaceId);
     }
 
     const parsed = JSON.parse(raw) as Record<string, unknown>;
@@ -182,7 +213,7 @@ export function readCachedDashboardView(workspaceId?: string | null): CachedDash
     const commitments = parseList(parsed.commitments, parseCommitment);
     const recentTransactions = parseList(parsed.recentTransactions, parseRecentTransaction);
     if (!spending || !commitments || !recentTransactions) {
-      return null;
+      return readMiniCache(workspaceId);
     }
 
     return {
@@ -209,6 +240,19 @@ export function saveCachedDashboardView(workspaceId: string | undefined | null, 
   try {
     window.localStorage.setItem(CACHE_KEY_PREFIX + workspaceId, JSON.stringify(view));
   } catch {
-    // Cache local é apenas um acelerador de exibição. Se falhar, o cálculo real continua sendo a fonte.
+    // Cache completo não coube (QuotaExceededError, comum em storage cheio ou modo
+    // privado). Tenta salvar pelo menos os números e legendas — ~150 bytes, cabe em
+    // qualquer lugar e já evita o flash de "—" no boot.
+    try {
+      const mini = {
+        totalBalanceCents: view.totalBalanceCents,
+        freeToSpendCents: view.freeToSpendCents,
+        committedCents: view.committedCents,
+        availableCaption: view.availableCaption,
+        committedCaption: view.committedCaption,
+        spendingVariationPct: view.spendingVariationPct
+      };
+      window.localStorage.setItem(CACHE_KEY_PREFIX + workspaceId + '.mini', JSON.stringify(mini));
+    } catch { /* sem recuperação possível */ }
   }
 }

@@ -6,6 +6,7 @@ import {
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
+  persistentSingleTabManager,
   type Firestore
 } from 'firebase/firestore';
 import { getStorage, connectStorageEmulator, type FirebaseStorage } from 'firebase/storage';
@@ -76,7 +77,8 @@ export function getFirebaseServices() {
     try {
       dbInstance = initializeFirestore(app, {
         localCache: persistentLocalCache({
-          tabManager: persistentMultipleTabManager()
+          tabManager: persistentMultipleTabManager(),
+          cacheSizeBytes: 104857600 // 100 MB — evita expulsão do IndexedDB pelo browser
         }),
         // Some networks/proxies/browsers break Firestore's WebChannel streaming,
         // making writes hang on "pending" until a full reload. Auto-detecting long
@@ -84,7 +86,22 @@ export function getFirebaseServices() {
         experimentalAutoDetectLongPolling: true
       });
     } catch {
-      dbInstance = getFirestore(app);
+      // persistentMultipleTabManager pode falhar em Safari/iOS ou com IndexedDB
+      // corrompido. Tenta single-tab antes de desistir da persistência offline.
+      try {
+        dbInstance = initializeFirestore(app, {
+          localCache: persistentLocalCache({
+            tabManager: persistentSingleTabManager({}),
+            cacheSizeBytes: 104857600
+          }),
+          experimentalAutoDetectLongPolling: true
+        });
+      } catch (e) {
+        dbInstance = getFirestore(app);
+        if (import.meta.env.DEV) {
+          console.warn('[Firestore] Sem persistência offline — IndexedDB indisponível.', e);
+        }
+      }
     }
 
     firebaseServices = {

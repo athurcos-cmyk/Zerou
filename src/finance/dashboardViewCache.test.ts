@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   readCachedDashboardView,
   saveCachedDashboardView,
@@ -71,5 +71,63 @@ describe('dashboardViewCache', () => {
       JSON.stringify({ ...sampleView, committedCaption: 42 })
     );
     expect(readCachedDashboardView(workspaceId)).toBeNull();
+  });
+
+  // --- Mini cache (fallback quando o cache completo não coube no localStorage) ---
+
+  it('mini cache: salva e recupera números + legendas com listas vazias', () => {
+    const mini = {
+      totalBalanceCents: 150000,
+      freeToSpendCents: 90000,
+      committedCents: 60000,
+      availableCaption: 'Livre agora.',
+      committedCaption: 'Considerando os próximos 30 dias',
+      spendingVariationPct: 12
+    };
+    window.localStorage.setItem('zerou.dashboardView.v1.' + workspaceId + '.mini', JSON.stringify(mini));
+    const view = readCachedDashboardView(workspaceId);
+    expect(view).not.toBeNull();
+    expect(view!.totalBalanceCents).toBe(150000);
+    expect(view!.freeToSpendCents).toBe(90000);
+    expect(view!.committedCents).toBe(60000);
+    expect(view!.spending).toEqual([]);
+    expect(view!.commitments).toEqual([]);
+    expect(view!.recentTransactions).toEqual([]);
+  });
+
+  it('mini cache: é ignorado se o cache completo existe (versão completa tem precedência)', () => {
+    // Grava mini primeiro
+    const mini = { totalBalanceCents: 1, freeToSpendCents: 1, committedCents: 1, availableCaption: 'mini', committedCaption: 'mini', spendingVariationPct: null };
+    window.localStorage.setItem('zerou.dashboardView.v1.' + workspaceId + '.mini', JSON.stringify(mini));
+    // Depois grava completo
+    saveCachedDashboardView(workspaceId, sampleView);
+    // Deve retornar o completo, não o mini
+    expect(readCachedDashboardView(workspaceId)).toEqual(sampleView);
+  });
+
+  it('mini cache: rejeita se números forem inválidos', () => {
+    window.localStorage.setItem(
+      'zerou.dashboardView.v1.' + workspaceId + '.mini',
+      JSON.stringify({ totalBalanceCents: 'x', freeToSpendCents: 1, committedCents: 1, availableCaption: 'a', committedCaption: 'b', spendingVariationPct: null })
+    );
+    expect(readCachedDashboardView(workspaceId)).toBeNull();
+  });
+
+  it('salvar cache: grava mini quando o cache completo não coube (simula QuotaExceededError)', () => {
+    // Storage.prototype.setItem funciona independente de como window.localStorage é acessado
+    const setItem = vi.spyOn(Storage.prototype, 'setItem');
+    // Primeira chamada (cache completo) → QuotaExceededError
+    setItem.mockImplementationOnce(() => {
+      throw new DOMException('QuotaExceededError', 'QuotaExceededError');
+    });
+    saveCachedDashboardView(workspaceId, sampleView);
+    // Deve ter tentado gravar o cache completo (que falhou) + o mini (que passou)
+    expect(setItem).toHaveBeenCalledTimes(2);
+    const view = readCachedDashboardView(workspaceId);
+    expect(view).not.toBeNull();
+    expect(view!.totalBalanceCents).toBe(sampleView.totalBalanceCents);
+    expect(view!.freeToSpendCents).toBe(sampleView.freeToSpendCents);
+    expect(view!.spending).toEqual([]);
+    setItem.mockRestore();
   });
 });

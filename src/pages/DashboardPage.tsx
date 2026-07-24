@@ -132,9 +132,19 @@ export function DashboardPage() {
   // em branco por 1-2s a cada abertura, sem mexer na lógica de loading em si. A gravação
   // desse cache fica mais abaixo, depois que `spendingRows`/`categoryMap` já existem.
   const cachedView = useMemo(() => readCachedDashboardView(workspaceId), [workspaceId]);
+  // O cache de exibição cobre duas situações: (a) durante o boot normal, enquanto
+  // os listeners do Firestore ainda não dispararam; (b) depois que o boot timeout
+  // de 2.5s disparou mas os dados ainda não chegaram (ex.: IndexedDB lento no
+  // celular ou rede oscilando). Sem essa segunda perna, o Dashboard zerava os
+  // números e mostrava "Comece em poucos minutos" por vários segundos até o
+  // Firestore responder — exatamente o "pisca" que o dono reportou.
+  const hasStarted = finance.accounts.length > 0 || finance.transactions.length > 0 || cardsData.cards.length > 0;
+  // cache != null → mostra os dados cacheados. Cobre: (a) boot normal (loading=true),
+  // (b) depois do boot timeout sem dados (loading=false, arrays vazios, mas cache existe).
+  const cache = (cachedView && (isCommittedLoading || !hasStarted)) ? cachedView : null;
 
-  const effectiveFreeToSpend = isCommittedLoading && cachedView
-    ? cachedView.freeToSpendCents
+  const effectiveFreeToSpend = cache
+    ? cache.freeToSpendCents
     : dashboard.freeToSpendCents;
 
   const perDayDisplay = useMemo(() => {
@@ -147,21 +157,21 @@ export function DashboardPage() {
       : null;
   }, [dashboard.committedCutoff, effectiveFreeToSpend]);
 
-  const totalBalanceDisplay = isLoading
-    ? cachedView
-      ? formatMoney(cachedView.totalBalanceCents)
-      : '—'
-    : formatMoney(dashboard.totalBalanceCents);
-  const freeToSpendDisplay = isCommittedLoading
-    ? cachedView
-      ? formatMoney(cachedView.freeToSpendCents)
-      : '—'
-    : formatMoney(dashboard.freeToSpendCents);
-  const committedDisplay = isCommittedLoading
-    ? cachedView
-      ? formatMoney(cachedView.committedCents)
-      : '—'
-    : formatMoney(dashboard.committedCents);
+  const totalBalanceDisplay = cache
+    ? formatMoney(cache.totalBalanceCents)
+    : isLoading
+      ? '—'
+      : formatMoney(dashboard.totalBalanceCents);
+  const freeToSpendDisplay = cache
+    ? formatMoney(cache.freeToSpendCents)
+    : isCommittedLoading
+      ? '—'
+      : formatMoney(dashboard.freeToSpendCents);
+  const committedDisplay = cache
+    ? formatMoney(cache.committedCents)
+    : isCommittedLoading
+      ? '—'
+      : formatMoney(dashboard.committedCents);
   const syncStatus = finance.pendingWrites || cardsData.pendingWrites ? 'pending' : 'synced';
   const currentMonth = new Date().toISOString().slice(0, 7);
   const now = new Date();
@@ -213,12 +223,12 @@ export function DashboardPage() {
 
   // Enquanto ainda carrega, renderiza o que o cache guardou; quando o dado real chega, troca
   // sem piscar (na imensa maioria das aberturas os dois são idênticos, então é imperceptível).
-  const effectiveSpending: CachedSpendingRow[] = isCommittedLoading && cachedView ? cachedView.spending : liveSpending;
-  const effectiveCommitments: CommitmentView[] = isCommittedLoading && cachedView
-    ? cachedView.commitments.map((commitment) => ({ ...commitment, dueAt: new Date(commitment.dueAtISO) }))
+  const effectiveSpending: CachedSpendingRow[] = cache ? cache.spending : liveSpending;
+  const effectiveCommitments: CommitmentView[] = cache
+    ? cache.commitments.map((commitment) => ({ ...commitment, dueAt: new Date(commitment.dueAtISO) }))
     : dashboard.upcomingCommitments;
-  const effectiveRecent: RecentTransactionView[] = isLoading && cachedView
-    ? cachedView.recentTransactions.map((transaction) => ({
+  const effectiveRecent: RecentTransactionView[] = cache
+    ? cache.recentTransactions.map((transaction) => ({
         id: transaction.id,
         type: transaction.type,
         description: transaction.description,
@@ -291,24 +301,23 @@ export function DashboardPage() {
     profile?.committedWindowDays,
     profile?.availableMode
   ]);
-  const hasStarted = finance.accounts.length > 0 || finance.transactions.length > 0 || cardsData.cards.length > 0;
-  // Só decide "conta nova" depois que finanças E cartões resolveram. No boot os arrays
-  // começam vazios, então sem esse guard o guia "Comece em poucos minutos" piscava mesmo
-  // numa conta já usada (achado pelo dono ao dar refresh).
-  const showStartGuide = !hasStarted && !isCommittedLoading;
+  // Se existe cache de exibição, o app NÃO está vazio — a pessoa já usou antes.
+  // Só decide "conta nova" depois que finanças E cartões resolveram E não há cache
+  // de nenhum tipo (dashboard + IndexedDB).
+  const showStartGuide = !hasStarted && !isCommittedLoading && !cachedView;
 
   // Durante o boot: cache se tiver, senão o placeholder antigo. Depois de carregar: dado ao vivo.
-  const effectiveAvailableCaption = isCommittedLoading
-    ? cachedView
-      ? cachedView.availableCaption
-      : 'Carregando...'
-    : liveAvailableCaption;
-  const effectiveCommittedCaption = isCommittedLoading
-    ? cachedView
-      ? cachedView.committedCaption
-      : 'Contas e fatura.'
-    : committedCaption;
-  const effectiveVariationPct = isCommittedLoading && cachedView ? cachedView.spendingVariationPct : spendingVariationPct;
+  const effectiveAvailableCaption = cache
+    ? cache.availableCaption
+    : isCommittedLoading
+      ? 'Carregando...'
+      : liveAvailableCaption;
+  const effectiveCommittedCaption = cache
+    ? cache.committedCaption
+    : isCommittedLoading
+      ? 'Contas e fatura.'
+      : committedCaption;
+  const effectiveVariationPct = cache ? cache.spendingVariationPct : spendingVariationPct;
 
   // "Próximos a receber": só o que vence em ≤5 dias, no fim da tela e SEM entrar em nenhum total —
   // dinheiro a receber não é dinheiro que se tem (ver docs/planning/CONTAS_A_RECEBER.md).

@@ -2,6 +2,15 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-24 — fix: app não mostra mais "sem dados" ao abrir (4 correções no boot/cache)
+
+- **4 causas raiz encontradas com `/investigate`** (4 agentes em paralelo) para o problema "abre o app, parece que não tem dado nenhum, depois pisca e aparece".
+- **RC1**: `initializeFirestore` com fallback silencioso → sem IndexedDB, sem offline. Agora tenta `persistentSingleTabManager` antes de desistir da persistência; loga aviso em dev. Sem offline = cold start em toda abertura.
+- **RC2**: Dashboard descartava o `cachedView` quando o boot timeout (2.5s) disparava antes dos dados chegarem → mostrava "Comece em poucos minutos" mesmo pra quem tem dados. Agora o cache cobre também o pós-timeout: se `loading=false` mas dados ainda vazios e cache existe, continua mostrando o cache em vez de zerar.
+- **RC3**: Cache do dashboard (10-20 KB) falhava silenciosamente ao estourar quota do localStorage → cache nunca mais era salvo. Agora grava um mini cache (~150 bytes, só números) como fallback; na leitura, tenta o mini se o completo não existe.
+- **RC4**: `persistentLocalCache` sem `cacheSizeBytes` → IndexedDB podia crescer até ser expulso pelo browser. Agora limitado a 100 MB.
+- `npm test` (412), `typecheck`, `build` limpos. Detalhe: `docs/history/2026-07.md`.
+
 ## 2026-07-24 — fix: tema escolhido persiste ao fechar e reabrir o app
 
 - **Causa**: `hasLocalOverride` (flag que impede o Firestore de sobrescrever a escolha local de tema) só existia em memória (Zustand) — resetava pra `false` a cada boot. Na reabertura, o perfil vindo do Firestore (ou do `profileCache`) sobrescrevia o localStorage, revertendo o tema.
