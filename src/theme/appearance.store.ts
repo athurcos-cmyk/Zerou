@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { AppearancePreferences, Density, FontScale, ThemeId, ThemeMode } from './theme.types';
-import { DEFAULT_APPEARANCE, persistAppearance, readStoredAppearance, resolveThemeId } from './theme.storage';
+import { DEFAULT_APPEARANCE, persistAppearance, persistThemeOverridden, readStoredAppearance, readThemeOverridden, resolveThemeId } from './theme.storage';
 
 interface AppearanceState {
   preferences: AppearancePreferences;
@@ -50,10 +50,13 @@ const initialPreferences = readStoredAppearance();
 export const useAppearanceStore = create<AppearanceState>((set, get) => ({
   preferences: initialPreferences,
   resolvedThemeId: getInitialResolvedTheme(initialPreferences),
-  hasLocalOverride: false,
+  hasLocalOverride: readThemeOverridden(),
   // Chamado no logout, para que o próximo login (troca de conta no mesmo
   // navegador, sem reload) volte a hidratar a partir do perfil salvo.
-  resetLocalOverride: () => set({ hasLocalOverride: false }),
+  resetLocalOverride: () => {
+    persistThemeOverridden(false);
+    set({ hasLocalOverride: false });
+  },
   hydrateFromProfile: (preferences) => {
     if (get().hasLocalOverride) {
       return;
@@ -75,21 +78,26 @@ export const useAppearanceStore = create<AppearanceState>((set, get) => ({
     });
   },
   setThemeMode: (themeMode) => {
+    persistThemeOverridden(true);
     set((state) => ({ ...updatePreferences(state.preferences, { themeMode }), hasLocalOverride: true }));
   },
   setThemeId: (themeId) => {
+    persistThemeOverridden(true);
     set((state) => ({
       ...updatePreferences(state.preferences, { themeId, themeMode: 'manual' }),
       hasLocalOverride: true
     }));
   },
   setDensity: (density) => {
+    persistThemeOverridden(true);
     set((state) => ({ ...updatePreferences(state.preferences, { density }), hasLocalOverride: true }));
   },
   setFontScale: (fontScale) => {
+    persistThemeOverridden(true);
     set((state) => ({ ...updatePreferences(state.preferences, { fontScale }), hasLocalOverride: true }));
   },
   setReduceMotion: (reduceMotion) => {
+    persistThemeOverridden(true);
     set((state) => ({ ...updatePreferences(state.preferences, { reduceMotion }), hasLocalOverride: true }));
   },
   refreshSystemTheme: (prefersDark) => {

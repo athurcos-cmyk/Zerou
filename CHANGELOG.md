@@ -2,6 +2,12 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-24 — fix: tema escolhido persiste ao fechar e reabrir o app
+
+- **Causa**: `hasLocalOverride` (flag que impede o Firestore de sobrescrever a escolha local de tema) só existia em memória (Zustand) — resetava pra `false` a cada boot. Na reabertura, o perfil vindo do Firestore (ou do `profileCache`) sobrescrevia o localStorage, revertendo o tema.
+- **Fix**: `hasLocalOverride` agora persiste no localStorage (`zerou.themeOverridden`). Uma vez que o usuário escolhe um tema neste dispositivo, o Firestore nunca mais sobrescreve — a escolha local é definitiva. No logout, o flag é limpo.
+- `npm test` (408), `typecheck` limpo.
+
 ## 2026-07-24 — fix+feat: botão "Pago" em recorrência vencida + totais em Contas a Pagar
 
 - **Label "Registrar" → "Pago"**: recorrência que já venceu ou vence hoje agora mostra "Pago" (igual contas avulsas), em vez de "Registrar". "Pagar adiantado" (≤7 dias) e "Em dia" (+7 dias) continuam iguais.

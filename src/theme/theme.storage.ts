@@ -6,7 +6,8 @@ const STORAGE_KEYS = {
   themeId: 'zerou.themeId',
   density: 'zerou.density',
   fontScale: 'zerou.fontScale',
-  reduceMotion: 'zerou.reduceMotion'
+  reduceMotion: 'zerou.reduceMotion',
+  themeOverridden: 'zerou.themeOverridden'
 } as const;
 
 export const DEFAULT_APPEARANCE: AppearancePreferences = {
@@ -68,4 +69,18 @@ export function resolveThemeId(themeMode: ThemeMode, themeId: ThemeId, prefersDa
   }
 
   return themeId;
+}
+
+export function readThemeOverridden(): boolean {
+  if (!canUseStorage()) return false;
+  return window.localStorage.getItem(STORAGE_KEYS.themeOverridden) === 'true';
+}
+
+export function persistThemeOverridden(value: boolean) {
+  if (!canUseStorage()) return;
+  if (value) {
+    window.localStorage.setItem(STORAGE_KEYS.themeOverridden, 'true');
+  } else {
+    window.localStorage.removeItem(STORAGE_KEYS.themeOverridden);
+  }
 }
