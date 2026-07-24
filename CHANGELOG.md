@@ -2,6 +2,14 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-24 — fix: gráfico da Análise "não carregava" ao abrir (mesma causa do fix de boot/cache, tela diferente)
+
+Achado via `/investigate` a partir de relato de usuárias ("o gráfico não carrega, só aparece depois que clico em algo").
+
+- **Causa raiz**: `SearchPage.tsx` nunca checava se `finance`/`cardsData`/`analysis` (dados de transações, cartões e faturas) ainda estavam carregando — só olhava se o total calculado era maior que zero. Enquanto o boot/rede demorava (ou uma leitura falhava), a tela mostrava a mesma UI de "nenhum gasto neste mês" que mostraria pra um mês genuinamente vazio, sem spinner nem erro. Reproduzido ao vivo limpando o cache do Firestore (simulando abertura fria): o donut e o histórico mensal ficaram presos em "R$ 0" por tempo indeterminado — só voltavam ao normal ao trocar de tela e navegar de volta (o que reassina as queries do zero). O Dashboard já tinha esse mesmo problema corrigido no dia anterior (`605737d`, RC2) — a Análise nunca ganhou o mesmo tratamento.
+- **Fix**: novo estado `isLoadingChartData` (`finance.loading || cardsData.loading || analysis.loading`) distingue "carregando" de "vazio de verdade" nas duas seções de gráfico (donut "Por categoria" e barras "Histórico mensal") — mostra um placeholder de carregamento em vez do EmptyState enquanto os dados não resolveram. Erro de leitura (`finance.error || cardsData.error || analysis.error`) agora também aparece como banner, igual o Dashboard já faz pra cartões.
+- `npm run typecheck`, `npm test` (412) e `npm run build` limpos. 100% client-side, zero mudança de regra/function.
+
 ## 2026-07-24 — fix: app não mostra mais "sem dados" ao abrir (4 correções no boot/cache)
 
 - **4 causas raiz encontradas com `/investigate`** (4 agentes em paralelo) para o problema "abre o app, parece que não tem dado nenhum, depois pisca e aparece".
