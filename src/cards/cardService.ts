@@ -778,7 +778,7 @@ export function subscribeInvoices(
   onError: (error: Error) => void
 ): Unsubscribe {
   return onSnapshot(
-    query(invoicesRef(workspaceId, cardId), orderBy('referenceMonth', 'desc'), limit(24)),
+    query(invoicesRef(workspaceId, cardId), orderBy('referenceMonth', 'asc'), limit(24)),
     { includeMetadataChanges: true },
     (snapshot) => onNext(snapshot.docs.map((item) => withLocalSync<Invoice>(item))),
     onError

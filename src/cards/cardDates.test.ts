@@ -95,8 +95,8 @@ describe('pickCurrentInvoice', () => {
   // Regressão: uma compra parcelada cria faturas abertas em vários meses futuros ao
   // mesmo tempo. A fatura "atual" (que acumula compras novas e fecha em breve) é
   // sempre a de referenceMonth mais próximo, não a que aparece primeiro no array
-  // (subscribeInvoices ordena por referenceMonth desc, então a mais distante vinha
-  // primeiro e o antigo `.find(status === 'open')` escolhia ela por engano).
+  // (subscribeInvoices ordena por referenceMonth asc, a mais próxima vem primeiro;
+  // o antigo `.find(status === 'open')` escolhia a errada quando tinha mais de uma aberta).
   it('picks the open invoice with the earliest referenceMonth, not array order', () => {
     const invoices = [
       { id: 'inv-09', status: 'open', referenceMonth: '2026-09' },

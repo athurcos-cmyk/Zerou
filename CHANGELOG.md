@@ -2,6 +2,12 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-24 — fix: histórico de faturas no cartão agora vai da mais antiga pra mais recente
+
+- `subscribeInvoices` (`cardService.ts`) usava `orderBy('referenceMonth', 'desc')` — a fatura mais distante no futuro (ex.: set 2027) aparecia primeiro, obrigando a rolar até o fim pra ver o histórico. Trocado pra `asc`: ordem cronológica (ago 2026 → set 2027).
+- Os lançamentos dentro da fatura (`subscribeInvoiceLedger`) continuam em `desc` (mais recente primeiro), que é o comportamento esperado ali.
+- `npm test` (408), `typecheck` limpo.
+
 ## 2026-07-23 — fix: "Compras"/"Créditos" da fatura ficavam inflados pra sempre depois de excluir uma compra no cartão
 
 Achado pelo dono testando ao vivo: excluir uma compra no cartão fechava "Valor a pagar" certo (zerava), mas "Compras"/"Créditos" no resumo da fatura continuavam contando a compra excluída pra sempre — a linha sumia da lista, o resumo não.
