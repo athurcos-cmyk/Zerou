@@ -1,6 +1,6 @@
 import { ZodError, type ZodIssue } from 'zod';
 
-const technicalFragments = ['too_small', 'invalid_format', 'invalid_type', '[{', '"code"', '"path"', 'FirebaseError'];
+const technicalFragments = ['too_small', 'invalid_format', 'invalid_type', '[{', '"code"', '"path"', 'FirebaseError', 'INTERNAL ASSERTION FAILED'];
 
 function normalizeZodMessage(issue: ZodIssue) {
   return issue.message.endsWith('.') ? issue.message : `${issue.message}.`;

@@ -5,7 +5,6 @@ import {
   connectFirestoreEmulator,
   initializeFirestore,
   persistentLocalCache,
-  persistentMultipleTabManager,
   persistentSingleTabManager,
   type Firestore
 } from 'firebase/firestore';
@@ -75,9 +74,17 @@ export function getFirebaseServices() {
     let dbInstance: Firestore;
 
     try {
+      // Single-tab (não multi-tab): a coordenação entre abas do persistentMultipleTabManager
+      // grava marcações no localStorage (`firestore_clients_*`/`firestore_targets_*`) que só se
+      // limpam sozinhas com um "fechar aba" limpo — coisa que um PWA no celular quase nunca faz
+      // (o app é trocado/matado pelo sistema, sem esse aviso). Essas marcações acumulam pra
+      // sempre até encher o localStorage, e a partir daí o próprio SDK do Firestore trava com
+      // "INTERNAL ASSERTION FAILED: Unexpected state" (crash real em produção, 2026-07-24).
+      // App mobile-first raramente tem duas abas do mesmo usuário abertas ao mesmo tempo — a
+      // perda é só o cache offline de uma segunda aba simultânea, se existir.
       dbInstance = initializeFirestore(app, {
         localCache: persistentLocalCache({
-          tabManager: persistentMultipleTabManager(),
+          tabManager: persistentSingleTabManager({}),
           cacheSizeBytes: 104857600 // 100 MB — evita expulsão do IndexedDB pelo browser
         }),
         // Some networks/proxies/browsers break Firestore's WebChannel streaming,
@@ -85,22 +92,10 @@ export function getFirebaseServices() {
         // polling falls back to a compatible transport and keeps the app responsive.
         experimentalAutoDetectLongPolling: true
       });
-    } catch {
-      // persistentMultipleTabManager pode falhar em Safari/iOS ou com IndexedDB
-      // corrompido. Tenta single-tab antes de desistir da persistência offline.
-      try {
-        dbInstance = initializeFirestore(app, {
-          localCache: persistentLocalCache({
-            tabManager: persistentSingleTabManager({}),
-            cacheSizeBytes: 104857600
-          }),
-          experimentalAutoDetectLongPolling: true
-        });
-      } catch (e) {
-        dbInstance = getFirestore(app);
-        if (import.meta.env.DEV) {
-          console.warn('[Firestore] Sem persistência offline — IndexedDB indisponível.', e);
-        }
+    } catch (e) {
+      dbInstance = getFirestore(app);
+      if (import.meta.env.DEV) {
+        console.warn('[Firestore] Sem persistência offline — IndexedDB indisponível.', e);
       }
     }
 

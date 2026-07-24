@@ -9,6 +9,15 @@ Achado testando a tela de Análise em viewport mobile: o card "Contas recorrente
 - `MetricCard` já tinha a prop `long` pra esse caso (usada em "Maior categoria") — reduz a fonte e quebra linha em vez de cortar. Só faltava aplicar em "Contas recorrentes". Uma linha.
 - `npm run typecheck` e `npm test` (412) limpos. Verificado ao vivo em viewport mobile (375px).
 
+## 2026-07-24 — fix: crash "FIRESTORE INTERNAL ASSERTION FAILED" em produção (persistência corrompida)
+
+Achado ao vivo por relato de usuária: tela cheia "Algo deu errado" com um dump técnico do SDK do Firestore, travando o app até recarregar manualmente.
+
+- **Causa**: `persistentMultipleTabManager` (config antiga do Firestore) coordena abas via chaves no `localStorage` (`firestore_clients_*`/`firestore_targets_*`) que só se limpam com um "fechar aba" limpo — coisa que um PWA no celular quase nunca faz (o sistema mata o app sem avisar). Essas chaves acumulavam pra sempre até estourar a quota do `localStorage`, e a partir daí o próprio SDK do Firestore trava com `INTERNAL ASSERTION FAILED: Unexpected state` (bug conhecido do `firebase-js-sdk`, issue 8305 no GitHub). Conecta com o RC3 do fix de boot/cache de mais cedo hoje, que já tinha achado o `localStorage` desse app perto da quota.
+- **Fix da causa** (`src/firebase/config.ts`): trocado `persistentMultipleTabManager` por `persistentSingleTabManager` — elimina a coordenação via `localStorage` que causava o acúmulo. Custo: perde persistência offline numa segunda aba do MESMO navegador aberta ao mesmo tempo (não afeta uso em aparelhos diferentes, ex. celular + computador).
+- **Rede de segurança pra quem já está com o `localStorage` sujo** (`src/firebase/firestoreRecovery.ts`, novo + `AppErrorBoundary.tsx`): reconhece esse erro específico, limpa o cache local corrompido (IndexedDB + chaves `firestore_*` do `localStorage`) e recarrega sozinho — sem exigir clique manual — com guarda de sessão pra nunca entrar em loop se o erro persistir. `userFacingError.ts` ganhou o fragmento técnico na lista de textos que nunca aparecem crus pro usuário.
+- `npm run typecheck`, `npm test` (412) e `npm run build` limpos. 100% client-side, zero mudança de regra/function.
+
 ## 2026-07-24 — fix: gráfico da Análise "não carregava" ao abrir (mesma causa do fix de boot/cache, tela diferente)
 
 Achado via `/investigate` a partir de relato de usuárias ("o gráfico não carrega, só aparece depois que clico em algo").
