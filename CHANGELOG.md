@@ -2,6 +2,13 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-24 — fix: valor de "Contas recorrentes" cortado no card da Análise no mobile
+
+Achado testando a tela de Análise em viewport mobile: o card "Contas recorrentes" (mês futuro) cortava valores como "~R$ 2.188,87" com reticências (`~R$ 2...`) numa coluna estreita de 2 colunas.
+
+- `MetricCard` já tinha a prop `long` pra esse caso (usada em "Maior categoria") — reduz a fonte e quebra linha em vez de cortar. Só faltava aplicar em "Contas recorrentes". Uma linha.
+- `npm run typecheck` e `npm test` (412) limpos. Verificado ao vivo em viewport mobile (375px).
+
 ## 2026-07-24 — fix: gráfico da Análise "não carregava" ao abrir (mesma causa do fix de boot/cache, tela diferente)
 
 Achado via `/investigate` a partir de relato de usuárias ("o gráfico não carrega, só aparece depois que clico em algo").

@@ -523,6 +523,7 @@ export function SearchPage() {
         />
         {isFutureMonth ? (
           <MetricCard
+            long
             label="Contas recorrentes"
             value={recurringTotalCents > 0 ? `~${formatMoney(recurringTotalCents)}` : 'R$ 0'}
             sub="estimativa do mês"
