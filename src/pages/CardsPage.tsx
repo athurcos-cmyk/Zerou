@@ -1,13 +1,15 @@
 import { useState, type FormEvent } from 'react';
-import { ChevronDown, CreditCard } from 'lucide-react';
+import { ChevronDown, CreditCard, WifiOff } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
-import { useCardsContext } from '../finance/FinanceDataContext';
+import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { EmptyState } from '../components/EmptyState';
+import { LoadingState } from '../components/LoadingState';
 import { SelectField } from '../components/SelectField';
 import { FormMessage } from '../components/FormMessage';
 import { cardBrandOptions, type CreateCreditCardInput } from '../cards/cardSchemas';
 import { createCreditCard } from '../cards/cardService';
+import { hasPendingCardLedgerActivity } from '../finance/financeCalculations';
 import { pickCurrentInvoice } from '../cards/cardDates';
 
 import { formatFriendlyDate, formatFriendlyMonth } from '../finance/financeDates';
@@ -20,6 +22,10 @@ export function CardsPage() {
   const navigate = useNavigate();
   const workspaceId = profile?.defaultWorkspaceId;
   const cardsData = useCardsContext();
+  const finance = useFinanceContext();
+  // "Disponível" de cada cartão soma o total da fatura que só a Cloud Function atualiza —
+  // ela não roda offline. Ver comentário completo em hasPendingCardLedgerActivity.
+  const hasPendingCardActivity = hasPendingCardLedgerActivity(finance.transactions);
   const [name, setName] = useState('');
   const [lastFour, setLastFour] = useState('');
   const [brand, setBrand] = useState<CreateCreditCardInput['brand']>('Visa');
@@ -71,11 +77,20 @@ export function CardsPage() {
         <SyncStatusBadge status={cardsData.pendingWrites ? 'pending' : 'synced'} />
       </div>
 
+      {hasPendingCardActivity && (
+        <div className="notice" style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', marginBottom: '1rem' }}>
+          <WifiOff size={16} style={{ flexShrink: 0, marginTop: '0.15rem' }} aria-hidden="true" />
+          <span>Uma compra no cartão ainda não sincronizou — conecte-se à internet para atualizar o Disponível.</span>
+        </div>
+      )}
+
       <div className="finance-grid">
         <article className="surface surface-pad">
           <p className="eyebrow">Seus cartões</p>
           <h2 style={{ margin: '0.25rem 0 1rem' }}>Cartões ativos</h2>
-          {cardsData.cards.length > 0 ? (
+          {cardsData.loading ? (
+            <LoadingState compact />
+          ) : cardsData.cards.length > 0 ? (
             <div className="card-list-hero-list">
               {cardsData.cards.map((card) => {
                 const activeInvoices = cardsData.invoices.filter(

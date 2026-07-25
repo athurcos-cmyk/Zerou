@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarClock, CreditCard, Minus, Plus, Target, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import { CalendarClock, CreditCard, Minus, Plus, Target, TrendingDown, TrendingUp, Wallet, WifiOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
@@ -7,7 +7,7 @@ import { AvailableModeSheet } from '../finance/AvailableModeSheet';
 import { updateAvailableMode } from '../workspaces/workspaceService';
 import type { AvailableMode, TransactionType } from '../types/contracts';
 
-import { calculateDashboardSummary, buildUpcomingReceivables } from '../finance/financeCalculations';
+import { calculateDashboardSummary, buildUpcomingReceivables, hasPendingCardLedgerActivity } from '../finance/financeCalculations';
 import { useCompleteCurrentMonth } from '../finance/useMonthlyTransactions';
 import { availableModeLabels, defaultAvailableMode } from '../finance/availableMode';
 import {
@@ -90,6 +90,9 @@ export function DashboardPage() {
   const welcomeTourSeen = useWelcomeTour((state) => state.seen);
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [tutorialDismissed, setTutorialDismissed] = useState(false);
+  // Disponível/Comprometido somam o total da fatura que só a Cloud Function atualiza — ela
+  // não roda offline. Ver comentário completo em hasPendingCardLedgerActivity.
+  const hasPendingCardActivity = hasPendingCardLedgerActivity(finance.transactions);
   const dashboard = calculateDashboardSummary({
     accounts: finance.accounts,
     transactions: finance.transactions,
@@ -335,6 +338,13 @@ export function DashboardPage() {
       </div>
 
       {finance.error || cardsData.error ? <div className="notice notice--danger" role="alert">{finance.error ?? cardsData.error}</div> : null}
+
+      {hasPendingCardActivity && (
+        <div className="notice" style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem' }}>
+          <WifiOff size={16} style={{ flexShrink: 0, marginTop: '0.15rem' }} aria-hidden="true" />
+          <span>Uma compra no cartão ainda não sincronizou — conecte-se à internet para atualizar o Disponível e o Comprometido.</span>
+        </div>
+      )}
 
       <BudgetAlertBanner />
 

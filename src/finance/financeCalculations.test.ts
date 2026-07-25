@@ -9,6 +9,7 @@ import {
   currentAccountBalances,
   currentTotalBalance,
   findNextIncomeDate,
+  hasPendingCardLedgerActivity,
   invertAccountEffects,
   mergeAccountEffects,
   transactionAccountEffects
@@ -614,6 +615,61 @@ describe('buildUpcomingCommitments', () => {
     );
 
     expect(commitments[0].description).toBe('Fatura jun 2026');
+  });
+});
+
+// Regressão (2026-07-24): Disponível/Comprometido no Dashboard e na lista de Cartões somam
+// invoice.outstandingBalanceCents, campo que só a Cloud Function atualiza — ela não roda
+// offline. Em vez de calcular o valor certo (exigiria carregar o ledger, custo que essas
+// telas evitam de propósito), um aviso honesto: "isso pode estar desatualizado".
+describe('hasPendingCardLedgerActivity', () => {
+  function localTxn(overrides: Partial<Transaction> & { localSyncStatus?: 'pending' | 'synced' }) {
+    return { ...transaction(overrides), localSyncStatus: overrides.localSyncStatus ?? 'synced' };
+  }
+
+  it('detecta uma compra no cartão ainda não sincronizada', () => {
+    const transactions = [localTxn({ type: 'card_purchase', localSyncStatus: 'pending' })];
+    expect(hasPendingCardLedgerActivity(transactions)).toBe(true);
+  });
+
+  it('detecta um pagamento de fatura ainda não sincronizado', () => {
+    const transactions = [localTxn({ type: 'card_payment', localSyncStatus: 'pending' })];
+    expect(hasPendingCardLedgerActivity(transactions)).toBe(true);
+  });
+
+  it('não acusa nada quando tudo já sincronizou', () => {
+    const transactions = [
+      localTxn({ type: 'card_purchase', localSyncStatus: 'synced' }),
+      localTxn({ type: 'card_payment', localSyncStatus: 'synced' })
+    ];
+    expect(hasPendingCardLedgerActivity(transactions)).toBe(false);
+  });
+
+  it('ignora transação pendente de outro tipo (não afeta fatura de cartão)', () => {
+    const transactions = [localTxn({ type: 'expense', localSyncStatus: 'pending' })];
+    expect(hasPendingCardLedgerActivity(transactions)).toBe(false);
+  });
+
+  // Regressão: excluir uma compra (softDeleteTransaction) marca deletedAt via batch.update,
+  // que fica pending do mesmo jeito até sincronizar — é esse update que dispara
+  // reverseCardPurchaseOnDelete (a Cloud Function que estorna a compra na fatura). Sem
+  // detectar isso, excluir uma compra offline deixaria o valor antigo (mais alto) sem aviso.
+  it('detecta uma compra que acabou de ser excluída (deletedAt ainda não sincronizado)', () => {
+    const transactions = [
+      localTxn({ type: 'card_purchase', localSyncStatus: 'pending', deletedAt: Timestamp.fromDate(new Date('2026-06-14')) })
+    ];
+    expect(hasPendingCardLedgerActivity(transactions)).toBe(true);
+  });
+
+  it('ignora uma compra já excluída E já sincronizada (exclusão antiga, não é mais notícia)', () => {
+    const transactions = [
+      localTxn({ type: 'card_purchase', localSyncStatus: 'synced', deletedAt: Timestamp.fromDate(new Date('2026-06-14')) })
+    ];
+    expect(hasPendingCardLedgerActivity(transactions)).toBe(false);
+  });
+
+  it('lista vazia não acusa nada', () => {
+    expect(hasPendingCardLedgerActivity([])).toBe(false);
   });
 });
 

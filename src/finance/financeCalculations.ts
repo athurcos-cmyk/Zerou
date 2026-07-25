@@ -3,6 +3,7 @@ import { formatFriendlyMonth, toDate } from './financeDates';
 import { defaultAvailableMode } from './availableMode';
 import { defaultCommittedWindowDays, nextPaydayFrom } from './payday';
 import type { Account, AvailableMode, Bill, CreditCard, Invoice, PaydayRule, Receivable, RecurringRule, Transaction } from '../types/contracts';
+import type { LocalSynced } from './financeService';
 
 export interface AccountBalance extends Account {
   balanceCents: number;
@@ -292,6 +293,39 @@ export function buildUpcomingCommitments(
 
   return [...billCommitments, ...recurringCommitments, ...invoiceCommitments].sort((left, right) =>
     compareAsc(left.dueAt, right.dueAt)
+  );
+}
+
+/**
+ * "Disponível"/"Comprometido" no Dashboard e o "Disponível" da lista de Cartões somam
+ * `invoice.outstandingBalanceCents` — um campo que só a Cloud Function
+ * (`invoiceLedgerEntryTrigger.ts`) atualiza, rodando no SERVIDOR depois que a escrita chega
+ * lá. Offline, ela nunca roda. `CardDetailPage`/`InvoicePage`/Análise já resolvem isso
+ * calculando ao vivo a partir do ledger que carregam sob demanda (`mergeInvoicesWithLedger`)
+ * — mas Dashboard/Cartões não carregam esse ledger, de propósito, pra não pagar o custo de
+ * leitura em toda tela de resumo/lista (ver `docs/COSTS.md`). Em vez de calcular o valor
+ * certo sem esse dado, avisa que ele pode estar desatualizado — honesto em vez de preciso.
+ *
+ * Detecta pela transação, não pelo lançamento da fatura: `card_purchase`/`card_payment` já
+ * são gravados em `finance.transactions` (que o boot já carrega) no MESMO batch que cria o
+ * lançamento — se a transação ainda não sincronizou (`localSyncStatus: 'pending'`, o próprio
+ * Firestore dizendo "não cheguei no servidor"), o lançamento correspondente também não
+ * chegou, e a Cloud Function não teve chance de rodar. Zero leitura nova.
+ *
+ * Cobre criar E excluir: excluir uma compra (`softDeleteTransaction`) faz um `batch.update()`
+ * marcando `deletedAt`, que fica `localSyncStatus: 'pending'` do mesmo jeito até sincronizar
+ * — é esse update que dispara a OUTRA Cloud Function relevante, `reverseCardPurchaseOnDelete`
+ * (estorna a compra na fatura). Sem contar `deletedAt` aqui, excluir uma compra offline
+ * deixaria "Comprometido"/"Disponível" com o valor antigo (mais alto) e SEM aviso nenhum —
+ * o próprio bug que este aviso existe pra evitar, só que na ponta de excluir em vez de criar.
+ *
+ * Limite conhecido: crédito/tarifa lançados direto na fatura (`recordInvoiceCredit`/
+ * `recordInvoiceFee`) não criam transação — ficam fora dessa detecção. Ação bem mais rara
+ * que lançar compra; o pior caso é igual ao de hoje (sem aviso), não uma regressão.
+ */
+export function hasPendingCardLedgerActivity(transactions: Array<LocalSynced<Transaction>>): boolean {
+  return transactions.some(
+    (t) => (t.type === 'card_purchase' || t.type === 'card_payment') && t.localSyncStatus === 'pending'
   );
 }
 
