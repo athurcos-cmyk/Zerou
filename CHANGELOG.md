@@ -2,6 +2,17 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-25 — fix: Dashboard travava Saldo total/Resumo de gastos/Transações recentes esperando cartão sincronizar, mesmo sem precisar dele
+
+Achado pelo dono: lançou transações pela Vic no WhatsApp com o app fechado, abriu o app depois e a tela inicial inteira (até o Saldo total) ficou presa na versão antiga até ele entrar na aba Transações. Causa: `DashboardPage.tsx` tinha uma única trava de cache (`isCommittedLoading` = finanças **e** cartões/faturas) decidindo quando trocar do cache local pro dado ao vivo — mas Saldo total, Resumo de gastos e Transações recentes (`calculateDashboardSummary`) nunca dependeram de cartão nenhum. Quando cartões/faturas demoram mais que finanças pra sincronizar (comum num boot frio), a tela inteira ficava refém do card mais lento. Corrigido com uma trava separada (`financeCache`, só `finance.loading`) pras três seções que não usam cartão; "Disponível"/"Comprometido"/"Próximos compromissos" continuam na trava combinada (genuinamente precisam de fatura). `npm run typecheck`/`test` (415) limpos, verificado ao vivo no navegador.
+
+## 2026-07-25 — fix: Vic (app + WhatsApp) parada por descontinuação de modelo da DeepSeek; consolidação do intent `out_of_scope` no WhatsApp
+
+- **Vic não respondia nem no app nem no WhatsApp**: a DeepSeek descontinuou o modelo `deepseek-chat` em 2026-07-24 15:59 UTC — toda chamada de IA passou a falhar com erro 400. Corrigido migrando pra `deepseek-v4-flash` (`deepseekClient.ts`). Achado só depois de investigar por que o WhatsApp não respondia (causa inicial suspeitada — recriação do número do bot na Meta — era real mas separada; corrigida antes, expôs o problema de verdade).
+- **Bug de log encontrado no caminho**: `logger.error(str, { message: err.message })` do `firebase-functions` sempre sobrescreve `message` com um stack trace sintético — o erro real da DeepSeek estava sendo silenciosamente descartado dos logs. Corrigido em `webhookHandler.ts`/`metaClient.ts`.
+- **WhatsApp: 4 intents negativos viram 1** (`advanced_card_action`/`unsupported_action`/`bill_management_action`/`advisory_decision` → `out_of_scope` + campo `suggestedScreen`) — o prompt do classificador só crescia a cada edge case novo descoberto, e qualquer pedido não enumerado caía no "não entendi" genérico mesmo quando o bot entendeu perfeitamente. Agora a lista do que a Vic FAZ é curta e estável; qualquer outro pedido claro vira redirecionamento pra tela certa do app. `question` também foi restringido a consulta pontual/autocontida — pergunta de análise mais aberta/comparativa agora redireciona pro app (aba Assistente, que guarda histórico) em vez de arriscar responder errado uma pergunta de acompanhamento.
+- 124 testes (functions) passando, deploy feito e verificado ao vivo pelo WhatsApp real. Detalhe completo em `docs/history/2026-07.md`, `docs/whatsapp/WHATSAPP.md` e `docs/ai/VIC.md`.
+
 ## 2026-07-24 — chore: Patrimônio Líquido descontinuado — código removido
 
 Desde 16/07 a feature estava desativada mas com o código intacto ("talvez no futuro faremos"). Decisão do dono hoje: descontinuar de vez, não é mais "talvez".

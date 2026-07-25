@@ -53,8 +53,8 @@ Itens acionáveis. Fechou? Mova para "Concluído" ou remova. Detalhe histórico 
 - [ ] `recordRecurringPayment` (`financeService.ts`) usa `opts.accountId || rule.accountId` — mesmo padrão que foi corrigido pra `??` em `payBill` (2026-07-12), mas o gêmeo ficou pra trás. Inofensivo hoje (único caller já normaliza `''` pra `undefined`); trocar por `??` quando mexer nessa função de novo.
 
 ### WhatsApp — Fase 2 (funcionalidades avançadas, fora do escopo atual)
-- [ ] Parcela de compra que já estava em andamento antes de usar o WhatsApp, antecipar parcela/fatura, renegociar — hoje o bot (`webhookHandler.ts`, intent `advanced_card_action`) redireciona pro app em vez de executar. Decisão de produto, não implementar sem pedido explícito.
-- [ ] Editar/excluir lançamento por mensagem (intent `unsupported_action`, 2026-07-16) — hoje só orienta a usar o app. Se decidir implementar no futuro, ver `docs/whatsapp/WHATSAPP.md` pro fluxo de intenção já existente.
+- [ ] Parcela de compra que já estava em andamento antes de usar o WhatsApp, antecipar parcela/fatura, renegociar — hoje o bot (`webhookHandler.ts`, intent `out_of_scope` com `suggestedScreen: 'cartoes'`) redireciona pro app em vez de executar. Decisão de produto, não implementar sem pedido explícito.
+- [ ] Editar/excluir lançamento por mensagem (intent `out_of_scope` com `suggestedScreen: 'transacoes'`, unificado em 2026-07-25 — antes era `unsupported_action`) — hoje só orienta a usar o app. Se decidir implementar no futuro, ver `docs/whatsapp/WHATSAPP.md` pro fluxo de intenção já existente.
 
 > A Fase 1 (vínculo de conta, extração de gasto/receita via DeepSeek, criação de categoria, perguntas financeiras, compra no cartão parcelada) já está em produção desde 2026-07-15/16 — ver `docs/whatsapp/WHATSAPP.md` (documento canônico) e `docs/history/2026-07.md`. Este item ficou desatualizado por um tempo listando como "pendente" trabalho que já tinha sido entregue — corrigido em 2026-07-16.
 

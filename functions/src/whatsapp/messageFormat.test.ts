@@ -9,6 +9,7 @@ import {
   categoryAlreadyExistsMessage,
   numberedList,
   pendingChoicePrompt,
+  outOfScopeMessage,
 } from './messageFormat.js';
 
 describe('formatBRL', () => {
@@ -80,5 +81,26 @@ describe('pendingChoicePrompt', () => {
   it('monta emoji, pergunta em negrito, lista e instrução em itálico', () => {
     const msg = pendingChoicePrompt({ emoji: '💳', question: 'Qual cartão usar?', labels: ['Nubank', 'Itaú'], instructions: 'Responda com o número.' });
     expect(msg).toBe('💳 *Qual cartão usar?*\n\n1. Nubank\n2. Itaú\n\n_Responda com o número._');
+  });
+});
+
+describe('outOfScopeMessage', () => {
+  it('aponta a aba certa por tela', () => {
+    expect(outOfScopeMessage('transacoes')).toContain('*Transações*');
+    expect(outOfScopeMessage('contas')).toContain('*Contas*');
+    expect(outOfScopeMessage('contas_a_pagar')).toContain('*Contas a Pagar*');
+    expect(outOfScopeMessage('contas_a_receber')).toContain('*Contas a Receber*');
+    expect(outOfScopeMessage('cartoes')).toContain('*Cartões*');
+    expect(outOfScopeMessage('metas')).toContain('*Metas*');
+    expect(outOfScopeMessage('analise')).toContain('*Análise*');
+    expect(outOfScopeMessage('assistente')).toContain('*Assistente*');
+  });
+
+  it('assistente convida pra conversa, não só recusa', () => {
+    expect(outOfScopeMessage('assistente')).toContain('pensar nela com calma');
+  });
+
+  it('geral cobre o fallback sem tela específica', () => {
+    expect(outOfScopeMessage('geral')).not.toContain('*');
   });
 });

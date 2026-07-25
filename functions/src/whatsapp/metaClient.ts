@@ -61,7 +61,10 @@ export async function sendWhatsAppMessage(phoneNumber: string, text: string): Pr
   } catch (err) {
     const msg = (err as Error)?.message ?? '';
     if (!msg.startsWith('WhatsApp API returned')) {
-      logger.error('whatsapp_send_network_error', { phoneNumber, message: msg });
+      // `logger.error(str, obj)` sobrescreve `obj.message` com um stack trace sintético
+      // (comportamento do firebase-functions/lib/logger) — a mensagem real precisa ir
+      // dentro da primeira string pra sobreviver, não como campo `message` do objeto.
+      logger.error(`whatsapp_send_network_error: ${msg}`, { phoneNumber });
     }
     throw err;
   }

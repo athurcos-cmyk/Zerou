@@ -33,7 +33,9 @@ export async function callDeepSeek(
 
   try {
     const body: Record<string, unknown> = {
-      model: 'deepseek-chat',
+      // 'deepseek-chat' foi descontinuado pela DeepSeek em 2026-07-24 15:59 UTC — vira
+      // 'deepseek-v4-flash' (thinking mode desligado por padrao, igual o comportamento antigo).
+      model: 'deepseek-v4-flash',
       messages,
       temperature: 0.3,
       max_tokens: 1024,

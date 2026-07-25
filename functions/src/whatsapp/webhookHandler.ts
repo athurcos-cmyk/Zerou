@@ -28,6 +28,7 @@ import {
   categoryCreatedMessage,
   categoryAlreadyExistsMessage,
   pendingChoicePrompt,
+  outOfScopeMessage,
 } from './messageFormat.js';
 
 const region = 'southamerica-east1';
@@ -364,42 +365,13 @@ export const whatsappWebhook = onRequest(
         return;
       }
 
-      // ── Acao avancada de cartao (parcela em andamento, antecipar, renegociar) ──
-      if (interpretation.intent === 'advanced_card_action') {
-        await sendWhatsAppMessage(
-          phone,
-          '🧭 Isso aqui é mais avançado — dá uma olhada em *Cartões* no app pra fazer isso (parcela que já estava em andamento, antecipar parcela/fatura, renegociar).',
-        );
-        return;
-      }
-
-      // ── Editar/excluir algo ja lancado (transacao, conta, meta, recorrencia) ──
-      if (interpretation.intent === 'unsupported_action') {
-        await sendWhatsAppMessage(
-          phone,
-          '✋ Editar ou excluir algo que você já lançou é melhor fazer direto pelo app — evita eu mexer na coisa errada sem querer.\n\nPor aqui eu só crio lançamentos novos e respondo perguntas.',
-        );
-        return;
-      }
-
-      // ── Criar conta a pagar/recorrencia (compromisso futuro, nao um gasto ja feito) ──
-      if (interpretation.intent === 'bill_management_action') {
-        await sendWhatsAppMessage(
-          phone,
-          '📋 Cadastrar conta a pagar ou recorrência é melhor fazer direto pelo app, na aba *Contas a Pagar* — lá dá pra definir vencimento, frequência e até pagar no cartão.\n\nPor aqui eu só registro lançamentos que já aconteceram (gasto, receita, compra no cartão).',
-        );
-        return;
-      }
-
-      // ── Decisao financeira grande (emprestimo, investir reserva, renegociar divida) —
-      // redireciona pro app: a Vic por la tem historico de conversa e consegue ir e voltar
-      // com a pessoa pra ajudar a pensar, o que o WhatsApp (mensagem isolada, sem memoria)
-      // nao faz direito. O WhatsApp fica focado em lancamento e pergunta rapida do dia a dia.
-      if (interpretation.intent === 'advisory_decision') {
-        await sendWhatsAppMessage(
-          phone,
-          '🧠 Essa é uma decisão grande — vale mais a pena pensar nela com calma comigo lá no app, na aba *Assistente*. Lá a gente consegue ir e voltar na conversa direito.\n\nPor aqui eu foco em lançamentos e perguntas rápidas do dia a dia. 💛',
-        );
+      // ── Fora do escopo do WhatsApp (editar/excluir algo existente, criar conta a
+      // pagar/recorrencia, acao avancada de cartao, decisao financeira grande/investimento —
+      // qualquer coisa fora da lista curta do que o bot faz por aqui) ──
+      if (interpretation.intent === 'out_of_scope') {
+        const screen = interpretation.suggestedScreen ?? 'geral';
+        logger.info('whatsapp_out_of_scope', { phone, workspaceId, suggestedScreen: screen });
+        await sendWhatsAppMessage(phone, outOfScopeMessage(screen));
         return;
       }
 
@@ -695,7 +667,10 @@ export const whatsappWebhook = onRequest(
         amountCents: result.amountCents,
       });
     } catch (err) {
-      logger.error('whatsapp_webhook_error', { message: (err as Error).message });
+      // `logger.error(str, obj)` sobrescreve `obj.message` com um stack trace sintético
+      // (comportamento do firebase-functions/lib/logger) — a mensagem real do erro precisa
+      // ir dentro da primeira string pra sobreviver, não como campo `message` do objeto.
+      logger.error(`whatsapp_webhook_error: ${(err as Error)?.message}`, { stack: (err as Error)?.stack });
     }
   },
 );

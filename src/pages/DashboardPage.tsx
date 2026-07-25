@@ -145,6 +145,16 @@ export function DashboardPage() {
   // cache != null → mostra os dados cacheados. Cobre: (a) boot normal (loading=true),
   // (b) depois do boot timeout sem dados (loading=false, arrays vazios, mas cache existe).
   const cache = (cachedView && (isCommittedLoading || !hasStarted)) ? cachedView : null;
+  // Saldo total/Resumo de gastos/Transações recentes não dependem de cartão nenhum
+  // (`calculateDashboardSummary` calcula os três só a partir de accounts/transactions) —
+  // mas antes ficavam presos no cache até `cardsData` TAMBÉM resolver, mesmo sem precisar
+  // dela. Isso prendia a tela inteira (inclusive o Saldo total) na versão em cache por mais
+  // tempo do que o necessário sempre que os cartões/faturas demoravam mais que as finanças
+  // pra sincronizar (ex.: lançamento feito pela Vic no WhatsApp com o app fechado — as
+  // transações chegam rápido, os cartões podem levar mais um instante). Gate próprio, só
+  // com `isLoading` (finanças), pra essas três seções trocarem pro dado ao vivo assim que
+  // finanças sincronizarem, sem esperar cartão.
+  const financeCache = (cachedView && (isLoading || !hasStarted)) ? cachedView : null;
 
   const effectiveFreeToSpend = cache
     ? cache.freeToSpendCents
@@ -160,8 +170,8 @@ export function DashboardPage() {
       : null;
   }, [dashboard.committedCutoff, effectiveFreeToSpend]);
 
-  const totalBalanceDisplay = cache
-    ? formatMoney(cache.totalBalanceCents)
+  const totalBalanceDisplay = financeCache
+    ? formatMoney(financeCache.totalBalanceCents)
     : isLoading
       ? '—'
       : formatMoney(dashboard.totalBalanceCents);
@@ -226,12 +236,14 @@ export function DashboardPage() {
 
   // Enquanto ainda carrega, renderiza o que o cache guardou; quando o dado real chega, troca
   // sem piscar (na imensa maioria das aberturas os dois são idênticos, então é imperceptível).
-  const effectiveSpending: CachedSpendingRow[] = cache ? cache.spending : liveSpending;
+  // Spending/recent usam `financeCache` (só finanças) — não dependem de cartão, não devem
+  // esperar por ele. Commitments usa `cache` (combinado) — inclui fatura de cartão.
+  const effectiveSpending: CachedSpendingRow[] = financeCache ? financeCache.spending : liveSpending;
   const effectiveCommitments: CommitmentView[] = cache
     ? cache.commitments.map((commitment) => ({ ...commitment, dueAt: new Date(commitment.dueAtISO) }))
     : dashboard.upcomingCommitments;
-  const effectiveRecent: RecentTransactionView[] = cache
-    ? cache.recentTransactions.map((transaction) => ({
+  const effectiveRecent: RecentTransactionView[] = financeCache
+    ? financeCache.recentTransactions.map((transaction) => ({
         id: transaction.id,
         type: transaction.type,
         description: transaction.description,
@@ -250,8 +262,9 @@ export function DashboardPage() {
   const previousMonthSpendCents = spendingSource
     .filter((transaction) => isCountableSpend(transaction, previousMonth))
     .reduce((sum, transaction) => sum + transaction.amountCents, 0);
+  // Variação de gasto usa só transações — `isLoading` (finanças), não o combinado com cartão.
   const spendingVariationPct =
-    !isCommittedLoading && previousMonthSpendCents > 0
+    !isLoading && previousMonthSpendCents > 0
       ? Math.round(((currentMonthSpendCents - previousMonthSpendCents) / previousMonthSpendCents) * 100)
       : null;
 
@@ -320,7 +333,7 @@ export function DashboardPage() {
     : isCommittedLoading
       ? 'Contas e fatura.'
       : committedCaption;
-  const effectiveVariationPct = cache ? cache.spendingVariationPct : spendingVariationPct;
+  const effectiveVariationPct = financeCache ? financeCache.spendingVariationPct : spendingVariationPct;
 
   // "Próximos a receber": só o que vence em ≤5 dias, no fim da tela e SEM entrar em nenhum total —
   // dinheiro a receber não é dinheiro que se tem (ver docs/planning/CONTAS_A_RECEBER.md).

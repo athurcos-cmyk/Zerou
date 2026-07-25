@@ -17,13 +17,28 @@ export type MessageIntent =
   | 'income'
   | 'transfer'
   | 'card_purchase'
-  | 'advanced_card_action'
-  | 'unsupported_action'
-  | 'bill_management_action'
   | 'create_category'
   | 'question'
-  | 'advisory_decision'
+  | 'out_of_scope'
   | 'unclear';
+
+/**
+ * Tela do app sugerida quando intent === 'out_of_scope' — substitui os antigos intents
+ * `advanced_card_action`/`unsupported_action`/`bill_management_action`/`advisory_decision`
+ * (cada um exigia sua própria explicação extensa no prompt pra IA discriminar). Agora a IA só
+ * precisa saber a lista curta do que a Vic FAZ; qualquer outro pedido claro vira
+ * `out_of_scope` + a tela mais provável — não precisa de um intent novo por caso novo.
+ */
+export type OutOfScopeScreen =
+  | 'transacoes'
+  | 'contas'
+  | 'contas_a_pagar'
+  | 'contas_a_receber'
+  | 'cartoes'
+  | 'metas'
+  | 'analise'
+  | 'assistente'
+  | 'geral';
 
 export interface MessageInterpretation {
   intent: MessageIntent;
@@ -40,6 +55,8 @@ export interface MessageInterpretation {
   sourceAccountId: string | null;
   /** transfer: conta de destino citada na mensagem, se identificável. */
   destinationAccountId: string | null;
+  /** Só preenchido quando intent === 'out_of_scope'; null nos outros casos. */
+  suggestedScreen: OutOfScopeScreen | null;
   confidence: 'high' | 'low';
 }
 
@@ -47,7 +64,7 @@ function buildSystemPrompt(): string {
   return `Voce interpreta mensagens em portugues brasileiro enviadas ao bot financeiro Granativa via WhatsApp.
 Retorne SOMENTE um JSON com este formato:
 {
-  "intent": "expense" | "income" | "transfer" | "card_purchase" | "advanced_card_action" | "unsupported_action" | "bill_management_action" | "create_category" | "question" | "advisory_decision" | "unclear",
+  "intent": "expense" | "income" | "transfer" | "card_purchase" | "create_category" | "question" | "out_of_scope" | "unclear",
   "amountCents": inteiro em centavos (0 se nao aplicavel),
   "description": descricao curta (max 80 chars, "" se nao aplicavel),
   "installments": numero de parcelas (1 se nao mencionado ou compra a vista, so relevante pra card_purchase),
@@ -59,50 +76,73 @@ Retorne SOMENTE um JSON com este formato:
     dinheiro), ou null se a mensagem nao citar conta nenhuma ou nenhuma bater com confianca,
   "sourceAccountId": id da conta EXISTENTE de origem, so pra intent transfer, ou null se nao identificavel,
   "destinationAccountId": id da conta EXISTENTE de destino, so pra intent transfer, ou null se nao identificavel,
+  "suggestedScreen": "transacoes" | "contas" | "contas_a_pagar" | "contas_a_receber" | "cartoes" | "metas" |
+    "analise" | "assistente" | "geral" — SO preenchido quando intent="out_of_scope" (tela do app que resolve
+    o pedido), null nos outros casos,
   "confidence": "high" | "low"
 }
 
-Como classificar intent:
+Como classificar intent — a Vic SO faz estas 6 coisas por mensagem. Qualquer pedido claro fora dessas 6 e
+out_of_scope (ver abaixo), nunca force numa das 6 so porque a mensagem tem valor/descricao parecido:
 - expense: relata gasto/compra/pagamento feito SEM ser no cartao de credito (dinheiro, pix, debito, conta).
 - income: relata recebimento (salario, freela, deposito, etc.).
 - transfer: move dinheiro de UMA conta do usuario pra OUTRA conta do usuario ("transfere 100 do nubank pro
   itau", "passa 50 da carteira pra poupanca", "movi 200 pro itau"). NUNCA use transfer pra pagamento de
   fatura de cartao ou pra um gasto/recebimento comum com uma unica conta envolvida.
-- card_purchase: compra feita NO CARTAO DE CREDITO, a vista ou parcelada (menciona "no cartao", "cartao de
-  credito", "parcelei", "em Nx", "N vezes"). Compra no cartao sem parcelamento mencionado tambem e
-  card_purchase (installments=1, "a vista no cartao").
-- advanced_card_action: pedido MAIS AVANCADO sobre cartao que o bot NAO executa — uma compra parcelada que
-  JA ESTAVA EM ANDAMENTO antes de usar o WhatsApp ("ja estou pagando", "parcela X de Y", "proxima parcela e
-  a Z"), antecipar parcela, antecipar fatura, renegociar fatura. Esses pedidos NUNCA devem ser executados
-  como card_purchase — classifique como advanced_card_action pra serem redirecionados ao app.
-- unsupported_action: pedido pra EDITAR, EXCLUIR, APAGAR ou CORRIGIR algo que ja foi lancado antes (uma
-  transacao, conta a pagar, meta, recorrencia, cartao) — o bot NAO faz isso por mensagem, so cria
-  lancamentos novos. Ex.: "exclui essa transacao", "apaga o gasto de mercado", "corrige o valor pra 50",
-  "muda a categoria daquela despesa", "remove a conta de luz". Diferente de advanced_card_action (que e
-  so sobre fatura/parcela de cartao) — este cobre qualquer edicao/exclusao de algo ja existente.
-- bill_management_action: pedido pra CRIAR ou CADASTRAR uma conta a pagar, recorrencia, conta fixa ou
-  assinatura recorrente — um compromisso FUTURO com vencimento/repeticao, NAO um gasto que ja aconteceu.
-  Ex.: "cria uma conta pra pagar o aluguel todo mes", "quero cadastrar a Netflix como conta fixa",
-  "adiciona uma conta avulsa da internet que vence dia 10", "poe minha academia como recorrencia mensal",
-  "cadastra uma assinatura de R$40 todo mes". O bot NAO cria conta a pagar/recorrencia por mensagem, so
-  lancamentos que ja aconteceram (expense/income/card_purchase). Diferente de expense/card_purchase (que
-  registram um gasto/compra JA FEITO agora) e de unsupported_action (que e sobre editar/excluir algo que
-  JA EXISTE) — este cobre pedido de CRIAR um compromisso futuro/recorrente novo.
+- card_purchase: compra NOVA feita NO CARTAO DE CREDITO, a vista ou parcelada (menciona "no cartao", "cartao
+  de credito", "parcelei", "em Nx", "N vezes"). Compra no cartao sem parcelamento mencionado tambem e
+  card_purchase (installments=1, "a vista no cartao"). So compra nova — NUNCA uma parcela que ja estava em
+  andamento antes de usar o WhatsApp (isso e out_of_scope, suggestedScreen "cartoes").
 - create_category: PEDIDO EXPLICITO para criar categoria (verbos "cria"/"criar"/"adiciona" + a palavra "categoria").
   NUNCA use create_category so porque a categoria ideal nao existe — nesse caso e expense/income/card_purchase
   com categoryId null.
-- question: pergunta sobre a situacao financeira (saldo, gastos, metas, contas a pagar) — CONSULTA de dado
-  que ja existe, tipo "quanto gastei", "quanto tenho disponivel", "minhas contas venceram?".
-- advisory_decision: pergunta pedindo OPINIAO sobre uma decisao financeira GRANDE ou de risco, OU qualquer
-  pergunta sobre INVESTIMENTO — pegar emprestimo, financiamento, renegociar divida, tirar um cartao novo ou
-  se vale a pena pagar/manter uma anuidade, ou investimento de qualquer tipo (onde investir, vale a pena
-  investir em acoes/tesouro direto/fundos/criptomoeda/previdencia, etc.) — ou qualquer escolha que
-  compromete o orcamento por varios meses ou e dificil de desfazer. Ex.: "devo pegar um emprestimo pra
-  quitar a fatura?", "vale a pena investir em X?", "e melhor renegociar essa divida ou parcelar de novo?",
-  "vale a pena tirar esse cartao, tem anuidade de 500?". NAO classifique como advisory_decision perguntas
-  rotineiras (question) nem decisoes pequenas do dia a dia (tipo "posso comprar isso?", "vale a pena esse
-  gasto?") — so decisoes realmente grandes/dificeis de desfazer e QUALQUER pergunta de investimento contam.
-- unclear: nenhum valor/pedido claro.
+- question: pergunta sobre a situacao financeira que pede UM dado ESPECIFICO e AUTOCONTIDO — responde sozinha,
+  sem precisar de contexto de mensagem anterior nenhuma. Ex.: "quanto gastei esse mes", "quanto tenho
+  disponivel", "minhas contas venceram?", "quanto ja gastei em mercado". NAO classifique como question pedido
+  de ANALISE mais aberta/comparativa (ver out_of_scope "analise" abaixo) — o WhatsApp responde cada mensagem
+  isolada, sem guardar as anteriores, entao um pedido que normalmente puxa pergunta de acompanhamento
+  ("e por categoria?", "e comparado a quando?") sempre sairia errado por aqui.
+- out_of_scope: a mensagem tem um pedido ou intencao CLARA, mas de algo que o bot NAO executa por mensagem —
+  qualquer coisa fora das 5 categorias de acao acima (expense/income/transfer/card_purchase/create_category)
+  ou da question. Preencha "suggestedScreen" com a tela do app mais provavel pra resolver o pedido. Casos
+  comuns (lista NAO exaustiva — use o espirito da regra pra casos parecidos que nao estao aqui):
+  * Editar, excluir, apagar ou corrigir uma transacao ja lancada ("exclui essa transacao", "corrige o valor
+    pra 50", "muda a categoria daquela despesa") -> suggestedScreen "transacoes".
+  * Editar, excluir ou renomear uma conta bancaria/carteira ja cadastrada ("renomeia minha conta nubank",
+    "apaga a conta poupanca que nao uso mais") -> suggestedScreen "contas".
+  * Criar, editar ou excluir conta a pagar, recorrencia, conta fixa ou assinatura recorrente — compromisso
+    FUTURO com vencimento/repeticao, NAO um gasto que ja aconteceu ("cria uma conta pra pagar o aluguel todo
+    mes", "cadastra a Netflix como conta fixa", "poe minha academia como recorrencia mensal", "muda o
+    vencimento daquela conta", "cancela essa recorrencia") -> suggestedScreen "contas_a_pagar". NUNCA
+    confunda com expense/card_purchase (que registram um gasto JA FEITO agora).
+  * O mesmo pra conta a RECEBER (criar/editar/excluir um valor a receber de terceiros) -> suggestedScreen
+    "contas_a_receber".
+  * Acao avancada de cartao que o bot nao executa: compra parcelada que JA ESTAVA EM ANDAMENTO antes de usar
+    o WhatsApp ("ja estou pagando", "parcela X de Y", "proxima parcela e a Z"), antecipar parcela/fatura,
+    renegociar fatura, ou editar/excluir um cartao cadastrado -> suggestedScreen "cartoes".
+  * Criar, editar ou excluir uma meta -> suggestedScreen "metas".
+  * Criar/editar limite de orcamento por categoria -> suggestedScreen "analise".
+  * Pedido de ANALISE financeira mais ampla ou comparativa — nao um dado especifico isolado (ver "question"
+    acima). Ex.: "como estao minhas financas esse mes", "faz uma analise dos meus gastos", "como foi
+    comparado ao mes passado", "qual a tendencia dos meus gastos", "me da um resumo geral" -> suggestedScreen
+    SEMPRE "assistente" (NUNCA "analise" aqui). Motivo: esse tipo de pergunta normalmente puxa pergunta de
+    acompanhamento ("e por categoria?", "e comparado a quando?") e o WhatsApp nao guarda historico de
+    conversa nenhum (cada mensagem e isolada) — o acompanhamento sempre sairia errado por aqui. No app, a
+    aba Assistente guarda as ultimas mensagens e consegue continuar a conversa direito.
+  * Decisao financeira GRANDE ou de risco (pegar emprestimo, financiamento, renegociar divida, tirar cartao
+    novo ou vale a pena manter/pagar uma anuidade) OU qualquer pergunta sobre INVESTIMENTO (onde investir,
+    vale a pena investir em acoes/tesouro direto/fundos/criptomoeda/previdencia etc.), ou qualquer escolha
+    que compromete o orcamento por varios meses ou e dificil de desfazer -> suggestedScreen SEMPRE
+    "assistente" (NUNCA "geral" aqui — decisao grande merece conversa de verdade com historico, nao um
+    redirecionamento seco). Ex.: "devo pegar um emprestimo pra quitar a fatura?", "vale a pena investir em
+    X?", "e melhor renegociar essa divida ou parcelar de novo?". NAO classifique como out_of_scope decisoes
+    PEQUENAS do dia a dia ("posso comprar isso?", "vale a pena esse gasto?") — essas sao question (se
+    pedirem um dado real) ou unclear (se nao houver pedido/valor claro nenhum).
+  * Qualquer outro pedido de acao ou mudanca de configuracao que o bot nao faz e nao se encaixa em nenhuma
+    tela acima -> suggestedScreen "geral".
+- unclear: nenhum valor/pedido claro identificavel (cumprimento, mensagem vazia, texto sem sentido financeiro
+  nenhum) — diferente de out_of_scope, que E um pedido claro, so que de algo que o bot nao executa por
+  mensagem.
 
 Regras de valor: "10 reais"=1000, "R$ 5,50"=550, "cinco e cinquenta"=550, "dois conto"=200.
 Se expense/income/transfer/card_purchase sem valor claro: amountCents=0, confidence="low".
@@ -179,12 +219,12 @@ export async function interpretMessage(
       accountId?: string | null;
       sourceAccountId?: string | null;
       destinationAccountId?: string | null;
+      suggestedScreen?: string | null;
       confidence?: string;
     };
 
     const validIntents: MessageIntent[] = [
-      'expense', 'income', 'transfer', 'card_purchase', 'advanced_card_action', 'unsupported_action',
-      'bill_management_action', 'create_category', 'question', 'advisory_decision', 'unclear',
+      'expense', 'income', 'transfer', 'card_purchase', 'create_category', 'question', 'out_of_scope', 'unclear',
     ];
     const intent: MessageIntent = validIntents.includes(parsed.intent as MessageIntent)
       ? (parsed.intent as MessageIntent)
@@ -229,6 +269,13 @@ export async function interpretMessage(
       destinationAccountId = null;
     }
 
+    const validScreens: OutOfScopeScreen[] = [
+      'transacoes', 'contas', 'contas_a_pagar', 'contas_a_receber', 'cartoes', 'metas', 'analise', 'assistente', 'geral',
+    ];
+    const suggestedScreen: OutOfScopeScreen | null = intent === 'out_of_scope'
+      ? (validScreens.includes(parsed.suggestedScreen as OutOfScopeScreen) ? (parsed.suggestedScreen as OutOfScopeScreen) : 'geral')
+      : null;
+
     return {
       intent,
       amountCents,
@@ -241,6 +288,7 @@ export async function interpretMessage(
       accountId,
       sourceAccountId,
       destinationAccountId,
+      suggestedScreen,
       confidence: parsed.confidence === 'high' ? 'high' : 'low',
     };
   } catch {
