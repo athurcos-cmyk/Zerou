@@ -43,15 +43,20 @@ describe('useMonthlyTransactions', () => {
     expect(mocks.subscribeTransactionsForMonths).not.toHaveBeenCalled();
   });
 
-  it('destrava o loading no timeout se o listener nunca responder (offline, cache vazio)', () => {
+  // Regressão (2026-07-24): antes, um timeout de 2.5s forçava loading=false + transactions=[]
+  // mesmo sem resposta nenhuma — em rede lenta (não offline de verdade), isso mostrava "sem
+  // dados" falso pra quem só estava demorando mais que 2.5s pra receber uma resposta REAL.
+  // Removido: `loading` só resolve com uma resposta de verdade (sucesso ou erro do próprio
+  // Firestore), nunca por decurso de tempo — o retry sustentado do SDK nunca desiste sozinho.
+  it('NÃO destrava o loading sozinho se o listener nunca responder — só com resposta real', () => {
     mocks.subscribeTransactionsForMonths.mockImplementation(() => vi.fn()); // nunca chama onNext
     const { result } = renderHook(() => useMonthlyTransactions('ws1', ['2026-07']));
 
     expect(result.current.loading).toBe(true);
     act(() => {
-      vi.advanceTimersByTime(2500);
+      vi.advanceTimersByTime(60_000);
     });
-    expect(result.current.loading).toBe(false);
+    expect(result.current.loading).toBe(true);
     expect(result.current.transactions).toEqual([]);
   });
 

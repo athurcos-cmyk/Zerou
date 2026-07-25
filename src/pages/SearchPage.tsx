@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Calendar, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, EllipsisVertical, Gauge, HelpCircle, LineChart, Loader2, Minus, Plus, Search, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
+import { Calendar, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, EllipsisVertical, Gauge, HelpCircle, LineChart, Minus, Plus, Search, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
 import {
   PieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -12,11 +12,13 @@ import { AnnualSummarySheet } from '../components/AnnualSummarySheet';
 import { CategoryTrendSheet } from '../components/CategoryTrendSheet';
 import { BottomSheet } from '../components/BottomSheet';
 import { EmptyState } from '../components/EmptyState';
+import { LoadingState } from '../components/LoadingState';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { mergeInvoicesWithLedger, useInvoiceLedger } from '../cards/useInvoiceLedger';
 import { formatFriendlyDate, toDate } from '../finance/financeDates';
 import { dedupeById, nextOccurrenceDate } from '../finance/financeService';
 import { useMonthlyTransactions } from '../finance/useMonthlyTransactions';
+import { useIsOnline } from '../finance/useIsOnline';
 import { billStatusLabels, transactionTypeLabels } from '../finance/financeLabels';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { centsToInputValue } from '../finance/money';
@@ -129,17 +131,6 @@ function MetricCard({ label, value, sub, accent = false, icon, long = false }: {
   );
 }
 
-// Placeholder mostrado enquanto os dados ainda não resolveram — evita confundir "carregando"
-// com "mês genuinamente vazio" (ver EmptyState logo abaixo, que é só pro caso vazio de verdade).
-function ChartLoadingState({ compact = false }: { compact?: boolean }) {
-  return (
-    <div className={`empty-state${compact ? ' empty-state--compact' : ''}`}>
-      <Loader2 size={28} style={{ animation: 'spin 0.9s linear infinite', color: 'var(--text-secondary)' }} aria-hidden="true" />
-      <strong className="empty-state-title">Carregando seus dados…</strong>
-    </div>
-  );
-}
-
 // ─── componente principal ──────────────────────────────────────────────────────
 
 export function SearchPage() {
@@ -186,28 +177,9 @@ export function SearchPage() {
     [finance.transactions, analysis.transactions]
   );
 
-  // "Sem gasto" e "ainda carregando" pareciam a mesma coisa pro usuário: o donut e o
-  // histórico só olhavam o total calculado, sem checar se a fonte já resolveu. Numa
-  // conta nova/rede lenta a tela mostrava "nenhum gasto" por alguns segundos até os
-  // dados chegarem sozinhos (sem re-render visível de erro) — parecia quebrado até
-  // alguém trocar de tela e voltar (o que reassina do zero e geralmente já pega o
-  // dado pronto). Mesmo padrão que o Dashboard já usa pra cartões.
-  const isLoadingChartData = finance.loading || cardsData.loading || analysis.loading;
-  const chartDataError = finance.error || cardsData.error || analysis.error;
-
   // Aviso de offline: com o histórico sob demanda, um mês que você nunca abriu online pode vir
   // incompleto offline. Nota sutil, não bloqueia (o resto segue funcionando pelo cache).
-  const [isOnline, setIsOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine);
-  useEffect(() => {
-    const goOnline = () => setIsOnline(true);
-    const goOffline = () => setIsOnline(false);
-    window.addEventListener('online', goOnline);
-    window.addEventListener('offline', goOffline);
-    return () => {
-      window.removeEventListener('online', goOnline);
-      window.removeEventListener('offline', goOffline);
-    };
-  }, []);
+  const isOnline = useIsOnline();
 
   const normalizedQuery = query.trim().toLocaleLowerCase('pt-BR');
 
@@ -218,7 +190,15 @@ export function SearchPage() {
     () => cardsData.invoices.map((inv) => ({ id: inv.id, cardId: inv.cardId })),
     [cardsData.invoices]
   );
-  const ledgerEntries = useInvoiceLedger(workspaceId, invoiceRefs, finance.transactionIndex);
+  const { entries: ledgerEntries, loading: ledgerLoading, error: ledgerError } = useInvoiceLedger(workspaceId, invoiceRefs, finance.transactionIndex);
+  // "Sem gasto" e "ainda carregando" pareciam a mesma coisa pro usuário: o donut e o
+  // histórico só olhavam o total calculado, sem checar se a fonte já resolveu. Numa
+  // conta nova/rede lenta a tela mostrava "nenhum gasto" por alguns segundos até os
+  // dados chegarem sozinhos (sem re-render visível de erro) — parecia quebrado até
+  // alguém trocar de tela e voltar (o que reassina do zero e geralmente já pega o
+  // dado pronto). Mesmo padrão que o Dashboard já usa pra cartões.
+  const isLoadingChartData = finance.loading || cardsData.loading || analysis.loading || ledgerLoading;
+  const chartDataError = finance.error || cardsData.error || analysis.error || ledgerError;
   // Faturas reduzidas ao que a Análise precisa (referenceMonth + ledger por parcela).
   const invoicesForSpending = useMemo<InvoiceForSpending[]>(
     () =>
@@ -730,7 +710,7 @@ export function SearchPage() {
             </div>
           </>
         ) : isLoadingChartData ? (
-          <ChartLoadingState compact />
+          <LoadingState compact />
         ) : (
           <EmptyState
             illustration="wallet"
@@ -849,7 +829,7 @@ export function SearchPage() {
             </div>
           </>
         ) : isLoadingChartData ? (
-          <ChartLoadingState compact />
+          <LoadingState compact />
         ) : (
           <EmptyState
             illustration="transactions"

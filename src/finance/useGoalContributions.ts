@@ -25,10 +25,6 @@ export function useGoalContributions(workspaceId: string | undefined, goalId: st
 
     setState((current) => ({ ...current, loading: true, error: null }));
 
-    const bootTimer = window.setTimeout(() => {
-      setState((current) => (current.loading ? { ...current, loading: false } : current));
-    }, 2500);
-
     const unsub = subscribeWithTransientRetry({
       subscribe: (onError, markLoaded) =>
         subscribeGoalContributions(
@@ -47,7 +43,6 @@ export function useGoalContributions(workspaceId: string | undefined, goalId: st
     });
 
     return () => {
-      window.clearTimeout(bootTimer);
       unsub();
     };
   }, [workspaceId, goalId]);

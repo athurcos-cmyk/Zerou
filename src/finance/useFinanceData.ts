@@ -22,9 +22,6 @@ const FINANCE_BOOT_RETRY_DELAYS_MS = [600, 1200, 2400, 4000];
 // fundacional do onboarding pode demorar mais que 8.2s em rede fraca, e sem isso a tela
 // ficava presa numa mensagem de erro permanente que só um reload manual resolvia.
 const FINANCE_BOOT_SUSTAINED_RETRY_DELAY_MS = 10000;
-// Se um listener onSnapshot não disparar em 2.5s (cache vazio + offline), assume []
-// para destravar o loading. Quando a rede voltar, o listener entrega os dados reais.
-const SLICE_BOOT_TIMEOUT_MS = 2500;
 // Persistido (não só em memória) pra não repetir esse getDocs a cada refresh do app —
 // era a causa de um banner de erro assustador aparecendo à toa em rede instável logo
 // após o refresh, mesmo com as categorias padrão já existindo há muito tempo.
@@ -201,30 +198,19 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
         onNext(items);
       };
 
-      const bootTimeout = window.setTimeout(() => {
-        if (cancelled || resolved) return;
-        resolved = true;
-        onNext([]);
-      }, SLICE_BOOT_TIMEOUT_MS);
-      timers.push(bootTimeout);
-
       unsubscribe = subscribe(activeWorkspaceId, wrappedOnNext, (error) => {
         if (cancelled) return;
 
         const code = getErrorCode(error);
 
         // unavailable = offline ou rede flaky. O SDK do Firestore ja retenta
-        // automaticamente quando a conexao voltar. Se ja temos dados do cache
-        // (ou o boot timeout ja entregou []), nao fazemos nada — o erro eh
-        // esperado e os dados continuam aparecendo. Se ainda nao recebemos nada,
-        // o boot timeout corre em paralelo e resolve com [] em 2.5s.
-        // Nunca matamos o listener — o SDK cuida do reconnect.
+        // automaticamente quando a conexao voltar — nunca matamos o listener, e
+        // `loading` fica true ate a resposta de verdade chegar (LoadingState mostra
+        // "offline"/"carregando" enquanto isso, nunca finge que o slice esta vazio).
         if (code === 'unavailable') return;
 
         // Erro real (permission-denied, deadline-exceeded sem ser offline):
         // so eh fatal se o listener nunca entregou dados.
-        window.clearTimeout(bootTimeout);
-
         if (resolved) return;
 
         unsubscribe();
@@ -248,7 +234,6 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
       });
 
       return () => {
-        window.clearTimeout(bootTimeout);
         unsubscribe();
       };
     }

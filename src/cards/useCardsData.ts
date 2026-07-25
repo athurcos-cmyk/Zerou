@@ -18,10 +18,12 @@ const initialState: CardsState = {
   error: null
 };
 
-/** Quanto esperar pela primeira entrega (sucesso OU erro) da fatura de um cartão antes de
- * considerá-la "resolvida" mesmo sem dado — evita que `loading` fique preso pra sempre
- * offline com uma fatura que nunca foi cacheada. Mesmo padrão de `SLICE_BOOT_TIMEOUT_MS`
- * em `useFinanceData.ts`. */
+/** Quanto esperar pela primeira entrega (sucesso OU erro) da fatura de UM cartão antes de
+ * considerá-la "resolvida" pro agregado `invoicesLoading` — evita que a fatura de um cartão
+ * travado prenda o `loading` de TODOS os cartões pra sempre. Não injeta array vazio em
+ * `state.invoices` (diferente do que os hooks de assunto único faziam antes de 2026-07-24):
+ * só destrava o agregado; o dado real desse cartão específico ainda aparece se/quando chegar,
+ * via o mesmo listener que continua rodando em segundo plano. */
 const INVOICE_BOOT_TIMEOUT_MS = 2500;
 
 export function useCardsData(workspaceId?: string) {
@@ -53,10 +55,6 @@ export function useCardsData(workspaceId?: string) {
 
     setState((current) => ({ ...current, loading: true, error: null }));
 
-    const bootTimer = window.setTimeout(() => {
-      setState((current) => current.loading ? { ...current, loading: false } : current);
-    }, 2500);
-
     const unsub = subscribeWithTransientRetry({
       subscribe: (onError, markLoaded) =>
         subscribeCards(
@@ -77,7 +75,6 @@ export function useCardsData(workspaceId?: string) {
     });
 
     return () => {
-      window.clearTimeout(bootTimer);
       unsub();
     };
   }, [workspaceId]);

@@ -3,10 +3,6 @@ import { subscribeWithTransientRetry } from '../firebase/firestoreRetry';
 import { dedupeById, subscribeTransactionsForMonths, type LocalSynced } from './financeService';
 import type { Transaction } from '../types/contracts';
 
-// Se as queries por mês não responderem em 2.5s (cache vazio + offline), destrava o loading
-// com o que tiver — mesmo padrão de `SLICE_BOOT_TIMEOUT_MS`/`INVOICE_BOOT_TIMEOUT_MS`.
-const MONTHLY_BOOT_TIMEOUT_MS = 2500;
-
 interface MonthlyTransactionsState {
   transactions: Array<LocalSynced<Transaction>>;
   loading: boolean;
@@ -37,9 +33,6 @@ export function useMonthlyTransactions(workspaceId: string | undefined, monthKey
     setState((current) => ({ ...current, loading: true, error: null }));
 
     let cancelled = false;
-    const bootTimer = window.setTimeout(() => {
-      setState((current) => (current.loading ? { ...current, loading: false } : current));
-    }, MONTHLY_BOOT_TIMEOUT_MS);
 
     const unsubscribe = subscribeWithTransientRetry({
       subscribe: (onError, markLoaded) =>
@@ -63,7 +56,6 @@ export function useMonthlyTransactions(workspaceId: string | undefined, monthKey
 
     return () => {
       cancelled = true;
-      window.clearTimeout(bootTimer);
       unsubscribe();
     };
   }, [workspaceId, monthsKey]);
