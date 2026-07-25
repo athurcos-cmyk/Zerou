@@ -6,6 +6,7 @@ import { SelectField } from '../components/SelectField';
 import { FormMessage } from '../components/FormMessage';
 import { useConfirm } from '../components/ConfirmDialog';
 import { EmptyState } from '../components/EmptyState';
+import { LoadingState } from '../components/LoadingState';
 import { findBankInstitution, searchBankInstitutions, type BankInstitution } from '../finance/bankInstitutions';
 import { accountTypeLabels } from '../finance/financeLabels';
 import { accountHasLiveTransactions, createAccount, deleteAccount, setPrimaryAccount, unsetPrimaryAccount } from '../finance/financeService';
@@ -149,7 +150,9 @@ export function AccountsPage() {
         </p>
       )}
 
-      {finance.accountBalances.length > 0 ? (
+      {finance.loading ? (
+        <LoadingState compact />
+      ) : finance.accountBalances.length > 0 ? (
         <div className="account-card-list">
           {finance.accountBalances.map((account) => {
             const institution = findBankInstitution(account.name);

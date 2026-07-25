@@ -1,7 +1,9 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { useInvoiceLedger, type InvoiceLedgerRef } from './useInvoiceLedger';
+import { Timestamp } from 'firebase/firestore';
+import { useInvoiceLedger, mergeInvoicesWithLedger, type InvoiceLedgerRef } from './useInvoiceLedger';
 import type { TransactionDeletionIndex } from '../finance/useFinanceData';
+import type { Invoice, InvoiceLedgerEntry } from '../types/contracts';
 
 const cardMocks = vi.hoisted(() => ({
   subscribeInvoiceLedger: vi.fn(),
@@ -62,11 +64,11 @@ describe('useInvoiceLedger', () => {
       { initialProps: { transactionIndex: index() } }
     );
 
-    expect(result.current.map((e) => e.id)).toEqual(['entry-1', 'entry-2']);
+    expect(result.current.entries.map((e) => e.id)).toEqual(['entry-1', 'entry-2']);
 
     rerender({ transactionIndex: index(['txn-1']) });
 
-    expect(result.current.map((e) => e.id)).toEqual(['entry-2']);
+    expect(result.current.entries.map((e) => e.id)).toEqual(['entry-2']);
   });
 
   // Regressão: antecipar uma parcela futura (InvoicePage) cria um débito
@@ -91,12 +93,12 @@ describe('useInvoiceLedger', () => {
       { initialProps: { transactionIndex: index() } }
     );
 
-    expect(result.current.find((e) => e.id === 'debit-1')).toBeDefined();
+    expect(result.current.entries.find((e) => e.id === 'debit-1')).toBeDefined();
 
     rerender({ transactionIndex: index(['txn-1']) });
 
-    expect(result.current.find((e) => e.id === 'debit-1')).toBeUndefined();
-    expect(result.current.find((e) => e.id === 'credit-1')).toBeUndefined();
+    expect(result.current.entries.find((e) => e.id === 'debit-1')).toBeUndefined();
+    expect(result.current.entries.find((e) => e.id === 'credit-1')).toBeUndefined();
   });
 
   // Regressão: excluir uma compra no cartão dispara `reverseCardPurchaseOnDelete`, que cria um
@@ -122,7 +124,7 @@ describe('useInvoiceLedger', () => {
 
     rerender({ transactionIndex: index(['txn-1']) });
 
-    expect(result.current.map((e) => e.id).sort()).toEqual(['purchase-1', 'reversal-1']);
+    expect(result.current.entries.map((e) => e.id).sort()).toEqual(['purchase-1', 'reversal-1']);
   });
 
   // Sem estorno no ledger (dado antigo, ou exclusão que aconteceu antes de
@@ -143,7 +145,7 @@ describe('useInvoiceLedger', () => {
 
     rerender({ transactionIndex: index(['txn-1']) });
 
-    expect(result.current).toEqual([]);
+    expect(result.current.entries).toEqual([]);
   });
 
   describe('compra excluída fora da janela de `subscribeTransactions` (limit 300)', () => {
@@ -165,9 +167,9 @@ describe('useInvoiceLedger', () => {
 
       const { result } = renderHook(() => useInvoiceLedger('ws-1', oneInvoice, index([], ['txn-recente'])));
 
-      expect(result.current.map((e) => e.id)).toEqual(['entry-antiga']);
+      expect(result.current.entries.map((e) => e.id)).toEqual(['entry-antiga']);
 
-      await waitFor(() => expect(result.current.map((e) => e.id)).toEqual([]));
+      await waitFor(() => expect(result.current.entries.map((e) => e.id)).toEqual([]));
       expect(cardMocks.fetchDeletedTransactionIds).toHaveBeenCalledWith('ws-1', ['txn-antiga']);
     });
 
@@ -179,7 +181,7 @@ describe('useInvoiceLedger', () => {
       const { result } = renderHook(() => useInvoiceLedger('ws-1', oneInvoice, index([], ['txn-recente'])));
 
       await waitFor(() => expect(cardMocks.fetchDeletedTransactionIds).toHaveBeenCalled());
-      expect(result.current.map((e) => e.id)).toEqual(['entry-antiga']);
+      expect(result.current.entries.map((e) => e.id)).toEqual(['entry-antiga']);
     });
 
     it('mantém o lançamento quando a consulta falha (offline sem cache)', async () => {
@@ -188,7 +190,7 @@ describe('useInvoiceLedger', () => {
       const { result } = renderHook(() => useInvoiceLedger('ws-1', oneInvoice, index([], ['txn-recente'])));
 
       await waitFor(() => expect(cardMocks.fetchDeletedTransactionIds).toHaveBeenCalled());
-      expect(result.current.map((e) => e.id)).toEqual(['entry-antiga']);
+      expect(result.current.entries.map((e) => e.id)).toEqual(['entry-antiga']);
     });
 
     it('não reconsulta a mesma transação a cada snapshot de ledger', async () => {
@@ -208,8 +210,105 @@ describe('useInvoiceLedger', () => {
     it('não consulta nada quando a janela já cobre a transação', async () => {
       const { result } = renderHook(() => useInvoiceLedger('ws-1', oneInvoice, index([], ['txn-antiga'])));
 
-      await waitFor(() => expect(result.current.map((e) => e.id)).toEqual(['entry-antiga']));
+      await waitFor(() => expect(result.current.entries.map((e) => e.id)).toEqual(['entry-antiga']));
       expect(cardMocks.fetchDeletedTransactionIds).not.toHaveBeenCalled();
     });
+  });
+});
+
+// Regressão (2026-07-24): "Limite disponível"/"Fatura atual" demoravam a atualizar depois de
+// lançar uma compra — outstandingBalanceCents só é recalculado pela Cloud Function
+// (invoiceLedgerEntryTrigger.ts), que só roda quando a escrita chega ao servidor. Offline, ou
+// nos segundos antes dela processar, o campo persistido fica desatualizado. mergeInvoicesWithLedger
+// agora recalcula os totais a partir do ledger que a tela já tem em memória (calculateInvoice,
+// a mesma função pura que a Cloud Function porta manualmente).
+describe('mergeInvoicesWithLedger — totais ao vivo', () => {
+  function invoice(overrides: Partial<Invoice> = {}): Invoice {
+    return {
+      id: 'invoice-1',
+      cardId: 'card-1',
+      workspaceId: 'ws-1',
+      referenceMonth: '2026-08',
+      dueDate: Timestamp.fromDate(new Date('2026-08-20')),
+      status: 'open',
+      purchasesTotalCents: 0,
+      paymentsTotalCents: 0,
+      creditsTotalCents: 0,
+      feesTotalCents: 0,
+      outstandingBalanceCents: 0,
+      overpaidCreditCents: 0,
+      version: 1,
+      ...overrides
+    };
+  }
+
+  function entry(overrides: Partial<InvoiceLedgerEntry> = {}): InvoiceLedgerEntry {
+    return {
+      id: 'entry-1',
+      invoiceId: 'invoice-1',
+      cardId: 'card-1',
+      workspaceId: 'ws-1',
+      type: 'purchase',
+      amountCents: 5000,
+      effectiveAt: Timestamp.fromDate(new Date('2026-08-01')),
+      idempotencyKey: 'txn-1_purchase_1',
+      createdBy: 'user-1',
+      ...overrides
+    };
+  }
+
+  it('reflete um lançamento recém-criado na hora, mesmo com o campo persistido ainda em zero (Cloud Function não processou — offline ou latência)', () => {
+    // outstandingBalanceCents/purchasesTotalCents ainda em 0: simula a Cloud Function não ter
+    // rodado ainda (offline, ou os poucos segundos antes dela processar em rede normal).
+    const staleInvoice = invoice({ outstandingBalanceCents: 0, purchasesTotalCents: 0 });
+    const pendingEntry = entry({ amountCents: 5000 });
+
+    const [merged] = mergeInvoicesWithLedger([staleInvoice], [{ ...pendingEntry, localSyncStatus: 'pending' }]);
+
+    expect(merged.outstandingBalanceCents).toBe(5000);
+    expect(merged.purchasesTotalCents).toBe(5000);
+  });
+
+  it('bate com o total persistido quando está tudo sincronizado (não regride o caso comum)', () => {
+    const syncedInvoice = invoice({ outstandingBalanceCents: 5000, purchasesTotalCents: 5000 });
+    const syncedEntry = entry({ amountCents: 5000 });
+
+    const [merged] = mergeInvoicesWithLedger([syncedInvoice], [{ ...syncedEntry, localSyncStatus: 'synced' }]);
+
+    expect(merged.outstandingBalanceCents).toBe(5000);
+  });
+
+  it('desconta um pagamento pendente do saldo devedor na hora', () => {
+    const staleInvoice = invoice({ outstandingBalanceCents: 5000, purchasesTotalCents: 5000 });
+    const purchase = entry({ id: 'entry-1', type: 'purchase', amountCents: 5000 });
+    const pendingPayment = entry({ id: 'entry-2', type: 'payment', amountCents: 2000, idempotencyKey: 'txn-2_payment' });
+
+    const [merged] = mergeInvoicesWithLedger(
+      [staleInvoice],
+      [
+        { ...purchase, localSyncStatus: 'synced' },
+        { ...pendingPayment, localSyncStatus: 'pending' }
+      ]
+    );
+
+    expect(merged.outstandingBalanceCents).toBe(3000);
+    expect(merged.paymentsTotalCents).toBe(2000);
+  });
+
+  it('não mistura lançamentos de outra fatura no total', () => {
+    const staleInvoice = invoice({ id: 'invoice-1' });
+    const thisInvoiceEntry = entry({ invoiceId: 'invoice-1', amountCents: 5000 });
+    const otherInvoiceEntry = entry({ id: 'entry-2', invoiceId: 'invoice-2', amountCents: 9999, idempotencyKey: 'txn-2_purchase_1' });
+
+    const [merged] = mergeInvoicesWithLedger(
+      [staleInvoice],
+      [
+        { ...thisInvoiceEntry, localSyncStatus: 'synced' },
+        { ...otherInvoiceEntry, localSyncStatus: 'synced' }
+      ]
+    );
+
+    expect(merged.outstandingBalanceCents).toBe(5000);
+    expect(merged.ledgerEntries.map((e) => e.id)).toEqual(['entry-1']);
   });
 });

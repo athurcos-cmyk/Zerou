@@ -5,6 +5,7 @@ import { useFinanceContext } from '../finance/FinanceDataContext';
 import { SelectField } from '../components/SelectField';
 import { BottomSheet } from '../components/BottomSheet';
 import { EmptyState } from '../components/EmptyState';
+import { LoadingState } from '../components/LoadingState';
 import { CategoryMark } from '../components/categoryIcons';
 import { defaultCategoryColors } from '../theme/palette';
 import { FormMessage } from '../components/FormMessage';
@@ -197,7 +198,9 @@ export function ReceivablesPage() {
             ))}
           </div>
 
-          {visible.length === 0 ? (
+          {finance.loading ? (
+            <LoadingState compact />
+          ) : visible.length === 0 ? (
             <EmptyState
               illustration="bills"
               compact

@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { BottomSheet } from '../components/BottomSheet';
 import { EmptyState } from '../components/EmptyState';
+import { LoadingState } from '../components/LoadingState';
 import { CategoryMark } from '../components/categoryIcons';
 import { SelectField } from '../components/SelectField';
 import { useConfirm } from '../components/ConfirmDialog';
@@ -295,7 +296,9 @@ export function TransactionsPage() {
       </BottomSheet>
 
       <article className="surface surface-pad">
-        {activeTransactions.length === 0 ? (
+        {finance.loading ? (
+          <LoadingState compact />
+        ) : activeTransactions.length === 0 ? (
           <EmptyState
             illustration="transactions"
             title="Nenhuma transação registrada"

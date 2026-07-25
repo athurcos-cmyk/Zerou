@@ -7,6 +7,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { BottomSheet } from '../components/BottomSheet';
 import { EmptyState } from '../components/EmptyState';
+import { LoadingState } from '../components/LoadingState';
 import { SelectField } from '../components/SelectField';
 import { useConfirm } from '../components/ConfirmDialog';
 import { FormMessage } from '../components/FormMessage';
@@ -48,7 +49,7 @@ export function InvoicePage() {
   const card = cardsData.cards.find((item) => item.id === cardId);
   const cardInvoices = useMemo(() => cardsData.invoices.filter((item) => item.cardId === cardId), [cardsData.invoices, cardId]);
   const invoiceRefs = useMemo(() => cardInvoices.map((item) => ({ id: item.id, cardId: item.cardId })), [cardInvoices]);
-  const ledgerEntries = useInvoiceLedger(workspaceId, invoiceRefs, finance.transactionIndex);
+  const { entries: ledgerEntries, loading: ledgerLoading, error: ledgerError } = useInvoiceLedger(workspaceId, invoiceRefs, finance.transactionIndex);
   const cardInvoicesWithLedger = useMemo(() => mergeInvoicesWithLedger(cardInvoices, ledgerEntries), [cardInvoices, ledgerEntries]);
   const invoice = cardInvoicesWithLedger.find((item) => item.id === invoiceId);
   const { confirm, dialog: confirmDialog } = useConfirm();
@@ -274,6 +275,9 @@ export function InvoicePage() {
       </div>
 
       <FormMessage>{message}</FormMessage>
+      {ledgerError && (
+        <div className="notice notice--danger" role="alert" style={{ marginBottom: '0.75rem' }}>{ledgerError}</div>
+      )}
 
       {invoice ? (
         <>
@@ -376,6 +380,8 @@ export function InvoicePage() {
               <p className="text-secondary">Nenhuma compra encontrada para "{purchaseQuery.trim()}".</p>
             ) : hiddenEntryIds.size > 0 ? (
               <p className="text-secondary">A parcela que caía aqui foi antecipada pra uma fatura anterior.</p>
+            ) : ledgerLoading ? (
+              <LoadingState compact />
             ) : (
               <EmptyState illustration="cards" title="Nenhuma compra nesta fatura ainda." compact />
             )}

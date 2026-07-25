@@ -4,6 +4,7 @@ import { BottomSheet } from '../../components/BottomSheet';
 import { categoryColors } from '../../components/categoryIcons';
 import { ACCENT_FOREGROUND } from '../../theme/palette';
 import { EmptyState } from '../../components/EmptyState';
+import { LoadingState } from '../../components/LoadingState';
 import { coupleGoalDeposit, coupleGoalWithdraw, createGoal, deleteGoal } from '../../finance/financeService';
 import { currentAccountBalances } from '../../finance/financeCalculations';
 import { formatMoney, parseMoneyToCents } from '../../finance/money';
@@ -122,7 +123,11 @@ export function CoupleSavingsSection({
           </div>
           <PiggyBank size={22} aria-hidden="true" />
         </div>
-        {savings.stats.length === 0 ? (
+        {savings.loading ? (
+          <article className="surface surface-pad">
+            <LoadingState compact />
+          </article>
+        ) : savings.stats.length === 0 ? (
           <article className="surface surface-pad">
             <EmptyState
               illustration="goals"

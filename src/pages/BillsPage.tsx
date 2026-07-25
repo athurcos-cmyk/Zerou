@@ -8,6 +8,7 @@ import { findSubscriptionService, searchSubscriptionServices, type SubscriptionS
 import { SelectField } from '../components/SelectField';
 import { BottomSheet } from '../components/BottomSheet';
 import { EmptyState } from '../components/EmptyState';
+import { LoadingState } from '../components/LoadingState';
 import { FormMessage } from '../components/FormMessage';
 import { useConfirm } from '../components/ConfirmDialog';
 import { formatFriendlyDate, fromDateInputValue, toDateInputValue, todayInputValue } from '../finance/financeDates';
@@ -458,7 +459,9 @@ export function BillsPage() {
             <Repeat size={22} aria-hidden="true" style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
           </div>
 
-          {hasRecurring ? (
+          {finance.loading ? (
+            <LoadingState compact />
+          ) : hasRecurring ? (
             <div className="item-list">
               {recurringItems.map((rule) => {
                 const due = isRecurrenceDue(rule.nextOccurrenceAt.toDate());
@@ -531,7 +534,9 @@ export function BillsPage() {
             </div>
           )}
 
-          {hasBills ? (
+          {finance.loading ? (
+            <LoadingState compact />
+          ) : hasBills ? (
             visibleBills.length > 0 ? (
               <div className="item-list">
                 {visibleBills.map((bill) => {

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { subscribeWithTransientRetry } from '../firebase/firestoreRetry';
 import { fetchDeletedTransactionIds, subscribeInvoiceLedger, type LocalCardSynced } from './cardService';
+import { calculateInvoice } from '../domain/invoices/calculateInvoice';
 import type { TransactionDeletionIndex } from '../finance/useFinanceData';
 import type { Invoice, InvoiceLedgerEntry } from '../types/contracts';
 
@@ -9,8 +10,21 @@ export interface InvoiceLedgerRef {
   cardId: string;
 }
 
+export interface InvoiceLedgerState {
+  entries: Array<LocalCardSynced<InvoiceLedgerEntry>>;
+  loading: boolean;
+  error: string | null;
+}
+
 const emptyIds: ReadonlySet<string> = new Set();
 const emptyEntries: Array<LocalCardSynced<InvoiceLedgerEntry>> = [];
+
+/** Quanto esperar pela primeira entrega (sucesso OU erro) do ledger de UMA fatura antes de
+ * considerá-la "resolvida" pro agregado `loading` — evita que uma fatura travada prenda o
+ * `loading` de TODAS as outras pra sempre. Não injeta array vazio em `entries` (mesmo padrão
+ * de `INVOICE_BOOT_TIMEOUT_MS` em `useCardsData.ts`, ver comentário lá) — só destrava o
+ * agregado; o dado real dessa fatura específica ainda aparece se/quando chegar. */
+const LEDGER_BOOT_TIMEOUT_MS = 2500;
 
 /**
  * Carrega o ledger só das faturas pedidas — ao contrário do boot global (`useCardsData`, que
@@ -21,11 +35,15 @@ export function useInvoiceLedger(
   workspaceId: string | undefined,
   invoiceRefs: InvoiceLedgerRef[],
   transactionIndex?: TransactionDeletionIndex
-): Array<LocalCardSynced<InvoiceLedgerEntry>> {
+): InvoiceLedgerState {
   const [ledgerEntries, setLedgerEntries] = useState<Array<LocalCardSynced<InvoiceLedgerEntry>>>(emptyEntries);
   // Excluídas descobertas fora da janela de 300 (ver `fetchDeletedTransactionIds`).
   const [remoteDeletedIds, setRemoteDeletedIds] = useState<ReadonlySet<string>>(emptyIds);
   const resolvedIds = useRef(new Set<string>());
+  // Quais faturas já tiveram o ledger resolvido (sucesso, erro ou timeout) pelo menos uma vez —
+  // usado só pra saber quando `loading` pode virar false, não guarda dado.
+  const [resolvedRefKeys, setResolvedRefKeys] = useState<ReadonlySet<string>>(emptyIds);
+  const [error, setError] = useState<string | null>(null);
 
   const refsKey = useMemo(
     () => invoiceRefs.map((ref) => `${ref.cardId}:${ref.id}`).sort().join(','),
@@ -35,6 +53,8 @@ export function useInvoiceLedger(
   useEffect(() => {
     if (!workspaceId || !refsKey) {
       setLedgerEntries(emptyEntries);
+      setResolvedRefKeys(emptyIds);
+      setError(null);
       return undefined;
     }
 
@@ -43,15 +63,34 @@ export function useInvoiceLedger(
       return { cardId, id };
     });
 
-    const unsubscribers = refs.map((ref) =>
-      subscribeWithTransientRetry({
+    setResolvedRefKeys(emptyIds);
+    setError(null);
+    const timers: number[] = [];
+
+    function markRefResolved(refKey: string) {
+      setResolvedRefKeys((current) => (current.has(refKey) ? current : new Set(current).add(refKey)));
+    }
+
+    const unsubscribers = refs.map((ref) => {
+      const refKey = `${ref.cardId}:${ref.id}`;
+      let resolved = false;
+      const bootTimer = window.setTimeout(() => {
+        resolved = true;
+        markRefResolved(refKey);
+      }, LEDGER_BOOT_TIMEOUT_MS);
+      timers.push(bootTimer);
+
+      return subscribeWithTransientRetry({
         subscribe: (onError, markLoaded) =>
           subscribeInvoiceLedger(
             workspaceId,
             ref.cardId,
             ref.id,
             (items) => {
+              resolved = true;
+              window.clearTimeout(bootTimer);
               markLoaded();
+              markRefResolved(refKey);
               setLedgerEntries((current) => [
                 ...current.filter((entry) => entry.invoiceId !== ref.id || entry.cardId !== ref.cardId),
                 ...items
@@ -59,11 +98,19 @@ export function useInvoiceLedger(
             },
             onError
           ),
-        onError: () => undefined
-      })
-    );
+        onError: () => {
+          if (!resolved) {
+            resolved = true;
+            window.clearTimeout(bootTimer);
+            markRefResolved(refKey);
+          }
+          setError('Não foi possível carregar os lançamentos da fatura.');
+        }
+      });
+    });
 
     return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
       unsubscribers.forEach((unsubscribe) => unsubscribe());
     };
   }, [workspaceId, refsKey]);
@@ -119,7 +166,7 @@ export function useInvoiceLedger(
     return new Set([...fromWindow, ...remoteDeletedIds]);
   }, [transactionIndex, remoteDeletedIds]);
 
-  return useMemo(() => {
+  const entries = useMemo(() => {
     // Ledger entries de uma compra no cartão excluída no Extrato (softDeleteTransaction
     // marca deletedAt na transação, mas as regras do Firestore não permitem que um
     // membro comum apague/edite o ledger da fatura) ficam órfãs para sempre — filtradas
@@ -145,15 +192,65 @@ export function useInvoiceLedger(
       return reversedTransactionIds.has(entry.sourceTransactionId);
     });
   }, [ledgerEntries, deletedTransactionIds]);
+
+  const loading = useMemo(() => {
+    if (!refsKey) return false;
+    return refsKey.split(',').some((refKey) => !resolvedRefKeys.has(refKey));
+  }, [refsKey, resolvedRefKeys]);
+
+  return { entries, loading, error };
 }
 
-/** Anexa `ledgerEntries` a cada fatura pedida. Totais/status já vêm certos de `useCardsData`. */
+/**
+ * Anexa `ledgerEntries` a cada fatura pedida e RECALCULA os totais (`outstandingBalanceCents`
+ * e cia + `status`) a partir desse ledger, em vez de confiar só no campo persistido pela Cloud
+ * Function (`invoiceLedgerEntryTrigger.ts`). A Function só roda quando a escrita chega ao
+ * servidor — offline, ou nos poucos segundos antes dela processar, o campo persistido fica
+ * desatualizado (2026-07-24, achado ao vivo pelo dono: "Limite disponível" demorava a
+ * atualizar depois de lançar uma compra).
+ *
+ * `calculateInvoice()` é a MESMA função pura que `functions/src/cards/invoiceTotals.ts` porta
+ * manualmente (comentário lá: "mantenha em sincronia manualmente se a lógica original
+ * mudar") — nenhuma lógica nova sendo duplicada aqui, só reaproveitando o que já existe e já
+ * é tratado como fonte da verdade. Zero leitura nova: as três telas que chamam esta função
+ * (Cartão, Fatura, Análise) já carregam esse ledger via `useInvoiceLedger` de qualquer jeito.
+ *
+ * Usa o ledger já FILTRADO (sem lançamentos órfãos de transação excluída sem estorno) — o
+ * mesmo conjunto que a lista "Compras" já mostra. Um lançamento órfão legado (dado anterior à
+ * Cloud Function de estorno, ver `docs/history/2026-07.md`) faria o total ao vivo divergir do
+ * persistido se usasse o ledger cru; com o filtrado, o total bate com o que a tela realmente
+ * exibe — mais correto que o campo persistido nesse caso raro, não menos.
+ */
 export function mergeInvoicesWithLedger<T extends Invoice>(
   invoices: T[],
   ledgerEntries: Array<LocalCardSynced<InvoiceLedgerEntry>>
 ): Array<T & { ledgerEntries: InvoiceLedgerEntry[] }> {
-  return invoices.map((invoice) => ({
-    ...invoice,
-    ledgerEntries: ledgerEntries.filter((entry) => entry.cardId === invoice.cardId && entry.invoiceId === invoice.id)
-  }));
+  return invoices.map((invoice) => {
+    const invoiceLedgerEntries = ledgerEntries.filter(
+      (entry) => entry.cardId === invoice.cardId && entry.invoiceId === invoice.id
+    );
+    const live = calculateInvoice(
+      invoiceLedgerEntries.map((entry) => ({
+        id: entry.id,
+        type: entry.type,
+        amountCents: entry.amountCents,
+        effectiveAt: entry.effectiveAt.toDate(),
+        idempotencyKey: entry.idempotencyKey
+      })),
+      invoice.status === 'open' ? 'open' : 'closed',
+      invoice.dueDate?.toDate()
+    );
+
+    return {
+      ...invoice,
+      ledgerEntries: invoiceLedgerEntries,
+      purchasesTotalCents: live.purchasesTotalCents,
+      paymentsTotalCents: live.paymentsTotalCents,
+      creditsTotalCents: live.creditsTotalCents,
+      feesTotalCents: live.feesTotalCents,
+      outstandingBalanceCents: live.outstandingBalanceCents,
+      overpaidCreditCents: live.overpaidCreditCents,
+      status: live.status
+    };
+  });
 }

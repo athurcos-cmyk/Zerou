@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { BottomSheet } from '../components/BottomSheet';
 import { EmptyState } from '../components/EmptyState';
+import { LoadingState } from '../components/LoadingState';
 import { OngoingInstallmentsSheet } from '../cards/OngoingInstallmentsSheet';
 import { invoiceHasVisibleActivity } from '../cards/anticipation';
 import { useConfirm } from '../components/ConfirmDialog';
@@ -29,7 +30,7 @@ export function CardDetailPage() {
   const card = cardsData.cards.find((item) => item.id === cardId);
   const invoices = cardsData.invoices.filter((invoice) => invoice.cardId === cardId);
   const invoiceRefs = useMemo(() => invoices.map((invoice) => ({ id: invoice.id, cardId: invoice.cardId })), [invoices]);
-  const ledgerEntries = useInvoiceLedger(workspaceId, invoiceRefs, finance.transactionIndex);
+  const { entries: ledgerEntries, loading: ledgerLoading, error: ledgerError } = useInvoiceLedger(workspaceId, invoiceRefs, finance.transactionIndex);
   const invoicesWithLedger = useMemo(() => mergeInvoicesWithLedger(invoices, ledgerEntries), [invoices, ledgerEntries]);
   // Uma fatura futura cuja única parcela foi antecipada pra cá some do histórico — igual sumiu
   // da própria tela dela (`anticipatedAwayEntryIds`). Se uma compra nova cair nela depois, ela
@@ -122,9 +123,12 @@ export function CardDetailPage() {
     );
   }
 
-  const activeInvoices = card
-    ? cardsData.invoices.filter((invoice) => invoice.cardId === card.id && (invoice.status === 'open' || invoice.status === 'closed'))
-    : [];
+  // invoicesWithLedger (não cardsData.invoices cru) — carrega o total AO VIVO calculado do
+  // ledger já em memória, em vez de esperar a Cloud Function processar (ver comentário em
+  // mergeInvoicesWithLedger). Cobre tanto "acabei de lançar uma compra" quanto offline.
+  const activeInvoices = invoicesWithLedger.filter(
+    (invoice) => invoice.status === 'open' || invoice.status === 'closed'
+  );
   const openInvoice = pickCurrentInvoice(activeInvoices);
   const usedCents = activeInvoices.reduce((total, invoice) => total + invoice.outstandingBalanceCents, 0);
   const availableCents = card ? Math.max(0, card.limitCents - usedCents) : 0;
@@ -224,6 +228,9 @@ export function CardDetailPage() {
       ) : null}
 
       <FormMessage>{message}</FormMessage>
+      {ledgerError && (
+        <div className="notice notice--danger" role="alert" style={{ marginBottom: '0.75rem' }}>{ledgerError}</div>
+      )}
 
       {card && showOnboardingCallout ? (
         // Logo depois de criar o cartão (ou enquanto ele não tem nenhuma compra): a maioria
@@ -249,7 +256,9 @@ export function CardDetailPage() {
           </div>
           <CalendarClock size={22} aria-hidden="true" />
         </div>
-        {(card && !showOnboardingCallout) || visibleInvoices.length > 0 ? (
+        {cardsData.loading || ledgerLoading ? (
+          <LoadingState compact />
+        ) : (card && !showOnboardingCallout) || visibleInvoices.length > 0 ? (
           <div className="item-list">
             {card && !showOnboardingCallout && (
               <button

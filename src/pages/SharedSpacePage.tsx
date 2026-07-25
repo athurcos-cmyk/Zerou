@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext';
 import { clearPendingInvite, readPendingInvite, savePendingInvite } from '../auth/pendingInvite';
 import { useConfirm } from '../components/ConfirmDialog';
 import { EmptyState } from '../components/EmptyState';
+import { LoadingState } from '../components/LoadingState';
 import { FormMessage } from '../components/FormMessage';
 import { useFinanceContext } from '../finance/FinanceDataContext';
 import { useCoupleSavingsContext, useSharedContext } from '../shared/SharedDataContext';
@@ -158,7 +159,9 @@ export function SharedSpacePage() {
       <FormMessage>{message ?? shared.error}</FormMessage>
 
       {/* 1) No shared space yet — create or join */}
-      {!shared.activeCoupleRef ? (
+      {shared.loading ? (
+        <LoadingState compact />
+      ) : !shared.activeCoupleRef ? (
         <div className="form-stack">
           <EmptyState
             illustration="shared"
