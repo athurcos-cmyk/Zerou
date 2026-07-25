@@ -5,6 +5,7 @@ import {
   buildUpcomingReceivables,
   calculateAccountBalances,
   calculateDashboardSummary,
+  calculateNextMonthProjection,
   calculateTotalBalance,
   currentAccountBalances,
   currentTotalBalance,
@@ -1091,5 +1092,94 @@ describe('buildUpcomingReceivables', () => {
 
   it('devolve vazio quando nada vence em ≤5 dias', () => {
     expect(buildUpcomingReceivables([receivable('far', day(20), 'pending')], now)).toEqual([]);
+  });
+});
+
+describe('calculateNextMonthProjection', () => {
+  const now = new Date('2026-06-14T12:00:00');
+
+  it('devolve null quando o salário previsto ainda não foi configurado', () => {
+    expect(
+      calculateNextMonthProjection({
+        transactions: [],
+        bills: [],
+        recurringRules: [],
+        now
+      })
+    ).toBeNull();
+  });
+
+  it('devolve null quando o salário previsto é 0 (nunca conta como configurado)', () => {
+    expect(
+      calculateNextMonthProjection({
+        projectedSalaryCents: 0,
+        transactions: [],
+        bills: [],
+        recurringRules: [],
+        now
+      })
+    ).toBeNull();
+  });
+
+  it('calcula sobra = salário previsto − comprometido', () => {
+    const result = calculateNextMonthProjection({
+      projectedSalaryCents: 500000,
+      transactions: [],
+      bills: [bill({ amountCents: 120000, dueDate: Timestamp.fromDate(new Date('2026-06-20T12:00:00')) })],
+      recurringRules: [recurring({ amountCents: 10000, nextOccurrenceAt: Timestamp.fromDate(new Date('2026-06-18T12:00:00')) })],
+      now
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.committedCents).toBe(130000);
+    expect(result!.leftoverCents).toBe(370000);
+  });
+
+  it('sobra pode ser negativa (rombo previsto) — não esconde o número ruim', () => {
+    const result = calculateNextMonthProjection({
+      projectedSalaryCents: 50000,
+      transactions: [],
+      bills: [bill({ amountCents: 120000, dueDate: Timestamp.fromDate(new Date('2026-06-20T12:00:00')) })],
+      recurringRules: [],
+      now
+    });
+
+    expect(result!.leftoverCents).toBe(-70000);
+  });
+
+  // SEMPRE força o corte no modo conservador (janela de dias), mesmo que exista uma
+  // receita futura já lançada que, no modo 'until_payday' do Dashboard ao vivo, encurtaria
+  // o corte pra antes dessa conta — a projeção não pode variar conforme o AvailableMode
+  // real do perfil, ela usa sempre o comprometido "cheio".
+  it('ignora receita futura lançada e usa sempre a janela conservadora, nunca until_payday', () => {
+    const result = calculateNextMonthProjection({
+      projectedSalaryCents: 500000,
+      transactions: [
+        transaction({ type: 'income', amountCents: 300000, date: Timestamp.fromDate(new Date('2026-06-16T12:00:00')) })
+      ],
+      bills: [bill({ amountCents: 120000, dueDate: Timestamp.fromDate(new Date('2026-06-20T12:00:00')) })],
+      recurringRules: [],
+      committedWindowDays: 30,
+      now
+    });
+
+    // Conta vence dia 20/06 — depois da receita lançada (16/06), então em modo
+    // 'until_payday' ficaria FORA do comprometido. Em modo conservador (janela de 30
+    // dias a partir de 14/06 = até 14/07) ela entra — prova que o modo é sempre forçado.
+    expect(result!.committedCents).toBe(120000);
+  });
+
+  it('não devolve nem depende de totalBalanceCents/freeToSpendCents — isolado do saldo real', () => {
+    const result = calculateNextMonthProjection({
+      projectedSalaryCents: 500000,
+      transactions: [],
+      bills: [],
+      recurringRules: [],
+      now
+    });
+
+    expect(result).toEqual({ committedCents: 0, leftoverCents: 500000 });
+    expect(result).not.toHaveProperty('totalBalanceCents');
+    expect(result).not.toHaveProperty('freeToSpendCents');
   });
 });

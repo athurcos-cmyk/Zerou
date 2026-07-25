@@ -93,6 +93,13 @@ export interface UserProfile extends AppearancePreferences {
   // tutorial abre sozinho. Depois de escolher (ou dispensar), o campo existe e o
   // tutorial só reaparece se ela pedir em Configurações.
   availableMode?: AvailableMode;
+  // Salário previsto pro card "Projeção do próximo mês" (Dashboard) — 100% declarado pela
+  // pessoa, nunca calculado/estimado pelo app (diferente da extinta "Fluxo de Caixa", que
+  // especulava receita futura pela média histórica e foi removida por isso em 2026-07-18,
+  // ver docs/history/2026-07.md). Nunca 0 (validado em firestore.rules); ausente = pessoa
+  // ainda não configurou, card mostra CTA em vez de resultado. Puramente pessoal — nunca
+  // usado em cálculo de saldo/Disponível real nem em nada do espaço do casal.
+  projectedSalaryCents?: number;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }

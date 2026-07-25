@@ -180,3 +180,22 @@ export function updateAvailableMode(uid: string, availableMode: AvailableMode) {
     updatedAt: serverTimestamp()
   }));
 }
+
+/**
+ * Grava/limpa o salário previsto do card "Projeção do próximo mês" (Dashboard). `null`
+ * limpa o campo (`deleteField()`) — volta pro estado "não configurado". Nunca aceita 0;
+ * quem chama (a sheet) já bloqueia isso na UI, e `validProjectedSalaryCents` em
+ * `firestore.rules` bloqueia de novo no servidor.
+ *
+ * A regra `onlyProjectedSalaryChanged` em `firestore.rules` aceita este update; se um
+ * campo novo entrar neste payload, ela precisa ser atualizada no MESMO commit.
+ */
+export function updateProjectedSalary(uid: string, projectedSalaryCents: number | null) {
+  const db = getFirebaseDb();
+  const userRef = doc(db, 'users', uid);
+
+  fireWrite(updateDoc(userRef, {
+    projectedSalaryCents: projectedSalaryCents ?? deleteField(),
+    updatedAt: serverTimestamp()
+  }));
+}

@@ -965,6 +965,65 @@ describe('firestore security rules', () => {
     );
   });
 
+  // O payload aqui é exatamente o de `updateProjectedSalary` (workspaceService.ts):
+  // `{ projectedSalaryCents, updatedAt }`. Salário previsto nunca pode ser 0 (regra de
+  // produto) — validado aqui em `validProjectedSalaryCents`, não só no client.
+  it('allows a user to set/clear their projected salary (never zero), and rejects anything else', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        projectedSalaryCents: 350000,
+        updatedAt: serverTimestamp()
+      })
+    );
+    // Limpar (voltar a "não configurado") via deleteField.
+    await assertSucceeds(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        projectedSalaryCents: deleteField(),
+        updatedAt: serverTimestamp()
+      })
+    );
+
+    // Nunca zero.
+    await assertFails(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        projectedSalaryCents: 0,
+        updatedAt: serverTimestamp()
+      })
+    );
+    // Nunca negativo.
+    await assertFails(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        projectedSalaryCents: -100,
+        updatedAt: serverTimestamp()
+      })
+    );
+    // Não-inteiro (centavos fracionados não fazem sentido).
+    await assertFails(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        projectedSalaryCents: 100.5,
+        updatedAt: serverTimestamp()
+      })
+    );
+    // Valor válido, mas contrabandeando um campo protegido junto.
+    await assertFails(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        projectedSalaryCents: 350000,
+        name: 'Forged name',
+        updatedAt: serverTimestamp()
+      })
+    );
+    // Ninguém edita pelos outros.
+    const bobDb = testEnv.authenticatedContext('bob').firestore();
+    await assertFails(
+      updateDoc(doc(bobDb, 'users/alice'), {
+        projectedSalaryCents: 350000,
+        updatedAt: serverTimestamp()
+      })
+    );
+  });
+
   // O payload aqui é exatamente o de `updateOnboardingAnswers` (workspaceService.ts):
   // `{ onboardingGoal, onboardingChallenge, updatedAt }`, incluindo `deleteField()` pra
   // limpar uma escolha. Antes essas respostas só eram gravadas uma vez no cadastro; agora

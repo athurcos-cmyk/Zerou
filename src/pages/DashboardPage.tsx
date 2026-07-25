@@ -4,10 +4,11 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { AvailableModeSheet } from '../finance/AvailableModeSheet';
-import { updateAvailableMode } from '../workspaces/workspaceService';
+import { NextMonthProjectionSheet } from '../finance/NextMonthProjectionSheet';
+import { updateAvailableMode, updateProjectedSalary } from '../workspaces/workspaceService';
 import type { AvailableMode, TransactionType } from '../types/contracts';
 
-import { calculateDashboardSummary, buildUpcomingReceivables, hasPendingCardLedgerActivity } from '../finance/financeCalculations';
+import { calculateDashboardSummary, calculateNextMonthProjection, buildUpcomingReceivables, hasPendingCardLedgerActivity } from '../finance/financeCalculations';
 import { useCompleteCurrentMonth } from '../finance/useMonthlyTransactions';
 import { availableModeLabels, defaultAvailableMode } from '../finance/availableMode';
 import {
@@ -90,6 +91,7 @@ export function DashboardPage() {
   const welcomeTourSeen = useWelcomeTour((state) => state.seen);
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [tutorialDismissed, setTutorialDismissed] = useState(false);
+  const [projectionSheetOpen, setProjectionSheetOpen] = useState(false);
   // Disponível/Comprometido somam o total da fatura que só a Cloud Function atualiza — ela
   // não roda offline. Ver comentário completo em hasPendingCardLedgerActivity.
   const hasPendingCardActivity = hasPendingCardLedgerActivity(finance.transactions);
@@ -104,6 +106,23 @@ export function DashboardPage() {
     committedWindowDays: profile?.committedWindowDays,
     availableMode: profile?.availableMode
   });
+  // Card "Projeção do próximo mês" — isolado do Disponível/saldo real de propósito (ver
+  // comentário em calculateNextMonthProjection). `null` quando ainda não configurado.
+  const nextMonthProjection = calculateNextMonthProjection({
+    projectedSalaryCents: profile?.projectedSalaryCents,
+    transactions: finance.transactions,
+    bills: finance.bills,
+    recurringRules: finance.recurringRules,
+    invoices: cardsData.invoices,
+    cards: cardsData.cards,
+    committedWindowDays: profile?.committedWindowDays
+  });
+  function handleSaveProjectedSalary(cents: number) {
+    if (user) updateProjectedSalary(user.uid, cents);
+  }
+  function handleRemoveProjectedSalary() {
+    if (user) updateProjectedSalary(user.uid, null);
+  }
   // Nomeia o modo ativo na legenda (antes só aparecia dentro do tutorial) — pedido do
   // dono pra deixar a escolha visível toda vez que a pessoa olha o Dashboard.
   const activeModeLabel = availableModeLabels[profile?.availableMode ?? defaultAvailableMode];
@@ -402,6 +421,41 @@ export function DashboardPage() {
         currentMode={profile?.availableMode}
         onChoose={handleChooseAvailableMode}
         onClose={handleCloseTutorial}
+      />
+
+      <article className="surface surface-pad">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Projeção do próximo mês</p>
+            <h2>{nextMonthProjection ? (nextMonthProjection.leftoverCents >= 0 ? 'Sobra prevista' : 'Rombo previsto') : 'Quanto sobraria mês que vem?'}</h2>
+          </div>
+        </div>
+        {nextMonthProjection ? (
+          <>
+            <strong className={`display-number ${nextMonthProjection.leftoverCents >= 0 ? 'amount--income' : 'amount--expense'}`}>
+              {formatMoney(nextMonthProjection.leftoverCents)}
+            </strong>
+            <p className="text-secondary" style={{ margin: '0.35rem 0 0.75rem' }}>
+              Salário previsto {formatMoney(profile!.projectedSalaryCents!)} − Comprometido no modo conservador{' '}
+              {formatMoney(nextMonthProjection.committedCents)}. Baseado no que você informou — não é saldo garantido.
+            </p>
+          </>
+        ) : (
+          <p className="text-secondary" style={{ margin: '0 0 0.75rem' }}>
+            Informe o salário que espera receber pra ver quanto sobraria depois de pagar tudo que já está comprometido.
+          </p>
+        )}
+        <button className="button button--subtle button--compact" type="button" onClick={() => setProjectionSheetOpen(true)}>
+          {nextMonthProjection ? 'Editar' : 'Adicionar salário previsto'}
+        </button>
+      </article>
+
+      <NextMonthProjectionSheet
+        open={projectionSheetOpen}
+        currentProjectedSalaryCents={profile?.projectedSalaryCents}
+        onSave={handleSaveProjectedSalary}
+        onRemove={handleRemoveProjectedSalary}
+        onClose={() => setProjectionSheetOpen(false)}
       />
 
       <div className="quick-actions">

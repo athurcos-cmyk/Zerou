@@ -422,3 +422,46 @@ export function calculateDashboardSummary(input: {
     committedCutoffSource
   };
 }
+
+/**
+ * Card "Projeção do próximo mês" (Dashboard) — `sobra = salário previsto − Comprometido`.
+ * Diferente da extinta "Fluxo de Caixa" (removida 2026-07-18 por especular receita futura
+ * pela MÉDIA histórica): aqui o salário vem 100% do que a pessoa declarou
+ * (`profile.projectedSalaryCents`), nunca de estimativa automática — `null` quando ainda
+ * não configurado, sem inventar um valor.
+ *
+ * SEMPRE força `availableMode: 'conservative'` no corte do Comprometido, independente do
+ * modo real do perfil (que pode estar em 'until_payday') — é assim que a pessoa já faz
+ * essa conta manualmente hoje (comprometido cheio, sem contar com o próprio salário que
+ * está tentando prever). Isolado de propósito do `calculateDashboardSummary` ao vivo: não
+ * lê nem devolve `accounts`/`totalBalanceCents`/`freeToSpendCents` — nunca deve ser
+ * combinado com o saldo real.
+ */
+export function calculateNextMonthProjection(input: {
+  projectedSalaryCents?: number;
+  transactions: Transaction[];
+  bills: Bill[];
+  recurringRules: RecurringRule[];
+  invoices?: Invoice[];
+  cards?: CreditCard[];
+  committedWindowDays?: number;
+  now?: Date;
+}): { committedCents: number; leftoverCents: number } | null {
+  if (!input.projectedSalaryCents) return null;
+
+  const { cutoff } = resolveCommittedCutoff({
+    transactions: input.transactions,
+    committedWindowDays: input.committedWindowDays,
+    availableMode: 'conservative',
+    now: input.now
+  });
+  const committedCents = buildUpcomingCommitments(
+    input.bills,
+    input.recurringRules,
+    cutoff,
+    input.invoices ?? [],
+    input.cards ?? []
+  ).reduce((total, commitment) => total + commitment.amountCents, 0);
+
+  return { committedCents, leftoverCents: input.projectedSalaryCents - committedCents };
+}

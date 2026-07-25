@@ -2,6 +2,17 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-25 — feat: card "Projeção do próximo mês" — salário previsto manual, isolado do saldo real
+
+Pedido da dona: hoje, pra saber quanto vai sobrar no mês que vem, ela faz um "hack" (lança uma transação de receita falsa com o salário esperado só pra simular no Disponível). Feature nova substitui isso: ela declara um "salário previsto" (nunca 0, editável quando quiser) e o Dashboard mostra `sobra = salário previsto − Comprometido (modo conservador, forçado)`, sem tocar em transação, saldo ou Disponível reais nenhum. Planejado com `/plan-eng-review`.
+
+Diferente da extinta "Fluxo de Caixa" (removida 2026-07-18 por especular receita futura pela MÉDIA histórica) — aqui o número é 100% declarado pela pessoa, nunca estimado; por isso o nome mudou, pra não confundir com a feature perigosa que foi apagada de propósito.
+
+- Campo novo `projectedSalaryCents` no perfil (`users/{uid}`) — pessoal, nunca relacionado ao workspace do casal. `firestore.rules` valida `> 0` no servidor, não só no client.
+- `calculateNextMonthProjection` (`financeCalculations.ts`) reaproveita `resolveCommittedCutoff`/`buildUpcomingCommitments` já existentes, sempre forçando modo conservador — ignora o `AvailableMode` real do perfil de propósito.
+- Card novo no Dashboard + sheet pra editar/remover (`NextMonthProjectionSheet.tsx`), mesmo padrão de `AvailableModeSheet.tsx`.
+- `npm run test:rules` (69/69), `typecheck`/`test` (421) limpos. Deploy de `firestore.rules` autorizado e feito; verificado ao vivo no navegador (definir, ver a sobra recalcular, editar, remover — Disponível/Comprometido reais nunca mudaram). Detalhe: `docs/history/2026-07.md`.
+
 ## 2026-07-25 — fix: Dashboard travava Saldo total/Resumo de gastos/Transações recentes esperando cartão sincronizar, mesmo sem precisar dele
 
 Achado pelo dono: lançou transações pela Vic no WhatsApp com o app fechado, abriu o app depois e a tela inicial inteira (até o Saldo total) ficou presa na versão antiga até ele entrar na aba Transações. Causa: `DashboardPage.tsx` tinha uma única trava de cache (`isCommittedLoading` = finanças **e** cartões/faturas) decidindo quando trocar do cache local pro dado ao vivo — mas Saldo total, Resumo de gastos e Transações recentes (`calculateDashboardSummary`) nunca dependeram de cartão nenhum. Quando cartões/faturas demoram mais que finanças pra sincronizar (comum num boot frio), a tela inteira ficava refém do card mais lento. Corrigido com uma trava separada (`financeCache`, só `finance.loading`) pras três seções que não usam cartão; "Disponível"/"Comprometido"/"Próximos compromissos" continuam na trava combinada (genuinamente precisam de fatura). `npm run typecheck`/`test` (415) limpos, verificado ao vivo no navegador.
