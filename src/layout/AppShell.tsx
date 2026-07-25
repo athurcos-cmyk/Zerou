@@ -89,7 +89,6 @@ export function AppShell() {
           <NavLink className={getNavClass} to="/app/accounts">
             <WalletCards size={19} aria-hidden="true" /> Contas
           </NavLink>
-          {/* Patrimônio Líquido desativado (2026-07-16, pedido do dono) — ver docs/planning/TODOS.md. Página/cálculo intactos, só sem entrada de navegação. */}
           <NavLink className={getNavClass} to="/app/cards">
             <CreditCardIcon /> Cartões
           </NavLink>
@@ -166,7 +165,6 @@ export function AppShell() {
             <NavLink className={getTileClass} to="/app/accounts" onClick={() => setMobileMenuOpen(false)}>
               <WalletCards size={20} aria-hidden="true" /> <span>Contas</span>
             </NavLink>
-            {/* Patrimônio Líquido desativado (2026-07-16, pedido do dono) — ver docs/planning/TODOS.md. */}
             <NavLink className={getTileClass} to="/app/bills" onClick={() => setMobileMenuOpen(false)}>
               <CalendarClock size={20} aria-hidden="true" /> <span>Contas a Pagar</span>
             </NavLink>

@@ -121,7 +121,7 @@ export function App() {
                 <Route path="receivables" element={<Suspense fallback={<LazyFallback />}><ReceivablesPage /></Suspense>} />
                 <Route path="goals" element={<Suspense fallback={<LazyFallback />}><GoalsPage /></Suspense>} />
                 <Route path="goals/:goalId" element={<Suspense fallback={<LazyFallback />}><GoalDetailPage /></Suspense>} />
-                {/* Patrimônio Líquido desativado (2026-07-16) — redireciona em vez de remover, pra não deixar link morto se alguém tiver a URL salva/favoritada. */}
+                {/* Patrimônio Líquido descontinuado (2026-07-24) — código removido; redirect fica pra não deixar link morto se alguém tiver a URL salva/favoritada. */}
                 <Route path="net-worth" element={<Navigate to="/app/dashboard" replace />} />
                 <Route path="search" element={<Suspense fallback={<LazyFallback />}><SearchPage /></Suspense>} />
                 <Route path="shared" element={<Suspense fallback={<LazyFallback />}><SharedSpacePage /></Suspense>} />
