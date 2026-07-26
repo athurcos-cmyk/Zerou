@@ -1,11 +1,15 @@
 import type { AvailableMode } from '../types/contracts';
 
 /**
- * Perfil sem `availableMode` (conta criada antes do mini tutorial existir, ou pessoa
- * que ainda não passou por ele) mantém o comportamento histórico do app — trocar esse
- * default muda o número do Dashboard de todo mundo de uma vez.
+ * Perfil sem `availableMode` (nunca escolheu explicitamente) usa este default. Mudado
+ * de 'until_payday' pra 'conservative' em 2026-07-26 — o mini tutorial que forçava essa
+ * escolha no primeiro acesso foi removido ("nenhum usuário está entendendo" os dois
+ * modos, pedido da dona) e 'conservative' é o lado seguro (nunca conta com dinheiro que
+ * ainda não entrou — mesma leitura que a Projeção do próximo mês já usa sempre). Quem já
+ * tinha escolhido um modo explicitamente (`profile.availableMode` já preenchido) não é
+ * afetado — só o fallback pra quem nunca escolheu nada muda.
  */
-export const defaultAvailableMode: AvailableMode = 'until_payday';
+export const defaultAvailableMode: AvailableMode = 'conservative';
 
 export const availableModeLabels: Record<AvailableMode, string> = {
   conservative: 'Conservador',

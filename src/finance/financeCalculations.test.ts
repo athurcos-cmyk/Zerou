@@ -799,20 +799,33 @@ describe('calculateDashboardSummary', () => {
     };
 
     expect(calculateDashboardSummary({ ...base, transactions: [] }).committedCutoffSource).toBe('window');
+    // 'payday'/'income' só saem no modo until_payday — precisa ser explícito desde que o
+    // default virou 'conservative' (2026-07-26).
     expect(
-      calculateDashboardSummary({ ...base, transactions: [], payday: { type: 'fixed_day', day: 25 } }).committedCutoffSource
+      calculateDashboardSummary({
+        ...base,
+        transactions: [],
+        payday: { type: 'fixed_day', day: 25 },
+        availableMode: 'until_payday'
+      }).committedCutoffSource
     ).toBe('payday');
     expect(
       calculateDashboardSummary({
         ...base,
         transactions: [transaction({ type: 'income', date: Timestamp.fromDate(new Date('2026-07-25T12:00:00')) })],
-        payday: { type: 'fixed_day', day: 5 }
+        payday: { type: 'fixed_day', day: 5 },
+        availableMode: 'until_payday'
       }).committedCutoffSource
     ).toBe('income');
     // "Renda variável" é uma escolha explícita (plantão, freela, autônomo), mas não
     // resolve pra uma data — cai na janela igual quem nunca respondeu a pergunta.
     expect(
-      calculateDashboardSummary({ ...base, transactions: [], payday: { type: 'variable_income' } }).committedCutoffSource
+      calculateDashboardSummary({
+        ...base,
+        transactions: [],
+        payday: { type: 'variable_income' },
+        availableMode: 'until_payday'
+      }).committedCutoffSource
     ).toBe('window');
   });
 
@@ -859,6 +872,7 @@ describe('calculateDashboardSummary', () => {
       bills: [bill({ amountCents: 5000, dueDate: Timestamp.fromDate(new Date('2026-07-20T12:00:00')) })],
       recurringRules: [],
       payday: { type: 'fixed_day', day: 20 },
+      availableMode: 'until_payday',
       now: new Date('2026-07-09T15:00:00')
     });
 
@@ -892,20 +906,37 @@ describe('calculateDashboardSummary', () => {
   });
 });
 
-// O modo é uma escolha explícita da pessoa (mini tutorial no Dashboard). As duas leituras
-// são legítimas: `until_payday` conta com o próximo recebimento (só o que vence antes dele
-// pesa); `conservative` nunca conta com o salário e olha uma janela fixa de dias — cada
-// parcela de cartão entra só quando o vencimento chega perto, não todas de uma vez.
+// O modo é uma escolha opcional em Configurações (não mais forçada no Dashboard, ver
+// 2026-07-26). As duas leituras continuam legítimas: `until_payday` conta com o próximo
+// recebimento (só o que vence antes dele pesa); `conservative` nunca conta com o salário
+// e olha uma janela fixa de dias — cada parcela de cartão entra só quando o vencimento
+// chega perto, não todas de uma vez.
 describe('calculateDashboardSummary — availableMode', () => {
   const now = new Date('2026-07-09T12:00:00');
 
-  it('defaults to until_payday when the profile never answered the tutorial', () => {
+  // 2026-07-26: default virou 'conservative' — perfil sem escolha explícita não conta
+  // mais com o payday automaticamente, mesmo com uma data cadastrada.
+  it('defaults to conservative (window) when availableMode was never chosen, even with a payday set', () => {
     const summary = calculateDashboardSummary({
       accounts: [account('checking', 100000)],
       transactions: [],
       bills: [],
       recurringRules: [],
       payday: { type: 'fixed_day', day: 5 },
+      now
+    });
+
+    expect(summary.committedCutoffSource).toBe('window');
+  });
+
+  it('uses payday-based cutoff only when until_payday is explicitly chosen', () => {
+    const summary = calculateDashboardSummary({
+      accounts: [account('checking', 100000)],
+      transactions: [],
+      bills: [],
+      recurringRules: [],
+      payday: { type: 'fixed_day', day: 5 },
+      availableMode: 'until_payday',
       now
     });
 

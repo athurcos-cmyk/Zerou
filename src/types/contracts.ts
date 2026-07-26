@@ -57,9 +57,10 @@ export type PaydayRule =
   | { type: 'end_of_month' }
   | { type: 'variable_income' };
 
-// Como o "Disponível" do resumo é calculado. Escolha explícita da pessoa (mini tutorial
-// no primeiro Dashboard, trocável em Configurações), porque as duas leituras são
-// legítimas e dependem da vida de cada um:
+// Como o "Disponível" do resumo é calculado. Default é sempre 'conservative' (2026-07-26 —
+// antes havia um mini tutorial forçando essa escolha no primeiro Dashboard; removido por
+// confundir os usuários). Ainda trocável em Configurações > Recebimento, pra quem quiser —
+// as duas leituras continuam legítimas, dependem da vida de cada um:
 //
 // - `conservative`: Comprometido = tudo que você já deve (contas pendentes, próxima
 //   ocorrência de cada recorrência, e todo saldo em aberto de fatura, inclusive parcelas
@@ -88,10 +89,11 @@ export interface UserProfile extends AppearancePreferences {
   // quando ausente; editável em Configurações por qualquer pessoa, não só quem tem
   // renda variável.
   committedWindowDays?: number;
-  // Ausente = a pessoa ainda não passou pelo mini tutorial do Dashboard. Nesse caso o
-  // cálculo usa `defaultAvailableMode` ('until_payday', o comportamento histórico) e o
-  // tutorial abre sozinho. Depois de escolher (ou dispensar), o campo existe e o
-  // tutorial só reaparece se ela pedir em Configurações.
+  // Ausente = a pessoa nunca escolheu explicitamente — usa `defaultAvailableMode`
+  // ('conservative' desde 2026-07-26; era 'until_payday', mas o mini tutorial que forçava
+  // essa escolha no primeiro acesso foi removido por confundir os usuários). A escolha
+  // continua disponível, só que discreta, em Configurações > Recebimento — nunca mais
+  // abre sozinha.
   availableMode?: AvailableMode;
   // Salário previsto pro card "Projeção do próximo mês" (Dashboard) — 100% declarado pela
   // pessoa, nunca calculado/estimado pelo app (diferente da extinta "Fluxo de Caixa", que

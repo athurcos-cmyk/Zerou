@@ -2,6 +2,14 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-26 — refactor: tira a escolha forçada de "Comprometido" (conservador vs. até o recebimento)
+
+Pedido da dona (`/plan-ceo-review`): "esses dois ainda muito confuso... nenhum usuário está entendendo." O mini tutorial que forçava essa escolha no primeiro acesso ao Dashboard foi removido — agora todo mundo usa o modo **conservador** por padrão (mesma leitura que a Projeção do próximo mês já força sempre), sem perguntar nada. "Até o próximo recebimento" continua existindo, só que discreto em Configurações > Recebimento — ninguém que já escolheu explicitamente antes é afetado.
+
+- `defaultAvailableMode` (`availableMode.ts`): `'until_payday'` → `'conservative'`.
+- `DashboardPage.tsx`: removida a lógica de auto-abertura do tutorial (`shouldAutoOpenTutorial`, `hasChosenAvailableMode`, `tutorialDismissed`) — a sheet só abre por toque explícito (legenda de Disponível/Comprometido).
+- `typecheck`/`test` (424) limpos, 3 testes que dependiam do default antigo atualizados. Verificado ao vivo: Dashboard e Configurações > Recebimento renderizam normal, sem regressão.
+
 ## 2026-07-25 — feat: card "Projeção do próximo mês" — salário previsto manual, isolado do saldo real
 
 Pedido da dona: hoje, pra saber quanto vai sobrar no mês que vem, ela faz um "hack" (lança uma transação de receita falsa com o salário esperado só pra simular no Disponível). Feature nova substitui isso: ela declara um "salário previsto" (nunca 0, editável quando quiser) e o Dashboard mostra `sobra = salário previsto − Comprometido (modo conservador, forçado)`, sem tocar em transação, saldo ou Disponível reais nenhum. Planejado com `/plan-eng-review`.

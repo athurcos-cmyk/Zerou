@@ -25,7 +25,6 @@ import { SyncStatusBadge } from '../finance/SyncStatusBadge';
 import { CategoryMark } from '../components/categoryIcons';
 import { defaultCategoryColors } from '../theme/palette';
 import { InstallPromptSheet } from '../pwa/InstallPromptSheet';
-import { useWelcomeTour } from '../onboarding/welcomeTour.store';
 import { BudgetAlertBanner } from '../components/BudgetAlertBanner';
 
 import { EmptyState } from '../components/EmptyState';
@@ -84,13 +83,12 @@ export function DashboardPage() {
   // contas/transações — sem isso, mostrariam um "Disponível" inflado por um instante
   // antes das faturas sincronizarem.
   const isCommittedLoading = finance.loading || cardsData.loading;
-  // Perfil sem `availableMode` = ainda não passou pelo mini tutorial. Ele abre sozinho
-  // (uma vez), e qualquer escolha — inclusive manter o padrão — grava o campo, que é o
-  // que impede de reabrir no próximo boot.
-  const hasChosenAvailableMode = Boolean(profile?.availableMode);
-  const welcomeTourSeen = useWelcomeTour((state) => state.seen);
+  // O modo (conservador/até o recebimento) não abre mais sozinho (2026-07-26, pedido da
+  // dona — "nenhum usuário está entendendo"): todo perfil sem escolha explícita usa
+  // `defaultAvailableMode` (conservador, o mesmo que a Projeção do próximo mês já força)
+  // sem perguntar nada. A sheet continua existindo só como explicação sob demanda — toque
+  // na legenda de Disponível/Comprometido, ou em Configurações > Recebimento.
   const [tutorialOpen, setTutorialOpen] = useState(false);
-  const [tutorialDismissed, setTutorialDismissed] = useState(false);
   const [projectionSheetOpen, setProjectionSheetOpen] = useState(false);
   // Disponível/Comprometido somam o total da fatura que só a Cloud Function atualiza — ela
   // não roda offline. Ver comentário completo em hasPendingCardLedgerActivity.
@@ -139,20 +137,8 @@ export function DashboardPage() {
       ? `${activeModeLabel} · Considerando seu recebimento em ${formatFriendlyDate(dashboard.committedCutoff!)}`
       : `${activeModeLabel} · Considerando os próximos ${profile?.committedWindowDays ?? 30} dias`;
 
-  // Só depois que o perfil carregou (senão o sheet pisca antes de sabermos a escolha) e
-  // depois que o tour de boas-vindas fechou — pra não empilhar dois modais no primeiro acesso.
-  const shouldAutoOpenTutorial = Boolean(profile) && !hasChosenAvailableMode && !tutorialDismissed && welcomeTourSeen;
-
   function handleChooseAvailableMode(mode: AvailableMode) {
     if (user) updateAvailableMode(user.uid, mode);
-    setTutorialDismissed(true);
-    setTutorialOpen(false);
-  }
-
-  function handleCloseTutorial() {
-    // Fechar sem escolher assume o padrão e grava — senão o tutorial reabre pra sempre.
-    if (user && !hasChosenAvailableMode) updateAvailableMode(user.uid, defaultAvailableMode);
-    setTutorialDismissed(true);
     setTutorialOpen(false);
   }
   // Mostra a última tela conhecida (cache local) enquanto os listeners do Firestore ainda
@@ -423,10 +409,10 @@ export function DashboardPage() {
       </div>
 
       <AvailableModeSheet
-        open={tutorialOpen || shouldAutoOpenTutorial}
+        open={tutorialOpen}
         currentMode={profile?.availableMode}
         onChoose={handleChooseAvailableMode}
-        onClose={handleCloseTutorial}
+        onClose={() => setTutorialOpen(false)}
       />
 
       <article className="projection-card">
