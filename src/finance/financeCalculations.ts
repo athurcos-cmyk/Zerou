@@ -424,18 +424,21 @@ export function calculateDashboardSummary(input: {
 }
 
 /**
- * Card "Projeção do próximo mês" (Dashboard) — `sobra = salário previsto − Comprometido`.
- * Diferente da extinta "Fluxo de Caixa" (removida 2026-07-18 por especular receita futura
- * pela MÉDIA histórica): aqui o salário vem 100% do que a pessoa declarou
- * (`profile.projectedSalaryCents`), nunca de estimativa automática — `null` quando ainda
- * não configurado, sem inventar um valor.
+ * Card "Projeção do próximo mês" (Dashboard) — `sobra = salário previsto − Comprometido`,
+ * mais o saldo total atual quando `includeCurrentBalance` estiver ligado (preferência da
+ * pessoa, `profile.projectionIncludesBalance`). Diferente da extinta "Fluxo de Caixa"
+ * (removida 2026-07-18 por especular receita futura pela MÉDIA histórica): o salário vem
+ * 100% do que a pessoa declarou (`profile.projectedSalaryCents`), nunca de estimativa
+ * automática — `null` quando ainda não configurado, sem inventar um valor. Somar o saldo
+ * atual (quando ligado) não fere essa regra: é um número real e já confirmado (o que já
+ * está na conta hoje), não uma projeção de dinheiro que ainda não existe.
  *
  * SEMPRE força `availableMode: 'conservative'` no corte do Comprometido, independente do
  * modo real do perfil (que pode estar em 'until_payday') — é assim que a pessoa já faz
  * essa conta manualmente hoje (comprometido cheio, sem contar com o próprio salário que
  * está tentando prever). Isolado de propósito do `calculateDashboardSummary` ao vivo: não
- * lê nem devolve `accounts`/`totalBalanceCents`/`freeToSpendCents` — nunca deve ser
- * combinado com o saldo real.
+ * lê `accounts` (recebe só o total já calculado, se pedido) e nunca escreve nada — nunca
+ * deve ser confundido com o Disponível real.
  */
 export function calculateNextMonthProjection(input: {
   projectedSalaryCents?: number;
@@ -445,6 +448,8 @@ export function calculateNextMonthProjection(input: {
   invoices?: Invoice[];
   cards?: CreditCard[];
   committedWindowDays?: number;
+  includeCurrentBalance?: boolean;
+  totalBalanceCents?: number;
   now?: Date;
 }): { committedCents: number; leftoverCents: number } | null {
   if (!input.projectedSalaryCents) return null;
@@ -463,5 +468,7 @@ export function calculateNextMonthProjection(input: {
     input.cards ?? []
   ).reduce((total, commitment) => total + commitment.amountCents, 0);
 
-  return { committedCents, leftoverCents: input.projectedSalaryCents - committedCents };
+  const balanceCents = input.includeCurrentBalance ? input.totalBalanceCents ?? 0 : 0;
+
+  return { committedCents, leftoverCents: input.projectedSalaryCents + balanceCents - committedCents };
 }

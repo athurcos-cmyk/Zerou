@@ -187,7 +187,7 @@ export function updateAvailableMode(uid: string, availableMode: AvailableMode) {
  * quem chama (a sheet) já bloqueia isso na UI, e `validProjectedSalaryCents` em
  * `firestore.rules` bloqueia de novo no servidor.
  *
- * A regra `onlyProjectedSalaryChanged` em `firestore.rules` aceita este update; se um
+ * A regra `onlyProjectionSettingsChanged` em `firestore.rules` aceita este update; se um
  * campo novo entrar neste payload, ela precisa ser atualizada no MESMO commit.
  */
 export function updateProjectedSalary(uid: string, projectedSalaryCents: number | null) {
@@ -196,6 +196,21 @@ export function updateProjectedSalary(uid: string, projectedSalaryCents: number 
 
   fireWrite(updateDoc(userRef, {
     projectedSalaryCents: projectedSalaryCents ?? deleteField(),
+    updatedAt: serverTimestamp()
+  }));
+}
+
+/**
+ * Liga/desliga se a "Projeção do próximo mês" também soma o saldo total atual na sobra.
+ * Escrita independente do salário — a pessoa pode mudar só a preferência sem reabrir o
+ * valor. Mesma regra `onlyProjectionSettingsChanged` de `updateProjectedSalary`.
+ */
+export function updateProjectionIncludesBalance(uid: string, includeBalance: boolean) {
+  const db = getFirebaseDb();
+  const userRef = doc(db, 'users', uid);
+
+  fireWrite(updateDoc(userRef, {
+    projectionIncludesBalance: includeBalance,
     updatedAt: serverTimestamp()
   }));
 }

@@ -1024,6 +1024,59 @@ describe('firestore security rules', () => {
     );
   });
 
+  // O payload aqui é exatamente o de `updateProjectionIncludesBalance` (workspaceService.ts):
+  // `{ projectionIncludesBalance, updatedAt }` — toggle independente do salário previsto,
+  // mas validado na MESMA regra (`onlyProjectionSettingsChanged`) já que os dois campos
+  // vivem na mesma sheet/tela.
+  it('allows a user to toggle whether the projection counts their current balance, and rejects anything else', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        projectionIncludesBalance: true,
+        updatedAt: serverTimestamp()
+      })
+    );
+    await assertSucceeds(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        projectionIncludesBalance: false,
+        updatedAt: serverTimestamp()
+      })
+    );
+    // Os dois campos juntos, mesmo write (salvar a sheet inteira de uma vez).
+    await assertSucceeds(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        projectedSalaryCents: 350000,
+        projectionIncludesBalance: true,
+        updatedAt: serverTimestamp()
+      })
+    );
+
+    // Tipo errado.
+    await assertFails(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        projectionIncludesBalance: 'true',
+        updatedAt: serverTimestamp()
+      })
+    );
+    // Valor válido, mas contrabandeando um campo protegido junto.
+    await assertFails(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        projectionIncludesBalance: true,
+        name: 'Forged name',
+        updatedAt: serverTimestamp()
+      })
+    );
+    // Ninguém edita pelos outros.
+    const bobDb = testEnv.authenticatedContext('bob').firestore();
+    await assertFails(
+      updateDoc(doc(bobDb, 'users/alice'), {
+        projectionIncludesBalance: true,
+        updatedAt: serverTimestamp()
+      })
+    );
+  });
+
   // O payload aqui é exatamente o de `updateOnboardingAnswers` (workspaceService.ts):
   // `{ onboardingGoal, onboardingChallenge, updatedAt }`, incluindo `deleteField()` pra
   // limpar uma escolha. Antes essas respostas só eram gravadas uma vez no cadastro; agora

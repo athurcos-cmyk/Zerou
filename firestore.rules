@@ -97,8 +97,8 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['onboardingGoal', 'onboardingChallenge', 'updatedAt']);
     }
 
-    function onlyProjectedSalaryChanged() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['projectedSalaryCents', 'updatedAt']);
+    function onlyProjectionSettingsChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['projectedSalaryCents', 'projectionIncludesBalance', 'updatedAt']);
     }
 
     function validAvailableMode(value) {
@@ -1608,8 +1608,9 @@ service cloud.firestore {
           && (!request.resource.data.keys().hasAny(['onboardingChallenge']) || request.resource.data.onboardingChallenge is string)
         )
         || (
-          onlyProjectedSalaryChanged()
+          onlyProjectionSettingsChanged()
           && (!request.resource.data.keys().hasAny(['projectedSalaryCents']) || validProjectedSalaryCents(request.resource.data.projectedSalaryCents))
+          && (!request.resource.data.keys().hasAny(['projectionIncludesBalance']) || request.resource.data.projectionIncludesBalance is bool)
         )
       );
       allow delete: if canDeleteUserAccountData(uid);

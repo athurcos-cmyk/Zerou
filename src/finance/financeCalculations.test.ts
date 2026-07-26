@@ -1169,9 +1169,10 @@ describe('calculateNextMonthProjection', () => {
     expect(result!.committedCents).toBe(120000);
   });
 
-  it('não devolve nem depende de totalBalanceCents/freeToSpendCents — isolado do saldo real', () => {
+  it('por padrão ignora totalBalanceCents (includeCurrentBalance ausente/false) — isolado do saldo real', () => {
     const result = calculateNextMonthProjection({
       projectedSalaryCents: 500000,
+      totalBalanceCents: 999999999, // presente, mas deve ser ignorado sem includeCurrentBalance
       transactions: [],
       bills: [],
       recurringRules: [],
@@ -1179,7 +1180,33 @@ describe('calculateNextMonthProjection', () => {
     });
 
     expect(result).toEqual({ committedCents: 0, leftoverCents: 500000 });
-    expect(result).not.toHaveProperty('totalBalanceCents');
-    expect(result).not.toHaveProperty('freeToSpendCents');
+  });
+
+  it('soma o saldo total atual na sobra quando includeCurrentBalance está ligado', () => {
+    const result = calculateNextMonthProjection({
+      projectedSalaryCents: 500000,
+      includeCurrentBalance: true,
+      totalBalanceCents: 200000,
+      transactions: [],
+      bills: [bill({ amountCents: 120000, dueDate: Timestamp.fromDate(new Date('2026-06-20T12:00:00')) })],
+      recurringRules: [],
+      now
+    });
+
+    // 500000 (salário) + 200000 (saldo) - 120000 (comprometido) = 580000
+    expect(result!.leftoverCents).toBe(580000);
+  });
+
+  it('includeCurrentBalance ligado sem totalBalanceCents informado soma zero (nunca quebra)', () => {
+    const result = calculateNextMonthProjection({
+      projectedSalaryCents: 500000,
+      includeCurrentBalance: true,
+      transactions: [],
+      bills: [],
+      recurringRules: [],
+      now
+    });
+
+    expect(result!.leftoverCents).toBe(500000);
   });
 });

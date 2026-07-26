@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarClock, CreditCard, Minus, Plus, Target, TrendingDown, TrendingUp, Wallet, WifiOff } from 'lucide-react';
+import { CalendarClock, CreditCard, Minus, Pencil, PiggyBank, Plus, Scale, Target, Telescope, TrendingDown, TrendingUp, Wallet, WifiOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { AvailableModeSheet } from '../finance/AvailableModeSheet';
 import { NextMonthProjectionSheet } from '../finance/NextMonthProjectionSheet';
-import { updateAvailableMode, updateProjectedSalary } from '../workspaces/workspaceService';
+import { updateAvailableMode, updateProjectedSalary, updateProjectionIncludesBalance } from '../workspaces/workspaceService';
 import type { AvailableMode, TransactionType } from '../types/contracts';
 
 import { calculateDashboardSummary, calculateNextMonthProjection, buildUpcomingReceivables, hasPendingCardLedgerActivity } from '../finance/financeCalculations';
@@ -108,8 +108,11 @@ export function DashboardPage() {
   });
   // Card "Projeção do próximo mês" — isolado do Disponível/saldo real de propósito (ver
   // comentário em calculateNextMonthProjection). `null` quando ainda não configurado.
+  // `totalBalanceCents` só entra na conta se a pessoa ligou `projectionIncludesBalance`.
   const nextMonthProjection = calculateNextMonthProjection({
     projectedSalaryCents: profile?.projectedSalaryCents,
+    includeCurrentBalance: profile?.projectionIncludesBalance,
+    totalBalanceCents: dashboard.totalBalanceCents,
     transactions: finance.transactions,
     bills: finance.bills,
     recurringRules: finance.recurringRules,
@@ -122,6 +125,9 @@ export function DashboardPage() {
   }
   function handleRemoveProjectedSalary() {
     if (user) updateProjectedSalary(user.uid, null);
+  }
+  function handleToggleIncludeBalance(include: boolean) {
+    if (user) updateProjectionIncludesBalance(user.uid, include);
   }
   // Nomeia o modo ativo na legenda (antes só aparecia dentro do tutorial) — pedido do
   // dono pra deixar a escolha visível toda vez que a pessoa olha o Dashboard.
@@ -423,38 +429,75 @@ export function DashboardPage() {
         onClose={handleCloseTutorial}
       />
 
-      <article className="surface surface-pad">
-        <div className="section-heading">
-          <div>
+      <article className="projection-card">
+        <div className="projection-card-header">
+          <span className={`projection-icon${nextMonthProjection && nextMonthProjection.leftoverCents < 0 ? ' projection-icon--negative' : ''}`}>
+            <Telescope size={19} aria-hidden="true" />
+          </span>
+          <div className="projection-card-title">
             <p className="eyebrow">Projeção do próximo mês</p>
             <h2>{nextMonthProjection ? (nextMonthProjection.leftoverCents >= 0 ? 'Sobra prevista' : 'Rombo previsto') : 'Quanto sobraria mês que vem?'}</h2>
           </div>
+          {nextMonthProjection ? (
+            <button
+              className="icon-button"
+              type="button"
+              onClick={() => setProjectionSheetOpen(true)}
+              aria-label="Editar salário previsto"
+            >
+              <Pencil size={16} aria-hidden="true" />
+            </button>
+          ) : null}
         </div>
+
         {nextMonthProjection ? (
           <>
-            <strong className={`display-number ${nextMonthProjection.leftoverCents >= 0 ? 'amount--income' : 'amount--expense'}`}>
+            <strong className={`projection-amount ${nextMonthProjection.leftoverCents >= 0 ? 'projection-amount--positive' : 'projection-amount--negative'}`}>
               {formatMoney(nextMonthProjection.leftoverCents)}
             </strong>
-            <p className="text-secondary" style={{ margin: '0.35rem 0 0.75rem' }}>
-              Salário previsto {formatMoney(profile!.projectedSalaryCents!)} − Comprometido no modo conservador{' '}
-              {formatMoney(nextMonthProjection.committedCents)}. Baseado no que você informou — não é saldo garantido.
-            </p>
+            <div className="projection-formula">
+              <span className="projection-formula-term">
+                <Wallet size={13} aria-hidden="true" /> {formatMoney(profile!.projectedSalaryCents!)}
+              </span>
+              {profile?.projectionIncludesBalance ? (
+                <>
+                  <span className="projection-formula-operator" aria-hidden="true">+</span>
+                  <span className="projection-formula-term">
+                    <PiggyBank size={13} aria-hidden="true" /> {formatMoney(dashboard.totalBalanceCents)}
+                  </span>
+                </>
+              ) : null}
+              <span className="projection-formula-operator" aria-hidden="true">−</span>
+              <span className="projection-formula-term">
+                <Scale size={13} aria-hidden="true" /> {formatMoney(nextMonthProjection.committedCents)}
+              </span>
+            </div>
+            <p className="projection-disclaimer">Simulação com o que você informou — não é saldo garantido.</p>
           </>
         ) : (
-          <p className="text-secondary" style={{ margin: '0 0 0.75rem' }}>
-            Informe o salário que espera receber pra ver quanto sobraria depois de pagar tudo que já está comprometido.
-          </p>
+          <button className="projection-empty" type="button" onClick={() => setProjectionSheetOpen(true)}>
+            <span className="projection-empty-icon">
+              <Plus size={20} aria-hidden="true" />
+            </span>
+            <span>
+              <span className="projection-empty-title">Adicionar salário previsto</span>
+              <span className="text-secondary projection-empty-desc">
+                Veja quanto sobraria depois de pagar tudo que já está comprometido.
+              </span>
+            </span>
+          </button>
         )}
-        <button className="button button--subtle button--compact" type="button" onClick={() => setProjectionSheetOpen(true)}>
-          {nextMonthProjection ? 'Editar' : 'Adicionar salário previsto'}
-        </button>
       </article>
 
       <NextMonthProjectionSheet
         open={projectionSheetOpen}
         currentProjectedSalaryCents={profile?.projectedSalaryCents}
+        committedCents={nextMonthProjection?.committedCents}
+        totalBalanceCents={dashboard.totalBalanceCents}
+        includeCurrentBalance={profile?.projectionIncludesBalance ?? false}
         onSave={handleSaveProjectedSalary}
         onRemove={handleRemoveProjectedSalary}
+        onToggleIncludeBalance={handleToggleIncludeBalance}
         onClose={() => setProjectionSheetOpen(false)}
       />
 

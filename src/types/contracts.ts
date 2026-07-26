@@ -100,6 +100,11 @@ export interface UserProfile extends AppearancePreferences {
   // ainda não configurou, card mostra CTA em vez de resultado. Puramente pessoal — nunca
   // usado em cálculo de saldo/Disponível real nem em nada do espaço do casal.
   projectedSalaryCents?: number;
+  // Se a "Projeção do próximo mês" também soma o saldo total atual (contas) na sobra, além
+  // do salário previsto. Ausente/`false` = comportamento padrão (só salário − comprometido).
+  // Diferente do salário, isso É um número real e já confirmado (saldo de hoje), não uma
+  // estimativa — não fere a regra de nunca especular dinheiro futuro.
+  projectionIncludesBalance?: boolean;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }

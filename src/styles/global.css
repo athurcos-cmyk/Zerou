@@ -4553,6 +4553,193 @@ span.service-mark--brand {
   background: linear-gradient(to top, var(--bg-surface) 78%, transparent);
 }
 
+/* "Projeção do próximo mês" (Dashboard) — borda tracejada de propósito: sinaliza
+   "simulação/rascunho" em vez do cartão sólido dos números reais (Saldo/Disponível/
+   Comprometido usam .dash-hero/.dash-metric cheios). Mesma ideia visual da "conta bate
+   ou não" ficar honesta sobre o que é real e o que é hipotético. */
+.projection-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.1rem 1.15rem;
+  border: 2px dashed var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-subtle);
+}
+
+.projection-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.projection-card-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.projection-card-title h2 {
+  margin: 0;
+}
+
+.projection-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.projection-icon--negative {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.projection-amount {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.7rem;
+  margin: 0;
+}
+
+.projection-amount--positive {
+  color: var(--success);
+}
+
+.projection-amount--negative {
+  color: var(--danger);
+}
+
+.projection-formula {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.75rem;
+  background: var(--bg-page);
+}
+
+.projection-formula-term {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.projection-formula-term svg {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.projection-formula-operator {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.projection-disclaimer {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.projection-empty {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.projection-empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--action-primary-soft);
+  color: var(--action-primary);
+  transition: transform var(--duration-fast) ease;
+}
+
+.projection-empty:hover .projection-empty-icon {
+  transform: scale(1.08);
+}
+
+.projection-empty-title {
+  display: block;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.projection-empty-desc {
+  font-size: 0.85rem;
+}
+
+/* Sheet de editar/remover salário previsto — input com o mesmo tratamento numérico
+   (DM Sans 800, tabular-nums) dos outros valores em destaque, mas em tom neutro
+   (não sobre gradiente) já que a sheet não tem hero colorido de fundo. */
+.projection-input-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.9rem 1rem;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-subtle);
+  border: 1px solid var(--border-subtle);
+  transition: border-color var(--duration-fast) ease;
+}
+
+.projection-input-wrap:focus-within {
+  border-color: var(--border-focus);
+}
+
+.projection-input-currency {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: var(--text-muted);
+}
+
+.projection-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(1.8rem, 9vw, 2.3rem);
+  line-height: 1;
+  padding: 0;
+  outline: none;
+}
+
+.projection-live-preview {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--text-secondary);
+}
+
+.projection-live-preview strong {
+  font-variant-numeric: tabular-nums;
+}
+
 .onboard-finish-hint {
   display: flex;
   align-items: center;
