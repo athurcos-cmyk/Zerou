@@ -57,10 +57,12 @@ export type PaydayRule =
   | { type: 'end_of_month' }
   | { type: 'variable_income' };
 
-// Como o "Disponível" do resumo é calculado. Default é sempre 'conservative' (2026-07-26 —
-// antes havia um mini tutorial forçando essa escolha no primeiro Dashboard; removido por
-// confundir os usuários). Ainda trocável em Configurações > Recebimento, pra quem quiser —
-// as duas leituras continuam legítimas, dependem da vida de cada um:
+// Como o "Disponível" do resumo é calculado. Default é 'until_payday' (ver
+// `defaultAvailableMode` em `src/finance/availableMode.ts` pro motivo técnico completo —
+// 'conservative' usa janela rolante e nunca esvazia de verdade). O mini tutorial que
+// forçava essa escolha no primeiro Dashboard foi removido em 2026-07-26 por confundir os
+// usuários; a escolha continua disponível, só que discreta, em Configurações >
+// Recebimento — as duas leituras continuam legítimas, dependem da vida de cada um:
 //
 // - `conservative`: Comprometido = tudo que você já deve (contas pendentes, próxima
 //   ocorrência de cada recorrência, e todo saldo em aberto de fatura, inclusive parcelas

@@ -2,6 +2,7 @@ import { addDays, compareAsc, endOfDay, isAfter, isBefore, isEqual } from 'date-
 import { formatFriendlyMonth, toDate } from './financeDates';
 import { defaultAvailableMode } from './availableMode';
 import { defaultCommittedWindowDays, nextPaydayFrom } from './payday';
+import { resolveInvoiceCycle } from '../cards/cardDates';
 import type { Account, AvailableMode, Bill, CreditCard, Invoice, PaydayRule, Receivable, RecurringRule, Transaction } from '../types/contracts';
 import type { LocalSynced } from './financeService';
 
@@ -226,7 +227,7 @@ export function buildUpcomingCommitments(
   cards: CreditCard[] = []
 ): UpcomingCommitment[] {
   const withinCutoff = (dueAt: Date) => cutoff === null || isOnOrBefore(dueAt, cutoff);
-  const cardNameById = new Map(cards.map((card) => [card.id, card.name]));
+  const cardById = new Map(cards.map((card) => [card.id, card]));
 
   const billCommitments = bills
     .filter((bill) => bill.status === 'pending' || bill.status === 'overdue')
@@ -242,18 +243,29 @@ export function buildUpcomingCommitments(
     )
     .filter((commitment) => withinCutoff(commitment.dueAt));
 
+  // Fixo pago no cartão (`rule.cardId`) ainda não virou compra — `nextOccurrenceAt` é a
+  // data da COBRANÇA, não a data em que o dinheiro sai da conta. Sem projetar pelo ciclo
+  // do cartão, uma recorrência no cartão contava como comprometida ~1 mês antes da hora
+  // (achado em sessão de design com a dona, 2026-07-26): a cobrança de hoje só vence de
+  // verdade quando a fatura que ela vai gerar fecha e vence, não no dia da cobrança em si.
+  // Mesma conta que compra avulsa no cartão já usa (`resolveInvoiceCycle`) — aqui só
+  // projeta a partir da PRÓXIMA ocorrência agendada em vez da data de uma compra real.
+  // Fixo pago direto da conta (`rule.accountId`) não tem esse intermediário — a data da
+  // cobrança já é a data em que o dinheiro sai, sem ajuste.
   const recurringCommitments = recurringRules
     .filter((rule) => rule.isActive && typeof rule.amountCents === 'number')
-    .map(
-      (rule) =>
-        ({
-          id: rule.id,
-          kind: 'recurring',
-          description: rule.description,
-          amountCents: rule.amountCents ?? 0,
-          dueAt: toDate(rule.nextOccurrenceAt)
-        }) satisfies UpcomingCommitment
-    )
+    .map((rule) => {
+      const occurrenceAt = toDate(rule.nextOccurrenceAt);
+      const card = rule.cardId ? cardById.get(rule.cardId) : undefined;
+      const dueAt = card ? resolveInvoiceCycle(occurrenceAt, card.closingDay, card.dueDay).dueDate : occurrenceAt;
+      return {
+        id: rule.id,
+        kind: 'recurring',
+        description: rule.description,
+        amountCents: rule.amountCents ?? 0,
+        dueAt
+      } satisfies UpcomingCommitment;
+    })
     .filter((commitment) => withinCutoff(commitment.dueAt));
 
   // Regra de fatura no comprometido:
@@ -276,7 +288,7 @@ export function buildUpcomingCommitments(
         (invoice.status === 'closed' || withinCutoff(toDate(invoice.dueDate)))
     )
     .map((invoice) => {
-      const cardName = cardNameById.get(invoice.cardId);
+      const cardName = cardById.get(invoice.cardId)?.name;
       // Sem prefixo "Fatura"/mês de referência: a linha já mostra "Fatura · <data>"
       // embaixo (mesmo padrão de bill.description/rule.description, que também são só
       // o nome, sem repetir o tipo). Fallback mantém o texto antigo se o cartão sumiu

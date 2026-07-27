@@ -524,6 +524,63 @@ describe('buildUpcomingCommitments', () => {
     expect(commitments).toHaveLength(0);
   });
 
+  // Achado em sessão de design com a dona (`/office-hours`, 2026-07-26): um fixo pago no
+  // cartão (Netflix, Cinemark etc.) ainda não é uma compra — `nextOccurrenceAt` é a data
+  // da COBRANÇA, não a data em que o dinheiro sai da conta. Sem projetar pelo ciclo do
+  // cartão, contava como comprometido ~1 mês antes da hora. Ver docs/history/2026-07.md.
+  describe('recorrência paga no cartão conta pelo vencimento real da fatura, não pela data da cobrança', () => {
+    it('projects the due date through the card cycle instead of using the charge date', () => {
+      const commitments = buildUpcomingCommitments(
+        [],
+        [recurring({ id: 'r-card', cardId: 'card-1', nextOccurrenceAt: Timestamp.fromDate(new Date('2026-08-01T12:00:00')) })],
+        new Date('2026-09-10T12:00:00'), // bem depois do vencimento real (05/09)
+        [],
+        [card({ id: 'card-1', closingDay: 25, dueDay: 5 })]
+      );
+
+      expect(commitments).toHaveLength(1);
+      expect(commitments[0].dueAt).toEqual(new Date('2026-09-05T12:00:00'));
+    });
+
+    it('regression: no longer counts the charge as committed right after it happens, before the invoice is really due', () => {
+      const commitments = buildUpcomingCommitments(
+        [],
+        [recurring({ id: 'r-card', cardId: 'card-1', nextOccurrenceAt: Timestamp.fromDate(new Date('2026-08-01T12:00:00')) })],
+        new Date('2026-08-15T12:00:00'), // depois da cobrança (01/08), bem antes do vencimento real (05/09)
+        [],
+        [card({ id: 'card-1', closingDay: 25, dueDay: 5 })]
+      );
+
+      expect(commitments).toHaveLength(0);
+    });
+
+    it('still counts an account-debited recurring rule at the occurrence date itself, unaffected', () => {
+      const commitments = buildUpcomingCommitments(
+        [],
+        [recurring({ id: 'r-account', accountId: 'checking', nextOccurrenceAt: Timestamp.fromDate(new Date('2026-08-01T12:00:00')) })],
+        new Date('2026-08-05T12:00:00'),
+        [],
+        []
+      );
+
+      expect(commitments).toHaveLength(1);
+      expect(commitments[0].dueAt).toEqual(new Date('2026-08-01T12:00:00'));
+    });
+
+    it('falls back to the occurrence date when the card behind a recurring rule cannot be found', () => {
+      const commitments = buildUpcomingCommitments(
+        [],
+        [recurring({ id: 'r-orphan', cardId: 'card-deleted', nextOccurrenceAt: Timestamp.fromDate(new Date('2026-08-01T12:00:00')) })],
+        new Date('2026-08-05T12:00:00'),
+        [],
+        []
+      );
+
+      expect(commitments).toHaveLength(1);
+      expect(commitments[0].dueAt).toEqual(new Date('2026-08-01T12:00:00'));
+    });
+  });
+
   it('always includes a closed invoice, regardless of reference month', () => {
     const commitments = buildUpcomingCommitments(
       [],
@@ -799,8 +856,8 @@ describe('calculateDashboardSummary', () => {
     };
 
     expect(calculateDashboardSummary({ ...base, transactions: [] }).committedCutoffSource).toBe('window');
-    // 'payday'/'income' só saem no modo until_payday — precisa ser explícito desde que o
-    // default virou 'conservative' (2026-07-26).
+    // 'until_payday' explícito aqui por clareza do teste — é o default desde 2026-07-26,
+    // mas essas asserções testam o comportamento do modo em si, não o fallback.
     expect(
       calculateDashboardSummary({
         ...base,
@@ -914,33 +971,38 @@ describe('calculateDashboardSummary', () => {
 describe('calculateDashboardSummary — availableMode', () => {
   const now = new Date('2026-07-09T12:00:00');
 
-  // 2026-07-26: default virou 'conservative' — perfil sem escolha explícita não conta
-  // mais com o payday automaticamente, mesmo com uma data cadastrada.
-  it('defaults to conservative (window) when availableMode was never chosen, even with a payday set', () => {
+  // 2026-07-26: default virou 'conservative' por algumas horas, revertido pra
+  // 'until_payday' na mesma sessão — 'conservative' usa janela rolante e nunca esvazia
+  // de verdade pra quem tem custo fixo mensal (a próxima ocorrência já reabastece a
+  // janela assim que a atual é paga), o que travava o Disponível perto de zero/negativo
+  // pra quem não acumula reserva. Achado em sessão de design com a dona (`/office-hours`),
+  // ver docs/history/2026-07.md. Perfil sem escolha explícita, com payday configurado,
+  // já se beneficia do corte ancorado no pagamento (drena de verdade ao longo do ciclo).
+  it('defaults to until_payday (anchored on payday) when availableMode was never chosen', () => {
     const summary = calculateDashboardSummary({
       accounts: [account('checking', 100000)],
       transactions: [],
       bills: [],
       recurringRules: [],
       payday: { type: 'fixed_day', day: 5 },
-      now
-    });
-
-    expect(summary.committedCutoffSource).toBe('window');
-  });
-
-  it('uses payday-based cutoff only when until_payday is explicitly chosen', () => {
-    const summary = calculateDashboardSummary({
-      accounts: [account('checking', 100000)],
-      transactions: [],
-      bills: [],
-      recurringRules: [],
-      payday: { type: 'fixed_day', day: 5 },
-      availableMode: 'until_payday',
       now
     });
 
     expect(summary.committedCutoffSource).toBe('payday');
+  });
+
+  it('uses the rolling window only when conservative is explicitly chosen', () => {
+    const summary = calculateDashboardSummary({
+      accounts: [account('checking', 100000)],
+      transactions: [],
+      bills: [],
+      recurringRules: [],
+      payday: { type: 'fixed_day', day: 5 },
+      availableMode: 'conservative',
+      now
+    });
+
+    expect(summary.committedCutoffSource).toBe('window');
   });
 
   // O caso concreto do dono: cartão com compra parcelada. No conservador, o Disponível

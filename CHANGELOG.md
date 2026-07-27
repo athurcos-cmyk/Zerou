@@ -2,6 +2,17 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-26 — fix: reverte default do Comprometido pra "até o recebimento" + corrige atraso de fixo no cartão
+
+Sessão de design (`/office-hours`) com a dona, horas depois da mudança abaixo ("conservador" como default): investigando a fundo por que ela sentia que o Comprometido "nunca esvazia", achamos a causa técnica real — `conservative` usa uma **janela rolante** (`now + N dias`) que nunca esvazia de verdade, porque a ocorrência do mês seguinte de qualquer conta fixa mensal já entra na janela no instante em que a atual é paga. Isso trava o Disponível perto de zero/negativo pra qualquer pessoa sem reserva acima de ~1 mês de custo fixo — não é cálculo errado, é a mecânica da janela não combinando com a forma como as pessoas sentem alívio depois de pagar as contas. `until_payday` (o default antigo) não tem esse problema — o corte é uma data fixa, drena de verdade ao longo do ciclo. A rede de segurança que "conservador como default" tentava dar não se perde: `calculateNextMonthProjection` (Projeção do próximo mês) já força conservador sempre, isolado.
+
+No mesmo mergulho, achamos um segundo problema real: fixo pago no cartão (Netflix, Cinemark etc.) contava como comprometido pela data da COBRANÇA (`nextOccurrenceAt`), não pela data real de vencimento da fatura que essa cobrança vai gerar — até ~1 mês adiantado. Mesma conta que compra avulsa no cartão já usa (`resolveInvoiceCycle`) agora também se aplica à recorrência.
+
+- `defaultAvailableMode` (`availableMode.ts`): volta pra `'until_payday'`. Zero impacto pra quem nunca configurou recebimento (cai na mesma janela); só corrige quem já tem payday configurado.
+- `buildUpcomingCommitments` (`financeCalculations.ts`): recorrência com `cardId` agora projeta o vencimento real via `resolveInvoiceCycle`, em vez de usar a data da cobrança direto. Recorrência paga por conta (`accountId`) não muda.
+- `typecheck`/`test` (428, +4 novos) limpos, `build` ok. Verificado ao vivo: troca de modo em Configurações > Recebimento funciona, Dashboard renderiza sem regressão.
+- Detalhe completo da investigação (incluindo o exemplo do Cinemark e por que não duplica) em `docs/history/2026-07.md`.
+
 ## 2026-07-26 — refactor: tira a escolha forçada de "Comprometido" (conservador vs. até o recebimento)
 
 Pedido da dona (`/plan-ceo-review`): "esses dois ainda muito confuso... nenhum usuário está entendendo." O mini tutorial que forçava essa escolha no primeiro acesso ao Dashboard foi removido — agora todo mundo usa o modo **conservador** por padrão (mesma leitura que a Projeção do próximo mês já força sempre), sem perguntar nada. "Até o próximo recebimento" continua existindo, só que discreto em Configurações > Recebimento — ninguém que já escolheu explicitamente antes é afetado.
