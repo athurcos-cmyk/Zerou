@@ -113,9 +113,10 @@ export function DashboardPage() {
   function handleToggleIncludeBalance(include: boolean) {
     if (user) updateProjectionIncludesBalance(user.uid, include);
   }
-  // Legenda fixa: o Comprometido é a soma das contas fixas/recorrentes + faturas de cartão
-  // em aberto. Sem corte por data, sem modo — o número é simplesmente tudo que já se deve.
-  const committedCaption = 'Contas fixas e recorrentes + faturas de cartão em aberto.';
+  // Legenda fixa: contas fixas/recorrentes + a fatura do ciclo atual do cartão (a aberta +
+  // a que está pra pagar, não as parcelas de meses futuros). "a fatura" no singular sinaliza
+  // "a atual", não todas — reflete `selectCurrentCycleInvoices`.
+  const committedCaption = 'Suas contas fixas e recorrentes + a fatura do cartão.';
 
   // Mostra a última tela conhecida (cache local) enquanto os listeners do Firestore ainda
   // não entregaram o primeiro snapshot — evita os números piscando "—" e as listas piscando

@@ -30,7 +30,7 @@ const slides: TourSlide[] = [
   {
     icon: <Wallet size={26} aria-hidden="true" />,
     title: 'Saldo e Comprometido',
-    text: 'Dois números que importam: quanto você tem nas contas, e o quanto já está prometido — suas contas fixas e recorrentes mais as faturas de cartão em aberto.'
+    text: 'Dois números que importam: quanto você tem nas contas, e o quanto já está prometido — suas contas fixas e recorrentes mais a fatura do cartão.'
   },
   {
     icon: <PieChart size={26} aria-hidden="true" />,

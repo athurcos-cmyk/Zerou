@@ -11,7 +11,7 @@ const workspaceId = 'ws-test';
 const sampleView: CachedDashboardView = {
   totalBalanceCents: 150000,
   committedCents: 60000,
-  committedCaption: 'Contas fixas e recorrentes + faturas de cartão em aberto.',
+  committedCaption: 'Suas contas fixas e recorrentes + a fatura do cartão.',
   spendingVariationPct: 12,
   spending: [
     { categoryId: 'food', categoryName: 'Alimentação', amountCents: 42000, mark: { id: 'food', icon: 'utensils', color: defaultCategoryColors.expense_food } },
@@ -77,7 +77,7 @@ describe('dashboardViewCache', () => {
     const mini = {
       totalBalanceCents: 150000,
       committedCents: 60000,
-      committedCaption: 'Contas fixas e recorrentes + faturas de cartão em aberto.',
+      committedCaption: 'Suas contas fixas e recorrentes + a fatura do cartão.',
       spendingVariationPct: 12
     };
     window.localStorage.setItem('zerou.dashboardView.v2.' + workspaceId + '.mini', JSON.stringify(mini));

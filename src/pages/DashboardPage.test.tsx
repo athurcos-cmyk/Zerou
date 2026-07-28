@@ -59,7 +59,7 @@ function cardsCtx(overrides: Record<string, unknown> = {}) {
 const cachedView: CachedDashboardView = {
   totalBalanceCents: 150000,
   committedCents: 60000,
-  committedCaption: 'Contas fixas e recorrentes + faturas de cartão em aberto.',
+  committedCaption: 'Suas contas fixas e recorrentes + a fatura do cartão.',
   spendingVariationPct: 12,
   spending: [
     { categoryId: 'food', categoryName: 'Alimentação', amountCents: 42000, mark: { id: 'food', icon: 'utensils', color: defaultCategoryColors.expense_food } }
@@ -108,7 +108,7 @@ describe('DashboardPage — listas do cache no boot', () => {
     expect(screen.queryByText('Sem gastos este mês')).not.toBeInTheDocument();
     expect(screen.queryByText('Nenhuma transação ainda')).not.toBeInTheDocument();
     // A legenda do Comprometido e a variação vêm do cache — sem "Contas e fatura." piscando.
-    expect(screen.getByText('Contas fixas e recorrentes + faturas de cartão em aberto.')).toBeInTheDocument();
+    expect(screen.getByText('Suas contas fixas e recorrentes + a fatura do cartão.')).toBeInTheDocument();
     expect(screen.getByText(/vs\. mês passado/)).toBeInTheDocument();
     expect(screen.queryByText('Contas e fatura.')).not.toBeInTheDocument();
   });
