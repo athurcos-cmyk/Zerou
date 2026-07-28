@@ -29,8 +29,8 @@ const slides: TourSlide[] = [
   },
   {
     icon: <Wallet size={26} aria-hidden="true" />,
-    title: 'Disponível × Comprometido',
-    text: 'O número que importa: quanto você tem, menos o que já está prometido (faturas, contas, recorrências). Você escolhe como ele é calculado.'
+    title: 'Saldo e Comprometido',
+    text: 'Dois números que importam: quanto você tem nas contas, e o quanto já está prometido — suas contas fixas e recorrentes mais as faturas de cartão em aberto.'
   },
   {
     icon: <PieChart size={26} aria-hidden="true" />,
@@ -42,8 +42,7 @@ const slides: TourSlide[] = [
 /**
  * Tour de boas-vindas em slides. Abre sozinho uma vez, depois do onboarding (quando o
  * usuário já tem workspace e ainda não viu), e é reabrível pelo menu ("Como funciona").
- * Fica montado no `AppShell`. O mini-tutorial do "Disponível" no Dashboard espera este
- * fechar (via `useWelcomeTour().seen`) pra não empilhar dois modais.
+ * Fica montado no `AppShell`.
  */
 export function WelcomeTour() {
   const { profile } = useAuth();

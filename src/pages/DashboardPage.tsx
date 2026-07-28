@@ -3,21 +3,18 @@ import { CalendarClock, CreditCard, Minus, Pencil, PiggyBank, Plus, Scale, Targe
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
-import { AvailableModeSheet } from '../finance/AvailableModeSheet';
 import { NextMonthProjectionSheet } from '../finance/NextMonthProjectionSheet';
-import { updateAvailableMode, updateProjectedSalary, updateProjectionIncludesBalance } from '../workspaces/workspaceService';
-import type { AvailableMode, TransactionType } from '../types/contracts';
+import { updateProjectedSalary, updateProjectionIncludesBalance } from '../workspaces/workspaceService';
+import type { TransactionType } from '../types/contracts';
 
 import { calculateDashboardSummary, calculateNextMonthProjection, buildUpcomingReceivables, hasPendingCardLedgerActivity } from '../finance/financeCalculations';
 import { useCompleteCurrentMonth } from '../finance/useMonthlyTransactions';
-import { availableModeLabels, defaultAvailableMode } from '../finance/availableMode';
 import {
   readCachedDashboardView,
   saveCachedDashboardView,
   type CachedCategoryMark,
   type CachedSpendingRow
 } from '../finance/dashboardViewCache';
-import { differenceInCalendarDays } from 'date-fns';
 import { formatFriendlyDate, toDate, type DateLike } from '../finance/financeDates';
 import { transactionTypeLabels } from '../finance/financeLabels';
 import { formatMoney } from '../finance/money';
@@ -79,19 +76,12 @@ export function DashboardPage() {
   const finance = useFinanceContext();
   const cardsData = useCardsContext();
   const isLoading = finance.loading;
-  // Disponível/Comprometido dependem das faturas de cartão (cardsData) além de
-  // contas/transações — sem isso, mostrariam um "Disponível" inflado por um instante
-  // antes das faturas sincronizarem.
+  // O Comprometido depende das faturas de cartão (cardsData) além de contas/transações —
+  // sem isso, mostraria um valor errado por um instante antes das faturas sincronizarem.
   const isCommittedLoading = finance.loading || cardsData.loading;
-  // O modo (conservador/até o recebimento) não abre mais sozinho (2026-07-26, pedido da
-  // dona — "nenhum usuário está entendendo"): todo perfil sem escolha explícita usa
-  // `defaultAvailableMode` (conservador, o mesmo que a Projeção do próximo mês já força)
-  // sem perguntar nada. A sheet continua existindo só como explicação sob demanda — toque
-  // na legenda de Disponível/Comprometido, ou em Configurações > Recebimento.
-  const [tutorialOpen, setTutorialOpen] = useState(false);
   const [projectionSheetOpen, setProjectionSheetOpen] = useState(false);
-  // Disponível/Comprometido somam o total da fatura que só a Cloud Function atualiza — ela
-  // não roda offline. Ver comentário completo em hasPendingCardLedgerActivity.
+  // O Comprometido soma o total da fatura que só a Cloud Function atualiza — ela não roda
+  // offline. Ver comentário completo em hasPendingCardLedgerActivity.
   const hasPendingCardActivity = hasPendingCardLedgerActivity(finance.transactions);
   const dashboard = calculateDashboardSummary({
     accounts: finance.accounts,
@@ -99,14 +89,11 @@ export function DashboardPage() {
     bills: finance.bills,
     recurringRules: finance.recurringRules,
     invoices: cardsData.invoices,
-    cards: cardsData.cards,
-    payday: profile?.payday,
-    committedWindowDays: profile?.committedWindowDays,
-    availableMode: profile?.availableMode
+    cards: cardsData.cards
   });
-  // Card "Projeção do próximo mês" — isolado do Disponível/saldo real de propósito (ver
-  // comentário em calculateNextMonthProjection). `null` quando ainda não configurado.
-  // `totalBalanceCents` só entra na conta se a pessoa ligou `projectionIncludesBalance`.
+  // Card "Projeção do próximo mês" — isolado do saldo real de propósito (ver comentário em
+  // calculateNextMonthProjection). `null` quando ainda não configurado. `totalBalanceCents`
+  // só entra na conta se a pessoa ligou `projectionIncludesBalance`.
   const nextMonthProjection = calculateNextMonthProjection({
     projectedSalaryCents: profile?.projectedSalaryCents,
     includeCurrentBalance: profile?.projectionIncludesBalance,
@@ -115,8 +102,7 @@ export function DashboardPage() {
     bills: finance.bills,
     recurringRules: finance.recurringRules,
     invoices: cardsData.invoices,
-    cards: cardsData.cards,
-    committedWindowDays: profile?.committedWindowDays
+    cards: cardsData.cards
   });
   function handleSaveProjectedSalary(cents: number) {
     if (user) updateProjectedSalary(user.uid, cents);
@@ -127,20 +113,10 @@ export function DashboardPage() {
   function handleToggleIncludeBalance(include: boolean) {
     if (user) updateProjectionIncludesBalance(user.uid, include);
   }
-  // Nomeia o modo ativo na legenda (antes só aparecia dentro do tutorial) — pedido do
-  // dono pra deixar a escolha visível toda vez que a pessoa olha o Dashboard.
-  const activeModeLabel = availableModeLabels[profile?.availableMode ?? defaultAvailableMode];
-  const committedCaption =
-    dashboard.committedCutoffSource === 'income'
-      ? `${activeModeLabel} · Considerando sua receita de ${formatFriendlyDate(dashboard.committedCutoff!)}`
-      : dashboard.committedCutoffSource === 'payday'
-      ? `${activeModeLabel} · Considerando seu recebimento em ${formatFriendlyDate(dashboard.committedCutoff!)}`
-      : `${activeModeLabel} · Considerando os próximos ${profile?.committedWindowDays ?? 30} dias`;
+  // Legenda fixa: o Comprometido é a soma das contas fixas/recorrentes + faturas de cartão
+  // em aberto. Sem corte por data, sem modo — o número é simplesmente tudo que já se deve.
+  const committedCaption = 'Contas fixas e recorrentes + faturas de cartão em aberto.';
 
-  function handleChooseAvailableMode(mode: AvailableMode) {
-    if (user) updateAvailableMode(user.uid, mode);
-    setTutorialOpen(false);
-  }
   // Mostra a última tela conhecida (cache local) enquanto os listeners do Firestore ainda
   // não entregaram o primeiro snapshot — evita os números piscando "—" e as listas piscando
   // em branco por 1-2s a cada abertura, sem mexer na lógica de loading em si. A gravação
@@ -167,30 +143,11 @@ export function DashboardPage() {
   // finanças sincronizarem, sem esperar cartão.
   const financeCache = (cachedView && (isLoading || !hasStarted)) ? cachedView : null;
 
-  const effectiveFreeToSpend = cache
-    ? cache.freeToSpendCents
-    : dashboard.freeToSpendCents;
-
-  const perDayDisplay = useMemo(() => {
-    if (!dashboard.committedCutoff) return null;
-    if (effectiveFreeToSpend <= 0) return null;
-    const daysUntilCutoff = Math.max(1, differenceInCalendarDays(dashboard.committedCutoff, new Date()));
-    const perDayCents = Math.floor(effectiveFreeToSpend / daysUntilCutoff);
-    return perDayCents > 0
-      ? `≈ ${formatMoney(perDayCents)}/dia até ${formatFriendlyDate(dashboard.committedCutoff)}`
-      : null;
-  }, [dashboard.committedCutoff, effectiveFreeToSpend]);
-
   const totalBalanceDisplay = financeCache
     ? formatMoney(financeCache.totalBalanceCents)
     : isLoading
       ? '—'
       : formatMoney(dashboard.totalBalanceCents);
-  const freeToSpendDisplay = cache
-    ? formatMoney(cache.freeToSpendCents)
-    : isCommittedLoading
-      ? '—'
-      : formatMoney(dashboard.freeToSpendCents);
   const committedDisplay = cache
     ? formatMoney(cache.committedCents)
     : isCommittedLoading
@@ -265,10 +222,8 @@ export function DashboardPage() {
     : liveRecent;
   const maxSpendingCents = Math.max(...effectiveSpending.map((row) => row.amountCents), 1);
 
-  // Legendas do Disponível/Comprometido e a variação de gastos também entram no cache, pra
-  // não piscarem "Carregando…"/"Contas e fatura." nem trocar de texto durante o boot.
-  const liveAvailableCaption =
-    perDayDisplay ?? (dashboard.freeToSpendCents <= 0 ? 'Você já comprometeu tudo que tem disponível.' : 'Livre agora.');
+  // A legenda do Comprometido e a variação de gastos também entram no cache, pra não
+  // piscarem "Carregando…"/"Contas e fatura." nem trocar de texto durante o boot.
   const currentMonthSpendCents = [...spendingByCategory.values()].reduce((sum, amount) => sum + amount, 0);
   const previousMonthSpendCents = spendingSource
     .filter((transaction) => isCountableSpend(transaction, previousMonth))
@@ -286,9 +241,7 @@ export function DashboardPage() {
     if (isCommittedLoading || !workspaceId) return;
     saveCachedDashboardView(workspaceId, {
       totalBalanceCents: dashboard.totalBalanceCents,
-      freeToSpendCents: dashboard.freeToSpendCents,
       committedCents: dashboard.committedCents,
-      availableCaption: liveAvailableCaption,
       committedCaption,
       spendingVariationPct,
       spending: liveSpending,
@@ -323,10 +276,7 @@ export function DashboardPage() {
     finance.recurringRules,
     finance.categories,
     cardsData.invoices,
-    cardsData.cards,
-    profile?.payday,
-    profile?.committedWindowDays,
-    profile?.availableMode
+    cardsData.cards
   ]);
   // Se existe cache de exibição, o app NÃO está vazio — a pessoa já usou antes.
   // Só decide "conta nova" depois que finanças E cartões resolveram E não há cache
@@ -334,11 +284,6 @@ export function DashboardPage() {
   const showStartGuide = !hasStarted && !isCommittedLoading && !cachedView;
 
   // Durante o boot: cache se tiver, senão o placeholder antigo. Depois de carregar: dado ao vivo.
-  const effectiveAvailableCaption = cache
-    ? cache.availableCaption
-    : isCommittedLoading
-      ? 'Carregando...'
-      : liveAvailableCaption;
   const effectiveCommittedCaption = cache
     ? cache.committedCaption
     : isCommittedLoading
@@ -366,7 +311,7 @@ export function DashboardPage() {
       {hasPendingCardActivity && (
         <div className="notice" style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem' }}>
           <WifiOff size={16} style={{ flexShrink: 0, marginTop: '0.15rem' }} aria-hidden="true" />
-          <span>Uma compra no cartão ainda não sincronizou — conecte-se à internet para atualizar o Disponível e o Comprometido.</span>
+          <span>Uma compra no cartão ainda não sincronizou — conecte-se à internet para atualizar o Comprometido.</span>
         </div>
       )}
 
@@ -380,40 +325,14 @@ export function DashboardPage() {
           </strong>
           <span style={{ color: 'var(--on-accent-55)', fontSize: '0.84rem' }}>Soma das contas ativas.</span>
         </article>
-        <div className="dash-secondary">
-          <article className="surface surface-pad dash-metric dash-metric--available">
-            <p className="eyebrow">Disponível</p>
-            <strong className="display-number">{freeToSpendDisplay}</strong>
-            <button
-              type="button"
-              className="dash-metric-explain"
-              onClick={() => setTutorialOpen(true)}
-              aria-label="Entender como o Disponível e o Comprometido são calculados"
-            >
-              {effectiveAvailableCaption}
-            </button>
-          </article>
-          <article className="surface surface-pad dash-metric dash-metric--committed">
+        <article className="surface surface-pad dash-metric dash-metric--committed">
+          <div className="dash-metric-head">
             <p className="eyebrow">Comprometido</p>
-            <strong className="display-number">{committedDisplay}</strong>
-            <button
-              type="button"
-              className="dash-metric-explain"
-              onClick={() => setTutorialOpen(true)}
-              aria-label="Entender como o Disponível e o Comprometido são calculados"
-            >
-              {effectiveCommittedCaption}
-            </button>
-          </article>
-        </div>
+            <span className="dash-metric-caption">{effectiveCommittedCaption}</span>
+          </div>
+          <strong className="display-number">{committedDisplay}</strong>
+        </article>
       </div>
-
-      <AvailableModeSheet
-        open={tutorialOpen}
-        currentMode={profile?.availableMode}
-        onChoose={handleChooseAvailableMode}
-        onClose={() => setTutorialOpen(false)}
-      />
 
       <article className="projection-card">
         <div className="projection-card-header">

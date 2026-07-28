@@ -6,7 +6,7 @@ import type { TransactionType } from '../types/contracts';
 // Firestore lê o IndexedDB de volta. É só um acelerador de exibição — a fonte real continua
 // sendo o cache do Firestore + os listeners. A chave nova (`dashboardView.v1`) ignora
 // entradas do formato antigo sozinha (validação retorna null), sem migração.
-const CACHE_KEY_PREFIX = 'zerou.dashboardView.v1.';
+const CACHE_KEY_PREFIX = 'zerou.dashboardView.v2.';
 
 /** O suficiente pra reproduzir o `CategoryMark` sem depender das categorias já terem
  * carregado: cor/ícone são resolvidos no render a partir daqui (ver DashboardPage). */
@@ -44,12 +44,9 @@ export interface CachedRecentTransaction {
 
 export interface CachedDashboardView {
   totalBalanceCents: number;
-  freeToSpendCents: number;
   committedCents: number;
-  /** Legendas já resolvidas do Disponível/Comprometido ("Livre agora.", "≈ R$ X/dia até…",
-   * "Considerando…") e a variação % de gastos — pré-computadas na gravação pra não piscarem
-   * "Carregando…"/"Contas e fatura." nem trocarem de texto durante o boot. */
-  availableCaption: string;
+  /** Legenda já resolvida do Comprometido e a variação % de gastos — pré-computadas na
+   * gravação pra não piscarem "Carregando…" nem trocarem de texto durante o boot. */
   committedCaption: string;
   spendingVariationPct: number | null;
   spending: CachedSpendingRow[];
@@ -162,9 +159,7 @@ function readMiniCache(workspaceId: string): CachedDashboardView | null {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     if (
       !isFiniteNumber(parsed.totalBalanceCents) ||
-      !isFiniteNumber(parsed.freeToSpendCents) ||
       !isFiniteNumber(parsed.committedCents) ||
-      typeof parsed.availableCaption !== 'string' ||
       typeof parsed.committedCaption !== 'string' ||
       (parsed.spendingVariationPct !== null && !isFiniteNumber(parsed.spendingVariationPct))
     ) {
@@ -172,9 +167,7 @@ function readMiniCache(workspaceId: string): CachedDashboardView | null {
     }
     return {
       totalBalanceCents: parsed.totalBalanceCents,
-      freeToSpendCents: parsed.freeToSpendCents,
       committedCents: parsed.committedCents,
-      availableCaption: parsed.availableCaption,
       committedCaption: parsed.committedCaption,
       spendingVariationPct: parsed.spendingVariationPct as number | null,
       spending: [],
@@ -200,9 +193,7 @@ export function readCachedDashboardView(workspaceId?: string | null): CachedDash
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     if (
       !isFiniteNumber(parsed.totalBalanceCents) ||
-      !isFiniteNumber(parsed.freeToSpendCents) ||
       !isFiniteNumber(parsed.committedCents) ||
-      typeof parsed.availableCaption !== 'string' ||
       typeof parsed.committedCaption !== 'string' ||
       (parsed.spendingVariationPct !== null && !isFiniteNumber(parsed.spendingVariationPct))
     ) {
@@ -218,9 +209,7 @@ export function readCachedDashboardView(workspaceId?: string | null): CachedDash
 
     return {
       totalBalanceCents: parsed.totalBalanceCents,
-      freeToSpendCents: parsed.freeToSpendCents,
       committedCents: parsed.committedCents,
-      availableCaption: parsed.availableCaption,
       committedCaption: parsed.committedCaption,
       spendingVariationPct: parsed.spendingVariationPct as number | null,
       spending,
@@ -246,9 +235,7 @@ export function saveCachedDashboardView(workspaceId: string | undefined | null, 
     try {
       const mini = {
         totalBalanceCents: view.totalBalanceCents,
-        freeToSpendCents: view.freeToSpendCents,
         committedCents: view.committedCents,
-        availableCaption: view.availableCaption,
         committedCaption: view.committedCaption,
         spendingVariationPct: view.spendingVariationPct
       };

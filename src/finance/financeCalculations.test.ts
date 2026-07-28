@@ -9,7 +9,6 @@ import {
   calculateTotalBalance,
   currentAccountBalances,
   currentTotalBalance,
-  findNextIncomeDate,
   hasPendingCardLedgerActivity,
   invertAccountEffects,
   mergeAccountEffects,
@@ -45,6 +44,7 @@ function transaction(overrides: Partial<Transaction>): Transaction {
     destinationAccountId: overrides.destinationAccountId,
     cardId: overrides.cardId,
     invoiceId: overrides.invoiceId,
+    recurringId: overrides.recurringId,
     date: overrides.date ?? date,
     competenceMonth: overrides.competenceMonth ?? '2026-06',
     cashMonth: overrides.cashMonth ?? '2026-06',
@@ -412,80 +412,7 @@ describe('currentAccountBalances / currentTotalBalance', () => {
   });
 });
 
-describe('findNextIncomeDate', () => {
-  const now = new Date('2026-06-14T12:00:00');
-
-  it('returns the earliest future income among several', () => {
-    const next = findNextIncomeDate(
-      [
-        transaction({ type: 'income', date: Timestamp.fromDate(new Date('2026-07-01T12:00:00')) }),
-        transaction({ type: 'income', date: Timestamp.fromDate(new Date('2026-06-20T12:00:00')) }),
-        transaction({ type: 'income', date: Timestamp.fromDate(new Date('2026-08-01T12:00:00')) })
-      ],
-      now
-    );
-
-    expect(next?.toISOString().slice(0, 10)).toBe('2026-06-20');
-  });
-
-  it('ignores income dates already in the past', () => {
-    const next = findNextIncomeDate(
-      [transaction({ type: 'income', date: Timestamp.fromDate(new Date('2026-06-01T12:00:00')) })],
-      now
-    );
-
-    expect(next).toBeNull();
-  });
-
-  it('ignores deleted income transactions', () => {
-    const next = findNextIncomeDate(
-      [
-        transaction({
-          type: 'income',
-          date: Timestamp.fromDate(new Date('2026-06-20T12:00:00')),
-          deletedAt: Timestamp.fromDate(new Date('2026-06-15T12:00:00'))
-        })
-      ],
-      now
-    );
-
-    expect(next).toBeNull();
-  });
-
-  // Retirada de meta/cofrinho cria uma transação `income` de verdade (credita a conta),
-  // mas não é um "recebimento" pro cálculo de Comprometido/Disponível — mesma exclusão
-  // que o lado da despesa já tem. Hoje isso fica inofensivo só porque toda retirada é
-  // datada "agora" (sempre no passado pra esse filtro); este teste trava o comportamento
-  // pro dia em que uma retirada futura ou agendada existir.
-  it('ignores income transactions tagged meta or cofrinho', () => {
-    const next = findNextIncomeDate(
-      [
-        transaction({ type: 'income', date: Timestamp.fromDate(new Date('2026-06-20T12:00:00')), tags: ['meta'] }),
-        transaction({ type: 'income', date: Timestamp.fromDate(new Date('2026-06-21T12:00:00')), tags: ['cofrinho'] }),
-        transaction({ type: 'income', date: Timestamp.fromDate(new Date('2026-06-25T12:00:00')) })
-      ],
-      now
-    );
-
-    expect(next?.toISOString().slice(0, 10)).toBe('2026-06-25');
-  });
-
-  // Antes esta função contava uma receita datada de HOJE como "próximo recebimento".
-  // Isso tinha dois problemas: a receita de hoje já está somada no saldo (o saldo não
-  // filtra por data), então usá-la como corte encolhia o Comprometido pra "só o que
-  // vence hoje"; e, como a comparação era contra o instante `now`, a mesma receita
-  // (gravada ao meio-dia) contava de manhã e não contava à tarde. O corte agora é o
-  // fim do dia de hoje: só receita de amanhã em diante é "próxima".
-  it('does not treat an income dated today as the next income', () => {
-    const next = findNextIncomeDate([transaction({ type: 'income', date: Timestamp.fromDate(now) })], now);
-
-    expect(next).toBeNull();
-  });
-});
-
 describe('buildUpcomingCommitments', () => {
-  const cutoff = new Date('2026-07-14T12:00:00');
-
   it('includes pending and overdue bills, excludes paid/cancelled', () => {
     const commitments = buildUpcomingCommitments(
       [
@@ -494,21 +421,21 @@ describe('buildUpcomingCommitments', () => {
         bill({ id: 'b-paid', status: 'paid' }),
         bill({ id: 'b-cancelled', status: 'cancelled' })
       ],
-      [],
-      cutoff
+      []
     );
 
     expect(commitments.map((c) => c.id).sort()).toEqual(['b-overdue', 'b-pending']);
   });
 
-  it('excludes bills due after the cutoff', () => {
+  // Sem corte por data: uma conta que vence daqui a meses conta do mesmo jeito — é
+  // dívida já assumida. O antigo "cutoff" foi removido.
+  it('includes bills regardless of how far the due date is', () => {
     const commitments = buildUpcomingCommitments(
-      [bill({ id: 'b-far', dueDate: Timestamp.fromDate(new Date('2026-09-01T12:00:00')) })],
-      [],
-      cutoff
+      [bill({ id: 'b-far', dueDate: Timestamp.fromDate(new Date('2026-12-01T12:00:00')) })],
+      []
     );
 
-    expect(commitments).toHaveLength(0);
+    expect(commitments.map((c) => c.id)).toEqual(['b-far']);
   });
 
   it('excludes inactive recurring rules and rules without a forecast amount', () => {
@@ -517,116 +444,48 @@ describe('buildUpcomingCommitments', () => {
       [
         recurring({ id: 'r-inactive', isActive: false }),
         recurring({ id: 'r-no-amount', amountCents: undefined })
-      ],
-      cutoff
-    );
-
-    expect(commitments).toHaveLength(0);
-  });
-
-  // Achado em sessão de design com a dona (`/office-hours`, 2026-07-26): um fixo pago no
-  // cartão (Netflix, Cinemark etc.) ainda não é uma compra — `nextOccurrenceAt` é a data
-  // da COBRANÇA, não a data em que o dinheiro sai da conta. Sem projetar pelo ciclo do
-  // cartão, contava como comprometido ~1 mês antes da hora. Ver docs/history/2026-07.md.
-  describe('recorrência paga no cartão conta pelo vencimento real da fatura, não pela data da cobrança', () => {
-    it('projects the due date through the card cycle instead of using the charge date', () => {
-      const commitments = buildUpcomingCommitments(
-        [],
-        [recurring({ id: 'r-card', cardId: 'card-1', nextOccurrenceAt: Timestamp.fromDate(new Date('2026-08-01T12:00:00')) })],
-        new Date('2026-09-10T12:00:00'), // bem depois do vencimento real (05/09)
-        [],
-        [card({ id: 'card-1', closingDay: 25, dueDay: 5 })]
-      );
-
-      expect(commitments).toHaveLength(1);
-      expect(commitments[0].dueAt).toEqual(new Date('2026-09-05T12:00:00'));
-    });
-
-    it('regression: no longer counts the charge as committed right after it happens, before the invoice is really due', () => {
-      const commitments = buildUpcomingCommitments(
-        [],
-        [recurring({ id: 'r-card', cardId: 'card-1', nextOccurrenceAt: Timestamp.fromDate(new Date('2026-08-01T12:00:00')) })],
-        new Date('2026-08-15T12:00:00'), // depois da cobrança (01/08), bem antes do vencimento real (05/09)
-        [],
-        [card({ id: 'card-1', closingDay: 25, dueDay: 5 })]
-      );
-
-      expect(commitments).toHaveLength(0);
-    });
-
-    it('still counts an account-debited recurring rule at the occurrence date itself, unaffected', () => {
-      const commitments = buildUpcomingCommitments(
-        [],
-        [recurring({ id: 'r-account', accountId: 'checking', nextOccurrenceAt: Timestamp.fromDate(new Date('2026-08-01T12:00:00')) })],
-        new Date('2026-08-05T12:00:00'),
-        [],
-        []
-      );
-
-      expect(commitments).toHaveLength(1);
-      expect(commitments[0].dueAt).toEqual(new Date('2026-08-01T12:00:00'));
-    });
-
-    it('falls back to the occurrence date when the card behind a recurring rule cannot be found', () => {
-      const commitments = buildUpcomingCommitments(
-        [],
-        [recurring({ id: 'r-orphan', cardId: 'card-deleted', nextOccurrenceAt: Timestamp.fromDate(new Date('2026-08-01T12:00:00')) })],
-        new Date('2026-08-05T12:00:00'),
-        [],
-        []
-      );
-
-      expect(commitments).toHaveLength(1);
-      expect(commitments[0].dueAt).toEqual(new Date('2026-08-01T12:00:00'));
-    });
-  });
-
-  it('always includes a closed invoice, regardless of reference month', () => {
-    const commitments = buildUpcomingCommitments(
-      [],
-      [],
-      cutoff,
-      [invoice({ id: 'inv-closed-past', status: 'closed', referenceMonth: '2026-01', outstandingBalanceCents: 5000 })]
-    );
-
-    expect(commitments.map((c) => c.id)).toEqual(['inv-closed-past']);
-  });
-
-  it('includes an open invoice whose due date falls on or before the cutoff', () => {
-    const commitments = buildUpcomingCommitments(
-      [],
-      [],
-      cutoff,
-      [
-        invoice({ id: 'inv-open-soon', status: 'open', dueDate: Timestamp.fromDate(new Date('2026-07-10T12:00:00')), outstandingBalanceCents: 5000 }),
-        invoice({ id: 'inv-open-past-due', status: 'open', dueDate: Timestamp.fromDate(new Date('2026-06-05T12:00:00')), outstandingBalanceCents: 3000 })
       ]
     );
 
-    expect(commitments.map((c) => c.id).sort()).toEqual(['inv-open-past-due', 'inv-open-soon']);
+    expect(commitments).toHaveLength(0);
   });
 
-  // Regressão: o critério já foi "referenceMonth <= mês atual" (mês do CICLO da
-  // compra). Isso contava uma fatura inteira como comprometida assim que a compra
-  // entrava no ciclo — mesmo em cartões que fecham tarde e vencem só no mês
-  // seguinte (fecha dia 25, vence dia 5), onde a cobrança de verdade só chega bem
-  // depois. Critério agora é a data de vencimento real, igual bills/recorrências.
-  it('excludes an open invoice whose real due date falls after the cutoff (future installment or "fecha tarde, vence mês que vem")', () => {
+  // Modelo novo (2026-07-27): TODA recorrência ativa conta como linha (cartão e conta),
+  // pela `nextOccurrenceAt` crua — sem projeção pelo ciclo do cartão, sem exclusão. A
+  // recorrência de cartão aparece no Comprometido ANTES de ser registrada; a duplicidade
+  // com a fatura é desfeita descontando a cobrança da fatura, não excluindo a recorrência.
+  it('counts every active recurring rule (card and account) as a line by its nextOccurrenceAt', () => {
+    const commitments = buildUpcomingCommitments(
+      [],
+      [
+        recurring({ id: 'r-card', amountCents: 12000, cardId: 'card-1', nextOccurrenceAt: Timestamp.fromDate(new Date('2026-08-01T12:00:00')) }),
+        recurring({ id: 'r-account', amountCents: 8000, accountId: 'checking', nextOccurrenceAt: Timestamp.fromDate(new Date('2026-08-10T12:00:00')) })
+      ]
+    );
+
+    expect(commitments.map((c) => ({ id: c.id, amountCents: c.amountCents, dueAt: c.dueAt }))).toEqual([
+      { id: 'r-card', amountCents: 12000, dueAt: new Date('2026-08-01T12:00:00') },
+      { id: 'r-account', amountCents: 8000, dueAt: new Date('2026-08-10T12:00:00') }
+    ]);
+  });
+
+  it('includes every open/closed invoice with an outstanding balance, without a date cutoff', () => {
     const commitments = buildUpcomingCommitments(
       [],
       [],
-      cutoff,
-      [invoice({ id: 'inv-open-future', status: 'open', referenceMonth: '2026-06', dueDate: Timestamp.fromDate(new Date('2026-08-05T12:00:00')), outstandingBalanceCents: 5000 })]
+      [
+        invoice({ id: 'inv-closed-past', status: 'closed', referenceMonth: '2026-01', outstandingBalanceCents: 5000 }),
+        invoice({ id: 'inv-open-future', status: 'open', referenceMonth: '2026-06', dueDate: Timestamp.fromDate(new Date('2026-12-05T12:00:00')), outstandingBalanceCents: 3000 })
+      ]
     );
 
-    expect(commitments).toHaveLength(0);
+    expect(commitments.map((c) => c.id).sort()).toEqual(['inv-closed-past', 'inv-open-future']);
   });
 
   it('excludes paid, overpaid and zero-balance invoices', () => {
     const commitments = buildUpcomingCommitments(
       [],
       [],
-      cutoff,
       [
         invoice({ id: 'inv-paid', status: 'paid', referenceMonth: '2026-06', outstandingBalanceCents: 0 }),
         invoice({ id: 'inv-overpaid', status: 'overpaid', referenceMonth: '2026-06', outstandingBalanceCents: 0 }),
@@ -637,25 +496,78 @@ describe('buildUpcomingCommitments', () => {
     expect(commitments).toHaveLength(0);
   });
 
+  // O coração do fix de duplicidade: a cobrança de uma recorrência registrada no cartão
+  // (`card_purchase` com `recurringId`) é descontada do saldo devedor da fatura no
+  // Comprometido — a recorrência já conta como linha própria.
+  describe('desconto de cobranças de recorrência na fatura (anti-duplicidade)', () => {
+    it('subtracts a recurring-sourced card charge from its invoice total', () => {
+      const commitments = buildUpcomingCommitments(
+        [],
+        [recurring({ id: 'r-claude', amountCents: 12000, cardId: 'card-1', nextOccurrenceAt: Timestamp.fromDate(new Date('2026-08-15T12:00:00')) })],
+        [invoice({ id: 'inv-1', status: 'open', outstandingBalanceCents: 20000 })],
+        [card({ id: 'card-1' })],
+        [transaction({ type: 'card_purchase', amountCents: 12000, recurringId: 'r-claude', invoiceId: 'inv-1' })]
+      );
+
+      const recurringLine = commitments.find((c) => c.id === 'r-claude');
+      const invoiceLine = commitments.find((c) => c.id === 'inv-1');
+      // A recorrência conta cheia (12000); a fatura conta só o que NÃO é recorrência
+      // (20000 − 12000 = 8000). Total 20000 — a assinatura não é contada duas vezes.
+      expect(recurringLine?.amountCents).toBe(12000);
+      expect(invoiceLine?.amountCents).toBe(8000);
+    });
+
+    it('drops an invoice that was 100% recurring after the discount (nothing left to show)', () => {
+      const commitments = buildUpcomingCommitments(
+        [],
+        [recurring({ id: 'r-claude', amountCents: 12000, cardId: 'card-1', nextOccurrenceAt: Timestamp.fromDate(new Date('2026-08-15T12:00:00')) })],
+        [invoice({ id: 'inv-1', status: 'open', outstandingBalanceCents: 12000 })],
+        [card({ id: 'card-1' })],
+        [transaction({ type: 'card_purchase', amountCents: 12000, recurringId: 'r-claude', invoiceId: 'inv-1' })]
+      );
+
+      expect(commitments.map((c) => c.id)).toEqual(['r-claude']);
+    });
+
+    it('does not discount a one-off (non-recurring) card purchase from the invoice', () => {
+      const commitments = buildUpcomingCommitments(
+        [],
+        [],
+        [invoice({ id: 'inv-1', status: 'open', outstandingBalanceCents: 20000 })],
+        [card({ id: 'card-1' })],
+        [transaction({ type: 'card_purchase', amountCents: 5000, invoiceId: 'inv-1' })] // sem recurringId
+      );
+
+      expect(commitments.find((c) => c.id === 'inv-1')?.amountCents).toBe(20000);
+    });
+
+    it('ignores a deleted recurring charge (no discount)', () => {
+      const commitments = buildUpcomingCommitments(
+        [],
+        [],
+        [invoice({ id: 'inv-1', status: 'open', outstandingBalanceCents: 20000 })],
+        [card({ id: 'card-1' })],
+        [transaction({ type: 'card_purchase', amountCents: 12000, recurringId: 'r-claude', invoiceId: 'inv-1', deletedAt: Timestamp.fromDate(new Date('2026-08-01T12:00:00')) })]
+      );
+
+      expect(commitments.find((c) => c.id === 'inv-1')?.amountCents).toBe(20000);
+    });
+  });
+
   it('sorts bills, recurring rules and invoices together by due date', () => {
     const commitments = buildUpcomingCommitments(
       [bill({ id: 'b-1', dueDate: Timestamp.fromDate(new Date('2026-06-25T12:00:00')) })],
       [recurring({ id: 'r-1', nextOccurrenceAt: Timestamp.fromDate(new Date('2026-06-16T12:00:00')) })],
-      cutoff,
       [invoice({ id: 'inv-1', status: 'closed', referenceMonth: '2026-06', dueDate: Timestamp.fromDate(new Date('2026-06-20T12:00:00')), outstandingBalanceCents: 1000 })]
     );
 
     expect(commitments.map((c) => c.id)).toEqual(['r-1', 'inv-1', 'b-1']);
   });
 
-  // Regressão: com mais de um cartão, todas as faturas do mesmo mês de referência
-  // mostravam o mesmo texto ("Fatura 2026-07"), sem indicar de qual cartão era cada
-  // uma — só dava pra saber clicando. Achado pelo dono ao vivo em 2026-07-16.
   it('includes the card name in the invoice description when the card is known', () => {
     const commitments = buildUpcomingCommitments(
       [],
       [],
-      cutoff,
       [invoice({ id: 'inv-1', status: 'closed', referenceMonth: '2026-06', cardId: 'card-nubank' })],
       [card({ id: 'card-nubank', name: 'Nubank' })]
     );
@@ -667,7 +579,6 @@ describe('buildUpcomingCommitments', () => {
     const commitments = buildUpcomingCommitments(
       [],
       [],
-      cutoff,
       [invoice({ id: 'inv-1', status: 'closed', referenceMonth: '2026-06', cardId: 'card-deleted' })],
       [card({ id: 'card-nubank', name: 'Nubank' })]
     );
@@ -732,22 +643,20 @@ describe('hasPendingCardLedgerActivity', () => {
 });
 
 describe('calculateDashboardSummary', () => {
-  it('calculates free to spend from bills and recurring rules', () => {
+  it('sums committed from bills and recurring rules (no date cutoff)', () => {
     const summary = calculateDashboardSummary({
       accounts: [account('checking', 300000)],
       transactions: [],
-      bills: [bill({ amountCents: 120000, dueDate: Timestamp.fromDate(new Date('2026-06-20T12:00:00')) })],
-      recurringRules: [recurring({ amountCents: 10000, nextOccurrenceAt: Timestamp.fromDate(new Date('2026-06-18T12:00:00')) })],
-      now: new Date('2026-06-14T12:00:00')
+      bills: [bill({ amountCents: 120000, dueDate: Timestamp.fromDate(new Date('2026-12-20T12:00:00')) })],
+      recurringRules: [recurring({ amountCents: 10000, nextOccurrenceAt: Timestamp.fromDate(new Date('2026-06-18T12:00:00')) })]
     });
 
     expect(summary.committedCents).toBe(130000);
-    expect(summary.freeToSpendCents).toBe(170000);
+    expect(summary.totalBalanceCents).toBe(300000);
     expect(summary.upcomingCommitments).toHaveLength(2);
   });
 
   it('sums the committed total across ALL commitments, even beyond the 3 shown on the dashboard', () => {
-    const now = new Date('2026-06-14T12:00:00');
     const bills = [1, 2, 3, 4, 5].map((n) =>
       bill({ id: `b-${n}`, amountCents: 1000 * n, dueDate: Timestamp.fromDate(new Date(`2026-06-${15 + n}T12:00:00`)) })
     );
@@ -756,8 +665,7 @@ describe('calculateDashboardSummary', () => {
       accounts: [account('checking', 1000000)],
       transactions: [],
       bills,
-      recurringRules: [],
-      now
+      recurringRules: []
     });
 
     const expectedTotal = bills.reduce((sum, b) => sum + b.amountCents, 0);
@@ -766,124 +674,44 @@ describe('calculateDashboardSummary', () => {
   });
 
   it('includes invoices in the committed total when provided', () => {
-    const now = new Date('2026-06-14T12:00:00');
     const summary = calculateDashboardSummary({
       accounts: [account('checking', 500000)],
       transactions: [],
       bills: [],
       recurringRules: [],
-      invoices: [invoice({ status: 'closed', referenceMonth: '2026-06', outstandingBalanceCents: 45000 })],
-      now
+      invoices: [invoice({ status: 'closed', referenceMonth: '2026-06', outstandingBalanceCents: 45000 })]
     });
 
     expect(summary.committedCents).toBe(45000);
-    expect(summary.freeToSpendCents).toBe(455000);
   });
 
-  // Cenário real do dono: cartão fecha dia 25, vence dia 5 do mês seguinte. Uma
-  // compra hoje (14 jun) fica no ciclo de junho (referenceMonth), mas só é cobrada
-  // dia 5 de agosto — bem além do cutoff padrão de 30 dias (14 jul, sem salário
-  // futuro lançado). "Disponível" não pode cair o valor inteiro da compra no mesmo
-  // dia que ela foi feita, quase 2 meses antes do vencimento de verdade.
-  it('keeps an open invoice due next month (closes-late/dues-next-month card) out of committed until it nears the due date', () => {
-    const now = new Date('2026-06-14T12:00:00');
-    const summary = calculateDashboardSummary({
-      accounts: [account('checking', 500000)],
+  // O cenário-chave do dono: assinatura de cartão de R$120. Antes de registrar, conta
+  // pela recorrência; depois de registrar (cobrança na fatura), a fatura é descontada —
+  // o Comprometido continua R$120, sem pular pra R$240.
+  it('keeps a card subscription at the same committed total before and after it is registered on the invoice', () => {
+    const rule = recurring({ id: 'r-claude', amountCents: 12000, cardId: 'card-1', nextOccurrenceAt: Timestamp.fromDate(new Date('2026-08-15T12:00:00')) });
+    const cards = [card({ id: 'card-1' })];
+
+    const beforeRegister = calculateDashboardSummary({
+      accounts: [account('checking', 100000)],
       transactions: [],
       bills: [],
-      recurringRules: [],
-      invoices: [
-        invoice({
-          status: 'open',
-          referenceMonth: '2026-06',
-          dueDate: Timestamp.fromDate(new Date('2026-08-05T12:00:00')),
-          outstandingBalanceCents: 140000
-        })
-      ],
-      now
+      recurringRules: [rule],
+      invoices: [invoice({ id: 'inv-1', status: 'open', outstandingBalanceCents: 0 })],
+      cards
     });
+    expect(beforeRegister.committedCents).toBe(12000);
 
-    expect(summary.committedCents).toBe(0);
-    expect(summary.freeToSpendCents).toBe(500000);
-  });
-
-  // Renda variável (plantão, freela, autônomo): sem `payday`, uma janela de dias
-  // configurável substitui o chute fixo de 30 dias — a mesma fatura do teste acima
-  // (vence 5 ago) passa a contar se a pessoa alargar a janela o suficiente.
-  it('uses a custom committedWindowDays instead of the 30-day default when there is no payday', () => {
-    const now = new Date('2026-06-14T12:00:00');
-    const invoices = [
-      invoice({
-        status: 'open',
-        referenceMonth: '2026-06',
-        dueDate: Timestamp.fromDate(new Date('2026-08-05T12:00:00')),
-        outstandingBalanceCents: 140000
-      })
-    ];
-
-    const withDefaultWindow = calculateDashboardSummary({
-      accounts: [account('checking', 500000)],
-      transactions: [],
+    const afterRegister = calculateDashboardSummary({
+      accounts: [account('checking', 100000)],
+      // Registrar avança a ocorrência e cria a compra marcada na fatura.
+      transactions: [transaction({ type: 'card_purchase', amountCents: 12000, recurringId: 'r-claude', invoiceId: 'inv-1' })],
       bills: [],
-      recurringRules: [],
-      invoices,
-      now
+      recurringRules: [{ ...rule, nextOccurrenceAt: Timestamp.fromDate(new Date('2026-09-15T12:00:00')) }],
+      invoices: [invoice({ id: 'inv-1', status: 'open', outstandingBalanceCents: 12000 })],
+      cards
     });
-    expect(withDefaultWindow.committedCents).toBe(0);
-    expect(withDefaultWindow.committedCutoffSource).toBe('window');
-
-    const withWiderWindow = calculateDashboardSummary({
-      accounts: [account('checking', 500000)],
-      transactions: [],
-      bills: [],
-      recurringRules: [],
-      invoices,
-      committedWindowDays: 60,
-      now
-    });
-    expect(withWiderWindow.committedCents).toBe(140000);
-    expect(withWiderWindow.committedCutoffSource).toBe('window');
-  });
-
-  it('reports which source decided the committed cutoff: income, payday or the fallback window', () => {
-    const now = new Date('2026-07-09T12:00:00');
-    const base = {
-      accounts: [account('checking', 500000)],
-      bills: [],
-      recurringRules: [],
-      invoices: [],
-      now
-    };
-
-    expect(calculateDashboardSummary({ ...base, transactions: [] }).committedCutoffSource).toBe('window');
-    // 'until_payday' explícito aqui por clareza do teste — é o default desde 2026-07-26,
-    // mas essas asserções testam o comportamento do modo em si, não o fallback.
-    expect(
-      calculateDashboardSummary({
-        ...base,
-        transactions: [],
-        payday: { type: 'fixed_day', day: 25 },
-        availableMode: 'until_payday'
-      }).committedCutoffSource
-    ).toBe('payday');
-    expect(
-      calculateDashboardSummary({
-        ...base,
-        transactions: [transaction({ type: 'income', date: Timestamp.fromDate(new Date('2026-07-25T12:00:00')) })],
-        payday: { type: 'fixed_day', day: 5 },
-        availableMode: 'until_payday'
-      }).committedCutoffSource
-    ).toBe('income');
-    // "Renda variável" é uma escolha explícita (plantão, freela, autônomo), mas não
-    // resolve pra uma data — cai na janela igual quem nunca respondeu a pergunta.
-    expect(
-      calculateDashboardSummary({
-        ...base,
-        transactions: [],
-        payday: { type: 'variable_income' },
-        availableMode: 'until_payday'
-      }).committedCutoffSource
-    ).toBe('window');
+    expect(afterRegister.committedCents).toBe(12000);
   });
 
   it('defaults committed invoices to zero when the invoices list is omitted', () => {
@@ -891,12 +719,10 @@ describe('calculateDashboardSummary', () => {
       accounts: [account('checking', 500000)],
       transactions: [],
       bills: [],
-      recurringRules: [],
-      now: new Date('2026-06-14T12:00:00')
+      recurringRules: []
     });
 
     expect(summary.committedCents).toBe(0);
-    expect(summary.freeToSpendCents).toBe(500000);
   });
 
   it('lists only the 5 most recent active transactions, most recent first', () => {
@@ -909,246 +735,12 @@ describe('calculateDashboardSummary', () => {
       accounts: [account('checking', 100000)],
       transactions,
       bills: [],
-      recurringRules: [],
-      now: new Date('2026-06-14T12:00:00')
+      recurringRules: []
     });
 
     expect(summary.recentTransactions).toHaveLength(5);
     expect(summary.recentTransactions[0].id).toBe('tx-5');
     expect(summary.recentTransactions[4].id).toBe('tx-1');
-  });
-
-  // Regressão: `nextPaydayFrom` devolve meia-noite, mas contas e faturas são gravadas
-  // ao meio-dia (`fromDateInputValue`). Comparando instantes, uma conta que vence no
-  // PRÓPRIO dia do salário ficava depois do corte e sumia do Comprometido — o usuário
-  // via "Disponível" alto justamente no dia em que precisava pagar a conta.
-  it('counts a bill that falls exactly on payday as committed', () => {
-    const summary = calculateDashboardSummary({
-      accounts: [account('checking', 100000)],
-      transactions: [],
-      bills: [bill({ amountCents: 5000, dueDate: Timestamp.fromDate(new Date('2026-07-20T12:00:00')) })],
-      recurringRules: [],
-      payday: { type: 'fixed_day', day: 20 },
-      availableMode: 'until_payday',
-      now: new Date('2026-07-09T15:00:00')
-    });
-
-    expect(summary.committedCents).toBe(5000);
-    expect(summary.committedCutoffSource).toBe('payday');
-  });
-
-  // Regressão: o corte é um DIA, não um instante. Com `addDays(now, 30)` cru, abrir o
-  // app às 8h e às 20h dava Comprometidos diferentes para uma conta que vence no
-  // 30º dia.
-  it('keeps the 30-day window stable regardless of the hour the app is opened', () => {
-    const dueOnLastWindowDay = Timestamp.fromDate(new Date('2026-08-08T12:00:00'));
-
-    const morning = calculateDashboardSummary({
-      accounts: [account('checking', 100000)],
-      transactions: [],
-      bills: [bill({ amountCents: 5000, dueDate: dueOnLastWindowDay })],
-      recurringRules: [],
-      now: new Date('2026-07-09T08:00:00')
-    });
-    const evening = calculateDashboardSummary({
-      accounts: [account('checking', 100000)],
-      transactions: [],
-      bills: [bill({ amountCents: 5000, dueDate: dueOnLastWindowDay })],
-      recurringRules: [],
-      now: new Date('2026-07-09T20:00:00')
-    });
-
-    expect(morning.committedCents).toBe(5000);
-    expect(evening.committedCents).toBe(morning.committedCents);
-  });
-});
-
-// O modo é uma escolha opcional em Configurações (não mais forçada no Dashboard, ver
-// 2026-07-26). As duas leituras continuam legítimas: `until_payday` conta com o próximo
-// recebimento (só o que vence antes dele pesa); `conservative` nunca conta com o salário
-// e olha uma janela fixa de dias — cada parcela de cartão entra só quando o vencimento
-// chega perto, não todas de uma vez.
-describe('calculateDashboardSummary — availableMode', () => {
-  const now = new Date('2026-07-09T12:00:00');
-
-  // 2026-07-26: default virou 'conservative' por algumas horas, revertido pra
-  // 'until_payday' na mesma sessão — 'conservative' usa janela rolante e nunca esvazia
-  // de verdade pra quem tem custo fixo mensal (a próxima ocorrência já reabastece a
-  // janela assim que a atual é paga), o que travava o Disponível perto de zero/negativo
-  // pra quem não acumula reserva. Achado em sessão de design com a dona (`/office-hours`),
-  // ver docs/history/2026-07.md. Perfil sem escolha explícita, com payday configurado,
-  // já se beneficia do corte ancorado no pagamento (drena de verdade ao longo do ciclo).
-  it('defaults to until_payday (anchored on payday) when availableMode was never chosen', () => {
-    const summary = calculateDashboardSummary({
-      accounts: [account('checking', 100000)],
-      transactions: [],
-      bills: [],
-      recurringRules: [],
-      payday: { type: 'fixed_day', day: 5 },
-      now
-    });
-
-    expect(summary.committedCutoffSource).toBe('payday');
-  });
-
-  it('uses the rolling window only when conservative is explicitly chosen', () => {
-    const summary = calculateDashboardSummary({
-      accounts: [account('checking', 100000)],
-      transactions: [],
-      bills: [],
-      recurringRules: [],
-      payday: { type: 'fixed_day', day: 5 },
-      availableMode: 'conservative',
-      now
-    });
-
-    expect(summary.committedCutoffSource).toBe('window');
-  });
-
-  // O caso concreto do dono: cartão com compra parcelada. No conservador, o Disponível
-  // ia pra muito negativo porque as 10 parcelas contavam de uma vez. Agora só a que vence
-  // dentro da janela pesa.
-  describe('parcelas de cartão não caem todas de uma vez no conservador', () => {
-    // Compra de R$ 3.000 em 10x: uma fatura aberta por mês, R$ 300 cada.
-    const installments = Array.from({ length: 10 }, (_, i) => {
-      const due = new Date(2026, 6 + i, 15, 12, 0, 0);
-      return invoice({
-        id: `card-1_${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, '0')}`,
-        referenceMonth: `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, '0')}`,
-        outstandingBalanceCents: 30000,
-        dueDate: Timestamp.fromDate(due)
-      });
-    });
-
-    it('conservative: só a parcela dentro da janela de dias conta', () => {
-      const summary = calculateDashboardSummary({
-        accounts: [account('checking', 100000)], // R$ 1.000
-        transactions: [],
-        bills: [],
-        recurringRules: [],
-        invoices: installments,
-        committedWindowDays: 30,
-        availableMode: 'conservative',
-        now
-      });
-
-      // Janela de 30 dias a partir de 09/jul → corte 08/ago. Só a parcela de 15/jul entra.
-      expect(summary.committedCents).toBe(30000);
-      expect(summary.freeToSpendCents).toBe(70000);
-      expect(summary.committedCutoffSource).toBe('window');
-      expect(summary.committedCutoff).not.toBeNull();
-    });
-
-    it('conservative: janela maior alcança mais parcelas, mas nunca todas de uma vez', () => {
-      const summary = calculateDashboardSummary({
-        accounts: [account('checking', 100000)],
-        transactions: [],
-        bills: [],
-        recurringRules: [],
-        invoices: installments,
-        committedWindowDays: 90, // ~3 meses → parcelas de jul, ago, set
-        availableMode: 'conservative',
-        now
-      });
-
-      expect(summary.committedCents).toBe(90000);
-    });
-  });
-
-  // O que separa os dois modos: o conservador ignora o payday e usa a janela; o
-  // "até o recebimento" encurta o corte pro dia do salário.
-  it('conservative ignora o payday e usa a janela; until_payday usa o payday', () => {
-    const base = {
-      accounts: [account('checking', 100000)],
-      transactions: [],
-      bills: [],
-      recurringRules: [],
-      // Parcela vence 29/jul: depois do salário (dia 12), dentro da janela de 30 dias.
-      invoices: [invoice({ outstandingBalanceCents: 30000, referenceMonth: '2026-07', dueDate: Timestamp.fromDate(new Date('2026-07-29T12:00:00')) })],
-      payday: { type: 'fixed_day' as const, day: 12 },
-      committedWindowDays: 30,
-      now
-    };
-
-    const untilPayday = calculateDashboardSummary({ ...base, availableMode: 'until_payday' });
-    // Recebe dia 12, antes de a parcela vencer (29) → não pesa agora.
-    expect(untilPayday.committedCents).toBe(0);
-    expect(untilPayday.committedCutoffSource).toBe('payday');
-
-    const conservative = calculateDashboardSummary({ ...base, availableMode: 'conservative' });
-    // Não conta com o salário: guarda a parcela que vence dentro da janela.
-    expect(conservative.committedCents).toBe(30000);
-    expect(conservative.committedCutoffSource).toBe('window');
-  });
-
-  it('conservative ignora receita futura lançada (não assume que ela chega)', () => {
-    const summary = calculateDashboardSummary({
-      accounts: [account('checking', 100000)],
-      transactions: [transaction({ type: 'income', amountCents: 500000, date: Timestamp.fromDate(new Date('2026-07-20T12:00:00')) })],
-      bills: [bill({ amountCents: 8000, dueDate: Timestamp.fromDate(new Date('2026-07-25T12:00:00')) })],
-      recurringRules: [],
-      committedWindowDays: 30,
-      availableMode: 'conservative',
-      now
-    });
-
-    // A conta de 25/jul entra pela janela, sem depender da receita de 20/jul.
-    expect(summary.committedCents).toBe(8000);
-    expect(summary.committedCutoffSource).toBe('window');
-  });
-
-  it('conservative: ignora fatura paga e saldo zerado', () => {
-    const summary = calculateDashboardSummary({
-      accounts: [account('checking', 100000)],
-      transactions: [],
-      bills: [],
-      recurringRules: [],
-      invoices: [
-        invoice({ id: 'i-paid', status: 'paid', outstandingBalanceCents: 0, dueDate: Timestamp.fromDate(new Date('2026-07-15T12:00:00')) }),
-        invoice({ id: 'i-zero', status: 'open', outstandingBalanceCents: 0, dueDate: Timestamp.fromDate(new Date('2026-07-15T12:00:00')) })
-      ],
-      committedWindowDays: 30,
-      availableMode: 'conservative',
-      now
-    });
-
-    expect(summary.committedCents).toBe(0);
-  });
-
-  it('conservative: uma fatura FECHADA conta mesmo fora da janela (débito iminente)', () => {
-    const summary = calculateDashboardSummary({
-      accounts: [account('checking', 100000)],
-      transactions: [],
-      bills: [],
-      recurringRules: [],
-      invoices: [invoice({ status: 'closed', outstandingBalanceCents: 40000, dueDate: Timestamp.fromDate(new Date('2026-10-15T12:00:00')) })],
-      committedWindowDays: 30,
-      availableMode: 'conservative',
-      now
-    });
-
-    expect(summary.committedCents).toBe(40000);
-  });
-});
-
-describe('findNextIncomeDate — receita de hoje não é "próximo recebimento"', () => {
-  // Regressão: comparar com o instante `now` fazia uma receita datada de hoje (gravada
-  // ao meio-dia) contar como futura de manhã e não contar à tarde, mudando o corte do
-  // Comprometido conforme a hora. Receita de hoje já entrou no saldo.
-  it('ignores an income dated today, whatever the hour', () => {
-    const todayIncome = [transaction({ type: 'income', date: Timestamp.fromDate(new Date('2026-06-14T12:00:00')) })];
-
-    expect(findNextIncomeDate(todayIncome, new Date('2026-06-14T08:00:00'))).toBeNull();
-    expect(findNextIncomeDate(todayIncome, new Date('2026-06-14T20:00:00'))).toBeNull();
-  });
-
-  it('still finds an income dated tomorrow', () => {
-    const next = findNextIncomeDate(
-      [transaction({ type: 'income', date: Timestamp.fromDate(new Date('2026-06-15T12:00:00')) })],
-      new Date('2026-06-14T08:00:00')
-    );
-
-    expect(next?.toISOString().slice(0, 10)).toBe('2026-06-15');
   });
 });
 
@@ -1189,15 +781,12 @@ describe('buildUpcomingReceivables', () => {
 });
 
 describe('calculateNextMonthProjection', () => {
-  const now = new Date('2026-06-14T12:00:00');
-
   it('devolve null quando o salário previsto ainda não foi configurado', () => {
     expect(
       calculateNextMonthProjection({
         transactions: [],
         bills: [],
-        recurringRules: [],
-        now
+        recurringRules: []
       })
     ).toBeNull();
   });
@@ -1208,8 +797,7 @@ describe('calculateNextMonthProjection', () => {
         projectedSalaryCents: 0,
         transactions: [],
         bills: [],
-        recurringRules: [],
-        now
+        recurringRules: []
       })
     ).toBeNull();
   });
@@ -1219,8 +807,7 @@ describe('calculateNextMonthProjection', () => {
       projectedSalaryCents: 500000,
       transactions: [],
       bills: [bill({ amountCents: 120000, dueDate: Timestamp.fromDate(new Date('2026-06-20T12:00:00')) })],
-      recurringRules: [recurring({ amountCents: 10000, nextOccurrenceAt: Timestamp.fromDate(new Date('2026-06-18T12:00:00')) })],
-      now
+      recurringRules: [recurring({ amountCents: 10000, nextOccurrenceAt: Timestamp.fromDate(new Date('2026-06-18T12:00:00')) })]
     });
 
     expect(result).not.toBeNull();
@@ -1233,33 +820,27 @@ describe('calculateNextMonthProjection', () => {
       projectedSalaryCents: 50000,
       transactions: [],
       bills: [bill({ amountCents: 120000, dueDate: Timestamp.fromDate(new Date('2026-06-20T12:00:00')) })],
-      recurringRules: [],
-      now
+      recurringRules: []
     });
 
     expect(result!.leftoverCents).toBe(-70000);
   });
 
-  // SEMPRE força o corte no modo conservador (janela de dias), mesmo que exista uma
-  // receita futura já lançada que, no modo 'until_payday' do Dashboard ao vivo, encurtaria
-  // o corte pra antes dessa conta — a projeção não pode variar conforme o AvailableMode
-  // real do perfil, ela usa sempre o comprometido "cheio".
-  it('ignora receita futura lançada e usa sempre a janela conservadora, nunca until_payday', () => {
+  // Usa o mesmo Comprometido do Dashboard (sem corte por data, com o desconto de
+  // recorrência na fatura) — a compra de recorrência na fatura é descontada, não somada.
+  it('usa o mesmo comprometido do dashboard: desconta a cobrança de recorrência da fatura', () => {
     const result = calculateNextMonthProjection({
       projectedSalaryCents: 500000,
-      transactions: [
-        transaction({ type: 'income', amountCents: 300000, date: Timestamp.fromDate(new Date('2026-06-16T12:00:00')) })
-      ],
-      bills: [bill({ amountCents: 120000, dueDate: Timestamp.fromDate(new Date('2026-06-20T12:00:00')) })],
-      recurringRules: [],
-      committedWindowDays: 30,
-      now
+      transactions: [transaction({ type: 'card_purchase', amountCents: 12000, recurringId: 'r-claude', invoiceId: 'inv-1' })],
+      bills: [],
+      recurringRules: [recurring({ id: 'r-claude', amountCents: 12000, cardId: 'card-1' })],
+      invoices: [invoice({ id: 'inv-1', status: 'open', outstandingBalanceCents: 12000 })],
+      cards: [card({ id: 'card-1' })]
     });
 
-    // Conta vence dia 20/06 — depois da receita lançada (16/06), então em modo
-    // 'until_payday' ficaria FORA do comprometido. Em modo conservador (janela de 30
-    // dias a partir de 14/06 = até 14/07) ela entra — prova que o modo é sempre forçado.
-    expect(result!.committedCents).toBe(120000);
+    // Recorrência conta 12000; fatura 12000 − 12000 = 0. Total 12000, não 24000.
+    expect(result!.committedCents).toBe(12000);
+    expect(result!.leftoverCents).toBe(488000);
   });
 
   it('por padrão ignora totalBalanceCents (includeCurrentBalance ausente/false) — isolado do saldo real', () => {
@@ -1268,8 +849,7 @@ describe('calculateNextMonthProjection', () => {
       totalBalanceCents: 999999999, // presente, mas deve ser ignorado sem includeCurrentBalance
       transactions: [],
       bills: [],
-      recurringRules: [],
-      now
+      recurringRules: []
     });
 
     expect(result).toEqual({ committedCents: 0, leftoverCents: 500000 });
@@ -1282,8 +862,7 @@ describe('calculateNextMonthProjection', () => {
       totalBalanceCents: 200000,
       transactions: [],
       bills: [bill({ amountCents: 120000, dueDate: Timestamp.fromDate(new Date('2026-06-20T12:00:00')) })],
-      recurringRules: [],
-      now
+      recurringRules: []
     });
 
     // 500000 (salário) + 200000 (saldo) - 120000 (comprometido) = 580000
@@ -1296,8 +875,7 @@ describe('calculateNextMonthProjection', () => {
       includeCurrentBalance: true,
       transactions: [],
       bills: [],
-      recurringRules: [],
-      now
+      recurringRules: []
     });
 
     expect(result!.leftoverCents).toBe(500000);

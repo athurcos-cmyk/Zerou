@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { PiggyBank } from 'lucide-react';
+import { PiggyBank, TrendingDown, TrendingUp } from 'lucide-react';
 import { BottomSheet } from '../components/BottomSheet';
 import { centsToInputValue, formatMoney, parseMoneyToCents } from './money';
 
@@ -42,7 +42,7 @@ export function NextMonthProjectionSheet({
   // Sincroniza com o perfil só na ABERTURA da sheet, nunca a cada mudança do valor salvo —
   // um snapshot do Firestore chegando com a sheet aberta (o próprio write anterior
   // voltando, por exemplo) reverteria o que a pessoa está digitando agora. Mesmo cuidado
-  // de `AvailableModeSheet.tsx`/`PaydaySettingsPage.tsx`.
+  // (mesmo cuidado de sincronizar-só-na-abertura de outros sheets).
   useEffect(() => {
     if (open && !wasOpen.current) {
       setAmount(currentProjectedSalaryCents ? centsToInputValue(currentProjectedSalaryCents) : '');
@@ -109,12 +109,15 @@ export function NextMonthProjectionSheet({
         </div>
 
         {livePreviewCents !== null && (
-          <p className="projection-live-preview">
-            {livePreviewCents >= 0 ? 'Sobra prevista: ' : 'Rombo previsto: '}
-            <strong className={livePreviewCents >= 0 ? 'projection-amount--positive' : 'projection-amount--negative'}>
-              {formatMoney(livePreviewCents)}
-            </strong>
-          </p>
+          <div className={`projection-result ${livePreviewCents >= 0 ? 'projection-result--positive' : 'projection-result--negative'}`} role="status">
+            <span className="projection-result-icon">
+              {livePreviewCents >= 0 ? <TrendingUp size={18} aria-hidden="true" /> : <TrendingDown size={18} aria-hidden="true" />}
+            </span>
+            <div className="projection-result-body">
+              <span className="projection-result-label">{livePreviewCents >= 0 ? 'Sobra prevista' : 'Rombo previsto'}</span>
+              <strong className="projection-result-amount">{formatMoney(livePreviewCents)}</strong>
+            </div>
+          </div>
         )}
 
         <p className="text-muted" style={{ fontSize: '0.82rem', margin: 0 }}>

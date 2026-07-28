@@ -37,7 +37,7 @@ function DashboardScreen() {
         </div>
         <div className="mk-metrics">
           <div className="mk-metric">
-            <span className="mk-label">Disponível</span>
+            <span className="mk-label">Saldo total</span>
             <strong>R$ 2.480</strong>
           </div>
           <div className="mk-metric">

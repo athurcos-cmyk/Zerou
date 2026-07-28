@@ -1131,7 +1131,9 @@ export async function recordRecurringPayment(
       workspaceId,
       userId,
       { cardId: method.cardId, description: rule.description, amountCents: amount, purchaseDate: new Date(), categoryId: rule.categoryId, installments: 1 },
-      { transactionId: id }
+      // `recurringId`: marca a compra como vinda desta recorrência, pro Comprometido
+      // descontar a cobrança da fatura e não contar a assinatura duas vezes.
+      { transactionId: id, recurringId: rule.id }
     );
   } else if (method.accountId) {
     const now = new Date();

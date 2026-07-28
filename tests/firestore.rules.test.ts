@@ -1498,6 +1498,29 @@ describe('firestore security rules', () => {
     );
   });
 
+  // Recorrência registrada no cartão (`recordRecurringPayment` → `addCardPurchaseToBatch` com
+  // `recurringId`): a compra marca `recurringId`/`isRecurring`/`tags:['recorrente']` pro
+  // Comprometido descontar a cobrança da fatura (anti-duplicidade, 2026-07-27). `recurringId`
+  // já está em `validTransactionCreate` (hasOnly + validOptionalString) — este teste trava isso.
+  it('allows a card_purchase transaction marked with recurringId (recurring paid on card)', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(setDoc(doc(aliceDb, 'workspaces/workspaceA/cards/cardA'), cardPayload('workspaceA', 'cardA', 'alice')));
+    await assertSucceeds(
+      setDoc(doc(aliceDb, 'workspaces/workspaceA/cards/cardA/invoices/cardA_2026-06'), invoicePayload('workspaceA', 'cardA', 'cardA_2026-06'))
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/transactions/txnRecurringCard'),
+        cardPurchaseTransactionPayload('workspaceA', 'txnRecurringCard', 'alice', {
+          recurringId: 'rec_abc',
+          isRecurring: true,
+          tags: ['recorrente']
+        })
+      )
+    );
+  });
+
   it('rejects a card_purchase transaction with installments out of range', async () => {
     const aliceDb = testEnv.authenticatedContext('alice').firestore();
 

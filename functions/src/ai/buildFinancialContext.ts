@@ -1,7 +1,6 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import { Timestamp } from 'firebase-admin/firestore';
 import { onboardingChallengeLabels, onboardingGoalLabels } from './onboardingLabels.js';
-import { resolveCommittedCutoff, type AvailableMode, type PaydayRule } from '../shared/committedCutoff.js';
 
 function nowInBRT(): Date {
   return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
@@ -104,22 +103,12 @@ export async function buildFinancialContext(
   const previousMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const previousMonth = monthKey(previousMonthDate);
 
-  // ── User profile (payday, availableMode, objetivo/desafio do onboarding) ──
-  // `paydayInfo` só é montado mais abaixo, depois que o cutoff real (resolveCommittedCutoff)
-  // é calculado — precisa das transações (próxima receita já lançada) pra decidir a fonte.
-  let payday: PaydayRule | undefined;
-  let availableMode: AvailableMode = 'until_payday';
-  let windowDays = 30;
+  // ── User profile (objetivo/desafio do onboarding) ──
   let onboardingInfo = '';
-  let hasProfile = false;
   try {
     const userDoc = await db.doc(`users/${uid}`).get();
     if (userDoc.exists) {
-      hasProfile = true;
       const profile = userDoc.data() ?? {};
-      payday = profile.payday as PaydayRule | undefined;
-      availableMode = (profile.availableMode as AvailableMode) ?? 'until_payday';
-      windowDays = (profile.committedWindowDays as number) ?? 30;
 
       // Respostas do onboarding — editaveis depois em Configuracoes > Objetivo e desafio,
       // por isso podem estar ausentes ou desatualizadas; usar so como tempero de tom, nunca
@@ -158,7 +147,10 @@ export async function buildFinancialContext(
   const spendingByCategoryThisMonth = new Map<string, number>();
   const spendingByCategoryPrevMonth = new Map<string, number>();
   const monthlyTotals = new Map<string, number>();
-  const incomeTransactions: Array<{ type: string; date: Date; tags?: string[]; deletedAt?: unknown }> = [];
+  // Cobranças de recorrência já lançadas no cartão, por fatura — descontadas do saldo
+  // devedor da fatura no Comprometido pra não contar a assinatura duas vezes (linha da
+  // recorrência + fatura). Mesma lógica do client (`recurringChargesByInvoice`).
+  const recurringChargesByInvoice = new Map<string, number>();
 
   for (const doc of txnSnap.docs) {
     const txn = doc.data();
@@ -168,11 +160,13 @@ export async function buildFinancialContext(
     const txnDate = (txn.date as Timestamp).toDate();
     const txnMonth = (txn.cashMonth || txn.competenceMonth || monthKey(txnDate)) as string;
 
-    if (txn.type === 'income') {
-      incomeTransactions.push({ type: 'income', date: txnDate, tags: txn.tags as string[] | undefined });
-      if (txnMonth === currentMonth) {
-        incomeThisMonth += amount;
-      }
+    if (txn.type === 'income' && txnMonth === currentMonth) {
+      incomeThisMonth += amount;
+    }
+
+    if (txn.type === 'card_purchase' && txn.recurringId && txn.invoiceId) {
+      const invId = txn.invoiceId as string;
+      recurringChargesByInvoice.set(invId, (recurringChargesByInvoice.get(invId) ?? 0) + amount);
     }
 
     if (!SPENDING_TYPES.has(txn.type as string)) continue;
@@ -194,30 +188,9 @@ export async function buildFinancialContext(
   const totalThisMonth = [...spendingByCategoryThisMonth.values()].reduce((a, b) => a + b, 0);
   const totalPrevMonth = [...spendingByCategoryPrevMonth.values()].reduce((a, b) => a + b, 0);
 
-  // ── Cutoff do Comprometido — mesma lógica do Dashboard (resolveCommittedCutoff) ──
-  const committedCutoff = resolveCommittedCutoff({
-    transactions: incomeTransactions,
-    payday,
-    committedWindowDays: windowDays,
-    availableMode,
-    now
-  });
-
-  let paydayInfo = '';
-  if (hasProfile) {
-    if (availableMode === 'conservative') {
-      paydayInfo = `Modo conservador: nao assume recebimento futuro. Janela de ${windowDays} dias.`;
-    } else if (committedCutoff.source === 'income') {
-      paydayInfo = `Tem uma receita futura ja lancada em ${friendlyDate(committedCutoff.cutoff)} — o Comprometido considera ate essa data.`;
-    } else if (payday) {
-      if (payday.type === 'fixed_day') paydayInfo = `Recebe dia ${payday.day} (fixo).`;
-      else if (payday.type === 'business_day') paydayInfo = `Recebe ate o ${payday.day}o dia util.`;
-      else if (payday.type === 'end_of_month') paydayInfo = `Recebe no fim do mes.`;
-      else if (payday.type === 'variable_income') paydayInfo = `Renda variavel. Janela de ${windowDays} dias.`;
-    } else {
-      paydayInfo = `Nao informou data de recebimento. Janela de ${windowDays} dias.`;
-    }
-  }
+  // Comprometido = TUDO que se deve, sem corte por data (contas pendentes + todas as
+  // recorrencias ativas + faturas em aberto sem a parte de recorrencia). Mesma logica do
+  // Dashboard desde 2026-07-27.
 
   // ── Top 5 categories ──────────────────────────────────────────────────────
   const topCategories = [...spendingByCategoryThisMonth.entries()]
@@ -259,16 +232,14 @@ export async function buildFinancialContext(
     const amount = bill.amountCents as number;
     const isOverdue = bill.status === 'overdue' || dueDate < todayStart;
 
-    // Bills vencidas ou que vencem até o cutoff (mesmo corte do Comprometido do Dashboard)
-    if (isOverdue || (dueDate >= todayStart && dueDate <= committedCutoff.cutoff)) {
-      billsCommitted += amount;
-      upcomingBills.push({
-        description: sanitize((bill.description as string) ?? ''),
-        amountCents: amount,
-        dueDate: friendlyDate(dueDate),
-        overdue: isOverdue,
-      });
-    }
+    // Toda conta pendente/vencida conta como comprometido, sem corte por data.
+    billsCommitted += amount;
+    upcomingBills.push({
+      description: sanitize((bill.description as string) ?? ''),
+      amountCents: amount,
+      dueDate: friendlyDate(dueDate),
+      overdue: isOverdue,
+    });
   }
 
   upcomingBills.sort((a, b) => {
@@ -293,16 +264,14 @@ export async function buildFinancialContext(
     const nextDate = rule.nextOccurrenceAt.toDate();
     if (isNaN(nextDate.getTime())) continue;
 
-    // Conta como comprometido se a proxima ocorrencia cai até o cutoff (ou já passou —
-    // está devendo registrar)
-    if (nextDate <= committedCutoff.cutoff) {
-      recurringCommitted += rule.amountCents;
-      upcomingRecurring.push({
-        description: sanitize(rule.description ?? ''),
-        amountCents: rule.amountCents,
-        nextDate: friendlyDate(nextDate),
-      });
-    }
+    // Toda recorrencia ativa conta como comprometido (cartao e conta), sem corte por data.
+    // A duplicidade da de cartao e desfeita descontando a cobranca da fatura (abaixo).
+    recurringCommitted += rule.amountCents;
+    upcomingRecurring.push({
+      description: sanitize(rule.description ?? ''),
+      amountCents: rule.amountCents,
+      nextDate: friendlyDate(nextDate),
+    });
   }
 
   upcomingRecurring.sort((a, b) => a.nextDate.localeCompare(b.nextDate));
@@ -328,17 +297,16 @@ export async function buildFinancialContext(
       const inv = invDoc.data() as InvoiceData;
 
       // outstandingBalanceCents e mantido incrementalmente por
-      // invoiceLedgerEntryTrigger.ts a cada lancamento novo no ledger.
-      const outstanding = inv.outstandingBalanceCents ?? 0;
+      // invoiceLedgerEntryTrigger.ts a cada lancamento novo no ledger. Desconta as
+      // cobrancas de recorrencia (ja contadas como linha da recorrencia) pra nao duplicar.
+      const outstandingRaw = inv.outstandingBalanceCents ?? 0;
+      const outstanding = Math.max(0, outstandingRaw - (recurringChargesByInvoice.get(invDoc.id) ?? 0));
       if (outstanding <= 0) continue;
 
       const dueDate = inv.dueDate.toDate();
       if (isNaN(dueDate.getTime())) continue;
 
-      // Fatura fechada sempre conta (pagamento iminente); em aberto só se o vencimento
-      // real cair até o cutoff — mesma regra de buildUpcomingCommitments no client.
-      if (inv.status !== 'closed' && dueDate > committedCutoff.cutoff) continue;
-
+      // Toda fatura em aberto conta, sem corte por data — e divida ja assumida.
       invoiceCommitted += outstanding;
       activeInvoices.push({
         cardName: sanitize(card.name ?? 'Cartao'),
@@ -454,10 +422,9 @@ export async function buildFinancialContext(
   const lines: string[] = [];
 
   // SEU CICLO
-  if (paydayInfo || onboardingInfo) {
+  if (onboardingInfo) {
     lines.push('=== SEU CICLO ===');
-    if (paydayInfo) lines.push(paydayInfo);
-    if (onboardingInfo) lines.push(onboardingInfo);
+    lines.push(onboardingInfo);
     lines.push('');
   }
 
@@ -524,7 +491,7 @@ export async function buildFinancialContext(
 
   // COMPROMETIDO — Contas a Pagar (avulsas + recorrentes) + Faturas
   const totalBills = upcomingBills.length + upcomingRecurring.length;
-  lines.push(`=== COMPROMETIDO (ate ${friendlyDate(committedCutoff.cutoff)}) ===`);
+  lines.push('=== COMPROMETIDO (contas fixas + faturas em aberto) ===');
 
   if (totalBills > 0) {
     lines.push(`Contas a pagar (${totalBills}):`);
@@ -536,7 +503,7 @@ export async function buildFinancialContext(
       lines.push(`- ${rec.description}: ${formatBRL(rec.amountCents)} (prox. ${rec.nextDate}, se repete)`);
     }
   } else {
-    lines.push(`Nenhuma conta a pagar ate ${friendlyDate(committedCutoff.cutoff)}.`);
+    lines.push('Nenhuma conta a pagar no momento.');
   }
 
   if (activeInvoices.length > 0) {

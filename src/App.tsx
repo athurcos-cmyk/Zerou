@@ -36,7 +36,6 @@ const SharedSpacePage = lazy(() => import('./pages/SharedSpacePage').then((m) =>
 const OnboardingPage = lazy(() => import('./onboarding/OnboardingPage').then((m) => ({ default: m.OnboardingPage })));
 const AppearanceSettingsPage = lazy(() => import('./settings/AppearanceSettingsPage').then((m) => ({ default: m.AppearanceSettingsPage })));
 const LoginMethodsPage = lazy(() => import('./settings/LoginMethodsPage').then((m) => ({ default: m.LoginMethodsPage })));
-const PaydaySettingsPage = lazy(() => import('./settings/PaydaySettingsPage').then((m) => ({ default: m.PaydaySettingsPage })));
 const OnboardingAnswersSettingsPage = lazy(() => import('./settings/OnboardingAnswersSettingsPage').then((m) => ({ default: m.OnboardingAnswersSettingsPage })));
 const WhatsAppLinkPage = lazy(() => import('./settings/WhatsAppLinkPage').then((m) => ({ default: m.WhatsAppLinkPage })));
 const JoinInvitePage = lazy(() => import('./pages/JoinInvitePage').then((m) => ({ default: m.JoinInvitePage })));
@@ -128,7 +127,6 @@ export function App() {
                 <Route path="assistant" element={<Suspense fallback={<LazyFallback />}><AssistantPage /></Suspense>} />
                 <Route path="settings/appearance" element={<Suspense fallback={<LazyFallback />}><AppearanceSettingsPage /></Suspense>} />
                 <Route path="settings/billing" element={<Navigate to="/app/settings/appearance" replace />} />
-                <Route path="settings/payday" element={<Suspense fallback={<LazyFallback />}><PaydaySettingsPage /></Suspense>} />
                 <Route path="settings/onboarding" element={<Suspense fallback={<LazyFallback />}><OnboardingAnswersSettingsPage /></Suspense>} />
                 <Route path="settings/security/login-methods" element={<Suspense fallback={<LazyFallback />}><LoginMethodsPage /></Suspense>} />
                 <Route path="settings/whatsapp" element={<Suspense fallback={<LazyFallback />}><WhatsAppLinkPage /></Suspense>} />

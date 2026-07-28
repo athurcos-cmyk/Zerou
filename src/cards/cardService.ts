@@ -243,7 +243,7 @@ export async function addCardPurchaseToBatch(
   workspaceId: string,
   userId: string,
   input: CreateCardPurchaseInput,
-  opts: { transactionId?: string; skipInvoiceCheck?: boolean } = {}
+  opts: { transactionId?: string; skipInvoiceCheck?: boolean; recurringId?: string } = {}
 ): Promise<{ transactionId: string; firstInvoiceId: string; cardId: string }> {
   const parsed = createCardPurchaseSchema.parse(input);
   const card = await loadCard(workspaceId, parsed.cardId);
@@ -306,8 +306,12 @@ export async function addCardPurchaseToBatch(
     date: Timestamp.fromDate(parsed.purchaseDate),
     competenceMonth: monthKey,
     cashMonth: monthKey,
-    tags: [],
-    isRecurring: false,
+    // `recurringId` marca a compra como vinda de uma recorrência registrada no cartão —
+    // é o que o Comprometido usa pra descontar essa cobrança da fatura e não contar a
+    // assinatura duas vezes (recorrência como linha + fatura). Ver `recurringChargesByInvoice`.
+    tags: opts.recurringId ? ['recorrente'] : [],
+    isRecurring: Boolean(opts.recurringId),
+    ...(opts.recurringId ? { recurringId: opts.recurringId } : {}),
     installmentGroupId: installmentGroupId ?? '',
     installments: parsed.installments,
     clientMutationId: transactionId,

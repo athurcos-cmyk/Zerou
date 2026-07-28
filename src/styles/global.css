@@ -611,7 +611,7 @@ html[data-reduce-motion='true'] *::after {
 /* Compact dashboard summary: prominent balance + two smaller metrics */
 .dash-summary {
   display: grid;
-  grid-template-columns: minmax(12rem, 1.2fr) minmax(0, 2fr);
+  grid-template-columns: 1fr;
   gap: 0.75rem;
   margin-top: 1.25rem;
 }
@@ -646,6 +646,26 @@ html[data-reduce-motion='true'] *::after {
   align-content: center;
 }
 
+/* Comprometido agora é a única métrica secundária: barra horizontal de largura cheia
+   (rótulo + explicação à esquerda, valor grande à direita) em vez de meio-card solto. */
+.dash-metric--committed {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.dash-metric-head {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.dash-metric--committed .display-number {
+  flex-shrink: 0;
+  text-align: right;
+}
+
 /* Legenda do "Comprometido": também é o gatilho pra reabrir a explicação do cálculo.
    Herda a aparência de `.text-secondary` — é texto que por acaso é clicável, não um
    botão desenhado como botão. */
@@ -667,6 +687,13 @@ html[data-reduce-motion='true'] *::after {
 .dash-metric-explain:hover {
   color: var(--text-primary);
   text-decoration-color: var(--action-primary);
+}
+
+/* Legenda estática do Comprometido (não é mais botão — não há tutorial pra reabrir). */
+.dash-metric-caption {
+  font-size: 0.84rem;
+  line-height: 1.35;
+  color: var(--text-secondary);
 }
 
 .dash-metric .display-number {
@@ -4697,6 +4724,11 @@ span.service-mark--brand {
   display: flex;
   align-items: baseline;
   gap: 0.5rem;
+  /* Item de grid dentro do `.field` (grid): sem `min-width: 0`, o item herda
+     `min-width: auto` e não encolhe abaixo da largura INTRÍNSECA do input (fonte
+     gigante → ~20 caracteres → ~400px), estourando o corpo da sheet e sendo cortado.
+     Com `min-width: 0`, o wrap se ajusta à coluna e o input (flex:1, min-width:0) cabe. */
+  min-width: 0;
   padding: 0.9rem 1rem;
   border-radius: var(--radius-md);
   background: var(--bg-surface-subtle);
@@ -4705,14 +4737,15 @@ span.service-mark--brand {
 }
 
 .projection-input-wrap:focus-within {
-  border-color: var(--border-focus);
+  border-color: var(--action-primary);
+  box-shadow: 0 0 0 3px var(--action-primary-soft);
 }
 
 .projection-input-currency {
   font-family: 'DM Sans', system-ui, sans-serif;
   font-weight: 800;
   font-size: 1.1rem;
-  color: var(--text-muted);
+  color: var(--action-primary);
 }
 
 .projection-input {
@@ -4730,14 +4763,83 @@ span.service-mark--brand {
   outline: none;
 }
 
-.projection-live-preview {
-  margin: 0;
-  font-size: 0.92rem;
+/* Prévia ao vivo da "sobra": o momento de recompensa ao digitar o salário. Chip que
+   acende verde/vermelho, com o valor em DM Sans 800 — antes era só uma linha cinza. */
+.projection-result {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.8rem 0.95rem;
+  border-radius: var(--radius-md);
+  animation: projection-result-in 0.22s ease;
+}
+
+.projection-result--positive {
+  background: var(--success-soft);
+}
+
+.projection-result--negative {
+  background: var(--danger-soft);
+}
+
+.projection-result-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--bg-surface);
+}
+
+.projection-result--positive .projection-result-icon {
+  color: var(--success);
+}
+
+.projection-result--negative .projection-result-icon {
+  color: var(--danger);
+}
+
+.projection-result-body {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.projection-result-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   color: var(--text-secondary);
 }
 
-.projection-live-preview strong {
+.projection-result-amount {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
+  font-size: 1.5rem;
+  line-height: 1.1;
+}
+
+.projection-result--positive .projection-result-amount {
+  color: var(--success);
+}
+
+.projection-result--negative .projection-result-amount {
+  color: var(--danger);
+}
+
+@keyframes projection-result-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .onboard-finish-hint {

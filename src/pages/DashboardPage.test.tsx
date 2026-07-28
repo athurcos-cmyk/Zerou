@@ -24,8 +24,10 @@ vi.mock('../onboarding/welcomeTour.store', () => ({
 vi.mock('../pwa/InstallPromptSheet', () => ({ InstallPromptSheet: () => null }));
 vi.mock('../components/BudgetAlertBanner', () => ({ BudgetAlertBanner: () => null }));
 vi.mock('../finance/SyncStatusBadge', () => ({ SyncStatusBadge: () => null }));
-vi.mock('../finance/AvailableModeSheet', () => ({ AvailableModeSheet: () => null }));
-vi.mock('../workspaces/workspaceService', () => ({ updateAvailableMode: vi.fn() }));
+vi.mock('../workspaces/workspaceService', () => ({
+  updateProjectedSalary: vi.fn(),
+  updateProjectionIncludesBalance: vi.fn()
+}));
 
 // Importado depois dos mocks (vi.mock é hoisted, mas deixa explícito).
 import { DashboardPage } from './DashboardPage';
@@ -56,10 +58,8 @@ function cardsCtx(overrides: Record<string, unknown> = {}) {
 
 const cachedView: CachedDashboardView = {
   totalBalanceCents: 150000,
-  freeToSpendCents: 90000,
   committedCents: 60000,
-  availableCaption: 'Livre agora.',
-  committedCaption: 'Considerando os próximos 30 dias',
+  committedCaption: 'Contas fixas e recorrentes + faturas de cartão em aberto.',
   spendingVariationPct: 12,
   spending: [
     { categoryId: 'food', categoryName: 'Alimentação', amountCents: 42000, mark: { id: 'food', icon: 'utensils', color: defaultCategoryColors.expense_food } }
@@ -107,12 +107,9 @@ describe('DashboardPage — listas do cache no boot', () => {
     // E não cai nos estados vazios enquanto tem cache pra mostrar.
     expect(screen.queryByText('Sem gastos este mês')).not.toBeInTheDocument();
     expect(screen.queryByText('Nenhuma transação ainda')).not.toBeInTheDocument();
-    // Legendas do Disponível/Comprometido e a variação vêm do cache — sem "Carregando…"
-    // nem "Contas e fatura." piscando.
-    expect(screen.getByText('Livre agora.')).toBeInTheDocument();
-    expect(screen.getByText('Considerando os próximos 30 dias')).toBeInTheDocument();
+    // A legenda do Comprometido e a variação vêm do cache — sem "Contas e fatura." piscando.
+    expect(screen.getByText('Contas fixas e recorrentes + faturas de cartão em aberto.')).toBeInTheDocument();
     expect(screen.getByText(/vs\. mês passado/)).toBeInTheDocument();
-    expect(screen.queryByText('Carregando...')).not.toBeInTheDocument();
     expect(screen.queryByText('Contas e fatura.')).not.toBeInTheDocument();
   });
 

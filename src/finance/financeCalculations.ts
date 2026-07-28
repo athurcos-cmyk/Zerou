@@ -1,9 +1,6 @@
-import { addDays, compareAsc, endOfDay, isAfter, isBefore, isEqual } from 'date-fns';
+import { addDays, compareAsc, endOfDay } from 'date-fns';
 import { formatFriendlyMonth, toDate } from './financeDates';
-import { defaultAvailableMode } from './availableMode';
-import { defaultCommittedWindowDays, nextPaydayFrom } from './payday';
-import { resolveInvoiceCycle } from '../cards/cardDates';
-import type { Account, AvailableMode, Bill, CreditCard, Invoice, PaydayRule, Receivable, RecurringRule, Transaction } from '../types/contracts';
+import type { Account, Bill, CreditCard, Invoice, Receivable, RecurringRule, Transaction } from '../types/contracts';
 import type { LocalSynced } from './financeService';
 
 export interface AccountBalance extends Account {
@@ -19,10 +16,6 @@ export interface UpcomingCommitment {
   /** Só em `kind: 'invoice'` — pra linkar direto pra fatura do cartão no Dashboard. */
   cardId?: string;
 }
-
-// De onde veio a data-limite usada pra decidir o que conta como "Comprometido" —
-// exibido no Dashboard pra explicar o número em vez de só mostrar um valor sem contexto.
-export type CommittedCutoffSource = 'income' | 'payday' | 'window';
 
 export interface UpcomingReceivable {
   id: string;
@@ -60,24 +53,12 @@ export function buildUpcomingReceivables(
 export interface DashboardSummary {
   totalBalanceCents: number;
   committedCents: number;
-  freeToSpendCents: number;
   upcomingCommitments: UpcomingCommitment[];
   recentTransactions: Transaction[];
-  nextIncomeAt: Date | null;
-  /** Sempre um `Date` concreto — `resolveCommittedCutoff` nunca retorna `null`, nem no
-   * modo conservador (usa a janela fixa de dias como corte). O tipo aceita `null` porque
-   * `buildUpcomingCommitments` também é chamada diretamente (fora deste fluxo) com
-   * `cutoff: null` pra representar "sem data-limite, tudo que se deve conta". */
-  committedCutoff: Date | null;
-  committedCutoffSource: CommittedCutoffSource;
 }
 
 function isActiveTransaction(transaction: Transaction) {
   return !transaction.deletedAt;
-}
-
-function isOnOrBefore(left: Date, right: Date) {
-  return isBefore(left, right) || isEqual(left, right);
 }
 
 export interface AccountEffect {
@@ -192,42 +173,52 @@ export function calculateTotalBalance(accounts: Account[], transactions: Transac
   return calculateAccountBalances(accounts, transactions).reduce((total, account) => total + account.balanceCents, 0);
 }
 
-export function findNextIncomeDate(transactions: Transaction[], now = new Date()) {
-  // Estritamente DEPOIS de hoje: uma receita lançada com a data de hoje já entrou no
-  // saldo, então não é o "próximo recebimento". Comparar contra o instante `now` fazia
-  // a mesma receita de hoje contar de manhã (12:00 > 08:00) e não contar à tarde,
-  // mudando o Comprometido conforme a hora em que o app era aberto.
-  const todayEnd = endOfDay(now);
-  const futureIncomeDates = transactions
-    .filter(
-      (transaction) =>
-        isActiveTransaction(transaction) &&
-        transaction.type === 'income' &&
-        // Retirada de meta/cofrinho é receita na conta, mas não é "próximo recebimento"
-        // pro cálculo de Comprometido — mesma exclusão que já vale do lado da despesa.
-        !transaction.tags?.includes('meta') &&
-        !transaction.tags?.includes('cofrinho')
-    )
-    .map((transaction) => toDate(transaction.date))
-    .filter((date) => isAfter(date, todayEnd))
-    .sort(compareAsc);
-
-  return futureIncomeDates[0] ?? null;
+/**
+ * Soma, por fatura, as compras que vieram de uma recorrência (`card_purchase` com
+ * `recurringId` setado — marcado por `recordRecurringPayment`). É esse valor que se
+ * desconta do total da fatura no Comprometido: a recorrência já conta como linha própria,
+ * então contar a mesma cobrança de novo pela fatura seria duplicidade.
+ *
+ * Usa só as transações que o boot já carrega (as 300 mais recentes) — zero leitura nova.
+ * Faturas em aberto são do ciclo atual, então suas cobranças são recentes e caem dentro
+ * dessa janela pra qualquer uso realista; o caso extremo (300+ lançamentos por cima antes
+ * de a fatura ser paga) só deixa de descontar 1 item, e o aviso de `hasPendingCardLedgerActivity`
+ * já sinaliza que o número pode estar desatualizado.
+ */
+function recurringChargesByInvoice(transactions: Transaction[]): Map<string, number> {
+  const totals = new Map<string, number>();
+  for (const transaction of transactions) {
+    if (
+      transaction.type === 'card_purchase' &&
+      !transaction.deletedAt &&
+      transaction.recurringId &&
+      transaction.invoiceId
+    ) {
+      totals.set(transaction.invoiceId, (totals.get(transaction.invoiceId) ?? 0) + transaction.amountCents);
+    }
+  }
+  return totals;
 }
 
 /**
- * `cutoff = null` (modo conservador): não há data-limite — tudo que a pessoa já deve
- * conta como comprometido, inclusive parcelas de faturas de meses futuros.
+ * Comprometido = contas a pagar pendentes + TODAS as recorrências ativas (cartão e conta,
+ * uma ocorrência cada) + faturas em aberto SEM a parte que já é recorrência. Sem corte por
+ * data: tudo que a pessoa já deve conta.
+ *
+ * A recorrência sempre conta como linha própria (aparece antes de ser registrada). A fatura
+ * conta só o que NÃO é recorrência (compra avulsa, parcelado) — `recurringChargesByInvoice`
+ * desconta as cobranças de recorrência já lançadas, senão a mesma assinatura contaria duas
+ * vezes ao ser registrada no cartão. `transactions` é passado só pra esse desconto.
  */
 export function buildUpcomingCommitments(
   bills: Bill[],
   recurringRules: RecurringRule[],
-  cutoff: Date | null,
   invoices: Invoice[] = [],
-  cards: CreditCard[] = []
+  cards: CreditCard[] = [],
+  transactions: Transaction[] = []
 ): UpcomingCommitment[] {
-  const withinCutoff = (dueAt: Date) => cutoff === null || isOnOrBefore(dueAt, cutoff);
   const cardById = new Map(cards.map((card) => [card.id, card]));
+  const recurringInInvoice = recurringChargesByInvoice(transactions);
 
   const billCommitments = bills
     .filter((bill) => bill.status === 'pending' || bill.status === 'overdue')
@@ -240,68 +231,45 @@ export function buildUpcomingCommitments(
           amountCents: bill.amountCents,
           dueAt: toDate(bill.dueDate)
         }) satisfies UpcomingCommitment
-    )
-    .filter((commitment) => withinCutoff(commitment.dueAt));
+    );
 
-  // Fixo pago no cartão (`rule.cardId`) ainda não virou compra — `nextOccurrenceAt` é a
-  // data da COBRANÇA, não a data em que o dinheiro sai da conta. Sem projetar pelo ciclo
-  // do cartão, uma recorrência no cartão contava como comprometida ~1 mês antes da hora
-  // (achado em sessão de design com a dona, 2026-07-26): a cobrança de hoje só vence de
-  // verdade quando a fatura que ela vai gerar fecha e vence, não no dia da cobrança em si.
-  // Mesma conta que compra avulsa no cartão já usa (`resolveInvoiceCycle`) — aqui só
-  // projeta a partir da PRÓXIMA ocorrência agendada em vez da data de uma compra real.
-  // Fixo pago direto da conta (`rule.accountId`) não tem esse intermediário — a data da
-  // cobrança já é a data em que o dinheiro sai, sem ajuste.
+  // Toda recorrência ativa conta uma ocorrência (a próxima), pelo `nextOccurrenceAt`.
+  // Cartão e conta contam igual — a duplicidade da de cartão é desfeita descontando a
+  // cobrança dela da fatura (abaixo), não excluindo a recorrência.
   const recurringCommitments = recurringRules
     .filter((rule) => rule.isActive && typeof rule.amountCents === 'number')
-    .map((rule) => {
-      const occurrenceAt = toDate(rule.nextOccurrenceAt);
-      const card = rule.cardId ? cardById.get(rule.cardId) : undefined;
-      const dueAt = card ? resolveInvoiceCycle(occurrenceAt, card.closingDay, card.dueDay).dueDate : occurrenceAt;
-      return {
-        id: rule.id,
-        kind: 'recurring',
-        description: rule.description,
-        amountCents: rule.amountCents ?? 0,
-        dueAt
-      } satisfies UpcomingCommitment;
-    })
-    .filter((commitment) => withinCutoff(commitment.dueAt));
+    .map(
+      (rule) =>
+        ({
+          id: rule.id,
+          kind: 'recurring',
+          description: rule.description,
+          amountCents: rule.amountCents ?? 0,
+          dueAt: toDate(rule.nextOccurrenceAt)
+        }) satisfies UpcomingCommitment
+    );
 
-  // Regra de fatura no comprometido:
-  // - 'closed': sempre (já fechou, o pagamento é iminente)
-  // - 'open': só se o VENCIMENTO REAL cair dentro do mesmo cutoff usado pra contas a
-  //   pagar/recorrências (antes do próximo salário, ou 30 dias). Antes usava
-  //   "referenceMonth <= mês atual" (mês do CICLO da compra, não da cobrança) — em
-  //   cartões que fecham tarde e vencem no mês seguinte (padrão comum: fecha dia 25,
-  //   vence dia 5), isso contava a fatura inteira como comprometida um mês antes do
-  //   vencimento de verdade, mesmo já com `resolveInvoiceCycle` calculando a data de
-  //   vencimento certa. Decisão do dono do produto: vencimento real é o critério.
-  // No modo conservador (`cutoff === null`) toda fatura em aberto conta, inclusive as
-  // de parcelas que só vencem daqui a meses — é dívida já assumida.
+  // Toda fatura em aberto (status != paga/overpaid, saldo > 0) conta, sem corte por data —
+  // é dívida já assumida. O valor é o saldo devedor MENOS as cobranças que vieram de
+  // recorrência (já contadas como linha acima), com piso em 0.
   const invoiceCommitments = invoices
-    .filter(
-      (invoice) =>
-        invoice.status !== 'paid' &&
-        invoice.status !== 'overpaid' &&
-        invoice.outstandingBalanceCents > 0 &&
-        (invoice.status === 'closed' || withinCutoff(toDate(invoice.dueDate)))
-    )
+    .filter((invoice) => invoice.status !== 'paid' && invoice.status !== 'overpaid' && invoice.outstandingBalanceCents > 0)
     .map((invoice) => {
       const cardName = cardById.get(invoice.cardId)?.name;
-      // Sem prefixo "Fatura"/mês de referência: a linha já mostra "Fatura · <data>"
-      // embaixo (mesmo padrão de bill.description/rule.description, que também são só
-      // o nome, sem repetir o tipo). Fallback mantém o texto antigo se o cartão sumiu
-      // (excluído) ou não foi passado pro caller.
+      const amountCents = Math.max(0, invoice.outstandingBalanceCents - (recurringInInvoice.get(invoice.id) ?? 0));
       return {
         id: invoice.id,
         kind: 'invoice',
+        // Sem prefixo "Fatura"/mês de referência: a linha já mostra "Fatura · <data>"
+        // embaixo. Fallback mantém o texto antigo se o cartão sumiu (excluído).
         description: cardName ?? `Fatura ${formatFriendlyMonth(invoice.referenceMonth)}`,
-        amountCents: invoice.outstandingBalanceCents,
+        amountCents,
         dueAt: toDate(invoice.dueDate),
         cardId: invoice.cardId
       } satisfies UpcomingCommitment;
-    });
+    })
+    // Fatura que era 100% recorrência fica com 0 depois do desconto — não vira linha.
+    .filter((commitment) => commitment.amountCents > 0);
 
   return [...billCommitments, ...recurringCommitments, ...invoiceCommitments].sort((left, right) =>
     compareAsc(left.dueAt, right.dueAt)
@@ -341,59 +309,6 @@ export function hasPendingCardLedgerActivity(transactions: Array<LocalSynced<Tra
   );
 }
 
-export interface CommittedCutoff {
-  /** `resolveCommittedCutoff` sempre devolve um `Date` concreto aqui, inclusive no modo
-   * conservador (janela fixa de dias) — `null` só é usado por quem chama
-   * `buildUpcomingCommitments` diretamente, fora deste fluxo, pra dizer "sem data-limite". */
-  cutoff: Date | null;
-  source: CommittedCutoffSource;
-  nextIncomeAt: Date | null;
-}
-
-/**
- * Até quando o "Comprometido" enxerga. É o coração do "Disponível", e a tela de
- * Configurações usa esta mesma função pra mostrar a data real que está em vigor —
- * sem isso, a explicação lá e o número do Dashboard poderiam divergir em silêncio.
- */
-export function resolveCommittedCutoff(input: {
-  transactions: Transaction[];
-  payday?: PaydayRule;
-  committedWindowDays?: number;
-  availableMode?: AvailableMode;
-  now?: Date;
-}): CommittedCutoff {
-  const now = input.now ?? new Date();
-  const nextIncomeAt = findNextIncomeDate(input.transactions, now);
-  const availableMode = input.availableMode ?? defaultAvailableMode;
-  const windowDays = input.committedWindowDays ?? defaultCommittedWindowDays;
-
-  // Modo conservador: nunca assume que o salário vai cair, então ignora receita futura
-  // lançada e a data de recebimento do perfil — usa só a janela fixa de N dias. Assim
-  // uma parcela de cartão só entra no Comprometido quando o vencimento dela chega perto,
-  // em vez de as 10 parcelas de uma compra caírem todas de uma vez (o que jogava o
-  // Disponível pra muito negativo, sem sentido, no caso de quem tem compra parcelada).
-  if (availableMode === 'conservative') {
-    return { cutoff: endOfDay(addDays(now, windowDays)), source: 'window', nextIncomeAt };
-  }
-
-  // Sem receita futura lançada na mão, usa a data de recebimento estimada do perfil
-  // (pergunta do onboarding) antes de cair na janela configurável (padrão 30 dias) —
-  // evita que uma fatura que só vence depois do próximo salário pareça "comprometida"
-  // hoje. "Renda variável" é uma escolha explícita sem data resolvível — cai na janela
-  // igual quem nunca respondeu a pergunta.
-  const resolvablePayday = input.payday && input.payday.type !== 'variable_income' ? input.payday : undefined;
-  const source: CommittedCutoffSource = nextIncomeAt ? 'income' : resolvablePayday ? 'payday' : 'window';
-  // `endOfDay`: o corte é um DIA, não um instante. As três origens produzem horas
-  // diferentes (receita lançada e vencimentos ficam ao meio-dia; `nextPaydayFrom`
-  // devolve meia-noite; a janela de N dias herda a hora atual) — sem normalizar, uma
-  // conta que vence no próprio dia do salário entrava ou não no Comprometido dependendo
-  // da origem do corte, e a janela de 30 dias mudava de resultado conforme a hora em
-  // que o app era aberto.
-  const rawCutoff = nextIncomeAt ?? (resolvablePayday ? nextPaydayFrom(resolvablePayday, now) : addDays(now, windowDays));
-
-  return { cutoff: endOfDay(rawCutoff), source, nextIncomeAt };
-}
-
 export function calculateDashboardSummary(input: {
   accounts: Account[];
   transactions: Transaction[];
@@ -401,21 +316,15 @@ export function calculateDashboardSummary(input: {
   recurringRules: RecurringRule[];
   invoices?: Invoice[];
   cards?: CreditCard[];
-  payday?: PaydayRule;
-  committedWindowDays?: number;
-  availableMode?: AvailableMode;
-  now?: Date;
 }): DashboardSummary {
-  const now = input.now ?? new Date();
-  const { cutoff, source: committedCutoffSource, nextIncomeAt } = resolveCommittedCutoff({
-    transactions: input.transactions,
-    payday: input.payday,
-    committedWindowDays: input.committedWindowDays,
-    availableMode: input.availableMode,
-    now
-  });
   const totalBalanceCents = currentTotalBalance(input.accounts);
-  const commitments = buildUpcomingCommitments(input.bills, input.recurringRules, cutoff, input.invoices ?? [], input.cards ?? []);
+  const commitments = buildUpcomingCommitments(
+    input.bills,
+    input.recurringRules,
+    input.invoices ?? [],
+    input.cards ?? [],
+    input.transactions
+  );
   const committedCents = commitments.reduce((total, commitment) => total + commitment.amountCents, 0);
   const recentTransactions = input.transactions
     .filter(isActiveTransaction)
@@ -426,12 +335,8 @@ export function calculateDashboardSummary(input: {
   return {
     totalBalanceCents,
     committedCents,
-    freeToSpendCents: totalBalanceCents - committedCents,
     upcomingCommitments: commitments.slice(0, 3),
-    recentTransactions,
-    nextIncomeAt,
-    committedCutoff: cutoff,
-    committedCutoffSource
+    recentTransactions
   };
 }
 
@@ -445,12 +350,9 @@ export function calculateDashboardSummary(input: {
  * atual (quando ligado) não fere essa regra: é um número real e já confirmado (o que já
  * está na conta hoje), não uma projeção de dinheiro que ainda não existe.
  *
- * SEMPRE força `availableMode: 'conservative'` no corte do Comprometido, independente do
- * modo real do perfil (que pode estar em 'until_payday') — é assim que a pessoa já faz
- * essa conta manualmente hoje (comprometido cheio, sem contar com o próprio salário que
- * está tentando prever). Isolado de propósito do `calculateDashboardSummary` ao vivo: não
- * lê `accounts` (recebe só o total já calculado, se pedido) e nunca escreve nada — nunca
- * deve ser confundido com o Disponível real.
+ * Usa o MESMO Comprometido do Dashboard (`buildUpcomingCommitments`, sem corte por data):
+ * salário previsto menos tudo que já se deve. Isolado de propósito do saldo real — não lê
+ * `accounts` (recebe só o total já calculado, se pedido) e nunca escreve nada.
  */
 export function calculateNextMonthProjection(input: {
   projectedSalaryCents?: number;
@@ -459,25 +361,17 @@ export function calculateNextMonthProjection(input: {
   recurringRules: RecurringRule[];
   invoices?: Invoice[];
   cards?: CreditCard[];
-  committedWindowDays?: number;
   includeCurrentBalance?: boolean;
   totalBalanceCents?: number;
-  now?: Date;
 }): { committedCents: number; leftoverCents: number } | null {
   if (!input.projectedSalaryCents) return null;
 
-  const { cutoff } = resolveCommittedCutoff({
-    transactions: input.transactions,
-    committedWindowDays: input.committedWindowDays,
-    availableMode: 'conservative',
-    now: input.now
-  });
   const committedCents = buildUpcomingCommitments(
     input.bills,
     input.recurringRules,
-    cutoff,
     input.invoices ?? [],
-    input.cards ?? []
+    input.cards ?? [],
+    input.transactions
   ).reduce((total, commitment) => total + commitment.amountCents, 0);
 
   const balanceCents = input.includeCurrentBalance ? input.totalBalanceCents ?? 0 : 0;

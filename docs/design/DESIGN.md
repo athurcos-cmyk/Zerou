@@ -61,6 +61,12 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
 - **CTA de conclusão de formulário longo é sticky** (`.entry-actions`): no mobile o offset
   usa `--bottom-nav-space` (fonte única da folga da bottom nav, definida no media query
   de 900px) — nunca hardcodar 5.75rem de novo.
+- **Input com fonte gigante dentro de flex/grid precisa de `min-width: 0` no contêiner**
+  (achado no `NextMonthProjectionSheet`, 2026-07-27): um `<input>` sem `size` tem largura
+  intrínseca de ~20 caracteres — com fonte de valor (DM Sans 800, ~34px) isso vira ~400px.
+  Item de flex/grid nasce com `min-width: auto` e **não encolhe** abaixo disso, estourando o
+  contêiner e sendo cortado por qualquer `overflow-x: hidden` acima. Sempre `min-width: 0` no
+  wrapper do input (o input já precisa de `flex: 1; min-width: 0` também).
 - **Chips que não cabem numa linha rolam** (`.chip-row--scroll`), não quebram; chip que
   carrega estado (ex.: "Filtros · N") vai primeiro pra nunca sair da viewport.
 - Chips para presets (datas Hoje/Ontem/Outra, tipo de divisão).
@@ -71,7 +77,7 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
 - **Navegação por mês/período** (`.month-switcher`, `global.css`): `‹ Mês de Ano › ` com `.icon-button`, introduzido em `SearchPage.tsx` (2026-07-08) — padrão a reaproveitar se outra tela precisar filtrar por mês, em vez de inventar um novo controle.
 - Ação em cartão do casal/despesa que muda estado do servidor (gerar/regenerar/revogar convite): sempre com `confirm()` explicando a consequência antes de agir, principalmente se for destrutiva ou invalidar algo que já foi compartilhado com outra pessoa.
 - **Estado exclusivo/progressivo precisa de indicador visível do que está ativo** (aprendido nos modos do casal, 2026-07-08): quando uma escolha é um valor único mas as opções são níveis cumulativos (cada uma mostra mais UI), o usuário acha que está "acumulando". Sempre mostrar um badge do estado atual na tela (não escondido em acordeão), usar verbo de troca ("Mudar pra X", não "Ativar X"), e no seletor marcar o valor vigente ("Atual") distinto do tentativamente selecionado.
-- **Excluir algo que guarda dinheiro de verdade (meta, cofrinho) precisa perguntar o destino do valor** (aprendido nas Metas, 2026-07-18): nunca decidir sozinho se o dinheiro some ou volta. Sheet de duas opções no molde `.choice-list`/`.choice-card` (ver `AvailableModeSheet`) — "devolver pra uma conta" (pede pra escolher qual, nunca assume a conta original) ou "deixar sumir" — e só oferecer a devolução quando fizer sentido ter "guardado" pra devolver (não numa meta de dívida, onde o valor já foi pago a um credor real).
+- **Excluir algo que guarda dinheiro de verdade (meta, cofrinho) precisa perguntar o destino do valor** (aprendido nas Metas, 2026-07-18): nunca decidir sozinho se o dinheiro some ou volta. Sheet de duas opções no molde `.choice-list`/`.choice-card` (ver `GoalDeleteSheet.tsx`) — "devolver pra uma conta" (pede pra escolher qual, nunca assume a conta original) ou "deixar sumir" — e só oferecer a devolução quando fizer sentido ter "guardado" pra devolver (não numa meta de dívida, onde o valor já foi pago a um credor real).
 
 ## Landing (`src/landing/`)
 

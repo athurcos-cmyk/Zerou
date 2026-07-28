@@ -10,10 +10,8 @@ const workspaceId = 'ws-test';
 
 const sampleView: CachedDashboardView = {
   totalBalanceCents: 150000,
-  freeToSpendCents: 90000,
   committedCents: 60000,
-  availableCaption: 'Livre agora.',
-  committedCaption: 'Considerando os próximos 30 dias',
+  committedCaption: 'Contas fixas e recorrentes + faturas de cartão em aberto.',
   spendingVariationPct: 12,
   spending: [
     { categoryId: 'food', categoryName: 'Alimentação', amountCents: 42000, mark: { id: 'food', icon: 'utensils', color: defaultCategoryColors.expense_food } },
@@ -53,21 +51,21 @@ describe('dashboardViewCache', () => {
       ...sampleView,
       recentTransactions: [{ id: 'tx-1', type: 'expense', description: 'Mercado', amountCents: 5000, mark: null }]
     };
-    window.localStorage.setItem('zerou.dashboardView.v1.' + workspaceId, JSON.stringify(corrupted));
+    window.localStorage.setItem('zerou.dashboardView.v2.' + workspaceId, JSON.stringify(corrupted));
     expect(readCachedDashboardView(workspaceId)).toBeNull();
   });
 
   it('rejeita quando os números do topo não são números', () => {
     window.localStorage.setItem(
-      'zerou.dashboardView.v1.' + workspaceId,
+      'zerou.dashboardView.v2.' + workspaceId,
       JSON.stringify({ ...sampleView, totalBalanceCents: 'x' })
     );
     expect(readCachedDashboardView(workspaceId)).toBeNull();
   });
 
-  it('rejeita quando uma legenda (Comprometido/Disponível) não é string', () => {
+  it('rejeita quando a legenda do Comprometido não é string', () => {
     window.localStorage.setItem(
-      'zerou.dashboardView.v1.' + workspaceId,
+      'zerou.dashboardView.v2.' + workspaceId,
       JSON.stringify({ ...sampleView, committedCaption: 42 })
     );
     expect(readCachedDashboardView(workspaceId)).toBeNull();
@@ -75,20 +73,17 @@ describe('dashboardViewCache', () => {
 
   // --- Mini cache (fallback quando o cache completo não coube no localStorage) ---
 
-  it('mini cache: salva e recupera números + legendas com listas vazias', () => {
+  it('mini cache: salva e recupera números + legenda com listas vazias', () => {
     const mini = {
       totalBalanceCents: 150000,
-      freeToSpendCents: 90000,
       committedCents: 60000,
-      availableCaption: 'Livre agora.',
-      committedCaption: 'Considerando os próximos 30 dias',
+      committedCaption: 'Contas fixas e recorrentes + faturas de cartão em aberto.',
       spendingVariationPct: 12
     };
-    window.localStorage.setItem('zerou.dashboardView.v1.' + workspaceId + '.mini', JSON.stringify(mini));
+    window.localStorage.setItem('zerou.dashboardView.v2.' + workspaceId + '.mini', JSON.stringify(mini));
     const view = readCachedDashboardView(workspaceId);
     expect(view).not.toBeNull();
     expect(view!.totalBalanceCents).toBe(150000);
-    expect(view!.freeToSpendCents).toBe(90000);
     expect(view!.committedCents).toBe(60000);
     expect(view!.spending).toEqual([]);
     expect(view!.commitments).toEqual([]);
@@ -97,8 +92,8 @@ describe('dashboardViewCache', () => {
 
   it('mini cache: é ignorado se o cache completo existe (versão completa tem precedência)', () => {
     // Grava mini primeiro
-    const mini = { totalBalanceCents: 1, freeToSpendCents: 1, committedCents: 1, availableCaption: 'mini', committedCaption: 'mini', spendingVariationPct: null };
-    window.localStorage.setItem('zerou.dashboardView.v1.' + workspaceId + '.mini', JSON.stringify(mini));
+    const mini = { totalBalanceCents: 1, committedCents: 1, committedCaption: 'mini', spendingVariationPct: null };
+    window.localStorage.setItem('zerou.dashboardView.v2.' + workspaceId + '.mini', JSON.stringify(mini));
     // Depois grava completo
     saveCachedDashboardView(workspaceId, sampleView);
     // Deve retornar o completo, não o mini
@@ -107,8 +102,8 @@ describe('dashboardViewCache', () => {
 
   it('mini cache: rejeita se números forem inválidos', () => {
     window.localStorage.setItem(
-      'zerou.dashboardView.v1.' + workspaceId + '.mini',
-      JSON.stringify({ totalBalanceCents: 'x', freeToSpendCents: 1, committedCents: 1, availableCaption: 'a', committedCaption: 'b', spendingVariationPct: null })
+      'zerou.dashboardView.v2.' + workspaceId + '.mini',
+      JSON.stringify({ totalBalanceCents: 'x', committedCents: 1, committedCaption: 'b', spendingVariationPct: null })
     );
     expect(readCachedDashboardView(workspaceId)).toBeNull();
   });
@@ -126,7 +121,7 @@ describe('dashboardViewCache', () => {
     const view = readCachedDashboardView(workspaceId);
     expect(view).not.toBeNull();
     expect(view!.totalBalanceCents).toBe(sampleView.totalBalanceCents);
-    expect(view!.freeToSpendCents).toBe(sampleView.freeToSpendCents);
+    expect(view!.committedCents).toBe(sampleView.committedCents);
     expect(view!.spending).toEqual([]);
     setItem.mockRestore();
   });

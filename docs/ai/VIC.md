@@ -15,7 +15,7 @@ Vic é a assistente de IA do Granativa. Ela responde perguntas sobre os gastos d
 | Arquivo | Função |
 |---|---|
 | `functions/src/ai/deepseekClient.ts` | Cliente HTTP para API DeepSeek (`deepseek-v4-flash`, modo não-thinking — thinking desligado por padrão, não precisa de parâmetro extra). Timeout 45s, retry único para 429/503, validação de API key. |
-| `functions/src/ai/buildFinancialContext.ts` | Agrega dados do workspace (transações 90 dias, bills, contas, budgets, goals, perfil) em string de texto ≤ 5000 chars para o prompt. Lê também perfil do usuário (payday + objetivo/desafio do onboarding) e espaço do casal. Usa BRT (`nowInBRT()`), conta `expense` + `card_purchase`, trata null/undefined/vazio defensivamente. |
+| `functions/src/ai/buildFinancialContext.ts` | Agrega dados do workspace (transações 90 dias, bills, contas, budgets, goals, perfil) em string de texto ≤ 5000 chars para o prompt. Lê também o objetivo/desafio do onboarding e o espaço do casal. Usa BRT (`nowInBRT()`), conta `expense` + `card_purchase`, trata null/undefined/vazio defensivamente. Comprometido sem corte por data desde 2026-07-27 (ver seção COMPROMETIDO). |
 | `functions/src/ai/onboardingLabels.ts` | Espelha `src/onboarding/onboardingOptions.tsx` (id → label legível, sem ícone) — Cloud Functions não importa `src/` do app cliente. Usado por `buildFinancialContext.ts` pra traduzir `onboardingGoal`/`onboardingChallenge` num texto natural. Manter em sincronia manualmente. |
 | `functions/src/ai/verifyWorkspaceMembership.ts` | Verifica `workspaces/{id}/members/{uid}` com `status == 'active'`. |
 | `functions/src/ai/financialAssistant.ts` | Cloud Function `onCall` principal. Fluxo: auth → membership → rate limit pre-check → contexto → DeepSeek → rate limit increment. |
@@ -53,9 +53,8 @@ Vic é a assistente de IA do Granativa. Ela responde perguntas sobre os gastos d
 
 O contexto é dividido em até 10 seções (algumas só aparecem quando há dados). Assinatura: `buildFinancialContext(db, workspaceId, uid)` — precisa do `uid` desde 2026-07-14 para ler perfil e espaço do casal. Limite de contexto: 5000 caracteres.
 
-**=== SEU CICLO ===** (2026-07-17)
-- Como o usuário recebe (`payday`/`availableMode`/`committedWindowDays` do perfil).
-- **Objetivo e desafio declarados no onboarding** (`onboardingGoal`/`onboardingChallenge`), traduzidos pra um label legível via `onboardingLabels.ts` (id desconhecido/stale é ignorado silenciosamente, nunca vaza o id cru pro prompt). Editável a qualquer momento em `/app/settings/onboarding` — a Vic é instruída a usar só como tempero de tom, nunca como fato garantido, já que pode estar desatualizado.
+**=== SEU CICLO ===** (2026-07-17; simplificado em 2026-07-27)
+- **Objetivo e desafio declarados no onboarding** (`onboardingGoal`/`onboardingChallenge`), traduzidos pra um label legível via `onboardingLabels.ts` (id desconhecido/stale é ignorado silenciosamente, nunca vaza o id cru pro prompt). Editável a qualquer momento em `/app/settings/onboarding` — a Vic é instruída a usar só como tempero de tom, nunca como fato garantido, já que pode estar desatualizado. *(A parte de "como o usuário recebe" — `payday`/`availableMode`/`committedWindowDays` — foi removida em 2026-07-27 junto com o corte por data do Comprometido; a seção só aparece agora se houver objetivo/desafio.)*
 
 **=== RESUMO ===**
 - Mês atual e anterior (`yyyy-MM`)
@@ -69,10 +68,10 @@ O contexto é dividido em até 10 seções (algumas só aparecem quando há dado
 - Top 5 categorias de gasto no mês atual com comparação vs. mês anterior
 - Conta `expense` + `card_purchase`, excluindo `deletedAt`
 
-**=== COMPROMETIDO (até {data do cutoff}) ===`** (cabeçalho dinâmico desde 2026-07-22 — antes dizia sempre "próximos 30 dias", ver "Bugs corrigidos")
-- O cutoff usa a **mesma lógica do Dashboard** (`resolveCommittedCutoff`, portada pra `functions/src/shared/committedCutoff.ts`): modo `conservative` → janela fixa (`committedWindowDays`, padrão 30); modo `until_payday` → próxima receita já lançada, senão a data de recebimento do perfil (`payday`), senão a janela.
-- **Contas a pagar**: unifica `bills` (status `pending`/`overdue`, vencimento até o cutoff ou já vencidas) + `recurring` ativas com `amountCents > 0` e `nextOccurrenceAt` até o cutoff ou já passada. Recorrentes são anotadas com "(se repete)". Ordenadas: VENCIDAS primeiro, depois avulsas por data, depois recorrentes.
-- **Faturas de cartão**: `invoices` com status `open`/`closed`/`overdue`/`partial` e saldo devedor > 0. Fatura `closed` sempre entra; `open` só se o vencimento real cair até o cutoff (mesma regra do client) — antes de 2026-07-22 toda fatura em aberto entrava incondicionalmente. Lê `outstandingBalanceCents` direto — esse campo é mantido incrementalmente por `invoiceLedgerEntryTrigger.ts` a cada lançamento novo no ledger (ver "Bugs corrigidos")
+**=== COMPROMETIDO (contas fixas + faturas em aberto) ===** (modelo novo desde 2026-07-27 — antes tinha cabeçalho com data de cutoff; o corte por data foi removido)
+- **Sem corte por data.** Mesma lógica do Dashboard (`buildUpcomingCommitments`, `financeCalculations.ts`): tudo que a pessoa já deve conta.
+- **Contas a pagar**: `bills` (status `pending`/`overdue`, TODAS) + `recurring` ativas com `amountCents > 0` (TODAS, cartão e conta). Recorrentes anotadas com "(se repete)". Ordenadas: VENCIDAS primeiro, depois avulsas por data, depois recorrentes.
+- **Faturas de cartão**: `invoices` com status `open`/`closed`/`overdue`/`partial` e saldo devedor > 0, TODAS. Lê `outstandingBalanceCents` direto (mantido incrementalmente por `invoiceLedgerEntryTrigger.ts`) **menos** as cobranças de recorrência já lançadas nessa fatura (`card_purchase` com `recurringId`, somadas por fatura no loop de transações) — a recorrência já conta como linha própria, então descontar evita contar a assinatura duas vezes. Fatura que era 100% recorrência fica zerada e não aparece.
 - Total comprometido quebrado por tipo (contas + faturas)
 
 **Coleções consultadas**: `categories`, `transactions`, `bills`, `recurring`, `cards` + `cards/*/invoices`, `accounts`
@@ -186,11 +185,9 @@ npm --prefix functions run test
 - Casal sem workspace não mostra seção
 - Objetivo/desafio declarado no onboarding aparece traduzido em SEU CICLO
 - Id de objetivo desconhecido/removido é ignorado, nunca vaza cru pro prompt
-- Receita futura já lançada estende o Comprometido além de 30 dias (2026-07-22)
-- Conta vencendo depois da receita futura não entra no Comprometido (2026-07-22)
-- Modo conservador respeita `committedWindowDays` do perfil, não 30 dias fixo (2026-07-22)
-- Fatura de cartão em aberto vencendo além do cutoff não entra (2026-07-22)
-- Fatura fechada sempre entra, mesmo com vencimento além do cutoff (2026-07-22)
+- Conta que vence daqui a meses entra no Comprometido, sem corte por data (2026-07-27)
+- Toda fatura em aberto (open ou closed) entra no Comprometido, sem corte por data (2026-07-27)
+- Desconta a cobrança de recorrência da fatura — não duplica a assinatura no cartão (2026-07-27)
 
 4 testes em `verifyWorkspaceMembership.test.ts`:
 - Membro ativo → resolve

@@ -352,23 +352,6 @@ describe('buildFinancialContext', () => {
     expect(context).not.toContain('Conta sem data');
   });
 
-  it('includes payday info from user profile', async () => {
-    const db = mockDb(
-      { 'users/user1': { payday: { type: 'fixed_day', day: 5 }, availableMode: 'until_payday', committedWindowDays: 30 } },
-      {
-        ...emptyCollections,
-        'workspaces/ws1/categories': [],
-        'workspaces/ws1/transactions': [],
-        'workspaces/ws1/bills': [],
-        'workspaces/ws1/accounts': [],
-      },
-    );
-
-    const context = await buildFinancialContext(db, 'ws1', 'user1');
-    expect(context).toContain('SEU CICLO');
-    expect(context).toContain('Recebe dia 5');
-  });
-
   it('includes the declared onboarding goal/challenge in SEU CICLO, translated to a readable label', async () => {
     const db = mockDb(
       { 'users/user1': { onboardingGoal: 'metas', onboardingChallenge: 'prazos' } },
@@ -418,100 +401,25 @@ describe('buildFinancialContext', () => {
     expect(context).not.toContain('SEU CICLO');
   });
 
-  it('usa o cutoff real (não mais 30 dias fixo): uma receita futura já lançada estende o Comprometido além de 30 dias', async () => {
-    // Achado do /plan-eng-review: buildFinancialContext usava uma janela fixa de 30 dias,
-    // ignorando o AvailableMode/receita futura já lançada — divergindo do Dashboard
-    // (resolveCommittedCutoff). Uma conta vencendo em 45 dias, com renda lançada em 50
-    // dias, precisa contar como comprometido (o Dashboard já faz isso).
-    const in45Days = makeDateFuture(45);
-    const in50Days = makeDateFuture(50);
-    const db = mockDb(
-      { 'users/user1': { availableMode: 'until_payday' } },
-      {
-        ...emptyCollections,
-        'workspaces/ws1/categories': [],
-        'workspaces/ws1/transactions': [
-          fakeDoc('txn_income', { type: 'income', amountCents: 300000, date: Timestamp.fromDate(in50Days) }),
-        ],
-        'workspaces/ws1/bills': [
-          fakeDoc('bill_far', { description: 'IPVA', amountCents: 90000, status: 'pending', dueDate: Timestamp.fromDate(in45Days) }),
-        ],
-        'workspaces/ws1/accounts': [],
-      },
-    );
-
-    const context = await buildFinancialContext(db, 'ws1', 'user1');
-    expect(context).toContain('IPVA');
-    expect(context).toContain('Tem uma receita futura ja lancada');
-  });
-
-  it('conta vencendo depois da receita futura já lançada NÃO entra no Comprometido', async () => {
-    const in50Days = makeDateFuture(50);
+  // Modelo novo (2026-07-27): sem corte por data. Toda conta pendente conta, mesmo vencendo
+  // daqui a meses — o antigo cutoff (payday/janela) foi removido.
+  it('conta que vence daqui a meses entra no Comprometido (sem corte por data)', async () => {
     const in60Days = makeDateFuture(60);
-    const db = mockDb(
-      { 'users/user1': { availableMode: 'until_payday' } },
-      {
-        ...emptyCollections,
-        'workspaces/ws1/categories': [],
-        'workspaces/ws1/transactions': [
-          fakeDoc('txn_income', { type: 'income', amountCents: 300000, date: Timestamp.fromDate(in50Days) }),
-        ],
-        'workspaces/ws1/bills': [
-          fakeDoc('bill_far', { description: 'Seguro Anual', amountCents: 50000, status: 'pending', dueDate: Timestamp.fromDate(in60Days) }),
-        ],
-        'workspaces/ws1/accounts': [],
-      },
-    );
-
-    const context = await buildFinancialContext(db, 'ws1', 'user1');
-    expect(context).not.toContain('Seguro Anual');
-  });
-
-  it('modo conservador respeita committedWindowDays do perfil, não 30 dias fixo', async () => {
-    const in20Days = makeDateFuture(20);
-    const db = mockDb(
-      { 'users/user1': { availableMode: 'conservative', committedWindowDays: 10 } },
-      {
-        ...emptyCollections,
-        'workspaces/ws1/categories': [],
-        'workspaces/ws1/transactions': [],
-        'workspaces/ws1/bills': [
-          fakeDoc('bill_20d', { description: 'Fatura anual', amountCents: 30000, status: 'pending', dueDate: Timestamp.fromDate(in20Days) }),
-        ],
-        'workspaces/ws1/accounts': [],
-      },
-    );
-
-    const context = await buildFinancialContext(db, 'ws1', 'user1');
-    expect(context).not.toContain('Fatura anual');
-    expect(context).toContain('Janela de 10 dias');
-  });
-
-  it('fatura de cartão em aberto vencendo além do cutoff NÃO entra no Comprometido', async () => {
-    // Antes desta correção, toda fatura com saldo devedor entrava incondicionalmente —
-    // agora só entra se `closed` (sempre) ou o vencimento real cair até o cutoff.
-    const in90Days = makeDateFuture(90);
     const db = mockDb({}, {
       ...emptyCollections,
       'workspaces/ws1/categories': [],
       'workspaces/ws1/transactions': [],
-      'workspaces/ws1/bills': [],
-      'workspaces/ws1/accounts': [],
-      'workspaces/ws1/cards': [fakeDoc('card1', { name: 'Nubank' })],
-      'workspaces/ws1/cards/card1/invoices': [
-        fakeDoc('inv_far', {
-          cardId: 'card1', referenceMonth: '2027-01', status: 'open',
-          outstandingBalanceCents: 40000, dueDate: Timestamp.fromDate(in90Days),
-        }),
+      'workspaces/ws1/bills': [
+        fakeDoc('bill_far', { description: 'Seguro Anual', amountCents: 50000, status: 'pending', dueDate: Timestamp.fromDate(in60Days) }),
       ],
+      'workspaces/ws1/accounts': [],
     });
 
     const context = await buildFinancialContext(db, 'ws1', 'user1');
-    expect(context).not.toContain('Nubank');
-    expect(context).not.toMatch(/R\$\s*400[,.]00/);
+    expect(context).toContain('Seguro Anual');
   });
 
-  it('fatura fechada sempre entra no Comprometido, mesmo com vencimento além do cutoff', async () => {
+  it('toda fatura em aberto (open ou closed) entra no Comprometido, sem corte por data', async () => {
     const in90Days = makeDateFuture(90);
     const db = mockDb({}, {
       ...emptyCollections,
@@ -521,8 +429,8 @@ describe('buildFinancialContext', () => {
       'workspaces/ws1/accounts': [],
       'workspaces/ws1/cards': [fakeDoc('card1', { name: 'Nubank' })],
       'workspaces/ws1/cards/card1/invoices': [
-        fakeDoc('inv_closed', {
-          cardId: 'card1', referenceMonth: '2027-01', status: 'closed',
+        fakeDoc('inv_open_far', {
+          cardId: 'card1', referenceMonth: '2027-01', status: 'open',
           outstandingBalanceCents: 40000, dueDate: Timestamp.fromDate(in90Days),
         }),
       ],
@@ -531,6 +439,38 @@ describe('buildFinancialContext', () => {
     const context = await buildFinancialContext(db, 'ws1', 'user1');
     expect(context).toContain('Nubank');
     expect(context).toMatch(/R\$\s*400[,.]00/);
+  });
+
+  // Anti-duplicidade: a cobrança de uma recorrência registrada no cartão é descontada do
+  // saldo devedor da fatura, senão a assinatura contaria duas vezes (linha da recorrência
+  // + fatura). Fatura de R$120 100% recorrência → não sobra nada da fatura.
+  it('desconta a cobrança de recorrência da fatura (não duplica a assinatura no cartão)', async () => {
+    const db = mockDb({}, {
+      ...emptyCollections,
+      'workspaces/ws1/categories': [],
+      'workspaces/ws1/transactions': [
+        fakeDoc('txn_claude', { type: 'card_purchase', amountCents: 12000, recurringId: 'rec_claude', invoiceId: 'inv1', date: Timestamp.fromDate(makeDateFuture(-2)) }),
+      ],
+      'workspaces/ws1/bills': [],
+      'workspaces/ws1/accounts': [],
+      'workspaces/ws1/recurring': [
+        fakeDoc('rec_claude', { description: 'Claude', amountCents: 12000, isActive: true, cardId: 'card1', nextOccurrenceAt: Timestamp.fromDate(makeDateFuture(20)) }),
+      ],
+      'workspaces/ws1/cards': [fakeDoc('card1', { name: 'Nubank' })],
+      'workspaces/ws1/cards/card1/invoices': [
+        fakeDoc('inv1', {
+          cardId: 'card1', referenceMonth: '2026-07', status: 'open',
+          outstandingBalanceCents: 12000, dueDate: Timestamp.fromDate(makeDateFuture(10)),
+        }),
+      ],
+    });
+
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
+    // A recorrência conta como linha; a fatura, descontada, fica zerada e não aparece.
+    expect(context).toContain('Claude');
+    expect(context).not.toContain('Nubank');
+    // Total comprometido = 12000 (só a recorrência), não 24000.
+    expect(context).toMatch(/Total comprometido \(contas \+ faturas\): R\$\s*120[,.]00/);
   });
 
   it('includes budget progress with percentage', async () => {

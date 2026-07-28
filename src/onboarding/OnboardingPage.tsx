@@ -1,38 +1,15 @@
-﻿import { useEffect, useState, type ReactNode } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import {
-  ArrowLeft, ArrowRight, CalendarRange, CalendarClock, CheckCircle2,
-  Shuffle, Sparkles, Wallet
-} from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Sparkles } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { readPendingInvite } from '../auth/pendingInvite';
 import { FormMessage } from '../components/FormMessage';
 import { useAppearanceStore } from '../theme/appearance.store';
-import {
-  committedWindowDaysMax,
-  committedWindowDaysMin,
-  defaultCommittedWindowDays,
-  paydayBusinessDayMax,
-  paydayFixedDayMax
-} from '../finance/payday';
-import type { PaydayRule } from '../types/contracts';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
 import { ensurePersonalFoundation } from '../workspaces/workspaceService';
 import { onboardingGoals as goals, onboardingChallenges as challenges, type OnboardingChoice as Choice } from './onboardingOptions';
 
-const TOTAL_STEPS = 4;
-
-// 'variable_income' não é um PaydayRule de verdade — representa "não tenho data fixa"
-// (plantão, freela, autônomo). Nesse caso `payday` fica undefined e só a janela de
-// dias (`committedWindowDays`) é usada.
-type PaydayChoice = PaydayRule['type'] | 'variable_income';
-
-const paydayOptions: { id: PaydayChoice; label: string; hint: string; icon: ReactNode }[] = [
-  { id: 'fixed_day', label: 'Dia fixo do mês', hint: 'Ex.: todo dia 5', icon: <CalendarRange size={20} /> },
-  { id: 'business_day', label: 'Xº dia útil', hint: 'Ex.: 5º dia útil', icon: <CalendarClock size={20} /> },
-  { id: 'end_of_month', label: 'Último dia do mês', hint: 'Varia com o mês', icon: <Wallet size={20} /> },
-  { id: 'variable_income', label: 'Renda variável', hint: 'Plantão, freela, autônomo — sem data fixa', icon: <Shuffle size={20} /> }
-];
+const TOTAL_STEPS = 3;
 
 export function OnboardingPage() {
   const navigate = useNavigate();
@@ -45,25 +22,8 @@ export function OnboardingPage() {
   const [terms, setTerms] = useState(false);
   const [goal, setGoal] = useState('');
   const [challenge, setChallenge] = useState('');
-  const [paydayType, setPaydayType] = useState<PaydayChoice | ''>('');
-  const [paydayDay, setPaydayDay] = useState('5');
-  const [committedWindowDaysInput, setCommittedWindowDaysInput] = useState(String(defaultCommittedWindowDays));
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  const paydayDayMax = paydayType === 'business_day' ? paydayBusinessDayMax : paydayFixedDayMax;
-  const payday: PaydayRule | undefined =
-    paydayType === 'end_of_month'
-      ? { type: 'end_of_month' }
-      : paydayType === 'variable_income'
-      ? { type: 'variable_income' }
-      : paydayType === 'fixed_day' || paydayType === 'business_day'
-      ? { type: paydayType, day: Math.min(Math.max(Number(paydayDay) || 1, 1), paydayDayMax) }
-      : undefined;
-  const committedWindowDays =
-    paydayType === 'variable_income'
-      ? Math.min(Math.max(Number(committedWindowDaysInput) || defaultCommittedWindowDays, committedWindowDaysMin), committedWindowDaysMax)
-      : undefined;
 
   useEffect(() => {
     if (profile?.defaultWorkspaceId) {
@@ -100,9 +60,7 @@ export function OnboardingPage() {
         termsVersion: 'zerou-v12.2-foundation',
         appearance: preferences,
         goal: goal || undefined,
-        challenge: challenge || undefined,
-        payday,
-        committedWindowDays
+        challenge: challenge || undefined
       });
       navigate(pendingInvite ? `/join/${pendingInvite}` : '/app', { replace: true });
     } catch (error) {
@@ -168,55 +126,6 @@ export function OnboardingPage() {
               <ChoiceCard key={choice.id} choice={choice} selected={challenge === choice.id} onSelect={() => setChallenge(choice.id)} />
             ))}
           </div>
-        </div>
-      )}
-
-      {step === 3 && (
-        <div className="onboard-step">
-          <h1 className="onboard-title">Quando cai seu dinheiro?</h1>
-          <p className="onboard-subtitle">
-            Assim a Granativa sabe até quando uma fatura ou conta pode esperar antes de contar como "Comprometido" — sem
-            você precisar lançar seu salário na mão toda vez.
-          </p>
-          <div className="choice-list" role="radiogroup" aria-label="Quando voce recebe?">
-            {paydayOptions.map((option) => (
-              <ChoiceCard
-                key={option.id}
-                choice={{ id: option.id, label: `${option.label} · ${option.hint}`, icon: option.icon }}
-                selected={paydayType === option.id}
-                onSelect={() => setPaydayType(option.id)}
-              />
-            ))}
-          </div>
-          {(paydayType === 'fixed_day' || paydayType === 'business_day') && (
-            <label className="field">
-              <span>{paydayType === 'fixed_day' ? 'Qual dia do mês?' : 'Qual dia útil?'}</span>
-              <input
-                className="input"
-                type="number"
-                inputMode="numeric"
-                min={1}
-                max={paydayDayMax}
-                value={paydayDay}
-                onChange={(event) => setPaydayDay(event.target.value)}
-              />
-            </label>
-          )}
-          {paydayType === 'variable_income' && (
-            <label className="field">
-              <span>Contar como comprometido o que vence nos próximos quantos dias?</span>
-              <input
-                className="input"
-                type="number"
-                inputMode="numeric"
-                min={committedWindowDaysMin}
-                max={committedWindowDaysMax}
-                value={committedWindowDaysInput}
-                onChange={(event) => setCommittedWindowDaysInput(event.target.value)}
-              />
-              <span className="field-hint">Dá pra ajustar isso depois em Configurações.</span>
-            </label>
-          )}
           <div className="onboard-finish-hint">
             <Sparkles size={18} aria-hidden="true" />
             <span>Pronto! a Granativa vai montar seu espaço com base nessas respostas.</span>
@@ -236,12 +145,12 @@ export function OnboardingPage() {
             Continuar <ArrowRight size={18} aria-hidden="true" />
           </button>
         )}
-        {(step === 1 || step === 2) && (
+        {step === 1 && (
           <button className="button button--primary onboard-cta" type="button" onClick={next}>
             Continuar <ArrowRight size={18} aria-hidden="true" />
           </button>
         )}
-        {step === 3 && (
+        {step === 2 && (
           <button className="button button--primary onboard-cta" type="button" disabled={busy || Boolean(firebaseError)} onClick={() => void finish()}>
             {busy ? 'Preparando...' : <>Entrar na Granativa <CheckCircle2 size={18} aria-hidden="true" /></>}
           </button>
@@ -249,7 +158,7 @@ export function OnboardingPage() {
       </div>
 
       {step >= 1 && (
-        <button className="onboard-skip" type="button" onClick={step === 3 ? () => void finish() : next} disabled={busy}>
+        <button className="onboard-skip" type="button" onClick={step === 2 ? () => void finish() : next} disabled={busy}>
           Pular por enquanto
         </button>
       )}

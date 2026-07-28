@@ -3,7 +3,6 @@ import { deleteField, doc, serverTimestamp, updateDoc, writeBatch } from 'fireba
 import { getFirebaseAuth, getFirebaseDb } from '../firebase/config';
 import { fireWrite } from '../firebase/fireWrite';
 import type { AppearancePreferences } from '../theme/theme.types';
-import type { AvailableMode, PaydayRule } from '../types/contracts';
 
 const FOUNDATION_WRITE_TIMEOUT_MS = 700;
 
@@ -14,8 +13,6 @@ interface EnsurePersonalFoundationInput {
   appearance: AppearancePreferences;
   goal?: string;
   challenge?: string;
-  payday?: PaydayRule;
-  committedWindowDays?: number;
 }
 
 interface EnsurePersonalFoundationResponse {
@@ -43,9 +40,7 @@ export async function ensurePersonalFoundation({
   termsVersion,
   appearance,
   goal,
-  challenge,
-  payday,
-  committedWindowDays
+  challenge
 }: EnsurePersonalFoundationInput): Promise<EnsurePersonalFoundationResponse> {
   // Só cria o espaço se houver uma sessão Firebase Auth VIVA pro mesmo uid. Sem isso,
   // um "usuário-zumbi" restaurado do cache (conta já deletada, ou sessão expirada) grava
@@ -81,8 +76,6 @@ export async function ensurePersonalFoundation({
       defaultWorkspaceId: workspaceId,
       ...(goal ? { onboardingGoal: goal } : {}),
       ...(challenge ? { onboardingChallenge: challenge } : {}),
-      ...(payday ? { payday } : {}),
-      ...(typeof committedWindowDays === 'number' ? { committedWindowDays } : {}),
       ...appearance,
       createdAt: now,
       updatedAt: now
@@ -131,20 +124,6 @@ export async function ensurePersonalFoundation({
   return { workspaceId, created: true };
 }
 
-export function updatePaydaySettings(
-  uid: string,
-  settings: { payday: PaydayRule | null; committedWindowDays: number | null }
-) {
-  const db = getFirebaseDb();
-  const userRef = doc(db, 'users', uid);
-
-  fireWrite(updateDoc(userRef, {
-    payday: settings.payday ?? deleteField(),
-    committedWindowDays: settings.committedWindowDays ?? deleteField(),
-    updatedAt: serverTimestamp()
-  }));
-}
-
 /**
  * Grava/edita as respostas do onboarding (objetivo, desafio) depois do cadastro — antes
  * só eram gravadas uma vez em `ensurePersonalFoundation` e nunca podiam ser mudadas.
@@ -159,24 +138,6 @@ export function updateOnboardingAnswers(uid: string, answers: { goal: string | n
   fireWrite(updateDoc(userRef, {
     onboardingGoal: answers.goal ?? deleteField(),
     onboardingChallenge: answers.challenge ?? deleteField(),
-    updatedAt: serverTimestamp()
-  }));
-}
-
-/**
- * Grava a escolha de como calcular o "Disponível". Escrever o campo (mesmo com o valor
- * default) é o que marca "já passou pelo mini tutorial" — é por isso que dispensar o
- * tutorial também chama esta função, senão ele reabriria em todo boot.
- *
- * A regra `onlyAvailableModeChanged` em `firestore.rules` aceita este update; se um
- * campo novo entrar neste payload, ela precisa ser atualizada no MESMO commit.
- */
-export function updateAvailableMode(uid: string, availableMode: AvailableMode) {
-  const db = getFirebaseDb();
-  const userRef = doc(db, 'users', uid);
-
-  fireWrite(updateDoc(userRef, {
-    availableMode,
     updatedAt: serverTimestamp()
   }));
 }

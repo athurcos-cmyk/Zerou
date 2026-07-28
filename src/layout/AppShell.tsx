@@ -3,7 +3,6 @@ import { requestAndRegisterPushToken } from '../pwa/notifications';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   BarChart2,
-  Banknote,
   Bot,
   CalendarClock,
   HandCoins,
@@ -114,9 +113,6 @@ export function AppShell() {
             <Bot size={19} aria-hidden="true" /> Assistente
           </NavLink>
           <p className="eyebrow" style={{ margin: '0.75rem 0 0.15rem 0.6rem' }}>Conta</p>
-          <NavLink className={getNavClass} to="/app/settings/payday">
-            <Banknote size={19} aria-hidden="true" /> Recebimento
-          </NavLink>
           <NavLink className={getNavClass} to="/app/settings/onboarding">
             <Compass size={19} aria-hidden="true" /> Objetivo e desafio
           </NavLink>
@@ -187,9 +183,6 @@ export function AppShell() {
 
           <p className="eyebrow">Sua conta</p>
           <div className="menu-tiles menu-tiles--compact">
-            <NavLink className={getTileClass} to="/app/settings/payday" onClick={() => setMobileMenuOpen(false)}>
-              <Banknote size={18} aria-hidden="true" /> <span>Recebimento</span>
-            </NavLink>
             <NavLink className={getTileClass} to="/app/settings/onboarding" onClick={() => setMobileMenuOpen(false)}>
               <Compass size={18} aria-hidden="true" /> <span>Objetivo e desafio</span>
             </NavLink>

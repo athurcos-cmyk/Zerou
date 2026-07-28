@@ -46,32 +46,6 @@ export type InvoiceLedgerEntryType =
   // está revertendo já era, ele mesmo, um crédito. Ver `reverseCardPurchaseOnDelete.ts`.
   | 'anticipation_credit_reversal';
 
-// Quando a pessoa recebe (salário/renda) — usado pra saber até quando "Comprometido"
-// deve olhar sem precisar que ela lance uma receita futura manualmente.
-// `variable_income` é uma escolha explícita (plantão, freela, autônomo — sem data
-// fixa), não a ausência de resposta: guardar como valor real (não como `payday`
-// ausente) pra UI de configurações lembrar a escolha depois de recarregar.
-export type PaydayRule =
-  | { type: 'fixed_day'; day: number }
-  | { type: 'business_day'; day: number }
-  | { type: 'end_of_month' }
-  | { type: 'variable_income' };
-
-// Como o "Disponível" do resumo é calculado. Default é 'until_payday' (ver
-// `defaultAvailableMode` em `src/finance/availableMode.ts` pro motivo técnico completo —
-// 'conservative' usa janela rolante e nunca esvazia de verdade). O mini tutorial que
-// forçava essa escolha no primeiro Dashboard foi removido em 2026-07-26 por confundir os
-// usuários; a escolha continua disponível, só que discreta, em Configurações >
-// Recebimento — as duas leituras continuam legítimas, dependem da vida de cada um:
-//
-// - `conservative`: Comprometido = tudo que você já deve (contas pendentes, próxima
-//   ocorrência de cada recorrência, e todo saldo em aberto de fatura, inclusive parcelas
-//   de meses futuros). Nunca conta com dinheiro que ainda não entrou.
-// - `until_payday`: Comprometido = só o que vence antes do seu próximo recebimento
-//   (receita futura lançada → data do onboarding → janela de N dias). Otimista: assume
-//   que a próxima entrada acontece.
-export type AvailableMode = 'conservative' | 'until_payday';
-
 export interface UserProfile extends AppearancePreferences {
   id: string;
   name: string;
@@ -85,18 +59,6 @@ export interface UserProfile extends AppearancePreferences {
   themeId: ThemeId;
   onboardingGoal?: string;
   onboardingChallenge?: string;
-  payday?: PaydayRule;
-  // Sem `payday` (renda variável — plantão, freela, autônomo — ou pessoa que pulou a
-  // pergunta), quantos dias pra frente contam como "Comprometido" no resumo. Padrão 30
-  // quando ausente; editável em Configurações por qualquer pessoa, não só quem tem
-  // renda variável.
-  committedWindowDays?: number;
-  // Ausente = a pessoa nunca escolheu explicitamente — usa `defaultAvailableMode`
-  // ('conservative' desde 2026-07-26; era 'until_payday', mas o mini tutorial que forçava
-  // essa escolha no primeiro acesso foi removido por confundir os usuários). A escolha
-  // continua disponível, só que discreta, em Configurações > Recebimento — nunca mais
-  // abre sozinha.
-  availableMode?: AvailableMode;
   // Salário previsto pro card "Projeção do próximo mês" (Dashboard) — 100% declarado pela
   // pessoa, nunca calculado/estimado pelo app (diferente da extinta "Fluxo de Caixa", que
   // especulava receita futura pela média histórica e foi removida por isso em 2026-07-18,

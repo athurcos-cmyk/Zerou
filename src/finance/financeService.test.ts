@@ -185,19 +185,21 @@ describe('recordRecurringPayment', () => {
     );
   });
 
-  it('branch de cartão: chama addCardPurchaseToBatch com transactionId determinístico (protege contra clique duplo)', async () => {
+  it('branch de cartão: chama addCardPurchaseToBatch com transactionId determinístico e marca recurringId (anti-duplicidade + protege contra clique duplo)', async () => {
     cardServiceMocks.addCardPurchaseToBatch.mockClear();
     const ruleWithCard = rule({ cardId: 'card-1' });
     const expectedId = recurringOccurrenceTransactionId(ruleWithCard.id, ruleWithCard.nextOccurrenceAt.toDate());
 
     await recordRecurringPayment('workspace-1', 'user-1', ruleWithCard, {});
 
+    // `recurringId` marca a compra como vinda desta recorrência — é o que o Comprometido
+    // usa pra descontar a cobrança da fatura e não contar a assinatura duas vezes.
     expect(cardServiceMocks.addCardPurchaseToBatch).toHaveBeenCalledWith(
       firestoreMocks.batch,
       'workspace-1',
       'user-1',
       expect.objectContaining({ cardId: 'card-1', installments: 1 }),
-      { transactionId: expectedId }
+      { transactionId: expectedId, recurringId: ruleWithCard.id }
     );
   });
 
