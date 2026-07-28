@@ -4588,6 +4588,9 @@ span.service-mark--brand {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  /* Mesma folga vertical do resto do Dashboard (dash-summary usa 1.25rem) — sem isso o
+     card ficava colado no Comprometido, sem respiro. */
+  margin-top: 1.25rem;
   padding: 1.1rem 1.15rem;
   border: 2px dashed var(--border-default);
   border-radius: var(--radius-md);
