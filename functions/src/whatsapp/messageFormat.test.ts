@@ -10,6 +10,7 @@ import {
   numberedList,
   pendingChoicePrompt,
   outOfScopeMessage,
+  questionRedirectMessage,
 } from './messageFormat.js';
 
 describe('formatBRL', () => {
@@ -102,5 +103,15 @@ describe('outOfScopeMessage', () => {
 
   it('geral cobre o fallback sem tela específica', () => {
     expect(outOfScopeMessage('geral')).not.toContain('*');
+  });
+});
+
+describe('questionRedirectMessage', () => {
+  it('redireciona pergunta pra Vic do app (aba Assistente), sem tom de "decisão grande"', () => {
+    const msg = questionRedirectMessage();
+    expect(msg).toContain('*Assistente*');
+    expect(msg).toContain('histórico');
+    // Não é o texto de decisão grande — é o redirect geral de qualquer pergunta.
+    expect(msg).not.toContain('decisão grande');
   });
 });

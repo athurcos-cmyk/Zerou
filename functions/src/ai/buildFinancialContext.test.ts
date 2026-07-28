@@ -399,6 +399,44 @@ describe('buildFinancialContext', () => {
     const context = await buildFinancialContext(db, 'ws1', 'user1');
     expect(context).toContain('RESUMO');
     expect(context).not.toContain('SEU CICLO');
+    // Disponível/"Livre para gastar" foram removidos do modelo (2026-07-28).
+    expect(context).not.toContain('Livre para gastar');
+  });
+
+  // A Vic passa a enxergar a Projeção do próximo mês (2026-07-28): salário previsto − comprometido.
+  it('inclui a PROJECAO DO PROXIMO MES quando o salário previsto está configurado', async () => {
+    const db = mockDb(
+      { 'users/user1': { projectedSalaryCents: 500000 } },
+      {
+        ...emptyCollections,
+        'workspaces/ws1/categories': [],
+        'workspaces/ws1/transactions': [],
+        'workspaces/ws1/accounts': [],
+        'workspaces/ws1/bills': [
+          fakeDoc('bill1', { description: 'Aluguel', amountCents: 120000, status: 'pending', dueDate: Timestamp.fromDate(makeDateFuture(5)) }),
+        ],
+      },
+    );
+
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
+    expect(context).toContain('PROJECAO DO PROXIMO MES');
+    expect(context).toMatch(/Sal[aá]rio previsto \(declarado\): R\$\s*5\.000[,.]00/);
+    // Sobra = 5000 − 1200 (aluguel) = 3800; sem contar saldo por padrão.
+    expect(context).toMatch(/Sobra prevista: R\$\s*3\.800[,.]00/);
+    expect(context).toContain('Conta o saldo atual na sobra: nao');
+  });
+
+  it('não inclui a PROJECAO quando não há salário previsto configurado', async () => {
+    const db = mockDb({}, {
+      ...emptyCollections,
+      'workspaces/ws1/categories': [],
+      'workspaces/ws1/transactions': [],
+      'workspaces/ws1/bills': [],
+      'workspaces/ws1/accounts': [],
+    });
+
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
+    expect(context).not.toContain('PROJECAO DO PROXIMO MES');
   });
 
   // Modelo novo (2026-07-27): sem corte por data. Toda conta pendente conta, mesmo vencendo

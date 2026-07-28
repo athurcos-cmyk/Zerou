@@ -57,7 +57,16 @@ export interface MessageInterpretation {
   destinationAccountId: string | null;
   /** Só preenchido quando intent === 'out_of_scope'; null nos outros casos. */
   suggestedScreen: OutOfScopeScreen | null;
+  /** Data citada na mensagem (YYYY-MM-DD), pra lançamento retroativo. `null` = usar hoje.
+   * Só passado <= hoje; data futura é descartada (vira null). */
+  occurredOn: string | null;
   confidence: 'high' | 'low';
+}
+
+/** Data de hoje em America/Sao_Paulo, YYYY-MM-DD — referência pra resolver "ontem", "dia 20" etc. */
+function todayInBRT(): string {
+  const brt = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+  return `${brt.getFullYear()}-${String(brt.getMonth() + 1).padStart(2, '0')}-${String(brt.getDate()).padStart(2, '0')}`;
 }
 
 function buildSystemPrompt(): string {
@@ -79,6 +88,8 @@ Retorne SOMENTE um JSON com este formato:
   "suggestedScreen": "transacoes" | "contas" | "contas_a_pagar" | "contas_a_receber" | "cartoes" | "metas" |
     "analise" | "assistente" | "geral" — SO preenchido quando intent="out_of_scope" (tela do app que resolve
     o pedido), null nos outros casos,
+  "occurredOn": "YYYY-MM-DD" da data em que o gasto/receita/compra aconteceu, SE a mensagem citar uma data;
+    null se nao citar nenhuma (o app vai usar hoje),
   "confidence": "high" | "low"
 }
 
@@ -147,6 +158,13 @@ out_of_scope (ver abaixo), nunca force numa das 6 so porque a mensagem tem valor
 Regras de valor: "10 reais"=1000, "R$ 5,50"=550, "cinco e cinquenta"=550, "dois conto"=200.
 Se expense/income/transfer/card_purchase sem valor claro: amountCents=0, confidence="low".
 
+Regras de data (occurredOn) — pra lancamento retroativo: se a mensagem citar QUANDO aconteceu, resolva
+pra YYYY-MM-DD relativo a HOJE (a data de hoje vem no fim da mensagem do usuario). Ex. com hoje=2026-07-28:
+"ontem"=2026-07-27, "anteontem"=2026-07-26, "dia 20"=2026-07-20, "20/07"=2026-07-20, "segunda passada"=a
+segunda-feira anterior mais proxima, "semana passada"=~7 dias atras. Sempre no PASSADO ou hoje — nunca uma
+data futura (se a conta der no futuro, prefira o mes anterior, ex. hoje dia 10 e "dia 20" = dia 20 do mes
+passado). Se a mensagem NAO disser quando, occurredOn=null. So preencha quando houver mencao clara de tempo.
+
 Regras de parcelamento (so pra card_purchase): "em 10x", "10 vezes", "parcelado em 3" => installments=10/10/3.
 Sem mencao de parcelamento => installments=1 (compra a vista no cartao, ainda e card_purchase).
 
@@ -196,7 +214,8 @@ export async function interpretMessage(
     ? accounts.map((a) => `  ${a.id}: ${a.name}`).join('\n')
     : 'Nenhuma conta cadastrada.';
 
-  const userMessage = `Mensagem: "${text}"\n\nCategorias disponiveis (id: nome (tipo)):\n${categoryList}\n\nContas disponiveis (id: nome):\n${accountList}`;
+  const today = todayInBRT();
+  const userMessage = `Mensagem: "${text}"\n\nCategorias disponiveis (id: nome (tipo)):\n${categoryList}\n\nContas disponiveis (id: nome):\n${accountList}\n\nHoje e ${today} (fuso America/Sao_Paulo).`;
 
   const raw = await callDeepSeek(
     [
@@ -220,6 +239,7 @@ export async function interpretMessage(
       sourceAccountId?: string | null;
       destinationAccountId?: string | null;
       suggestedScreen?: string | null;
+      occurredOn?: string | null;
       confidence?: string;
     };
 
@@ -276,6 +296,17 @@ export async function interpretMessage(
       ? (validScreens.includes(parsed.suggestedScreen as OutOfScopeScreen) ? (parsed.suggestedScreen as OutOfScopeScreen) : 'geral')
       : null;
 
+    // Data retroativa: só aceita YYYY-MM-DD válido e <= hoje (BRT). Futuro ou formato
+    // inválido vira null (o handler cai pra hoje). Nunca confia cegamente no que o DeepSeek
+    // devolve — valida no boundary, igual o valor.
+    let occurredOn: string | null = null;
+    if (typeof parsed.occurredOn === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.occurredOn)) {
+      const parsedDate = new Date(`${parsed.occurredOn}T12:00:00-03:00`);
+      if (!Number.isNaN(parsedDate.getTime()) && parsed.occurredOn <= todayInBRT()) {
+        occurredOn = parsed.occurredOn;
+      }
+    }
+
     return {
       intent,
       amountCents,
@@ -289,6 +320,7 @@ export async function interpretMessage(
       sourceAccountId,
       destinationAccountId,
       suggestedScreen,
+      occurredOn,
       confidence: parsed.confidence === 'high' ? 'high' : 'low',
     };
   } catch {

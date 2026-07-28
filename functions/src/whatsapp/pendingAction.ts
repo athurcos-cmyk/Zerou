@@ -16,6 +16,9 @@ export interface PendingCardPurchase {
   installments: number;
   categoryId: string | null;
   candidates: Candidate[];
+  /** Data retroativa (YYYY-MM-DD) citada na mensagem original — preservada até a escolha do
+   * cartão/conta. Ausente/null = usar hoje. */
+  occurredOnISO?: string | null;
 }
 
 /** Falta escolher a conta única de débito/crédito de uma despesa/receita. */
@@ -28,6 +31,7 @@ export interface PendingDebitCredit {
   description: string;
   categoryId: string | null;
   candidates: Candidate[];
+  occurredOnISO?: string | null;
 }
 
 /**
@@ -45,6 +49,7 @@ export interface PendingTransfer {
   destinationAccountId: string | null;
   missing: 'source' | 'destination' | 'both';
   candidates: Candidate[];
+  occurredOnISO?: string | null;
 }
 
 export type PendingAction = PendingCardPurchase | PendingDebitCredit | PendingTransfer;

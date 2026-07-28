@@ -96,10 +96,20 @@ export function pendingChoicePrompt(opts: {
  * build se um valor novo de `OutOfScopeScreen` ficar sem mensagem — mesma garantia de "não
  * esquecer" que outras regras de sincronia deste projeto têm, só que via compilador.
  */
+/**
+ * Redirect de QUALQUER pergunta financeira (geral ou sobre os dados da pessoa) pra Vic do
+ * app. Decisão do dono (2026-07-28): o WhatsApp deixa de responder perguntas — a Vic do app
+ * tem histórico de conversa e consegue continuar o papo, o WhatsApp fica só pra lançar.
+ * Diferente do `outOfScopeMessage('assistente')`, que é o convite pra DECISÃO GRANDE.
+ */
+export function questionRedirectMessage(): string {
+  return '💬 Pra perguntas sobre suas finanças, fala com a Vic no app — aba *Assistente*. Lá ela lembra da conversa e consegue ir e voltar (por aqui cada mensagem é isolada, sem histórico).\n\nO WhatsApp eu deixo pra registrar rápido: gasto, receita, transferência e compra no cartão. 💛';
+}
+
 export function outOfScopeMessage(screen: OutOfScopeScreen): string {
   switch (screen) {
     case 'transacoes':
-      return '✋ Editar, corrigir ou excluir um lançamento que você já registrou é melhor fazer direto pelo app, na aba *Transações* — evita eu mexer na coisa errada sem querer.\n\nPor aqui eu só crio lançamentos novos e respondo perguntas.';
+      return '✋ Editar, corrigir ou excluir um lançamento que você já registrou é melhor fazer direto pelo app, na aba *Transações* — evita eu mexer na coisa errada sem querer.\n\nPor aqui eu só registro lançamentos novos (gasto, receita, transferência, compra no cartão).';
     case 'contas':
       return '🏦 Criar, editar ou excluir uma conta (banco, carteira, dinheiro) é melhor fazer direto pelo app, na aba *Contas*.';
     case 'contas_a_pagar':
@@ -116,8 +126,8 @@ export function outOfScopeMessage(screen: OutOfScopeScreen): string {
       // Tom deliberadamente diferente dos outros casos: não é "eu não faço isso", é "vamos
       // continuar essa conversa com calma" — decisão grande merece convite, não rejeição seca.
       // Não alinhar esse texto ao padrão genérico dos outros screens no futuro.
-      return '🧠 Essa é uma decisão grande — vale mais a pena pensar nela com calma comigo lá no app, na aba *Assistente*. Lá a gente consegue ir e voltar na conversa direito.\n\nPor aqui eu foco em lançamentos e perguntas rápidas do dia a dia. 💛';
+      return '🧠 Essa é uma decisão grande — vale mais a pena pensar nela com calma comigo lá no app, na aba *Assistente*. Lá a gente consegue ir e voltar na conversa direito.\n\nPor aqui eu foco em registrar seus lançamentos do dia a dia. 💛';
     case 'geral':
-      return '🧭 Isso por aqui eu ainda não faço — dá uma olhada no app pra fazer isso direito.\n\nPor aqui eu foco em lançar despesa/receita/transferência/compra no cartão, criar categoria e responder pergunta financeira rápida.';
+      return '🧭 Isso por aqui eu ainda não faço — dá uma olhada no app pra fazer isso direito.\n\nPor aqui eu foco em lançar despesa/receita/transferência/compra no cartão e criar categoria.';
   }
 }

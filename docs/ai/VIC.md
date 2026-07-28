@@ -62,7 +62,7 @@ O contexto é dividido em até 10 seções (algumas só aparecem quando há dado
 - Receitas no mês atual
 - Saldo total em contas (lido de `account.currentBalanceCents`, mantido incrementalmente — nunca mais recalculado só com os últimos 90 dias, ver "Bugs corrigidos")
 - Total comprometido (contas + faturas)
-- Livre para gastar (saldo - comprometido)
+- *("Livre para gastar" foi REMOVIDO em 2026-07-28 junto com o Disponível do app — a Vic não fala mais nisso; quem cobre "quanto sobra" é a Projeção do próximo mês, abaixo.)*
 
 **=== GASTOS POR CATEGORIA ===**
 - Top 5 categorias de gasto no mês atual com comparação vs. mês anterior
@@ -74,7 +74,11 @@ O contexto é dividido em até 10 seções (algumas só aparecem quando há dado
 - **Faturas de cartão**: só o **ciclo atual** de cada cartão (decisão do dono 2026-07-28: "em aberto e a que está pra ser paga, não todas que existem") — por cartão, as `closed`/`overdue`/`partial` (já "pra pagar") contam todas + das `open` só a de vencimento mais próximo (a que acumula agora). As faturas `open` de meses futuros (parcelas de compra parcelada) ficam de fora até chegarem, senão uma compra em 10x somaria as 10 de uma vez. Lê `outstandingBalanceCents` direto (mantido por `invoiceLedgerEntryTrigger.ts`) **menos** as cobranças de recorrência já lançadas nessa fatura (`card_purchase` com `recurringId`) — a recorrência já conta como linha, o desconto evita duplicar.
 - Total comprometido quebrado por tipo (contas + faturas)
 
-**Coleções consultadas**: `categories`, `transactions`, `bills`, `recurring`, `cards` + `cards/*/invoices`, `accounts`
+**=== PROJEÇÃO DO PROXIMO MES ===** (adicionada 2026-07-28 — "deixa a Vic ver a projeção")
+- Só aparece se a pessoa configurou um **salário previsto** (`users/{uid}.projectedSalaryCents`, declarado por ela, nunca 0/estimado). Lida no mesmo `userDoc` que o onboarding.
+- Mostra: salário previsto declarado, se conta o saldo atual na sobra (`projectionIncludesBalance`), e a **sobra/rombo prevista** = `salário previsto + (saldo atual se ligado) − comprometido`. O prompt instrui a tratar como **simulação declarada**, não saldo garantido nem o saldo real de hoje — isolada, igual no app.
+
+**Coleções consultadas**: `categories`, `transactions`, `bills`, `recurring`, `cards` + `cards/*/invoices`, `accounts`. `users/{uid}` pra onboarding + salário previsto.
 
 **Cuidados de timezone**: todas as datas usam `nowInBRT()` (mesmo padrão de `automation.ts`). Sem isso, entre 21h e 00h BRT no último dia do mês o mês "atual" ficava errado (UTC já virou).
 

@@ -103,8 +103,10 @@ export async function buildFinancialContext(
   const previousMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const previousMonth = monthKey(previousMonthDate);
 
-  // ── User profile (objetivo/desafio do onboarding) ──
+  // ── User profile (objetivo/desafio do onboarding + projecao do proximo mes) ──
   let onboardingInfo = '';
+  let projectedSalaryCents: number | null = null;
+  let projectionIncludesBalance = false;
   try {
     const userDoc = await db.doc(`users/${uid}`).get();
     if (userDoc.exists) {
@@ -119,6 +121,13 @@ export async function buildFinancialContext(
       if (goalLabel) onboardingLines.push(`Objetivo declarado: ${goalLabel}.`);
       if (challengeLabel) onboardingLines.push(`Maior desafio declarado: ${challengeLabel}.`);
       onboardingInfo = onboardingLines.join(' ');
+
+      // Projecao do proximo mes: salario previsto declarado pela pessoa (nunca 0/estimado) +
+      // se ela escolheu contar o saldo atual na sobra. Isolado do saldo real (ver secao no prompt).
+      if (typeof profile.projectedSalaryCents === 'number' && profile.projectedSalaryCents > 0) {
+        projectedSalaryCents = profile.projectedSalaryCents;
+      }
+      projectionIncludesBalance = profile.projectionIncludesBalance === true;
     }
   } catch {
     // Perfil ausente nao quebra o contexto
@@ -427,7 +436,6 @@ export async function buildFinancialContext(
 
   // ── Totals ────────────────────────────────────────────────────────────────
   const totalCommitted = billsCommitted + recurringCommitted + invoiceCommitted;
-  const freeToSpend = totalBalance - totalCommitted;
 
   // ── Build context string ──────────────────────────────────────────────────
   const lines: string[] = [];
@@ -460,8 +468,20 @@ export async function buildFinancialContext(
   }
   lines.push(`Saldo total em contas: ${formatBRL(totalBalance)}.`);
   lines.push(`Total comprometido (contas + faturas): ${formatBRL(totalCommitted)}.`);
-  lines.push(`Livre para gastar: ${formatBRL(freeToSpend)}.`);
   lines.push('');
+
+  // PROJECAO DO PROXIMO MES — so quando a pessoa configurou um salario previsto. Simulacao
+  // declarada por ela (sobra = salario previsto + saldo se ela contou - comprometido), nao
+  // dinheiro garantido. Isolada do saldo real, igual no app.
+  if (projectedSalaryCents !== null) {
+    const balancePortion = projectionIncludesBalance ? totalBalance : 0;
+    const leftover = projectedSalaryCents + balancePortion - totalCommitted;
+    lines.push('=== PROJECAO DO PROXIMO MES ===');
+    lines.push(`Salario previsto (declarado): ${formatBRL(projectedSalaryCents)}.`);
+    lines.push(`Conta o saldo atual na sobra: ${projectionIncludesBalance ? 'sim' : 'nao'}.`);
+    lines.push(`${leftover >= 0 ? 'Sobra prevista' : 'Rombo previsto'}: ${formatBRL(leftover)} (simulacao, nao e saldo garantido).`);
+    lines.push('');
+  }
 
   // TENDENCIA (6 meses)
   const nonZeroTrend = trendLines.filter((t) => t.total > 0);

@@ -7,7 +7,6 @@ import { interpretMessage, type AccountOption, type CategoryOption, type Message
 import { createTransactionFromMessage } from './createTransactionFromMessage.js';
 import { createCategoryFromMessage } from './createCategoryFromMessage.js';
 import { createCardPurchaseFromMessage } from './createCardPurchaseFromMessage.js';
-import { answerFinancialQuestion } from './answerFinancialQuestion.js';
 import { processLinkCode } from './linkAccount.js';
 import {
   getPendingAction,
@@ -18,7 +17,6 @@ import {
 } from './pendingAction.js';
 import { resolveDebitCreditAccount, resolveTransferSide, accountCandidates, type AccountRow } from './accountResolution.js';
 import { deepseekApiKey } from '../ai/deepseekClient.js';
-import { checkAiUsageNotExceeded, incrementAiUsage } from '../ai/aiRateLimit.js';
 import { checkWhatsappTransactionUsageNotExceeded } from './whatsappTransactionRateLimit.js';
 import {
   confirmExpense,
@@ -29,9 +27,23 @@ import {
   categoryAlreadyExistsMessage,
   pendingChoicePrompt,
   outOfScopeMessage,
+  questionRedirectMessage,
 } from './messageFormat.js';
 
 const region = 'southamerica-east1';
+
+/**
+ * Data de um lançamento retroativo a partir do YYYY-MM-DD extraído da mensagem (ao meio-dia
+ * BRT, mesmo padrão de data do app). Ausente/inválido = agora. Validação já foi feita em
+ * `interpretMessage` (só passa <= hoje); aqui é só a conversão + defesa.
+ */
+function occurredDateFromISO(iso: string | null | undefined): Date {
+  if (iso && /^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+    const parsed = new Date(`${iso}T12:00:00-03:00`);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  return new Date();
+}
 
 /**
  * Resolve a categoria de um lancamento: prioriza a mais especifica entre as existentes
@@ -234,7 +246,7 @@ export const whatsappWebhook = onRequest(
               description: pending.description,
               categoryId: pending.categoryId,
               installments: pending.installments,
-              purchaseDate: new Date(),
+              purchaseDate: occurredDateFromISO(pending.occurredOnISO),
             });
 
             await sendWhatsAppMessage(
@@ -261,7 +273,7 @@ export const whatsappWebhook = onRequest(
               description: pending.description,
               categoryId: pending.categoryId,
               accountId: resolvedAccountId,
-              date: new Date(),
+              date: occurredDateFromISO(pending.occurredOnISO),
               source: 'whatsapp',
             });
 
@@ -303,7 +315,7 @@ export const whatsappWebhook = onRequest(
               description: pending.description,
               accountId: sourceAccountId,
               destinationAccountId,
-              date: new Date(),
+              date: occurredDateFromISO(pending.occurredOnISO),
               source: 'whatsapp',
             });
 
@@ -360,10 +372,14 @@ export const whatsappWebhook = onRequest(
       if (!interpretation || interpretation.intent === 'unclear') {
         await sendWhatsAppMessage(
           phone,
-          '🤔 *Não entendi essa mensagem.*\n\nAqui está o que eu sei fazer:\n💸 Gasto — _"gastei 15 reais no mercado"_\n💰 Receita — _"recebi 200 reais de freela"_\n💳 Compra no cartão — _"gastei 300 no cartão em 3x"_\n🔄 Transferência — _"transfere 50 do nubank pro itaú"_\n🏷️ Categoria nova — _"cria uma categoria chamada Pet"_\n❓ Pergunta financeira — _"quanto gastei esse mês?"_',
+          '🤔 *Não entendi essa mensagem.*\n\nAqui está o que eu sei fazer:\n💸 Gasto — _"gastei 15 reais no mercado"_\n💰 Receita — _"recebi 200 reais de freela"_\n💳 Compra no cartão — _"gastei 300 no cartão em 3x"_\n🔄 Transferência — _"transfere 50 do nubank pro itaú"_\n🏷️ Categoria nova — _"cria uma categoria chamada Pet"_\n\nDá pra lançar com data também: _"gastei 40 no mercado dia 20"_.\nPra perguntas sobre suas finanças, fala comigo no app (aba Assistente).',
         );
         return;
       }
+
+      // Data do lançamento: retroativa se a mensagem citou quando aconteceu, senão agora.
+      // Guardada nas pendências (pra sobreviver ao "qual cartão/conta?").
+      const occurredDate = occurredDateFromISO(interpretation.occurredOn);
 
       // ── Fora do escopo do WhatsApp (editar/excluir algo existente, criar conta a
       // pagar/recorrencia, acao avancada de cartao, decisao financeira grande/investimento —
@@ -397,22 +413,14 @@ export const whatsappWebhook = onRequest(
         return;
       }
 
-      // ── Pergunta financeira (paridade com a Vic do app) ───────────
+      // ── Pergunta financeira → redireciona pra Vic do app ───────────
+      // Decisão do dono (2026-07-28): o WhatsApp não responde mais pergunta nenhuma (geral ou
+      // sobre os dados). A Vic do app tem histórico de conversa e continua o papo; o WhatsApp
+      // fica só pra lançar. As perguntas amplas/decisões já iam pro app (out_of_scope); agora
+      // as rápidas ("quanto gastei", "quanto devo") também.
       if (interpretation.intent === 'question') {
-        let usageRef;
-        try {
-          ({ usageRef } = await checkAiUsageNotExceeded(db, workspaceId));
-        } catch {
-          await sendWhatsAppMessage(
-            phone,
-            '⏳ Você atingiu o limite diário de perguntas para a Vic.\n\nVolte amanhã ou pergunte pelo app.',
-          );
-          return;
-        }
-
-        const answer = await answerFinancialQuestion(db, workspaceId, linkedByUid, cleanText);
-        await sendWhatsAppMessage(phone, answer);
-        await incrementAiUsage(usageRef);
+        logger.info('whatsapp_question_redirected', { phone, workspaceId });
+        await sendWhatsAppMessage(phone, questionRedirectMessage());
         return;
       }
 
@@ -450,7 +458,7 @@ export const whatsappWebhook = onRequest(
             description,
             categoryId,
             installments: interpretation.installments,
-            purchaseDate: new Date(),
+            purchaseDate: occurredDate,
           });
 
           await sendWhatsAppMessage(
@@ -475,6 +483,7 @@ export const whatsappWebhook = onRequest(
           installments: interpretation.installments,
           categoryId,
           candidates: activeCards,
+          occurredOnISO: interpretation.occurredOn,
         });
 
         await sendWhatsAppMessage(
@@ -529,7 +538,7 @@ export const whatsappWebhook = onRequest(
             description,
             accountId: sourceAccountId,
             destinationAccountId,
-            date: new Date(),
+            date: occurredDate,
             source: 'whatsapp',
           });
 
@@ -571,6 +580,7 @@ export const whatsappWebhook = onRequest(
           destinationAccountId,
           missing,
           candidates,
+          occurredOnISO: interpretation.occurredOn,
         });
 
         const question = missing === 'both'
@@ -620,6 +630,7 @@ export const whatsappWebhook = onRequest(
           description,
           categoryId,
           candidates: accountCandidates(accounts),
+          occurredOnISO: interpretation.occurredOn,
         });
 
         const verb = interpretation.intent === 'income' ? 'entra' : 'sai';
@@ -643,7 +654,7 @@ export const whatsappWebhook = onRequest(
         description,
         categoryId,
         accountId,
-        date: new Date(),
+        date: occurredDate,
         source: 'whatsapp',
       });
 

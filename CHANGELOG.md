@@ -2,6 +2,15 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-28 — Vic: WhatsApp redireciona toda pergunta pro app, Vic vê a Projeção, prompt atualizado, WhatsApp ganha data retroativa
+
+Rodada de trabalho na Vic (tudo em functions, deployado):
+- **WhatsApp não responde mais pergunta nenhuma** (geral ou sobre os dados) — redireciona pra Vic do app, que tem histórico de conversa e continua o papo. O WhatsApp fica só pra lançar. `answerFinancialQuestion.ts` deletado; `question` agora vira `questionRedirectMessage()` no handler. As perguntas amplas/decisões já iam pro app; agora as rápidas também.
+- **Data retroativa no WhatsApp**: "gastei 40 no mercado dia 20" / "ontem" / "20/07" registra na data citada (ao meio-dia BRT). `interpretMessage` extrai `occurredOn` (validado <= hoje); `webhookHandler` usa em todos os lançamentos, inclusive após o "qual cartão/conta?" (guardado em `pendingAction.occurredOnISO`). Sem data citada, continua sendo hoje.
+- **Vic do app vê a Projeção do próximo mês**: `buildFinancialContext` ganhou a seção PROJEÇÃO (salário previsto + sobra/rombo), lida do `users/{uid}`.
+- **Prompt da Vic do app atualizado** ao modelo novo: fora Disponível/"livre para gastar"/"modo de cálculo/data-limite"; COMPROMETIDO descrito como contas fixas + fatura do ciclo atual.
+- `typecheck` + `test` (112 functions, +3) verdes. Detalhe em `docs/ai/VIC.md` e `docs/whatsapp/WHATSAPP.md`.
+
 ## 2026-07-28 — fix: Comprometido conta só o ciclo atual da fatura, não todas as parcelas futuras
 
 Correção de requisito do dono logo após o refactor abaixo: "o comprometido não é faturas no plural, é apenas em aberto e a que está pra ser paga, não todas que existem". O modelo anterior somava **todas** as faturas com saldo devedor — o que fazia uma compra parcelada em 10x jogar os R$3.000 inteiros no Comprometido de uma vez (10 faturas de R$300). Agora, **por cartão**, conta as `closed`/`overdue`/`partial` (já "pra pagar") + só a `open` de vencimento mais próximo (o ciclo que acumula agora); as faturas `open` de meses futuros ficam de fora até chegarem.
