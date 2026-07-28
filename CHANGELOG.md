@@ -2,6 +2,14 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-28 — fix: Comprometido conta só o ciclo atual da fatura, não todas as parcelas futuras
+
+Correção de requisito do dono logo após o refactor abaixo: "o comprometido não é faturas no plural, é apenas em aberto e a que está pra ser paga, não todas que existem". O modelo anterior somava **todas** as faturas com saldo devedor — o que fazia uma compra parcelada em 10x jogar os R$3.000 inteiros no Comprometido de uma vez (10 faturas de R$300). Agora, **por cartão**, conta as `closed`/`overdue`/`partial` (já "pra pagar") + só a `open` de vencimento mais próximo (o ciclo que acumula agora); as faturas `open` de meses futuros ficam de fora até chegarem.
+
+- `financeCalculations.ts`: novo helper `selectCurrentCycleInvoices` (agrupa por cartão, mantém as fechadas + a aberta mais próxima). `buildFinancialContext.ts` (Vic/WhatsApp) espelha a mesma regra.
+- Testes novos: "10x não soma todas de uma vez — só a parcela do ciclo atual" (cliente + functions); cartões diferentes contados independentemente. `test` (402 cliente + 109 functions) verde.
+- Functions reimplantadas (`financialAssistantChat` + `whatsappWebhook`).
+
 ## 2026-07-27 — refactor: Comprometido simples ("conta tudo") + remove Disponível e o modo de recebimento
 
 Decisão de produto do dono: o corte por data do Comprometido (dois modos, payday, janela de dias, data do salário) confundia todo mundo e era a raiz da pendência aberta. Voltou pro modelo simples **"recorrências/fixas + contas a pagar pendentes + faturas de cartão em aberto"**, sem corte por data. O **Disponível** foi removido (a Projeção do próximo mês já dá a visão de "quanto sobra"). Planejado e discutido em plan mode.

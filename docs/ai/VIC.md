@@ -71,7 +71,7 @@ O contexto é dividido em até 10 seções (algumas só aparecem quando há dado
 **=== COMPROMETIDO (contas fixas + faturas em aberto) ===** (modelo novo desde 2026-07-27 — antes tinha cabeçalho com data de cutoff; o corte por data foi removido)
 - **Sem corte por data.** Mesma lógica do Dashboard (`buildUpcomingCommitments`, `financeCalculations.ts`): tudo que a pessoa já deve conta.
 - **Contas a pagar**: `bills` (status `pending`/`overdue`, TODAS) + `recurring` ativas com `amountCents > 0` (TODAS, cartão e conta). Recorrentes anotadas com "(se repete)". Ordenadas: VENCIDAS primeiro, depois avulsas por data, depois recorrentes.
-- **Faturas de cartão**: `invoices` com status `open`/`closed`/`overdue`/`partial` e saldo devedor > 0, TODAS. Lê `outstandingBalanceCents` direto (mantido incrementalmente por `invoiceLedgerEntryTrigger.ts`) **menos** as cobranças de recorrência já lançadas nessa fatura (`card_purchase` com `recurringId`, somadas por fatura no loop de transações) — a recorrência já conta como linha própria, então descontar evita contar a assinatura duas vezes. Fatura que era 100% recorrência fica zerada e não aparece.
+- **Faturas de cartão**: só o **ciclo atual** de cada cartão (decisão do dono 2026-07-28: "em aberto e a que está pra ser paga, não todas que existem") — por cartão, as `closed`/`overdue`/`partial` (já "pra pagar") contam todas + das `open` só a de vencimento mais próximo (a que acumula agora). As faturas `open` de meses futuros (parcelas de compra parcelada) ficam de fora até chegarem, senão uma compra em 10x somaria as 10 de uma vez. Lê `outstandingBalanceCents` direto (mantido por `invoiceLedgerEntryTrigger.ts`) **menos** as cobranças de recorrência já lançadas nessa fatura (`card_purchase` com `recurringId`) — a recorrência já conta como linha, o desconto evita duplicar.
 - Total comprometido quebrado por tipo (contas + faturas)
 
 **Coleções consultadas**: `categories`, `transactions`, `bills`, `recurring`, `cards` + `cards/*/invoices`, `accounts`
@@ -186,7 +186,7 @@ npm --prefix functions run test
 - Objetivo/desafio declarado no onboarding aparece traduzido em SEU CICLO
 - Id de objetivo desconhecido/removido é ignorado, nunca vaza cru pro prompt
 - Conta que vence daqui a meses entra no Comprometido, sem corte por data (2026-07-27)
-- Toda fatura em aberto (open ou closed) entra no Comprometido, sem corte por data (2026-07-27)
+- Conta só o ciclo atual do cartão (fechada + aberta mais próxima); exclui parcelas futuras (2026-07-28)
 - Desconta a cobrança de recorrência da fatura — não duplica a assinatura no cartão (2026-07-27)
 
 4 testes em `verifyWorkspaceMembership.test.ts`:

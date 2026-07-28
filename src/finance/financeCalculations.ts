@@ -201,6 +201,37 @@ function recurringChargesByInvoice(transactions: Transaction[]): Map<string, num
 }
 
 /**
+ * As faturas que o Comprometido conta, por cartão: só o CICLO ATUAL — as fechadas/vencidas/
+ * parciais (não pagas, já "pra pagar") contam todas, e das abertas só a de vencimento mais
+ * próximo (a que está acumulando agora). Faturas `open` de meses futuros (as parcelas de uma
+ * compra parcelada) ficam de fora até chegarem — decisão do dono (2026-07-28): "em aberto e a
+ * que está pra ser paga, não todas que existem". Sempre exige saldo devedor > 0.
+ */
+function selectCurrentCycleInvoices(invoices: Invoice[]): Invoice[] {
+  const unpaid = invoices.filter(
+    (invoice) => invoice.status !== 'paid' && invoice.status !== 'overpaid' && invoice.outstandingBalanceCents > 0
+  );
+  const byCard = new Map<string, Invoice[]>();
+  for (const invoice of unpaid) {
+    const list = byCard.get(invoice.cardId);
+    if (list) list.push(invoice);
+    else byCard.set(invoice.cardId, [invoice]);
+  }
+
+  const result: Invoice[] = [];
+  for (const list of byCard.values()) {
+    // Fechada/vencida/parcial: já é "pra pagar", conta todas.
+    result.push(...list.filter((invoice) => invoice.status !== 'open'));
+    // Aberta: só a do ciclo atual (vencimento mais próximo), nunca as parcelas futuras.
+    const nearestOpen = list
+      .filter((invoice) => invoice.status === 'open')
+      .sort((left, right) => compareAsc(toDate(left.dueDate), toDate(right.dueDate)))[0];
+    if (nearestOpen) result.push(nearestOpen);
+  }
+  return result;
+}
+
+/**
  * Comprometido = contas a pagar pendentes + TODAS as recorrências ativas (cartão e conta,
  * uma ocorrência cada) + faturas em aberto SEM a parte que já é recorrência. Sem corte por
  * data: tudo que a pessoa já deve conta.
@@ -249,11 +280,13 @@ export function buildUpcomingCommitments(
         }) satisfies UpcomingCommitment
     );
 
-  // Toda fatura em aberto (status != paga/overpaid, saldo > 0) conta, sem corte por data —
-  // é dívida já assumida. O valor é o saldo devedor MENOS as cobranças que vieram de
-  // recorrência (já contadas como linha acima), com piso em 0.
-  const invoiceCommitments = invoices
-    .filter((invoice) => invoice.status !== 'paid' && invoice.status !== 'overpaid' && invoice.outstandingBalanceCents > 0)
+  // Só as faturas do CICLO ATUAL entram — não todas as que existem. Por cartão: as
+  // fechadas/vencidas/parciais (já estão "pra pagar") contam todas, e das abertas só a de
+  // vencimento mais próximo (a que está acumulando agora). As parcelas de meses futuros
+  // (faturas `open` de compra parcelada) ficam de fora até chegarem — senão uma compra em
+  // 10x derrubaria o Comprometido inteiro de uma vez. O valor é o saldo devedor MENOS as
+  // cobranças que vieram de recorrência (já contadas como linha acima), com piso em 0.
+  const invoiceCommitments = selectCurrentCycleInvoices(invoices)
     .map((invoice) => {
       const cardName = cardById.get(invoice.cardId)?.name;
       const amountCents = Math.max(0, invoice.outstandingBalanceCents - (recurringInInvoice.get(invoice.id) ?? 0));

@@ -469,17 +469,45 @@ describe('buildUpcomingCommitments', () => {
     ]);
   });
 
-  it('includes every open/closed invoice with an outstanding balance, without a date cutoff', () => {
+  // Modelo do dono (2026-07-28): "em aberto e a que está pra ser paga, não todas que existem".
+  it('counts only the current cycle per card: closed (to-pay) + nearest open, excluding future installment invoices', () => {
     const commitments = buildUpcomingCommitments(
       [],
       [],
       [
-        invoice({ id: 'inv-closed-past', status: 'closed', referenceMonth: '2026-01', outstandingBalanceCents: 5000 }),
-        invoice({ id: 'inv-open-future', status: 'open', referenceMonth: '2026-06', dueDate: Timestamp.fromDate(new Date('2026-12-05T12:00:00')), outstandingBalanceCents: 3000 })
+        invoice({ id: 'inv-closed', status: 'closed', outstandingBalanceCents: 5000, dueDate: Timestamp.fromDate(new Date('2026-07-10T12:00:00')) }),
+        invoice({ id: 'inv-open-now', status: 'open', outstandingBalanceCents: 3000, dueDate: Timestamp.fromDate(new Date('2026-08-10T12:00:00')) }),
+        invoice({ id: 'inv-open-future1', status: 'open', outstandingBalanceCents: 3000, dueDate: Timestamp.fromDate(new Date('2026-09-10T12:00:00')) }),
+        invoice({ id: 'inv-open-future2', status: 'open', outstandingBalanceCents: 3000, dueDate: Timestamp.fromDate(new Date('2026-10-10T12:00:00')) })
       ]
     );
 
-    expect(commitments.map((c) => c.id).sort()).toEqual(['inv-closed-past', 'inv-open-future']);
+    // Fechada conta; das abertas só a mais próxima (ago); as parcelas de set/out ficam de fora.
+    expect(commitments.map((c) => c.id).sort()).toEqual(['inv-closed', 'inv-open-now']);
+  });
+
+  it('a compra parcelada em 10x não soma todas as faturas de uma vez — só a parcela do ciclo atual', () => {
+    const installments = Array.from({ length: 10 }, (_, i) =>
+      invoice({ id: `inv-parc-${i}`, status: 'open', outstandingBalanceCents: 30000, dueDate: Timestamp.fromDate(new Date(2026, 7 + i, 10, 12, 0, 0)) })
+    );
+    const commitments = buildUpcomingCommitments([], [], installments, [card({ id: 'card-1' })]);
+    const total = commitments.reduce((sum, c) => sum + c.amountCents, 0);
+    expect(commitments).toHaveLength(1); // só a parcela mais próxima
+    expect(total).toBe(30000); // R$300 (uma parcela), não R$3.000
+  });
+
+  it('conta faturas de cartões DIFERENTES independentemente (o ciclo atual de cada um)', () => {
+    const commitments = buildUpcomingCommitments(
+      [],
+      [],
+      [
+        invoice({ id: 'a-open', cardId: 'card-a', status: 'open', outstandingBalanceCents: 4000, dueDate: Timestamp.fromDate(new Date('2026-08-10T12:00:00')) }),
+        invoice({ id: 'b-open', cardId: 'card-b', status: 'open', outstandingBalanceCents: 6000, dueDate: Timestamp.fromDate(new Date('2026-08-12T12:00:00')) })
+      ],
+      [card({ id: 'card-a' }), card({ id: 'card-b' })]
+    );
+
+    expect(commitments.map((c) => c.id).sort()).toEqual(['a-open', 'b-open']);
   });
 
   it('excludes paid, overpaid and zero-balance invoices', () => {

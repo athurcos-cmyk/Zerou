@@ -293,26 +293,37 @@ export async function buildFinancialContext(
       .where('status', 'in', ['open', 'closed', 'overdue', 'partial'])
       .get();
 
+    // So o CICLO ATUAL de cada cartao entra: fechadas/vencidas/parciais (ja "pra pagar")
+    // contam todas; das abertas so a de vencimento mais proximo (a que acumula agora). As
+    // parcelas de meses futuros (faturas `open` de compra parcelada) ficam de fora ate
+    // chegarem. Decisao do dono (2026-07-28): "em aberto e a que esta pra ser paga, nao
+    // todas que existem". Espelha selectCurrentCycleInvoices em financeCalculations.ts.
+    type Candidate = { status: string; outstanding: number; dueDate: Date; referenceMonth: string };
+    const candidates: Candidate[] = [];
     for (const invDoc of invoicesSnap.docs) {
       const inv = invDoc.data() as InvoiceData;
-
-      // outstandingBalanceCents e mantido incrementalmente por
-      // invoiceLedgerEntryTrigger.ts a cada lancamento novo no ledger. Desconta as
-      // cobrancas de recorrencia (ja contadas como linha da recorrencia) pra nao duplicar.
-      const outstandingRaw = inv.outstandingBalanceCents ?? 0;
-      const outstanding = Math.max(0, outstandingRaw - (recurringChargesByInvoice.get(invDoc.id) ?? 0));
+      // outstandingBalanceCents (mantido por invoiceLedgerEntryTrigger.ts) MENOS as cobrancas
+      // de recorrencia ja contadas como linha da recorrencia (anti-duplicidade).
+      const outstanding = Math.max(0, (inv.outstandingBalanceCents ?? 0) - (recurringChargesByInvoice.get(invDoc.id) ?? 0));
       if (outstanding <= 0) continue;
-
       const dueDate = inv.dueDate.toDate();
       if (isNaN(dueDate.getTime())) continue;
+      candidates.push({ status: (inv.status as string) ?? 'open', outstanding, dueDate, referenceMonth: inv.referenceMonth });
+    }
 
-      // Toda fatura em aberto conta, sem corte por data — e divida ja assumida.
-      invoiceCommitted += outstanding;
+    const toCount = candidates.filter((candidate) => candidate.status !== 'open');
+    const nearestOpen = candidates
+      .filter((candidate) => candidate.status === 'open')
+      .sort((left, right) => left.dueDate.getTime() - right.dueDate.getTime())[0];
+    if (nearestOpen) toCount.push(nearestOpen);
+
+    for (const candidate of toCount) {
+      invoiceCommitted += candidate.outstanding;
       activeInvoices.push({
         cardName: sanitize(card.name ?? 'Cartao'),
-        referenceMonth: inv.referenceMonth,
-        outstandingCents: outstanding,
-        dueDate: friendlyDate(dueDate),
+        referenceMonth: candidate.referenceMonth,
+        outstandingCents: candidate.outstanding,
+        dueDate: friendlyDate(candidate.dueDate),
       });
     }
   }

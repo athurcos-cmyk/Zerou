@@ -419,8 +419,9 @@ describe('buildFinancialContext', () => {
     expect(context).toContain('Seguro Anual');
   });
 
-  it('toda fatura em aberto (open ou closed) entra no Comprometido, sem corte por data', async () => {
-    const in90Days = makeDateFuture(90);
+  // Modelo do dono (2026-07-28): so o ciclo atual de cada cartao — a fechada (pra pagar) +
+  // a aberta mais proxima; as parcelas de meses futuros (faturas open a frente) ficam de fora.
+  it('conta so o ciclo atual do cartao: fechada + aberta mais proxima, exclui parcelas futuras', async () => {
     const db = mockDb({}, {
       ...emptyCollections,
       'workspaces/ws1/categories': [],
@@ -429,16 +430,16 @@ describe('buildFinancialContext', () => {
       'workspaces/ws1/accounts': [],
       'workspaces/ws1/cards': [fakeDoc('card1', { name: 'Nubank' })],
       'workspaces/ws1/cards/card1/invoices': [
-        fakeDoc('inv_open_far', {
-          cardId: 'card1', referenceMonth: '2027-01', status: 'open',
-          outstandingBalanceCents: 40000, dueDate: Timestamp.fromDate(in90Days),
-        }),
+        fakeDoc('inv_closed', { cardId: 'card1', referenceMonth: '2026-07', status: 'closed', outstandingBalanceCents: 50000, dueDate: Timestamp.fromDate(makeDateFuture(5)) }),
+        fakeDoc('inv_open_now', { cardId: 'card1', referenceMonth: '2026-08', status: 'open', outstandingBalanceCents: 30000, dueDate: Timestamp.fromDate(makeDateFuture(35)) }),
+        fakeDoc('inv_parc1', { cardId: 'card1', referenceMonth: '2026-09', status: 'open', outstandingBalanceCents: 30000, dueDate: Timestamp.fromDate(makeDateFuture(65)) }),
+        fakeDoc('inv_parc2', { cardId: 'card1', referenceMonth: '2026-10', status: 'open', outstandingBalanceCents: 30000, dueDate: Timestamp.fromDate(makeDateFuture(95)) }),
       ],
     });
 
     const context = await buildFinancialContext(db, 'ws1', 'user1');
-    expect(context).toContain('Nubank');
-    expect(context).toMatch(/R\$\s*400[,.]00/);
+    // Comprometido = fechada 500 + aberta proxima 300 = 800 (nao 1.400 com as 2 parcelas futuras).
+    expect(context).toMatch(/Total comprometido \(contas \+ faturas\): R\$\s*800[,.]00/);
   });
 
   // Anti-duplicidade: a cobrança de uma recorrência registrada no cartão é descontada do
