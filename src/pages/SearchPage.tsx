@@ -653,38 +653,38 @@ export function SearchPage() {
                         <span style={{ flex: 1, fontSize: '0.82rem', fontWeight: isSelected ? 700 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {cat.name}
                         </span>
-                        {/* Com orçamento, o % é "quanto do LIMITE já usei" (62,86/100 = 63%), colorido
-                            pelo status — não a fatia do total (que confundia: "usei 62 de 100 e diz 5%?").
-                            Sem orçamento, mostra a fatia do total (contexto do donut). */}
-                        <span
-                          title={budgetPct !== null ? 'do limite usado' : 'do total gasto'}
-                          style={{ fontSize: '0.78rem', color: budgetPct !== null ? barColor : 'var(--text-secondary)', fontWeight: budgetPct !== null ? 700 : 400, flexShrink: 0 }}
-                        >
-                          {budgetPct !== null ? budgetPct : pct}%
-                        </span>
+                        {/* Fatia do total (contexto do donut). O % do LIMITE fica ao lado da barra, abaixo. */}
+                        <span title="do total gasto" style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', flexShrink: 0 }}>{pct}%</span>
                         <span style={{ fontSize: '0.82rem', fontWeight: 700, flexShrink: 0, minWidth: '4.5rem', textAlign: 'right' }}>
                           {formatMoney(cat.amountCents)}
                           {budget ? ` / ${formatMoney(budget.limitCents)}` : ''}
                         </span>
                       </div>
-                      {/* barra de progresso */}
-                      <div style={{ height: 4, borderRadius: 999, background: 'var(--border-subtle)', overflow: 'hidden', position: 'relative' }}>
-                        <div style={{
-                          height: 4, borderRadius: 999,
-                          background: barColor,
-                          width: budgetBarWidthPct !== null ? `${budgetBarWidthPct}%` : `${pct}%`,
-                          transition: 'width var(--duration-slow) ease',
-                        }} />
-                        {budget && (
-                          <div
-                            title={`Limite: ${formatMoney(budget.limitCents)}`}
-                            style={{
-                              position: 'absolute', top: 0, height: 4,
-                              left: `${budgetMarkerLeftPct}%`, width: 2,
-                              background: 'var(--text-secondary)',
-                              borderRadius: 1,
-                            }}
-                          />
+                      {/* barra de progresso + % do LIMITE (quando há orçamento) */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div style={{ flex: 1, height: 4, borderRadius: 999, background: 'var(--border-subtle)', overflow: 'hidden', position: 'relative' }}>
+                          <div style={{
+                            height: 4, borderRadius: 999,
+                            background: barColor,
+                            width: budgetBarWidthPct !== null ? `${budgetBarWidthPct}%` : `${pct}%`,
+                            transition: 'width var(--duration-slow) ease',
+                          }} />
+                          {budget && (
+                            <div
+                              title={`Limite: ${formatMoney(budget.limitCents)}`}
+                              style={{
+                                position: 'absolute', top: 0, height: 4,
+                                left: `${budgetMarkerLeftPct}%`, width: 2,
+                                background: 'var(--text-secondary)',
+                                borderRadius: 1,
+                              }}
+                            />
+                          )}
+                        </div>
+                        {budgetPct !== null && (
+                          <span title="do limite usado" style={{ fontSize: '0.72rem', fontWeight: 700, color: barColor, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                            {budgetPct}% <span style={{ fontWeight: 500, color: 'var(--text-secondary)' }}>lim.</span>
+                          </span>
                         )}
                       </div>
                     </button>
