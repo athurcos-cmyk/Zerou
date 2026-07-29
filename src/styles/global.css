@@ -3869,14 +3869,46 @@ span.service-mark--brand {
   box-shadow: 0 0 0 2px var(--bg-surface), 0 0 0 4px currentColor;
 }
 
+/* Seletor de ícone agrupado por tema (~120 ícones desde 29/07/2026). A rolagem vive AQUI, no
+   contêiner: se ficasse em cada `.icon-grid`, todo grupo viraria sua própria janelinha rolável
+   e a pessoa teria que rolar dentro de rolagem pra achar um ícone. */
+.icon-picker {
+  display: grid;
+  gap: 0.85rem;
+  min-width: 0;
+  max-height: 17rem;
+  overflow-y: auto;
+  overflow-x: clip;
+  /* Respiro pra última linha não colar na borda do recorte da rolagem. */
+  padding-bottom: 0.15rem;
+}
+
+.icon-picker-group {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+/* Rótulo da seção acompanha a rolagem — com 11 grupos, sem sticky a pessoa perde a
+   referência de onde está no meio da lista. */
+.icon-picker-label {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-surface);
+  padding: 0.1rem 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
 .icon-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(2.7rem, 1fr));
   gap: 0.5rem;
   min-width: 0;
-  max-height: 13rem;
-  overflow-y: auto;
-  overflow-x: clip;
 }
 
 .icon-cell {

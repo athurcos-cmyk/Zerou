@@ -2,8 +2,9 @@ import { memo, useState, type FormEvent } from 'react';
 import { Check, ChevronRight, Pencil, Plus, Settings2, Tag, Trash2, X } from 'lucide-react';
 import type { Category } from '../types/contracts';
 import { BottomSheet } from './BottomSheet';
+import { useConfirm } from './ConfirmDialog';
 import {
-  CategoryIcon, categoryColors, categoryIconKeys, resolveCategoryColor
+  CategoryIcon, categoryColors, categoryIconGroups, resolveCategoryColor
 } from './categoryIcons';
 import { ACCENT_FOREGROUND } from '../theme/palette';
 
@@ -38,6 +39,7 @@ export const CategoryField = memo(function CategoryField({
   const [mode, setMode] = useState<'list' | 'form'>('list');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [manage, setManage] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('shopping-bag');
@@ -93,12 +95,31 @@ export const CategoryField = memo(function CategoryField({
     }
   }
 
+  /**
+   * Excluir categoria pede confirmação — inclusive as embutidas, que passaram a ser
+   * excluíveis em 29/07/2026 (antes `isDefault` bloqueava, sem a pessoa entender por quê).
+   *
+   * A confirmação não é cerimônia: a exclusão é lógica (`isActive: false`), mas **não tem
+   * como desfazer pela interface**, e `ensureDefaultCategories` não recria a categoria — o
+   * documento continua existindo, então ela não volta no próximo boot. Some de vez.
+   */
   async function handleDelete(id: string) {
-    if (!onDeleteCategory) return;
+    if (!onDeleteCategory) return false;
+
+    const target = categories.find((cat) => cat.id === id);
+    const ok = await confirm({
+      title: `Excluir ${target?.name ?? 'categoria'}?`,
+      message: 'Ela sai da lista pra novos lançamentos. Os lançamentos antigos continuam como estão, e não dá pra trazer a categoria de volta.',
+      confirmLabel: 'Excluir',
+      danger: true
+    });
+    if (!ok) return false;
+
     setDeletingId(id);
     try {
       await onDeleteCategory(id);
       if (value === id) onChange('');
+      return true;
     } finally {
       setDeletingId(null);
     }
@@ -108,8 +129,6 @@ export const CategoryField = memo(function CategoryField({
     onChange(id);
     setOpen(false);
   }
-
-  const editingDefault = editingId ? filtered.find((c) => c.id === editingId)?.isDefault : false;
 
   return (
     <div className="field">
@@ -153,18 +172,14 @@ export const CategoryField = memo(function CategoryField({
                       <CategoryIcon icon={cat.icon} size={20} />
                     </span>
                     <span className="category-tile-name">{cat.name}</span>
+                    {/* Só UM adorno por canto. A lixeira ficava aqui também, sobreposta ao
+                        lápis (`.category-tile-check` em top/right 0.4rem vs `.category-tile-delete`
+                        em -0.35rem): dois ícones disputando o mesmo canto. Excluir agora vive
+                        dentro do formulário de edição — que é o lugar certo de qualquer jeito,
+                        já que o sistema não põe ação destrutiva a um toque em lista rolável
+                        (ver docs/design/DESIGN.md). */}
                     {isSelected && !manage && <Check size={14} className="category-tile-check" aria-hidden="true" />}
                     {manage && <Pencil size={13} className="category-tile-check" aria-hidden="true" />}
-                    {manage && onDeleteCategory && !cat.isDefault && (
-                      <button
-                        type="button"
-                        className="category-tile-delete"
-                        aria-label={`Excluir ${cat.name}`}
-                        onClick={(event) => { event.stopPropagation(); void handleDelete(cat.id); }}
-                      >
-                        {deletingId === cat.id ? <span className="spinner-dot" /> : <Trash2 size={13} />}
-                      </button>
-                    )}
                   </button>
                 );
               })}
@@ -230,21 +245,30 @@ export const CategoryField = memo(function CategoryField({
               </div>
             </div>
 
+            {/* Agrupado por tema: com ~120 ícones, uma grade plana viraria rolagem cega. Cada
+                grupo é um radiogroup próprio, com o rótulo da seção como nome acessível. */}
             <div className="field">
               <span className="field-label">Ícone</span>
-              <div className="icon-grid" role="radiogroup" aria-label="Ícone">
-                {categoryIconKeys.map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    className={`icon-cell${icon === key ? ' icon-cell--selected' : ''}`}
-                    style={icon === key ? { background: color, borderColor: color, color: ACCENT_FOREGROUND } : undefined}
-                    role="radio"
-                    aria-checked={icon === key}
-                    onClick={() => setIcon(key)}
-                  >
-                    <CategoryIcon icon={key} size={19} />
-                  </button>
+              <div className="icon-picker">
+                {categoryIconGroups.map((group) => (
+                  <div className="icon-picker-group" key={group.label}>
+                    <span className="icon-picker-label">{group.label}</span>
+                    <div className="icon-grid" role="radiogroup" aria-label={`Ícone — ${group.label}`}>
+                      {Object.keys(group.icons).map((key) => (
+                        <button
+                          key={key}
+                          type="button"
+                          className={`icon-cell${icon === key ? ' icon-cell--selected' : ''}`}
+                          style={icon === key ? { background: color, borderColor: color, color: ACCENT_FOREGROUND } : undefined}
+                          role="radio"
+                          aria-checked={icon === key}
+                          onClick={() => setIcon(key)}
+                        >
+                          <CategoryIcon icon={key} size={19} />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
@@ -253,8 +277,16 @@ export const CategoryField = memo(function CategoryField({
               <button className="button button--primary" type="submit" disabled={busy || !name.trim()}>
                 {busy ? 'Salvando...' : editingId ? 'Salvar alterações' : 'Criar categoria'}
               </button>
-              {editingId && onDeleteCategory && !editingDefault && (
-                <button className="button button--ghost button--danger-text" type="button" disabled={busy} onClick={() => { const id = editingId; setMode('list'); void handleDelete(id); }}>
+              {/* Vale também pras embutidas: `isDefault` bloqueava a exclusão sem explicar
+                  por quê, e a pessoa ficava com categorias que nunca usa entupindo a lista.
+                  Só volta pra lista se a exclusão foi confirmada de fato. */}
+              {editingId && onDeleteCategory && (
+                <button
+                  className="button button--ghost button--danger-text"
+                  type="button"
+                  disabled={busy || deletingId === editingId}
+                  onClick={() => { void handleDelete(editingId).then((deleted) => { if (deleted) setMode('list'); }); }}
+                >
                   <Trash2 size={16} aria-hidden="true" /> Excluir categoria
                 </button>
               )}
@@ -265,6 +297,7 @@ export const CategoryField = memo(function CategoryField({
           </form>
         )}
       </BottomSheet>
+      {confirmDialog}
     </div>
   );
 });

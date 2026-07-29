@@ -2,6 +2,18 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-29 (parte 6) — feat(categorias): 24 cores, 122 ícones agrupados, e as embutidas voltaram a ser excluíveis
+
+Pedido do dono (mais cor e mais ícone) somado a dois bugs relatados no mesmo fôlego.
+
+- **Cores: 12 → 24** (`categoryColors`, `palette.ts`), ordenadas como espectro pra grade virar degradê navegável. As 12 originais **não mudaram de posição** de propósito: `resolveCategoryColor` faz hash sobre esse array pra colorir categoria sem cor escolhida, então reordenar trocaria a cor de categorias que já existem.
+- **Ícones: 36 → 122**, agora em **11 grupos temáticos** (`categoryIconGroups` — fonte única, o mapa plano `categoryIcons` é derivado dela, impossível dessincronizar). Grade plana com 122 itens viraria rolagem cega; cada grupo tem rótulo sticky e a rolagem vive no contêiner. **Nenhuma chave antiga foi renomeada ou removida** (conferido por diff contra o HEAD: 36 chaves antigas, 0 perdidas, 0 duplicadas entre grupos) — chave de ícone fica gravada em `Category.icon`, mudá-la apagaria o ícone de categorias existentes.
+- **Bug visual corrigido**: no modo "Editar categorias", lápis e lixeira eram dois ícones absolutos ancorados no **mesmo canto** do tile (`0.4rem` vs `-0.35rem`) e se sobrepunham. A lixeira saiu do tile; excluir vive no formulário de edição — que é onde já deveria estar, já que o sistema não põe ação destrutiva a um toque em lista rolável.
+- **Categorias embutidas voltaram a ser excluíveis**: `isDefault` bloqueava a exclusão sem explicar por quê, e a pessoa ficava com categorias que nunca usa entupindo a lista. Agora todas podem ser excluídas, **com confirmação que diz a consequência** (antes a exclusão era um toque só, sem confirmação nenhuma). Seguro: a exclusão é lógica e `ensureDefaultCategories` não recria a categoria, porque o documento continua existindo.
+- **`resolveCategoryColor` estava duplicada** em `palette.ts` e `categoryIcons.tsx` — apesar do comentário na primeira dizer "fonte única". Agora `categoryIcons` reexporta a de `palette`.
+- **`firestore.rules` não muda**: `icon` e `color` são validados como string de até 40 chars (`validOptionalString`), não como enum — conferido antes de crescer as listas, conforme a REGRA PRINCIPAL do `CLAUDE.md`.
+- Verificado ao vivo em 375px: paleta de 24 em 4 linhas, grupos de ícone rolando com rótulo, tile sem sobreposição, "Excluir categoria" presente em Alimentação (embutida), confirmação explicando a consequência e cancelar mantendo o formulário aberto. `typecheck` + `test` (449) + `build` verdes.
+
 ## 2026-07-29 (parte 5) — fix(ux): o "Salvando…" parou de piscar a cada lançamento
 
 O dono notou o badge aparecendo ao salvar uma transação. Causa: `SyncStatusBadge` reflete `metadata.hasPendingWrites` — a escrita está no cache local mas o servidor ainda não confirmou. Como o app é fire-and-forget por regra, a linha aparece na lista **antes** do ack; online isso dura frações de segundo, então o aviso só piscava, bem no instante em que a UI deveria transmitir confiança.

@@ -39,7 +39,7 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
 | `CategoryField` | Sheet de categorias com ícone+cor, criar/editar/excluir. |
 | `ConfirmDialog` (`useConfirm`) | Confirmação destrutiva em sheet — nunca `window.confirm`. |
 | `EmptyState` | Estado vazio com ilustração SVG própria. 6 variantes: `transactions`, `cards`, `wallet`, `shared`, `goals`, `bills`. Sempre usar uma ilustração existente ou criar uma nova nesse padrão — nunca cair pra texto seco sem ilustração num card que tem vizinho ilustrado (inconsistência perceptível lado a lado). |
-| `categoryIcons` / `palette` | 36 ícones + paleta de cores de categoria/meta. |
+| `categoryIcons` / `palette` | **122 ícones em 11 grupos temáticos** (`categoryIconGroups` — fonte única; o mapa plano `categoryIcons` é derivado dela) + **24 cores** (`categoryColors`). **Nunca renomeie/remova chave de ícone nem reordene as 12 primeiras cores**: a chave fica gravada em `Category.icon`, e `resolveCategoryColor` faz hash sobre o array de cores — mexer troca ícone/cor de categorias que já existem. Só acrescente ao fim. |
 | `.metric-card` / `.metric-icon` / `.metric-strip` (`global.css`) | Cartão de métrica/KPI compacto (usado em `SearchPage.tsx`). `.metric-card--accent` para o destaque principal (mesmo tratamento gradiente do `.dash-hero`). Valor de **texto longo** (não dinheiro/porcentagem) precisa do modificador `.metric-card-value--compact` — a tipografia padrão do card é grande demais e corta nomes como "Alimentação". |
 | `.form-accordion-toggle` (`global.css`) | Botão de expandir/recolher formulário (usado em AccountsPage, BillsPage, CardsPage, ReceivablesPage). Substitui o inline style de 7 propriedades que estava duplicado 4×. |
 | `.list-toggle` (`global.css`, 2026-07-23) | "Ver todas as N / Ver menos" no fim de uma lista `.item-list` colapsada (ex.: Compras de uma fatura longa em `InvoicePage.tsx`, limite de 5 linhas). Link discreto (`--action-primary`), não botão cheio. |
@@ -58,6 +58,20 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
 - **Extrato agrupado por dia** (`.day-group`/`.day-group-header`, 2026-07-18): header sticky
   "Hoje/Ontem/12 jul" + resumo do dia. Cuidado: sticky dentro do `.app-main` mobile exige
   `overflow-x: clip` (não `hidden`, que vira scroll container e mata o sticky).
+- **Um adorno por canto no tile** (`.category-tile`, 29/07/2026): o modo "Editar categorias"
+  desenhava lápis (`.category-tile-check`, top/right `0.4rem`) **e** lixeira
+  (`.category-tile-delete`, top/right `-0.35rem`) no mesmo canto — os dois se sobrepunham. A
+  lixeira saiu; excluir vive dentro do formulário de edição, que é onde já deveria estar pela
+  regra de não pôr ação destrutiva a um toque em lista rolável. Dois indicadores absolutos
+  ancorados no mesmo canto é sempre colisão esperando acontecer.
+- **Seletor com muitas opções se agrupa, não só cresce** (`.icon-picker`, 29/07/2026): ao passar
+  de 36 pra 122 ícones, grade plana viraria rolagem cega. Grupos temáticos com rótulo **sticky**,
+  e a rolagem no contêiner (`.icon-picker`), nunca em cada grade — senão cada grupo vira sua
+  própria janelinha rolável e a pessoa rola dentro de rolagem.
+- **Excluir dado que a pessoa criou pede confirmação que diz a consequência**, não só "tem
+  certeza?". Categoria explicita que sai da lista, que lançamentos antigos ficam como estão e
+  que **não dá pra desfazer** — a exclusão é lógica (`isActive: false`), mas não há UI de
+  restauração e `ensureDefaultCategories` não recria (o documento continua existindo).
 - **Cabeçalho do dia mostra SALDO, não um total de fluxo** (`.day-group-total` +
   `balanceByDayEnd`, 2026-07-29): o saldo consolidado no fim daquele dia — o mesmo número do
   "Saldo total" do Dashboard, voltando no tempo. **Por que não "gasto"**: resumo de fluxo sempre

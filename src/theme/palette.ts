@@ -5,20 +5,47 @@
 /** White foreground used on top of accent/gradient surfaces. */
 export const ACCENT_FOREGROUND = '#ffffff';
 
-/** Sol-flavoured palette for category & goal marks — warm-leaning, readable with white text. */
+/**
+ * Paleta Sol para marcas de categoria e meta — quente de origem, toda legível com ícone branco
+ * (`ACCENT_FOREGROUND`), que é como estas cores sempre aparecem (`.category-mark`, `.color-dot`).
+ *
+ * Ordenada como espectro (quente → frio → neutro) pra grade do seletor virar um degradê
+ * navegável em vez de um mosaico aleatório. Ao acrescentar cor, **mantenha o tom médio-escuro**:
+ * cor clara demais some sob o ícone branco. As 12 primeiras são as originais e não mudam de
+ * posição — `resolveCategoryColor` faz hash sobre este array pra colorir categoria sem cor
+ * escolhida, então reordenar troca a cor de categorias que já existem por aí.
+ *
+ * Nenhuma mudança de regra é necessária ao crescer esta lista: `firestore.rules` valida `color`
+ * só como string de até 40 chars (`validOptionalString`), não como enum — conferido em
+ * 29/07/2026, ao dobrar a paleta.
+ */
 export const categoryColors = [
-  '#EE5524', // tangerine (Sol primary)
-  '#E8911C', // amber
-  '#D4A017', // gold
-  '#5FA052', // green
+  // — originais (posição fixa, ver nota acima) —
+  '#EE5524', // tangerina (primária Sol)
+  '#E8911C', // âmbar
+  '#D4A017', // ouro
+  '#5FA052', // verde
   '#2E9E8F', // teal
-  '#3B82C4', // blue
-  '#6366C9', // indigo
-  '#9B5DE5', // violet
-  '#D6549A', // pink
-  '#D14545', // red
+  '#3B82C4', // azul
+  '#6366C9', // índigo
+  '#9B5DE5', // violeta
+  '#D6549A', // rosa
+  '#D14545', // vermelho
   '#7C6F64', // taupe
-  '#4A5568' // slate
+  '#4A5568', // ardósia
+  // — acrescentadas em 29/07/2026 —
+  '#C2410C', // laranja queimado
+  '#B45309', // bronze
+  '#7A8B3A', // oliva
+  '#2F7D46', // verde-mata
+  '#0E9488', // teal profundo
+  '#1F7A9C', // oceano
+  '#1E4E8C', // azul-marinho
+  '#6B3FA0', // uva
+  '#B03E86', // magenta
+  '#C2306B', // framboesa
+  '#8A5A44', // cacau
+  '#2D3748' // grafite
 ];
 
 export const defaultCategoryColor = '#7C6F64';

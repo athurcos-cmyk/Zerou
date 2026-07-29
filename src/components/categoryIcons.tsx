@@ -1,53 +1,221 @@
 import {
-  Briefcase, Sparkles, Home, UtensilsCrossed, Car, HeartPulse, Smile,
-  Repeat, SlidersHorizontal, ShoppingBag, Shirt, Plane, GraduationCap,
-  Dumbbell, Gamepad2, Music, BookOpen, Coffee, Dog, Baby, Gift,
-  Wrench, Smartphone, Landmark, TrendingUp, Banknote, Bus, Fuel,
-  PiggyBank, Wifi, Droplets, Zap, Cigarette, Pizza, Stethoscope, Scissors,
+  Activity, Apple, Armchair, Baby, Banknote, Bath, Bed, Beef, Beer, Bike,
+  BookOpen, Brain, Briefcase, Building2, Bus, Cake, Calculator, Camera, Candy, Car, Carrot, Cat,
+  Church, Cigarette, Cloud, Coffee, Coins, Cookie, CreditCard, Croissant, Crown, CupSoda, Dices,
+  Dog, Droplets, Drumstick, Dumbbell, FileText, Film, Fish, Flame, Flower2, Fuel, Gamepad2, Gem,
+  Gift, Glasses, Globe, GraduationCap, Guitar, HandCoins, Hammer, Handshake, Headphones,
+  HeartHandshake, Heart, HeartPulse, Home, Hotel, IceCreamCone, Key, Landmark, Laptop, Leaf,
+  Luggage, MapPin, Milk, Monitor, Music, Newspaper, Package, Palette, PartyPopper, PawPrint,
+  Percent, PiggyBank, Pill, Pizza, Plane, Plug, Puzzle, Recycle, Receipt, Refrigerator, Repeat,
+  Salad, School, Scissors, Ship, Shirt, ShoppingBag, ShoppingCart, ShowerHead, ShieldCheck,
+  SlidersHorizontal, Smartphone, Smile, Sofa, Soup, Sparkles, Sprout, Stethoscope, Store, Sun,
+  Syringe, Target, Ticket, TrainFront, TreePine, TrendingUp, Trophy, Truck, Tv, Umbrella, Users,
+  UtensilsCrossed, WashingMachine, Watch, Wifi, Wine, Wrench, Zap,
   type LucideIcon
 } from 'lucide-react';
-import { categoryColors, defaultCategoryColor, defaultCategoryColors } from '../theme/palette';
+import { categoryColors, defaultCategoryColor, resolveCategoryColor } from '../theme/palette';
 
-export { categoryColors, defaultCategoryColor };
+export { categoryColors, defaultCategoryColor, resolveCategoryColor };
 
-export const categoryIcons: Record<string, LucideIcon> = {
-  'briefcase': Briefcase,
-  'sparkles': Sparkles,
-  'home': Home,
-  'utensils': UtensilsCrossed,
-  'pizza': Pizza,
-  'coffee': Coffee,
-  'car': Car,
-  'bus': Bus,
-  'fuel': Fuel,
-  'plane': Plane,
-  'heart-pulse': HeartPulse,
-  'stethoscope': Stethoscope,
-  'smile': Smile,
-  'repeat': Repeat,
-  'sliders': SlidersHorizontal,
-  'shopping-bag': ShoppingBag,
-  'shirt': Shirt,
-  'scissors': Scissors,
-  'graduation': GraduationCap,
-  'book': BookOpen,
-  'dumbbell': Dumbbell,
-  'gamepad': Gamepad2,
-  'music': Music,
-  'pet': Dog,
-  'baby': Baby,
-  'gift': Gift,
-  'tools': Wrench,
-  'phone': Smartphone,
-  'wifi': Wifi,
-  'droplets': Droplets,
-  'zap': Zap,
-  'cigarette': Cigarette,
-  'bank': Landmark,
-  'piggy': PiggyBank,
-  'investment': TrendingUp,
-  'money': Banknote
-};
+/**
+ * Ícones de categoria, **agrupados por tema**.
+ *
+ * O agrupamento não é enfeite: a lista passou de 35 pra ~90 ícones em 29/07/2026, e uma grade
+ * plana desse tamanho vira um "onde está o meu?" — a pessoa rola procurando em vez de escolher.
+ * Com rótulo de seção o seletor continua navegável.
+ *
+ * **Nunca renomeie nem remova uma chave existente**: ela fica gravada em `Category.icon` no
+ * Firestore, então mudar a chave apaga o ícone de categorias que já existem. Só acrescente.
+ * A ordem dentro do grupo é a ordem de exibição.
+ *
+ * Crescer esta lista não exige mudança em `firestore.rules`: `icon` é validado só como string
+ * de até 40 chars (`validOptionalString`), não como enum — conferido em 29/07/2026.
+ */
+export const categoryIconGroups: ReadonlyArray<{ label: string; icons: Record<string, LucideIcon> }> = [
+  {
+    label: 'Dinheiro',
+    icons: {
+      'money': Banknote,
+      'bank': Landmark,
+      'piggy': PiggyBank,
+      'investment': TrendingUp,
+      'credit-card': CreditCard,
+      'coins': Coins,
+      'hand-coins': HandCoins,
+      'receipt': Receipt,
+      'calculator': Calculator,
+      'percent': Percent,
+      'target': Target
+    }
+  },
+  {
+    label: 'Comida e bebida',
+    icons: {
+      'utensils': UtensilsCrossed,
+      'pizza': Pizza,
+      'coffee': Coffee,
+      'cart': ShoppingCart,
+      'salad': Salad,
+      'soup': Soup,
+      'beef': Beef,
+      'fish': Fish,
+      'drumstick': Drumstick,
+      'carrot': Carrot,
+      'apple': Apple,
+      'milk': Milk,
+      'candy': Candy,
+      'cookie': Cookie,
+      'ice-cream': IceCreamCone,
+      'croissant': Croissant,
+      'beer': Beer,
+      'wine': Wine,
+      'soda': CupSoda
+    }
+  },
+  {
+    label: 'Casa e contas',
+    icons: {
+      'home': Home,
+      'building': Building2,
+      'key': Key,
+      'bed': Bed,
+      'sofa': Sofa,
+      'armchair': Armchair,
+      'washing-machine': WashingMachine,
+      'fridge': Refrigerator,
+      'bath': Bath,
+      'shower': ShowerHead,
+      'droplets': Droplets,
+      'zap': Zap,
+      'plug': Plug,
+      'flame': Flame,
+      'wifi': Wifi,
+      'recycle': Recycle,
+      'tools': Wrench,
+      'hammer': Hammer
+    }
+  },
+  {
+    label: 'Transporte',
+    icons: {
+      'car': Car,
+      'bus': Bus,
+      'train': TrainFront,
+      'bike': Bike,
+      'truck': Truck,
+      'ship': Ship,
+      'plane': Plane,
+      'fuel': Fuel
+    }
+  },
+  {
+    label: 'Saúde',
+    icons: {
+      'heart-pulse': HeartPulse,
+      'stethoscope': Stethoscope,
+      'pill': Pill,
+      'syringe': Syringe,
+      'glasses': Glasses,
+      'brain': Brain,
+      'activity': Activity
+    }
+  },
+  {
+    label: 'Lazer',
+    icons: {
+      'smile': Smile,
+      'gamepad': Gamepad2,
+      'music': Music,
+      'guitar': Guitar,
+      'dumbbell': Dumbbell,
+      'tv': Tv,
+      'film': Film,
+      'ticket': Ticket,
+      'camera': Camera,
+      'headphones': Headphones,
+      'puzzle': Puzzle,
+      'dices': Dices,
+      'palette': Palette,
+      'trophy': Trophy
+    }
+  },
+  {
+    label: 'Pessoas e pets',
+    icons: {
+      'pet': Dog,
+      'cat': Cat,
+      'paw': PawPrint,
+      'baby': Baby,
+      'users': Users,
+      'heart': Heart,
+      'gift': Gift,
+      'cake': Cake,
+      'party': PartyPopper,
+      'donation': HeartHandshake,
+      'handshake': Handshake,
+      'church': Church
+    }
+  },
+  {
+    label: 'Trabalho e estudo',
+    icons: {
+      'briefcase': Briefcase,
+      'graduation': GraduationCap,
+      'school': School,
+      'book': BookOpen,
+      'laptop': Laptop,
+      'monitor': Monitor,
+      'cloud': Cloud,
+      'store': Store,
+      'newspaper': Newspaper,
+      'file': FileText,
+      'phone': Smartphone
+    }
+  },
+  {
+    label: 'Compras e cuidados',
+    icons: {
+      'shopping-bag': ShoppingBag,
+      'shirt': Shirt,
+      'scissors': Scissors,
+      'watch': Watch,
+      'gem': Gem,
+      'crown': Crown,
+      'package': Package
+    }
+  },
+  {
+    label: 'Viagem',
+    icons: {
+      'hotel': Hotel,
+      'luggage': Luggage,
+      'map-pin': MapPin,
+      'globe': Globe
+    }
+  },
+  {
+    label: 'Natureza e outros',
+    icons: {
+      'leaf': Leaf,
+      'tree': TreePine,
+      'flower': Flower2,
+      'sprout': Sprout,
+      'sun': Sun,
+      'umbrella': Umbrella,
+      'shield': ShieldCheck,
+      'sparkles': Sparkles,
+      'cigarette': Cigarette,
+      'repeat': Repeat,
+      'sliders': SlidersHorizontal
+    }
+  }
+];
+
+/** Mapa plano chave → ícone, derivado dos grupos (fonte única — não dá pra dessincronizar). */
+export const categoryIcons: Record<string, LucideIcon> = Object.assign(
+  {},
+  ...categoryIconGroups.map((group) => group.icons)
+);
 
 export const categoryIconKeys = Object.keys(categoryIcons);
 
@@ -72,15 +240,4 @@ export function CategoryMark({
       <CategoryIcon icon={icon} size={16} />
     </span>
   );
-}
-
-/** Resolve the color to paint a category mark: explicit color → built-in default → hashed palette. */
-export function resolveCategoryColor(category: { id: string; color?: string }) {
-  if (category.color) return category.color;
-  if (defaultCategoryColors[category.id]) return defaultCategoryColors[category.id];
-  let hash = 0;
-  for (let i = 0; i < category.id.length; i += 1) {
-    hash = (hash * 31 + category.id.charCodeAt(i)) >>> 0;
-  }
-  return categoryColors[hash % categoryColors.length];
 }
