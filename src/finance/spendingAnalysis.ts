@@ -345,6 +345,11 @@ export interface OngoingInstallmentPurchase {
  * `status` manualmente reconciliado pra `'paid'`/`'overpaid'`) também sai da conta na hora,
  * mesmo que o mês dela ainda não tenha virado: pagar a fatura é o que realmente resolve a
  * dívida, não só o calendário passar.
+ *
+ * Compra EXCLUÍDA some por completo: o ledger é imutável, mas excluir gera estornos
+ * (`purchase_reversal`/`anticipation_credit_reversal`, que só existem por exclusão), e qualquer
+ * um deles marca a compra como removida. Sem isso, uma parcelada errada excluída continuava
+ * "em andamento" enquanto a fatura tivesse outra parcela mantendo o saldo devedor > 0.
  */
 export function ongoingInstallmentPurchases(
   currentMonth: string,
@@ -370,12 +375,20 @@ export function ongoingInstallmentPurchases(
     return group;
   };
 
+  // Compras EXCLUÍDAS: `reverseCardPurchaseOnDelete` estorna todo lançamento de uma compra
+  // excluída, e `purchase_reversal`/`anticipation_credit_reversal` só existem por exclusão.
+  // Então qualquer estorno marca a compra inteira como removida — ela não deve mais aparecer
+  // como "em andamento" (a recadastrada certa tem outro sourceTransactionId, sem estorno).
+  const reversedSources = new Set<string>();
+
   // 1ª passada: total/valor da parcela (de qualquer parcela, passada ou futura) e quais meses
   // futuros foram antecipados — precisa ver todo mundo antes de decidir o que conta como restante.
   for (const invoice of invoices) {
     for (const entry of invoice.ledgerEntries) {
       if (!entry.sourceTransactionId) continue;
-      if (entry.type === 'purchase' && (entry.installmentTotal ?? 0) > 1) {
+      if (entry.type === 'purchase_reversal' || entry.type === 'anticipation_credit_reversal') {
+        reversedSources.add(entry.sourceTransactionId);
+      } else if (entry.type === 'purchase' && (entry.installmentTotal ?? 0) > 1) {
         const group = groupFor(entry.sourceTransactionId);
         group.installmentTotal = entry.installmentTotal ?? group.installmentTotal;
         group.installmentValueCents = entry.amountCents;
@@ -409,6 +422,7 @@ export function ongoingInstallmentPurchases(
 
   const result: OngoingInstallmentPurchase[] = [];
   for (const [sourceTransactionId, group] of groups) {
+    if (reversedSources.has(sourceTransactionId)) continue; // compra excluída não aparece
     if (group.installmentTotal <= 1 || group.remainingCents <= 0) continue;
     result.push({
       sourceTransactionId,

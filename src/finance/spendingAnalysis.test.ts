@@ -283,6 +283,22 @@ describe('ongoingInstallmentPurchases', () => {
     expect(ongoingInstallmentPurchases('2026-07', invoices, () => 'Antiga')).toHaveLength(0);
   });
 
+  it('compra excluída (com estorno no ledger) some, mas a recadastrada certa fica (regressão)', () => {
+    // ERRADA em 3x: parcelas + estorno de cada uma (excluída). CERTA em 3x recadastrada no lugar,
+    // nas mesmas faturas — o saldo devedor não zera, então sem o fix a errada continuava aparecendo.
+    const invoices: InvoiceForSpending[] = ['2026-07', '2026-08', '2026-09'].map((month, i) => ({
+      referenceMonth: month,
+      ledgerEntries: [
+        entry({ id: `bad_p${i + 1}`, type: 'purchase', amountCents: 10000, sourceTransactionId: 'bad', installmentNumber: i + 1, installmentTotal: 3 }),
+        entry({ id: `bad_rev${i + 1}`, type: 'purchase_reversal', amountCents: 10000, sourceTransactionId: 'bad' }),
+        entry({ id: `good_p${i + 1}`, type: 'purchase', amountCents: 20000, sourceTransactionId: 'good', installmentNumber: i + 1, installmentTotal: 3 })
+      ]
+    }));
+    const result = ongoingInstallmentPurchases('2026-07', invoices, (id) => (id === 'good' ? 'Certa' : 'Errada'));
+    expect(result).toHaveLength(1);
+    expect(result[0].sourceTransactionId).toBe('good');
+  });
+
   // Regressão: pagar a fatura no app NUNCA muda `status` (só `reconcileInvoice`, manual,
   // faz isso — o fluxo normal de "pagar fatura" só zera `outstandingBalanceCents` via Cloud
   // Function). Sem olhar esse saldo, "andamento" só sumia quando o calendário passava do mês

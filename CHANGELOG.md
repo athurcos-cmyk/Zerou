@@ -2,6 +2,13 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-28 — fix: parcelada excluída também some de "Compras parceladas em andamento"
+
+Continuação do fix de exclusão anterior (que cobriu o donut/categorias via `signedCharge`). O card "Compras parceladas em andamento" da Análise usa outra função — `ongoingInstallmentPurchases` — que somava as parcelas `purchase` do ledger e **ignorava o `purchase_reversal`**. Resultado: uma parcelada errada excluída continuava aparecendo enquanto a fatura daquele mês tivesse outra parcela mantendo o saldo devedor > 0 (o único caso que sumia era a fatura zerar por completo). Achado pelo dono ("as que coloquei errado e excluí vão continuar?"). Confirmado nos dados reais dele: **5 parceladas excluídas** ainda lingering (Mercado Livre, Dr Consulta, Game, 2× Limite convertido), cada uma com a versão recadastrada certa ao lado.
+
+- `ongoingInstallmentPurchases`: uma compra com qualquer estorno (`purchase_reversal`/`anticipation_credit_reversal` — só existem por exclusão) é marcada como removida e não aparece. A recadastrada certa tem `sourceTransactionId` novo, sem estorno, então continua normalmente.
+- Teste de regressão (excluída some, recadastrada fica). `test` (428) + `build` verdes. 100% client-side.
+
 ## 2026-07-28 — design(análise): cards de "Recorrentes previstas" e "Parcelas em andamento" no sistema Sol
 
 Passada visual nos dois cards de lista da Análise, pra ficarem no nível do resto do app — reusando componentes existentes, sem inventar padrão novo:
