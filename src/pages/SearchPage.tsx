@@ -38,6 +38,7 @@ import {
   type RecurringForProjection
 } from '../finance/spendingAnalysis';
 import { defaultCategoryColor, resolveCategoryColor } from '../theme/palette';
+import { CategoryMark } from '../components/categoryIcons';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -732,14 +733,16 @@ export function SearchPage() {
               <p className="eyebrow">Contas recorrentes previstas</p>
               <h2>{monthTitle}</h2>
             </div>
+            <span className="page-badge">{formatMoney(recurringProjected.reduce((sum, r) => sum + r.amountCents, 0))}</span>
           </div>
           <p className="text-secondary" style={{ margin: '0.1rem 0 1rem', fontSize: '0.86rem' }}>
             Estimativa pelas suas recorrências ativas — pode mudar se você cancelar ou ajustar alguma.
           </p>
           <div className="item-list">
             {(showAllRecurring ? recurringProjected : recurringProjected.slice(0, 5)).map((r) => (
-              <div className="list-row" key={r.id}>
-                <div>
+              <div className="list-row list-row--with-icon" key={r.id}>
+                <CategoryMark category={r.categoryId ? categoryMap.get(r.categoryId) ?? null : null} />
+                <div className="list-row-body">
                   <strong>{r.description}</strong>
                   <span className="text-secondary">{r.categoryId ? (categoryNames.get(r.categoryId) ?? 'Sem categoria') : 'Sem categoria'}</span>
                 </div>
@@ -780,22 +783,26 @@ export function SearchPage() {
             O valor cheio de cada compra. Na visão por categoria acima ele aparece diluído — só a parcela do mês pesa lá.
           </p>
           <div className="item-list">
-            {ongoing.map((purchase) => (
-              <div className="list-row" key={purchase.sourceTransactionId}>
-                <div>
-                  <strong>{purchase.description}</strong>
-                  <span className="text-secondary">
-                    {purchase.installmentTotal}x de {formatMoney(purchase.installmentValueCents)} · compra de {formatMoney(purchase.fullAmountCents)}
-                  </span>
+            {ongoing.map((purchase) => {
+              const catId = txnCategoryById.get(purchase.sourceTransactionId);
+              return (
+                <div className="list-row list-row--with-icon" key={purchase.sourceTransactionId}>
+                  <CategoryMark category={catId ? categoryMap.get(catId) ?? null : null} />
+                  <div className="list-row-body">
+                    <strong>{purchase.description}</strong>
+                    <span className="text-secondary">
+                      {purchase.installmentTotal}x de {formatMoney(purchase.installmentValueCents)} · compra de {formatMoney(purchase.fullAmountCents)}
+                    </span>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <strong>{formatMoney(purchase.remainingCents)}</strong>
+                    <span className="text-secondary" style={{ display: 'block' }}>
+                      {purchase.remainingCount} {purchase.remainingCount === 1 ? 'parcela' : 'parcelas'} a vencer
+                    </span>
+                  </div>
                 </div>
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <strong>{formatMoney(purchase.remainingCents)}</strong>
-                  <span className="text-secondary" style={{ display: 'block' }}>
-                    {purchase.remainingCount} {purchase.remainingCount === 1 ? 'parcela' : 'parcelas'} a vencer
-                  </span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </article>
       )}

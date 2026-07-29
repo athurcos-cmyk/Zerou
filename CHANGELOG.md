@@ -2,6 +2,13 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-28 — design(análise): cards de "Recorrentes previstas" e "Parcelas em andamento" no sistema Sol
+
+Passada visual nos dois cards de lista da Análise, pra ficarem no nível do resto do app — reusando componentes existentes, sem inventar padrão novo:
+- **Total no cabeçalho** das recorrências previstas (badge com a soma prevista do mês) — o card não tinha âncora de valor.
+- **Chip de ícone colorido por categoria** (`CategoryMark`, o mesmo das transações do Dashboard) em cada linha dos dois cards (`list-row--with-icon`): a categoria vira reconhecível de relance em vez de só texto. Parcelas resolvem a categoria da compra via `txnCategoryById`.
+- O expansor "Ver todas as N recorrências" já existente segue funcionando. Só `SearchPage.tsx`. Verificado ao vivo (mobile), `typecheck`/`test` (427)/`build` verdes.
+
 ## 2026-07-28 — fix: compra de cartão excluída some da Análise + expansor nas recorrências previstas
 
 Bug (achado pelo dono): uma compra no cartão excluída continuava aparecendo na Análise pra sempre. Causa: `signedCharge` (`spendingAnalysis.ts`) não reconhecia os lançamentos de estorno que a Cloud Function `reverseCardPurchaseOnDelete` cria ao excluir — `purchase_reversal` (crédito) e `anticipation_credit_reversal` (débito) — então o estorno não abatia a compra. Mesma classe de drift de enum que o `CLAUDE.md` marca como o bug nº 1 do projeto (3ª ocorrência). Planejado com `/plan-eng-review`, revisado com `/code-review`.
