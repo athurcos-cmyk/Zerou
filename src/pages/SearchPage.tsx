@@ -789,15 +789,12 @@ export function SearchPage() {
                 <div className="list-row list-row--with-icon" key={purchase.sourceTransactionId}>
                   <CategoryMark category={catId ? categoryMap.get(catId) ?? null : null} />
                   <div className="list-row-body">
-                    <strong>{purchase.description}</strong>
+                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.6rem' }}>
+                      <strong>{purchase.description}</strong>
+                      <strong style={{ flexShrink: 0 }}>{formatMoney(purchase.remainingCents)}</strong>
+                    </div>
                     <span className="text-secondary">
-                      {purchase.installmentTotal}x de {formatMoney(purchase.installmentValueCents)} · compra de {formatMoney(purchase.fullAmountCents)}
-                    </span>
-                  </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <strong>{formatMoney(purchase.remainingCents)}</strong>
-                    <span className="text-secondary" style={{ display: 'block' }}>
-                      {purchase.remainingCount} {purchase.remainingCount === 1 ? 'parcela' : 'parcelas'} a vencer
+                      {purchase.installmentTotal}x de {formatMoney(purchase.installmentValueCents)} · compra de {formatMoney(purchase.fullAmountCents)} · {purchase.remainingCount} {purchase.remainingCount === 1 ? 'parcela' : 'parcelas'} a vencer
                     </span>
                   </div>
                 </div>
