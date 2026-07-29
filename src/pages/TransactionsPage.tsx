@@ -12,31 +12,27 @@ import { useConfirm } from '../components/ConfirmDialog';
 import { defaultCategoryColors } from '../theme/palette';
 import { compareByDateDesc, formatFriendlyDate, toDateInputValue } from '../finance/financeDates';
 import { transactionTypeLabels } from '../finance/financeLabels';
-import { dayFlowTotals, transactionFlowByType, type DayFlowTotals } from '../finance/financeCalculations';
+import { balanceByDayEnd, transactionFlowByType } from '../finance/financeCalculations';
 import { dedupeById, loadMoreTransactions, softDeleteTransaction, type LocalSynced } from '../finance/financeService';
 import { formatMoney } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
 import type { Transaction } from '../types/contracts';
 
 /**
- * Resumo do dia no cabeçalho do grupo.
+ * Saldo no fim daquele dia, no cabeçalho do grupo — o mesmo número do "Saldo total" do
+ * Dashboard, voltando no tempo. Lendo a lista de cima pra baixo vira a trajetória do dinheiro
+ * ("nesse dia eu tinha tanto; depois desse gasto, tanto").
  *
- * Mostra **um** fato rotulado, não um líquido: "gasto" na maioria dos dias, "recebido" quando
- * entrou mais do que saiu (dia de salário) — aí a cor verde aparece e significa alguma coisa.
- * O vermelho saiu de propósito: como todo dia tinha gasto, um cabeçalho sempre vermelho não
- * carregava informação nenhuma e ainda competia com o valor de cada linha, no mesmo peso e na
- * mesma cor. Cor que nunca varia é decoração, não dado.
+ * Fica em `--text-secondary` peso 700: é referência, não o dado da linha. Vermelho só quando o
+ * saldo fica negativo — a única vez em que a cor diz algo aqui.
  */
-function DayGroupSummary({ totals }: { totals: DayFlowTotals }) {
-  const received = totals.receivedCents > totals.spentCents;
-  const value = received ? totals.receivedCents : totals.spentCents;
-
-  if (value === 0) return null;
+function DayGroupBalance({ balanceCents }: { balanceCents: number | undefined }) {
+  if (balanceCents === undefined) return null;
 
   return (
-    <span className={`day-group-total${received ? ' day-group-total--received' : ''}`}>
-      <span className="day-group-total-label">{received ? 'recebido' : 'gasto'}</span>
-      {formatMoney(value)}
+    <span className={`day-group-total${balanceCents < 0 ? ' day-group-total--negative' : ''}`}>
+      <span className="day-group-total-label">saldo</span>
+      {formatMoney(balanceCents)}
     </span>
   );
 }
@@ -152,12 +148,7 @@ export function TransactionsPage() {
   }, [activeTransactions, cardFilter, typeFilter, tagFilter, normalizedQuery, categoryMap]);
 
   // Extrato agrupado por dia (padrão de app financeiro nativo): cabeçalho "Hoje/Ontem/12 jul"
-  // com o resumo do dia. A lista já vem ordenada por data; agrupar preserva a ordem.
-  //
-  // O resumo é rotulado ("gasto"/"recebido") em vez de um líquido cru: um número sozinho não
-  // diz se é gasto, saldo ou entrada, e o líquido de um dia só significa algo no dia em que se
-  // recebe. Antes, o cálculo ignorava ajuste/estorno/reembolso e o cabeçalho **contradizia as
-  // linhas logo abaixo** (dia com +1,44, −1,44, +1,44 exibia "−R$ 1,44"). Ver `dayFlowTotals`.
+  // com o saldo no fim daquele dia. A lista já vem ordenada por data; agrupar preserva a ordem.
   const dayGroups = useMemo(() => {
     const groups: Array<{ key: string; label: string; transactions: Array<LocalSynced<Transaction>> }> = [];
     let current: (typeof groups)[number] | undefined;
@@ -169,12 +160,20 @@ export function TransactionsPage() {
       }
       current.transactions.push(transaction);
     }
-    return groups.map((group) => ({ ...group, totals: dayFlowTotals(group.transactions) }));
+    return groups;
   }, [visibleTransactions]);
 
-  // Com busca textual ativa o "total do dia" seria o total do subconjunto encontrado —
-  // parece bug ("total: R$ 37"). Só mostrar sem busca; filtros de tipo/tag são intencionais.
-  const showDayTotals = normalizedQuery.length === 0;
+  // Saldo por dia sai de `activeTransactions` (SEM filtro), nunca das visíveis: quanto a pessoa
+  // tinha naquele dia é um fato do dia, não do filtro — escolher "Despesas" não pode mudar o
+  // saldo. Ver `balanceByDayEnd`.
+  const balanceByDay = useMemo(
+    () => balanceByDayEnd(finance.accounts, activeTransactions),
+    [finance.accounts, activeTransactions]
+  );
+
+  // Nota: o saldo do dia aparece mesmo com busca/filtro ativo. Isso era proibido enquanto o
+  // cabeçalho mostrava um TOTAL (o total do subconjunto encontrado parecia bug), mas saldo não
+  // depende do que está na tela — continua verdadeiro com qualquer filtro.
 
   const typeChips: Array<{ key: typeof typeFilter; label: string }> = [
     { key: 'all', label: 'Tudo' },
@@ -347,7 +346,7 @@ export function TransactionsPage() {
               <section className="day-group" key={group.key} aria-label={group.label}>
                 <header className="day-group-header">
                   <span className="day-group-label">{group.label}</span>
-                  {showDayTotals ? <DayGroupSummary totals={group.totals} /> : null}
+                  <DayGroupBalance balanceCents={balanceByDay.get(group.key)} />
                 </header>
                 {group.transactions.map((transaction) => {
                   const isIncome = transaction.type === 'income';

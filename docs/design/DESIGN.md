@@ -58,19 +58,31 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
 - **Extrato agrupado por dia** (`.day-group`/`.day-group-header`, 2026-07-18): header sticky
   "Hoje/Ontem/12 jul" + resumo do dia. Cuidado: sticky dentro do `.app-main` mobile exige
   `overflow-x: clip` (não `hidden`, que vira scroll container e mata o sticky).
+- **Cabeçalho do dia mostra SALDO, não um total de fluxo** (`.day-group-total` +
+  `balanceByDayEnd`, 2026-07-29): o saldo consolidado no fim daquele dia — o mesmo número do
+  "Saldo total" do Dashboard, voltando no tempo. **Por que não "gasto"**: resumo de fluxo sempre
+  esbarra em "o que conta como gasto?" — num dia com pagamento de fatura de R$ 1.000 mais uma
+  compra de R$ 1.000 no cartão, nem R$ 1.000 nem R$ 2.000 respondem bem. Saldo é a mesma
+  pergunta todo dia e não depende da natureza do lançamento. Lido de cima pra baixo, vira a
+  trajetória do dinheiro. **Dois dias seguidos com o mesmo saldo não é bug** — é dia em que só
+  houve compra no cartão, que não tira do banco.
 - **Resumo não usa a mesma roupa do dado que resume** (`.day-group-total`, refeito 2026-07-29):
   o total do dia era vermelho peso 800 — igual ao valor de cada linha — e empilhado logo acima
   dele se disfarçava de transação. Agora é `--text-secondary` peso 700 com um rótulo micro em
-  maiúscula (`.day-group-total-label`: "gasto"/"recebido"), recuando um nível abaixo das linhas.
-  Duas regras que valem pra qualquer resumo novo: **(1) número sozinho não se explica** — um
-  valor sem rótulo não diz se é gasto, saldo ou entrada; **(2) cor que nunca varia é decoração,
-  não dado** — como todo dia tem gasto, vermelho em todo cabeçalho não informava nada; o verde
-  só aparece quando o dia entrou mais do que saiu, que é quando a cor diz algo.
-- **Cor da linha = se entra na conta do resumo** (`transactionFlowByType`, `financeCalculations.ts`):
+  maiúscula (`.day-group-total-label`), recuando um nível abaixo das linhas. Duas regras que
+  valem pra qualquer resumo novo: **(1) número sozinho não se explica** — um valor sem rótulo
+  não diz se é gasto, saldo ou entrada; **(2) cor que nunca varia é decoração, não dado** — como
+  todo dia tem gasto, vermelho em todo cabeçalho não informava nada; hoje o vermelho só aparece
+  se o saldo ficar negativo, que é quando a cor diz algo.
+- **Resumo que é um FATO do dia ignora o filtro da tela.** O saldo sai de `activeTransactions`
+  (sem filtro), nunca das visíveis: escolher "Despesas" não pode mudar quanto a pessoa tinha.
+  Vale a distinção — enquanto o cabeçalho mostrava um total, ele precisava sumir na busca (total
+  de um subconjunto parece bug); um saldo continua verdadeiro com qualquer filtro.
+- **Cor da linha = direção do dinheiro** (`transactionFlowByType`, `financeCalculations.ts`):
   verde/`+` para entrada (receita, ajuste, estorno, reembolso), vermelho/`−` para saída (despesa,
   compra no cartão), **neutro sem sinal** para movimento interno (transferência, pagamento de
-  fatura) — que de propósito não entra no total do dia. Assim dá pra somar as linhas coloridas
-  com o dedo e bater com o cabeçalho.
+  fatura). A direção é derivada da mesma leitura que `transactionAccountEffects` usa pra mover o
+  saldo — nunca de uma regra paralela.
 - **CTA de conclusão de formulário longo é sticky** (`.entry-actions`): no mobile o offset
   usa `--bottom-nav-space` (fonte única da folga da bottom nav, definida no media query
   de 900px) — nunca hardcodar 5.75rem de novo.

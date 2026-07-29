@@ -2,6 +2,15 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-29 (parte 4) — feat(transações): o cabeçalho do dia virou SALDO, não resumo de gasto
+
+Decisão do dono, olhando o resultado da parte 3: **qualquer** resumo de fluxo esbarra em "o que conta como gasto?". No dia 23, com dois pagamentos de fatura (R$ 1.000) mais uma compra de tênis no cartão (R$ 1.000), nem "gasto R$ 1.000" nem "gasto R$ 2.000" respondiam bem — a pergunta é que estava errada. Agora o cabeçalho mostra o **saldo no fim daquele dia**: mesma pergunta todo dia, resposta que não depende da natureza do lançamento, e lido de cima pra baixo vira a trajetória do dinheiro ("nesse dia eu tinha tanto").
+
+- **`balanceByDayEnd`** (`financeCalculations.ts`, substitui `dayFlowTotals`): parte do `currentTotalBalance` — a **mesma fonte** do "Saldo total" do Dashboard — e anda pra trás desfazendo o efeito de cada lançamento via `transactionAccountEffects`. Ao chegar no primeiro lançamento de um dia, tudo mais recente já foi desfeito, então o acumulado é o saldo no fim daquele dia. Só é correto porque a lista é contígua e ordenada do mais recente pro mais antigo; ignora efeito em conta que não existe mais, igual `calculateAccountBalances`.
+- **Sai da lista SEM filtro** (`activeTransactions`): saldo é fato do dia, não do filtro — "Despesas" não pode mudar quanto a pessoa tinha. Por isso também deixou de sumir na busca, o que era obrigatório enquanto era um total.
+- **Compra no cartão não mexe no saldo; pagamento de fatura mexe** — é a realidade (comprar fiado não tira do banco), e é o que desfaz a ambiguidade original. Efeito colateral esperado: dois dias seguidos podem mostrar o mesmo saldo, quando no dia só houve compra no cartão.
+- Verificado ao vivo em 375px contra o banco: o cabeçalho do dia mais recente mostra **R$ 4.001,44**, exatamente a soma de `currentBalanceCents` que o Dashboard usa; o dia 23 fecha em R$ 4.000,00 com os R$ 15.500 de compras no cartão do dia 24 sem mover nada. 6 testes novos; `typecheck` + `test` (444) + `build` verdes. 100% client-side.
+
 ## 2026-07-29 (parte 3) — design(transações): o resumo do dia parou de mentir e de se disfarçar de transação
 
 Passada de `/frontend-design` na tela de Transações (mobile), a partir de um incômodo do dono com o total por dia. A avaliação achou que o número não era só barulhento — **estava errado em dois sentidos**:

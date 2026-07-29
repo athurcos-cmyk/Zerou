@@ -1,5 +1,5 @@
 import { addDays, compareAsc, endOfDay } from 'date-fns';
-import { compareByDateDesc, formatFriendlyMonth, toDate } from './financeDates';
+import { compareByDateDesc, formatFriendlyMonth, toDate, toDateInputValue } from './financeDates';
 import type { Account, Bill, CreditCard, Invoice, Receivable, RecurringRule, Transaction, TransactionType } from '../types/contracts';
 import type { LocalSynced } from './financeService';
 
@@ -140,31 +140,50 @@ export const transactionFlowByType = {
   card_payment: 'internal'
 } as const satisfies Record<TransactionType, TransactionFlow>;
 
-export interface DayFlowTotals {
-  spentCents: number;
-  receivedCents: number;
-}
-
 /**
- * Quanto saiu e quanto entrou num conjunto de lançamentos (o resumo de um dia no Extrato).
+ * Saldo consolidado no **fim de cada dia** que aparece no Extrato — o mesmo número do "Saldo
+ * total" do Dashboard (`currentTotalBalance`), só que voltando no tempo.
  *
- * Somas separadas, não um líquido: "gastei 27" e "recebi 5.200" são fatos diferentes, e o
- * líquido de um dia só significa alguma coisa no dia em que se recebe. Compra parcelada entra
- * pelo **valor cheio** (decisão do dono, 29/07/2026) — foi o que se comprometeu naquele dia.
+ * Decisão do dono (29/07/2026): o cabeçalho do dia mostra **saldo**, não "gasto"/"recebido".
+ * Resumo de fluxo sempre esbarrava em "o que conta como gasto?" — no dia com dois pagamentos
+ * de fatura (R$ 1.000) mais uma compra de tênis no cartão (R$ 1.000), nem "gasto R$ 1.000" nem
+ * "gasto R$ 2.000" respondiam bem. Saldo não tem esse problema: é a mesma pergunta todo dia
+ * ("quanto eu tinha") e a resposta não depende da natureza do lançamento.
+ *
+ * **Como funciona**: parte do saldo de hoje e anda pra trás, desfazendo o efeito de cada
+ * lançamento. Ao chegar no primeiro lançamento de um dia, tudo que é mais recente que ele já
+ * foi desfeito — então o acumulado naquele instante é exatamente o saldo no fim daquele dia.
+ * Isso só é correto porque a lista vem ordenada do mais recente pro mais antigo e é contígua
+ * (as 300 do boot + as páginas de "Carregar mais"): qualquer dia visível tem, acima dele, todos
+ * os lançamentos posteriores.
+ *
+ * **Passe a lista SEM filtro** (`activeTransactions`, não `visibleTransactions`): saldo é um
+ * fato do dia, não do filtro — filtrar por "Despesas" não pode mudar quanto a pessoa tinha.
+ *
+ * Reusa `transactionAccountEffects` (a mesma função que move o saldo de verdade) e ignora
+ * efeito em conta que não existe mais, igual `calculateAccountBalances` faz — senão o passeio
+ * subtrairia um valor que `currentTotalBalance` nunca somou. Compra no cartão não tem efeito em
+ * conta, então não mexe no saldo: é exatamente a realidade (comprar fiado não tira do banco; o
+ * que tira é o pagamento da fatura).
  */
-export function dayFlowTotals(
-  transactions: ReadonlyArray<Pick<Transaction, 'type' | 'amountCents'>>
-): DayFlowTotals {
-  let spentCents = 0;
-  let receivedCents = 0;
+export function balanceByDayEnd(
+  accounts: Account[],
+  transactionsNewestFirst: ReadonlyArray<Transaction>
+): Map<string, number> {
+  const accountIds = new Set(accounts.map((account) => account.id));
+  const byDay = new Map<string, number>();
+  let running = currentTotalBalance(accounts);
 
-  for (const transaction of transactions) {
-    const flow = transactionFlowByType[transaction.type];
-    if (flow === 'spent') spentCents += transaction.amountCents;
-    else if (flow === 'received') receivedCents += transaction.amountCents;
+  for (const transaction of transactionsNewestFirst) {
+    const day = toDateInputValue(transaction.date);
+    if (!byDay.has(day)) byDay.set(day, running);
+
+    for (const effect of transactionAccountEffects(transaction)) {
+      if (accountIds.has(effect.accountId)) running -= effect.deltaCents;
+    }
   }
 
-  return { spentCents, receivedCents };
+  return byDay;
 }
 
 /**

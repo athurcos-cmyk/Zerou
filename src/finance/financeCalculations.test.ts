@@ -8,8 +8,8 @@ import {
   calculateNextMonthProjection,
   calculateTotalBalance,
   currentAccountBalances,
+  balanceByDayEnd,
   currentTotalBalance,
-  dayFlowTotals,
   hasPendingCardLedgerActivity,
   invertAccountEffects,
   mergeAccountEffects,
@@ -911,59 +911,94 @@ describe('calculateNextMonthProjection', () => {
   });
 });
 
-describe('dayFlowTotals', () => {
-  it('separa o que saiu do que entrou, sem virar um líquido', () => {
-    const totals = dayFlowTotals([
-      transaction({ type: 'expense', amountCents: 1646 }),
-      transaction({ type: 'expense', amountCents: 1080 }),
-      transaction({ type: 'income', amountCents: 520000 })
-    ]);
+describe('balanceByDayEnd', () => {
+  function txOn(day: string, overrides: Partial<Transaction>) {
+    return transaction({ ...overrides, date: Timestamp.fromDate(new Date(`${day}T12:00:00`)) });
+  }
 
-    expect(totals).toEqual({ spentCents: 2726, receivedCents: 520000 });
+  it('devolve o saldo de hoje para o dia mais recente e desfaz o passado dia a dia', () => {
+    // Saldo atual 700; ontem saiu 100 → no fim de anteontem havia 800.
+    const balances = balanceByDayEnd(
+      [account('checking', 0, { currentBalanceCents: 70000 })],
+      [
+        txOn('2026-06-14', { type: 'expense', amountCents: 10000, accountId: 'checking' }),
+        txOn('2026-06-13', { type: 'income', amountCents: 5000, accountId: 'checking' })
+      ]
+    );
+
+    expect(balances.get('2026-06-14')).toBe(70000);
+    expect(balances.get('2026-06-13')).toBe(80000);
   });
 
-  // O bug que motivou a mudança (achado ao vivo pelo dono, 29/07/2026): o cabeçalho do dia
-  // ignorava `adjustment` e exibia "−R$ 1,44" num dia cujas linhas visíveis somavam +R$ 1,44.
-  it('conta ajuste, estorno e reembolso como entrada — o cabeçalho tem que fechar com as linhas', () => {
-    const totals = dayFlowTotals([
-      transaction({ type: 'adjustment', amountCents: 144 }),
-      transaction({ type: 'expense', amountCents: 144 }),
-      transaction({ type: 'adjustment', amountCents: 144 }),
-      transaction({ type: 'refund', amountCents: 1000 }),
-      transaction({ type: 'reimbursement', amountCents: 2000 })
-    ]);
+  // O caso que motivou a troca de "gasto" por "saldo" (dono, 29/07/2026): um dia com
+  // pagamento de fatura + compra no cartão não tinha resposta boa em "quanto gastei".
+  it('compra no cartão não mexe no saldo; o pagamento da fatura mexe', () => {
+    const balances = balanceByDayEnd(
+      [account('checking', 0, { currentBalanceCents: 50000 })],
+      [
+        txOn('2026-06-14', { type: 'card_purchase', amountCents: 100000, accountId: undefined, cardId: 'card-1' }),
+        txOn('2026-06-13', { type: 'card_payment', amountCents: 20000, accountId: 'checking' }),
+        txOn('2026-06-12', { type: 'expense', amountCents: 1, accountId: 'checking' })
+      ]
+    );
 
-    expect(totals).toEqual({ spentCents: 144, receivedCents: 3288 });
+    // Compra de R$ 1.000 no cartão não tira nada da conta: o dia 14 fecha igual ao dia 13.
+    expect(balances.get('2026-06-14')).toBe(50000);
+    expect(balances.get('2026-06-13')).toBe(50000);
+    // Já o pagamento de fatura de R$ 200 saiu de verdade: antes dele o saldo era 700.
+    expect(balances.get('2026-06-12')).toBe(70000);
   });
 
-  it('ignora transferência (dinheiro entre contas suas não é gasto)', () => {
-    const totals = dayFlowTotals([
-      transaction({ type: 'transfer', amountCents: 50000, destinationAccountId: 'savings' })
-    ]);
+  it('transferência entre contas próprias não muda o saldo consolidado', () => {
+    const balances = balanceByDayEnd(
+      [account('checking', 0, { currentBalanceCents: 30000 }), account('wallet', 0, { currentBalanceCents: 20000 })],
+      [txOn('2026-06-14', { type: 'transfer', amountCents: 10000, accountId: 'checking', destinationAccountId: 'wallet' })]
+    );
 
-    expect(totals).toEqual({ spentCents: 0, receivedCents: 0 });
+    expect(balances.get('2026-06-14')).toBe(50000);
   });
 
-  // Contar o pagamento da fatura somaria de novo compras que já entraram como gasto no dia
-  // delas — o mesmo cuidado de dupla contagem que o Comprometido já toma.
-  it('ignora pagamento de fatura pra não contar a mesma compra duas vezes', () => {
-    const totals = dayFlowTotals([
-      transaction({ type: 'card_purchase', amountCents: 30000 }),
-      transaction({ type: 'card_payment', amountCents: 30000 })
-    ]);
+  it('usa o saldo do fim do dia, não o de antes do primeiro lançamento', () => {
+    const balances = balanceByDayEnd(
+      [account('checking', 0, { currentBalanceCents: 10000 })],
+      [
+        txOn('2026-06-14', { type: 'expense', amountCents: 3000, accountId: 'checking' }),
+        txOn('2026-06-14', { type: 'expense', amountCents: 2000, accountId: 'checking' }),
+        txOn('2026-06-10', { type: 'income', amountCents: 1000, accountId: 'checking' })
+      ]
+    );
 
-    expect(totals).toEqual({ spentCents: 30000, receivedCents: 0 });
+    // Fim do dia 14 = saldo atual (não há nada depois). Antes dos dois gastos havia 150.
+    expect(balances.get('2026-06-14')).toBe(10000);
+    expect(balances.get('2026-06-10')).toBe(15000);
   });
 
-  it('conta compra parcelada pelo valor cheio (o que foi comprometido no dia)', () => {
-    const totals = dayFlowTotals([
-      transaction({ type: 'card_purchase', amountCents: 131076, installments: 12 })
-    ]);
+  it('ignora lançamento de conta que não existe mais (igual calculateAccountBalances)', () => {
+    const balances = balanceByDayEnd(
+      [account('checking', 0, { currentBalanceCents: 10000 })],
+      [
+        txOn('2026-06-14', { type: 'expense', amountCents: 500, accountId: 'checking' }),
+        txOn('2026-06-13', { type: 'expense', amountCents: 99999, accountId: 'conta-apagada' })
+      ]
+    );
 
-    expect(totals.spentCents).toBe(131076);
+    expect(balances.get('2026-06-13')).toBe(10500);
   });
 
-  it('devolve zero para um dia sem lançamento nenhum', () => {
-    expect(dayFlowTotals([])).toEqual({ spentCents: 0, receivedCents: 0 });
+  it('ignora lançamento excluído', () => {
+    const balances = balanceByDayEnd(
+      [account('checking', 0, { currentBalanceCents: 10000 })],
+      [
+        txOn('2026-06-14', { type: 'expense', amountCents: 500, accountId: 'checking' }),
+        txOn('2026-06-13', {
+          type: 'expense',
+          amountCents: 7000,
+          accountId: 'checking',
+          deletedAt: Timestamp.fromDate(new Date('2026-06-15T12:00:00'))
+        })
+      ]
+    );
+
+    expect(balances.get('2026-06-13')).toBe(10500);
   });
 });
