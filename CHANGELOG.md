@@ -2,6 +2,10 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-28 — fix(análise): categoria com orçamento mostra % do LIMITE, não a fatia do total
+
+O dono achou confuso: limite de R$100 em "Guloseimas", gastou R$62, e a Análise dizia "5%". Aquele 5% era a fatia da categoria no gasto **total** (62/1394), não o quanto do **limite** foi usado. Agora, quando a categoria tem orçamento, o % mostra "quanto do limite já usei" (62,86/100 = **63%**), em negrito e colorido pelo status (verde < 80%, âmbar 80-99%, vermelho ≥ 100%) — casando com a barra de limite. Sem orçamento, segue mostrando a fatia do total (contexto do donut) em cinza. Só `SearchPage.tsx`. Verificado ao vivo.
+
 ## 2026-07-28 — perf(análise): donut de categorias refeito em SVG puro (fim do travamento no celular)
 
 O donut "Por categoria" era Recharts (`PieChart`) dentro de `ResponsiveContainer` — a animação de "formação" em JS + o ResizeObserver do container demoravam pra carregar e engasgavam no celular (relatado pelo dono). Refeito em **SVG puro** (arcos via `stroke-dasharray`): render instantâneo, sem ResizeObserver, com entrada suave em CSS (fade+scale, GPU, respeita `prefers-reduced-motion`) no lugar do sweep em JS.
