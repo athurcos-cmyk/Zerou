@@ -1,5 +1,5 @@
 ﻿import { useState, type FormEvent } from 'react';
-import { Building2, ChevronDown, Star, Trash2 } from 'lucide-react';
+import { Building2, ChevronDown, Scale, Star, Trash2 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useFinanceContext } from '../finance/FinanceDataContext';
 import { SelectField } from '../components/SelectField';
@@ -7,7 +7,9 @@ import { FormMessage } from '../components/FormMessage';
 import { useConfirm } from '../components/ConfirmDialog';
 import { EmptyState } from '../components/EmptyState';
 import { LoadingState } from '../components/LoadingState';
+import { AccountReconcileSheet } from '../finance/AccountReconcileSheet';
 import { findBankInstitution, searchBankInstitutions, type BankInstitution } from '../finance/bankInstitutions';
+import type { AccountBalance } from '../finance/financeCalculations';
 import { accountTypeLabels } from '../finance/financeLabels';
 import { accountHasLiveTransactions, createAccount, deleteAccount, setPrimaryAccount, unsetPrimaryAccount } from '../finance/financeService';
 import { accountTypes } from '../finance/financeSchemas';
@@ -23,11 +25,14 @@ export function AccountsPage() {
   const [name, setName] = useState('');
   const [type, setType] = useState<AccountType>('checking');
   const [openingBalance, setOpeningBalance] = useState('');
-  const [message, setMessage] = useState<string | null>(null);
+  // Mensagem com tom: erros em vermelho (padrão), sucesso (ex.: acerto de saldo) em verde.
+  const [message, setMessage] = useState<{ text: string; tone: 'success' | 'danger' } | null>(null);
+  const showError = (text: string) => setMessage({ text, tone: 'danger' });
   const [formOpen, setFormOpen] = useState(false);
   // Enquanto a conferência de lançamentos roda, o botão da conta fica travado — a leitura
   // vai ao servidor e demora o suficiente pra dar dois cliques.
   const [deleteProbeAccountId, setDeleteProbeAccountId] = useState<string | null>(null);
+  const [reconcileAccount, setReconcileAccount] = useState<AccountBalance | null>(null);
   const { confirm, dialog: confirmDialog } = useConfirm();
   const suggestions = searchBankInstitutions(name, name.trim() ? 6 : 8);
   const syncStatusByAccountId = new Map(finance.accounts.map((account) => [account.id, account.localSyncStatus]));
@@ -45,14 +50,14 @@ export function AccountsPage() {
 
     if (isPrimary) {
       unsetPrimaryAccount(workspaceId, accountId).catch((error) =>
-        setMessage(getUserFacingErrorMessage(error, 'Não foi possível atualizar a conta principal agora.'))
+        showError(getUserFacingErrorMessage(error, 'Não foi possível atualizar a conta principal agora.'))
       );
       return;
     }
 
     const currentPrimaryId = finance.accountBalances.find((account) => account.isPrimary)?.id ?? null;
     setPrimaryAccount(workspaceId, accountId, currentPrimaryId).catch((error) =>
-      setMessage(getUserFacingErrorMessage(error, 'Não foi possível atualizar a conta principal agora.'))
+      showError(getUserFacingErrorMessage(error, 'Não foi possível atualizar a conta principal agora.'))
     );
   }
 
@@ -61,7 +66,7 @@ export function AccountsPage() {
     setMessage(null);
 
     if (!workspaceId || !user) {
-      setMessage('Conclua seu cadastro inicial antes de criar contas.');
+      showError('Conclua seu cadastro inicial antes de criar contas.');
       return;
     }
 
@@ -69,7 +74,7 @@ export function AccountsPage() {
       name,
       type,
       openingBalanceCents: parseMoneyToCents(openingBalance)
-    }).catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível criar a conta agora.')));
+    }).catch((error) => showError(getUserFacingErrorMessage(error, 'Não foi possível criar a conta agora.')));
     setName('');
     setType('checking');
     setOpeningBalance('');
@@ -85,7 +90,7 @@ export function AccountsPage() {
     const hasRecurringRules = finance.recurringRules.some((rule) => rule.accountId === accountId && rule.isActive);
 
     if (hasBills || hasRecurringRules) {
-      setMessage(
+      showError(
         `Não dá para excluir "${accountName}" ainda. Ela está ligada a contas a pagar ou recorrências. Remova ou altere esses vínculos primeiro.`
       );
       return;
@@ -99,14 +104,14 @@ export function AccountsPage() {
     try {
       hasTransactions = await accountHasLiveTransactions(workspaceId, accountId);
     } catch (error) {
-      setMessage(getUserFacingErrorMessage(error, 'Não foi possível conferir os lançamentos desta conta agora. Tente de novo.'));
+      showError(getUserFacingErrorMessage(error, 'Não foi possível conferir os lançamentos desta conta agora. Tente de novo.'));
       return;
     } finally {
       setDeleteProbeAccountId(null);
     }
 
     if (hasTransactions) {
-      setMessage(
+      showError(
         `Não dá para excluir "${accountName}" ainda. Ela está ligada a lançamentos. Remova ou altere esses vínculos primeiro.`
       );
       return;
@@ -125,7 +130,7 @@ export function AccountsPage() {
 
     setMessage(null);
     deleteAccount(workspaceId, accountId).catch((error) =>
-      setMessage(getUserFacingErrorMessage(error, 'Não foi possível excluir a conta agora.'))
+      showError(getUserFacingErrorMessage(error, 'Não foi possível excluir a conta agora.'))
     );
   }
 
@@ -141,7 +146,7 @@ export function AccountsPage() {
         )}
       </div>
 
-      <FormMessage>{message}</FormMessage>
+      <FormMessage type={message?.tone}>{message?.text}</FormMessage>
 
       {finance.accountBalances.length > 1 && (
         <p className="settings-hint">
@@ -171,6 +176,15 @@ export function AccountsPage() {
                 <div className="account-card-hero-footer">
                   <SyncStatusBadge status={syncStatusByAccountId.get(account.id) ?? 'synced'} />
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <button
+                      className="icon-button"
+                      type="button"
+                      aria-label={`Acertar saldo de ${account.name} com o banco`}
+                      title="Acertar saldo com o banco"
+                      onClick={() => setReconcileAccount(account)}
+                    >
+                      <Scale size={17} aria-hidden="true" />
+                    </button>
                     <button
                       className={`icon-button icon-button--star${account.isPrimary ? ' is-active' : ''}`}
                       type="button"
@@ -227,7 +241,7 @@ export function AccountsPage() {
         </button>
         {formOpen && (
           <>
-            <FormMessage>{message}</FormMessage>
+            <FormMessage type={message?.tone}>{message?.text}</FormMessage>
             <label className="field">
               <span>Nome</span>
               <input className="input" value={name} onChange={(event) => setName(event.target.value)} placeholder="Nubank, Carteira, Poupança" />
@@ -264,6 +278,22 @@ export function AccountsPage() {
           </>
         )}
       </form>
+
+      <AccountReconcileSheet
+        open={reconcileAccount !== null}
+        workspaceId={workspaceId}
+        userId={user?.uid}
+        account={reconcileAccount}
+        onClose={() => setReconcileAccount(null)}
+        onApplied={(deltaCents) => {
+          const name = reconcileAccount?.name ?? 'a conta';
+          const verb = deltaCents > 0 ? 'receita' : 'despesa';
+          setMessage({
+            text: `Saldo acertado — lançamos uma ${verb} de acerto de ${formatMoney(Math.abs(deltaCents))} em ${name}.`,
+            tone: 'success'
+          });
+        }}
+      />
 
       {confirmDialog}
     </section>

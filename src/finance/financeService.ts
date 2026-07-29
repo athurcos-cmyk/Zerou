@@ -210,6 +210,53 @@ export async function createTransaction(workspaceId: string, userId: string, inp
   return id;
 }
 
+/**
+ * "Acertar saldo com o banco": leva o saldo da conta ao valor real informado, criando UM
+ * lançamento de acerto pela diferença — em vez de a pessoa calcular na mão e lançar uma
+ * receita/despesa "Ajuste" (o que já era o costume do dono; ver a diferença de 1,44 do
+ * rendimento automático do Nubank, que credita centavos que ninguém digita).
+ *
+ * A direção vem do TIPO, nunca de valor negativo (a regra do Firestore exige `amountCents >= 0`):
+ * banco maior → `adjustment` (credita, efeito +amount); banco menor → `expense` (debita,
+ * efeito −amount). Nos dois casos o efeito no saldo é exatamente a diferença, então a conta
+ * pousa no alvo. Sem diferença, não grava nada.
+ *
+ * Fire-and-forget como todo write (offline-first): a UI já pode fechar e mostrar o resultado
+ * a partir do `deltaCents` retornado — o saldo reflete do cache local na hora.
+ */
+export function reconcileAccountBalance(
+  workspaceId: string,
+  userId: string,
+  input: { accountId: string; currentBalanceCents: number; targetBalanceCents: number }
+): { applied: boolean; deltaCents: number } {
+  const deltaCents = input.targetBalanceCents - input.currentBalanceCents;
+  if (deltaCents === 0) {
+    return { applied: false, deltaCents: 0 };
+  }
+
+  const isCredit = deltaCents > 0;
+  const type = isCredit ? ('adjustment' as const) : ('expense' as const);
+  const amountCents = Math.abs(deltaCents);
+  const now = new Date();
+  const monthKey = monthKeyFromDate(now);
+  const id = createId('txn');
+
+  const batch = writeBatch(getFirebaseDb());
+  batch.set(documentRef(workspaceId, 'transactions', id), omitUndefined({
+    id, workspaceId, createdBy: userId, updatedBy: userId,
+    type, amountCents,
+    description: 'Acerto de saldo com o banco',
+    accountId: input.accountId,
+    date: Timestamp.fromDate(now), competenceMonth: monthKey, cashMonth: monthKey,
+    tags: ['acerto'], isRecurring: false, clientMutationId: id,
+    syncStatus: 'synced', version: 1, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+  }));
+  applyAccountEffectsToBatch(batch, workspaceId, transactionAccountEffects({ type, amountCents, accountId: input.accountId }));
+  fireWrite(batch.commit());
+
+  return { applied: true, deltaCents };
+}
+
 export async function createCategory(
   workspaceId: string,
   userId: string,

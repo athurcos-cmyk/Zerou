@@ -31,7 +31,7 @@ vi.mock('../cards/cardService', () => ({
   addCardPurchaseToBatch: cardServiceMocks.addCardPurchaseToBatch
 }));
 
-const { markOverdueBills, payBill, recordRecurringPayment, recurringOccurrenceTransactionId, updateBill } = await import(
+const { markOverdueBills, payBill, reconcileAccountBalance, recordRecurringPayment, recurringOccurrenceTransactionId, updateBill } = await import(
   './financeService'
 );
 
@@ -211,5 +211,60 @@ describe('recordRecurringPayment', () => {
 
     expect(firestoreMocks.batch.set).not.toHaveBeenCalled();
     expect(cardServiceMocks.addCardPurchaseToBatch).not.toHaveBeenCalled();
+  });
+});
+
+describe('reconcileAccountBalance', () => {
+  it('banco maior: cria adjustment pela diferença e credita o saldo (efeito +delta)', () => {
+    firestoreMocks.batch.set.mockClear();
+    firestoreMocks.batch.update.mockClear();
+
+    // Caso real: app em 705,91, banco em 707,35 (rendimento não lançado) → +1,44.
+    const result = reconcileAccountBalance('workspace-1', 'user-1', {
+      accountId: 'acct-1',
+      currentBalanceCents: 70591,
+      targetBalanceCents: 70735
+    });
+
+    expect(result).toEqual({ applied: true, deltaCents: 144 });
+    const [, payload] = firestoreMocks.batch.set.mock.calls[0];
+    expect(payload).toEqual(
+      expect.objectContaining({ type: 'adjustment', amountCents: 144, accountId: 'acct-1', tags: ['acerto'] })
+    );
+    // efeito de saldo: 1 update na conta (increment). adjustment credita.
+    expect(firestoreMocks.batch.update).toHaveBeenCalledTimes(1);
+    expect(firestoreMocks.batch.commit).toHaveBeenCalled();
+  });
+
+  it('banco menor: cria expense pela diferença absoluta e debita o saldo', () => {
+    firestoreMocks.batch.set.mockClear();
+    firestoreMocks.batch.update.mockClear();
+
+    const result = reconcileAccountBalance('workspace-1', 'user-1', {
+      accountId: 'acct-1',
+      currentBalanceCents: 80000,
+      targetBalanceCents: 79000
+    });
+
+    expect(result).toEqual({ applied: true, deltaCents: -1000 });
+    const [, payload] = firestoreMocks.batch.set.mock.calls[0];
+    // amountCents sempre positivo (a regra do Firestore exige >= 0); a direção vem do tipo.
+    expect(payload).toEqual(expect.objectContaining({ type: 'expense', amountCents: 1000, accountId: 'acct-1' }));
+    expect(firestoreMocks.batch.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('saldo já bate: não grava nada e reporta applied=false', () => {
+    firestoreMocks.batch.set.mockClear();
+    firestoreMocks.batch.update.mockClear();
+
+    const result = reconcileAccountBalance('workspace-1', 'user-1', {
+      accountId: 'acct-1',
+      currentBalanceCents: 50000,
+      targetBalanceCents: 50000
+    });
+
+    expect(result).toEqual({ applied: false, deltaCents: 0 });
+    expect(firestoreMocks.batch.set).not.toHaveBeenCalled();
+    expect(firestoreMocks.batch.update).not.toHaveBeenCalled();
   });
 });

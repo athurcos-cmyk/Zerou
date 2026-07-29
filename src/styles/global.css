@@ -478,6 +478,12 @@ html[data-reduce-motion='true'] *::after {
   color: var(--text-primary);
 }
 
+/* Notice como banner solto no topo de uma página (não dentro de form/sheet, que já
+   espaçam via gap): dá respiro embaixo pra não colar no conteúdo seguinte. */
+.page-content > .notice {
+  margin-bottom: 1rem;
+}
+
 .app-layout {
   display: grid;
   min-height: 100vh;
@@ -3637,6 +3643,77 @@ span.service-mark--brand {
 
 .button--danger-text {
   color: var(--danger);
+}
+
+/* --- Acertar saldo com o banco --- */
+.reconcile-current {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-subtle);
+}
+
+.reconcile-current span {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.reconcile-current strong {
+  font-variant-numeric: tabular-nums;
+  font-size: 1.02rem;
+}
+
+.reconcile-diff {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: var(--radius-md);
+}
+
+.reconcile-diff > svg {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
+.reconcile-diff strong {
+  display: block;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.25rem;
+  line-height: 1.15;
+}
+
+.reconcile-diff span {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+}
+
+.reconcile-diff--credit {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.reconcile-diff--debit,
+.reconcile-diff--match {
+  background: var(--bg-surface-subtle);
+}
+
+.reconcile-diff--debit {
+  color: var(--danger);
+}
+
+.reconcile-diff--match {
+  color: var(--success);
+  align-items: center;
+}
+
+.reconcile-diff--match strong {
+  font-size: 0.98rem;
 }
 
 /* --- Category grid in sheet --- */
