@@ -2,6 +2,16 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-28 — fix: compra de cartão excluída some da Análise + expansor nas recorrências previstas
+
+Bug (achado pelo dono): uma compra no cartão excluída continuava aparecendo na Análise pra sempre. Causa: `signedCharge` (`spendingAnalysis.ts`) não reconhecia os lançamentos de estorno que a Cloud Function `reverseCardPurchaseOnDelete` cria ao excluir — `purchase_reversal` (crédito) e `anticipation_credit_reversal` (débito) — então o estorno não abatia a compra. Mesma classe de drift de enum que o `CLAUDE.md` marca como o bug nº 1 do projeto (3ª ocorrência). Planejado com `/plan-eng-review`, revisado com `/code-review`.
+
+- **`signedCharge`**: `purchase_reversal` → crédito (−), `anticipation_credit_reversal` → débito (+). `isSinglePurchaseLedgerEntry` passou a ignorar também o `purchase_reversal` de compra **à vista** — senão, no regime de competência, excluir uma à vista deixava um crédito fantasma no mês da fatura (a compra some pela transação, mas o estorno continuava pesando no ledger).
+- **`calculateInvoice.ts`** (mirror client): fechado o gap gêmeo — `anticipation_credit_reversal` faltava lá também (divergia de `invoiceTotals.ts`, a fonte da verdade da Cloud Function).
+- **Trava anti-regressão**: teste que percorre os 15 tipos de ledger e garante que `signedCharge` e `calculateInvoice` concordam; a lista de tipos é **exaustiva por construção** (`satisfies Record<InvoiceLedgerEntryType, true>` → um tipo novo no enum sem entrar na lista vira erro de compilação). Mais 3 testes de regressão das exclusões (parcelada, à vista sem fantasma, antecipada).
+- **Expansor** na lista "Contas recorrentes previstas" da Análise: colapsa em 5 com "Ver todas as N recorrências", espelhando o expansor de categorias.
+- `typecheck` + `test` (427) + `build` verdes. 100% client-side (sem deploy de regras/functions). Detalhe em `docs/history/2026-07.md`.
+
 ## 2026-07-28 — feat: Análise em regime de competência (compra à vista no cartão conta no mês da compra)
 
 O dono notou que gastos à vista no cartão feitos em julho apareciam só na Análise de agosto. Não era bug: a Análise usava **regime de caixa** (gasto do cartão pelo mês da fatura). Como o cartão dele **fecha dia 2**, quase tudo caía na fatura do mês seguinte — um atraso sistemático de ~1 mês entre "quando gastei" e "onde aparece". Decisão do dono: mudar pra **regime de competência**.

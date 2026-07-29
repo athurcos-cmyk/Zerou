@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Timestamp } from 'firebase/firestore';
-import type { InvoiceLedgerEntry, Transaction } from '../types/contracts';
+import type { InvoiceLedgerEntry, InvoiceLedgerEntryType, Transaction } from '../types/contracts';
+import { calculateInvoice } from '../domain/invoices/calculateInvoice';
 import {
   billsByCategoryForMonth,
   committedByCategoryForMonth,
@@ -9,6 +10,7 @@ import {
   ongoingInstallmentPurchases,
   projectedRecurringForMonth,
   recurringByCategoryForMonth,
+  signedCharge,
   spendingByCategoryForMonth,
   spendingByCategoryAcrossMonths,
   computeCategoryTrend,
@@ -565,5 +567,73 @@ describe('cartão à vista conta pela data da compra (regime de competência)', 
     // Não conta os R$300 cheios em julho: conta R$100 por fatura (parcela detectada por ocorrência > 1).
     expect(spendingByCategoryForMonth('2026-07', [purchaseTxn], invoices, catOf).get('compras')).toBe(10000);
     expect(spendingByCategoryForMonth('2026-08', [purchaseTxn], invoices, catOf).get('compras')).toBe(10000);
+  });
+});
+
+describe('signedCharge sincronizado com calculateInvoice (trava anti-drift dos tipos de ledger)', () => {
+  // Se um tipo novo for adicionado só num dos dois classificadores, este teste quebra —
+  // é a defesa contra a classe de bug que deixou purchase_reversal fora do signedCharge.
+  // Exaustivo POR CONSTRUÇÃO: `satisfies Record<InvoiceLedgerEntryType, true>` vira erro de
+  // compilação se um tipo novo entrar no enum sem ser listado aqui — sem isso, um tipo novo
+  // passaria despercebido no teste (a exata classe de drift que este teste existe pra travar).
+  const ALL_TYPES_MAP = {
+    purchase: true, payment: true, advance_payment: true, refund_credit: true,
+    chargeback_credit: true, manual_credit: true, manual_debit: true, interest: true,
+    fine: true, iof: true, fee: true, installment_anticipation: true,
+    installment_anticipation_credit: true, purchase_reversal: true, anticipation_credit_reversal: true
+  } satisfies Record<InvoiceLedgerEntryType, true>;
+  const ALL_TYPES = Object.keys(ALL_TYPES_MAP) as InvoiceLedgerEntryType[];
+
+  it.each(ALL_TYPES)('tipo %s: signedCharge == contribuição de recognizedExpense do calculateInvoice', (type) => {
+    const amountCents = 1000;
+    const viaSpending = signedCharge({ type, amountCents });
+    const viaInvoice = calculateInvoice([
+      { id: 't', type, amountCents, effectiveAt: new Date('2026-07-15'), idempotencyKey: 't' }
+    ]).recognizedExpenseCents;
+    expect(viaSpending).toBe(viaInvoice);
+  });
+});
+
+describe('exclusão de compra no cartão some da Análise (regressão do purchase_reversal)', () => {
+  it('parcelada excluída: parcela + estorno se anulam em cada mês da fatura', () => {
+    const catOf = (id?: string) => (id === 'p3x' ? 'compras' : undefined);
+    const invoices: InvoiceForSpending[] = ['2026-07', '2026-08', '2026-09'].map((month, i) => ({
+      referenceMonth: month,
+      ledgerEntries: [
+        entry({ id: `p3x_p${i + 1}`, type: 'purchase', amountCents: 10000, sourceTransactionId: 'p3x', installmentNumber: i + 1, installmentTotal: 3 }),
+        entry({ id: `p3x_rev${i + 1}`, type: 'purchase_reversal', amountCents: 10000, sourceTransactionId: 'p3x' })
+      ]
+    }));
+    for (const month of ['2026-07', '2026-08', '2026-09']) {
+      expect(spendingByCategoryForMonth(month, [], invoices, catOf).get('compras') ?? 0).toBe(0);
+    }
+  });
+
+  it('à vista excluída: some do mês da compra E não deixa crédito fantasma no mês da fatura', () => {
+    const deleted = txn({
+      id: 'av1', type: 'card_purchase', amountCents: 1660, categoryId: 'transporte', cardId: 'card',
+      cashMonth: '2026-07', competenceMonth: '2026-07', deletedAt: Timestamp.fromDate(new Date('2026-07-27'))
+    });
+    const invoices: InvoiceForSpending[] = [{
+      referenceMonth: '2026-08',
+      ledgerEntries: [
+        entry({ id: 'av1_p1', type: 'purchase', amountCents: 1660, sourceTransactionId: 'av1' }),
+        entry({ id: 'av1_rev', type: 'purchase_reversal', amountCents: 1660, sourceTransactionId: 'av1' })
+      ]
+    }];
+    const catOf = (id?: string) => (id === 'av1' ? 'transporte' : undefined);
+    expect(spendingByCategoryForMonth('2026-07', [deleted], invoices, catOf).get('transporte')).toBeUndefined();
+    expect(spendingByCategoryForMonth('2026-08', [deleted], invoices, catOf).get('transporte')).toBeUndefined();
+  });
+
+  it('parcela antecipada de compra excluída: crédito de antecipação + seu estorno se anulam', () => {
+    const catOf = (id?: string) => (id === 'antp' ? 'compras' : undefined);
+    const invoices: InvoiceForSpending[] = [
+      { referenceMonth: '2026-09', ledgerEntries: [
+        entry({ id: 'antp_credit', type: 'installment_anticipation_credit', amountCents: 10000, sourceTransactionId: 'antp' }),
+        entry({ id: 'antp_credit_rev', type: 'anticipation_credit_reversal', amountCents: 10000, sourceTransactionId: 'antp' })
+      ] }
+    ];
+    expect(spendingByCategoryForMonth('2026-09', [], invoices, catOf).get('compras') ?? 0).toBe(0);
   });
 });

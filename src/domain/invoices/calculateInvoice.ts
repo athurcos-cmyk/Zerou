@@ -43,7 +43,11 @@ export function calculateInvoice(entries: InvoiceLedgerInput[], lifecycle: 'open
       return;
     }
 
-    if (entry.type === 'installment_anticipation') {
+    // Antecipação (débito na fatura atual) e o estorno de um crédito de antecipação
+    // (`anticipation_credit_reversal`, gerado ao excluir uma compra com parcela antecipada)
+    // entram como débito. Sincronizado com invoiceTotals.ts (Cloud Function) e signedCharge
+    // (Análise) — os três precisam concordar, senão o total da fatura diverge em silêncio.
+    if (entry.type === 'installment_anticipation' || entry.type === 'anticipation_credit_reversal') {
       purchasesTotalCents += entry.amountCents;
       return;
     }

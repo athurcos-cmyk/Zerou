@@ -143,6 +143,7 @@ export function SearchPage() {
   const [query, setQuery] = useState('');
   const [selectedCatIndex, setSelectedCatIndex] = useState<number | null>(null);
   const [showAllCategories, setShowAllCategories] = useState(false);
+  const [showAllRecurring, setShowAllRecurring] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [annualOpen, setAnnualOpen] = useState(false);
@@ -736,7 +737,7 @@ export function SearchPage() {
             Estimativa pelas suas recorrências ativas — pode mudar se você cancelar ou ajustar alguma.
           </p>
           <div className="item-list">
-            {recurringProjected.map((r) => (
+            {(showAllRecurring ? recurringProjected : recurringProjected.slice(0, 5)).map((r) => (
               <div className="list-row" key={r.id}>
                 <div>
                   <strong>{r.description}</strong>
@@ -746,6 +747,23 @@ export function SearchPage() {
               </div>
             ))}
           </div>
+          {recurringProjected.length > 5 && (
+            <button
+              type="button"
+              onClick={() => setShowAllRecurring((v) => !v)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.3rem',
+                fontSize: '0.78rem', fontWeight: 600, color: 'var(--action-primary)',
+                background: 'none', border: 'none', padding: '0.7rem 0 0', cursor: 'pointer',
+              }}
+            >
+              {showAllRecurring ? (
+                <>Ver menos <ChevronUp size={14} aria-hidden="true" /></>
+              ) : (
+                <>Ver todas as {recurringProjected.length} recorrências <ChevronDown size={14} aria-hidden="true" /></>
+              )}
+            </button>
+          )}
         </article>
       )}
 

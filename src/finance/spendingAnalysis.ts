@@ -25,21 +25,29 @@ import type { InvoiceLedgerEntry, InvoiceLedgerEntryType, InvoiceStatus, Transac
  * sobre o extrato da fatura.
  */
 
+// Débitos: pesam como gasto (+). `anticipation_credit_reversal` também é débito — é o estorno
+// de um crédito de antecipação, gerado ao excluir uma compra que teve parcela antecipada
+// (ver reverseCardPurchaseOnDelete). Mantido em sincronia com invoiceTotals.ts/calculateInvoice.ts
+// (o teste `signedCharge x calculateInvoice concordam nos N tipos` trava essa sincronia).
 const cardChargeTypes = new Set<InvoiceLedgerEntryType>([
   'purchase',
   'manual_debit',
   'installment_anticipation',
+  'anticipation_credit_reversal',
   'interest',
   'fine',
   'iof',
   'fee'
 ]);
 
+// Créditos: abatem o gasto (−). `purchase_reversal` é o estorno de uma compra excluída — sem
+// ele aqui, uma compra excluída continuava contando na Análise pra sempre (bug real 2026-07-28).
 const cardCreditTypes = new Set<InvoiceLedgerEntryType>([
   'installment_anticipation_credit',
   'refund_credit',
   'chargeback_credit',
-  'manual_credit'
+  'manual_credit',
+  'purchase_reversal'
 ]);
 
 // 'payment' e 'advance_payment' são liquidação da fatura, não gasto — ignorados de propósito.
@@ -96,12 +104,21 @@ function isSingleCardPurchase(t: Pick<Transaction, 'type' | 'id'>, parceledIds: 
   return t.type === 'card_purchase' && !parceledIds.has(t.id);
 }
 
-/** Parcela `purchase` à vista no ledger — IGNORADA (já contada pela transação). */
+/**
+ * Lançamento de uma compra à vista no ledger — IGNORADO na Análise (a compra já é contada
+ * pela transação, no mês da compra). Cobre a compra (`purchase`) E o estorno dela
+ * (`purchase_reversal`, gerado ao excluir): os dois somem juntos. Sem incluir o estorno aqui,
+ * excluir uma compra à vista deixava um crédito fantasma (−valor) no mês da fatura — porque a
+ * compra some pela transação (deletedAt), mas o estorno continuaria pesando no ledger.
+ * Parcela de compra parcelada (id em `parceledIds`) nunca é ignorada — conta pela fatura.
+ */
 function isSinglePurchaseLedgerEntry(
   entry: Pick<InvoiceLedgerEntry, 'type' | 'sourceTransactionId'>,
   parceledIds: Set<string>
 ): boolean {
-  return entry.type === 'purchase' && !!entry.sourceTransactionId && !parceledIds.has(entry.sourceTransactionId);
+  return (entry.type === 'purchase' || entry.type === 'purchase_reversal')
+    && !!entry.sourceTransactionId
+    && !parceledIds.has(entry.sourceTransactionId);
 }
 
 function isCountableExpense(t: Transaction, month: string, parceledIds: Set<string>): boolean {
