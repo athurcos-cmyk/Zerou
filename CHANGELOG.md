@@ -2,6 +2,14 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-29 — fix(transações): ordem dentro do mesmo dia respeita a hora real do lançamento
+
+O dono notou: gasto de R$16 lançado primeiro, R$10 lançado depois — mas o de R$10 aparecia embaixo. Causa: `Transaction.date` só grava o **dia** (o formulário sempre grava meio-dia, `fromDateInputValue`), então duas transações do mesmo dia empatam nesse campo e a ordem exibida virava a ordem arbitrária de chegada do snapshot do Firestore, não a ordem real do lançamento.
+
+- Novo `compareByDateDesc` (`financeDates.ts`): ordena por `date` desc, desempatando por `createdAt` (hora real do registro, já gravado em toda transação) quando a data é igual.
+- Aplicado no Extrato (`TransactionsPage.tsx`) e nas "transações recentes" do Dashboard (`financeCalculations.ts`), que tinha o mesmo bug pelo mesmo motivo.
+- Verificado ao vivo na conta de teste: lançou A e depois B no mesmo dia — B passou a aparecer acima de A. `typecheck` + `test` (260 de `src/finance`) + `build` verdes. 100% client-side, sem mudança em regras/functions.
+
 ## 2026-07-28 — análise: categoria com orçamento mostra os DOIS % (fatia do total + % do limite)
 
 Refinamento do anterior, a pedido do dono: em vez de trocar um % pelo outro, a linha de uma categoria orçada mostra **os dois** — a **fatia do total** (cinza, junto do valor, contexto do donut) e o **% do limite usado** ("63% lim.", colorido pelo status, junto da barra de progresso). Cada número no seu contexto, sem apertar a linha. Só `SearchPage.tsx`. Verificado ao vivo.

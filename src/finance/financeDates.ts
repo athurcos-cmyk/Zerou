@@ -39,6 +39,24 @@ export function todayInputValue() {
   return format(new Date(), 'yyyy-MM-dd');
 }
 
+interface DatedRecord {
+  date: DateLike;
+  createdAt?: DateLike;
+}
+
+/** Ordena por `date` desc. `date` só grava o dia — o formulário sempre grava meio-dia
+ * (`fromDateInputValue`) — então duas transações do mesmo dia empatam; desempata por
+ * `createdAt` (hora real do registro) pra refletir a ordem em que a pessoa lançou, não a
+ * ordem arbitrária de chegada do snapshot (achado do dono, 29/07: despesas do mesmo dia
+ * trocadas de lugar). */
+export function compareByDateDesc(a: DatedRecord, b: DatedRecord) {
+  const dateDiff = toDate(b.date).getTime() - toDate(a.date).getTime();
+  if (dateDiff !== 0) return dateDiff;
+  const aCreated = a.createdAt ? toDate(a.createdAt).getTime() : 0;
+  const bCreated = b.createdAt ? toDate(b.createdAt).getTime() : 0;
+  return bCreated - aCreated;
+}
+
 export function fromDateInputValue(value: string) {
   const [year, month, day] = value.split('-').map(Number);
 

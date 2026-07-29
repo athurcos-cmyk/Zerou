@@ -10,7 +10,7 @@ import { CategoryMark } from '../components/categoryIcons';
 import { SelectField } from '../components/SelectField';
 import { useConfirm } from '../components/ConfirmDialog';
 import { defaultCategoryColors } from '../theme/palette';
-import { formatFriendlyDate, toDate, toDateInputValue } from '../finance/financeDates';
+import { compareByDateDesc, formatFriendlyDate, toDateInputValue } from '../finance/financeDates';
 import { transactionTypeLabels } from '../finance/financeLabels';
 import { dedupeById, loadMoreTransactions, softDeleteTransaction, type LocalSynced } from '../finance/financeService';
 import { formatMoney } from '../finance/money';
@@ -53,9 +53,7 @@ export function TransactionsPage() {
   // excluídas (o cursor de paginação precisa continuar certo); o filtro de exibição tira depois.
   const loadedTransactions = useMemo(
     () =>
-      dedupeById(finance.transactions, olderTransactions).sort(
-        (a, b) => toDate(b.date).getTime() - toDate(a.date).getTime()
-      ),
+      dedupeById(finance.transactions, olderTransactions).sort(compareByDateDesc),
     [finance.transactions, olderTransactions]
   );
 

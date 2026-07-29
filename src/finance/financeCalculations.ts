@@ -1,5 +1,5 @@
 import { addDays, compareAsc, endOfDay } from 'date-fns';
-import { formatFriendlyMonth, toDate } from './financeDates';
+import { compareByDateDesc, formatFriendlyMonth, toDate } from './financeDates';
 import type { Account, Bill, CreditCard, Invoice, Receivable, RecurringRule, Transaction } from '../types/contracts';
 import type { LocalSynced } from './financeService';
 
@@ -362,7 +362,7 @@ export function calculateDashboardSummary(input: {
   const recentTransactions = input.transactions
     .filter(isActiveTransaction)
     .slice()
-    .sort((left, right) => compareAsc(toDate(right.date), toDate(left.date)))
+    .sort(compareByDateDesc)
     .slice(0, 5);
 
   return {
