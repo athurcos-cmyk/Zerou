@@ -9,6 +9,7 @@ import {
   calculateTotalBalance,
   currentAccountBalances,
   currentTotalBalance,
+  dayFlowTotals,
   hasPendingCardLedgerActivity,
   invertAccountEffects,
   mergeAccountEffects,
@@ -907,5 +908,62 @@ describe('calculateNextMonthProjection', () => {
     });
 
     expect(result!.leftoverCents).toBe(500000);
+  });
+});
+
+describe('dayFlowTotals', () => {
+  it('separa o que saiu do que entrou, sem virar um líquido', () => {
+    const totals = dayFlowTotals([
+      transaction({ type: 'expense', amountCents: 1646 }),
+      transaction({ type: 'expense', amountCents: 1080 }),
+      transaction({ type: 'income', amountCents: 520000 })
+    ]);
+
+    expect(totals).toEqual({ spentCents: 2726, receivedCents: 520000 });
+  });
+
+  // O bug que motivou a mudança (achado ao vivo pelo dono, 29/07/2026): o cabeçalho do dia
+  // ignorava `adjustment` e exibia "−R$ 1,44" num dia cujas linhas visíveis somavam +R$ 1,44.
+  it('conta ajuste, estorno e reembolso como entrada — o cabeçalho tem que fechar com as linhas', () => {
+    const totals = dayFlowTotals([
+      transaction({ type: 'adjustment', amountCents: 144 }),
+      transaction({ type: 'expense', amountCents: 144 }),
+      transaction({ type: 'adjustment', amountCents: 144 }),
+      transaction({ type: 'refund', amountCents: 1000 }),
+      transaction({ type: 'reimbursement', amountCents: 2000 })
+    ]);
+
+    expect(totals).toEqual({ spentCents: 144, receivedCents: 3288 });
+  });
+
+  it('ignora transferência (dinheiro entre contas suas não é gasto)', () => {
+    const totals = dayFlowTotals([
+      transaction({ type: 'transfer', amountCents: 50000, destinationAccountId: 'savings' })
+    ]);
+
+    expect(totals).toEqual({ spentCents: 0, receivedCents: 0 });
+  });
+
+  // Contar o pagamento da fatura somaria de novo compras que já entraram como gasto no dia
+  // delas — o mesmo cuidado de dupla contagem que o Comprometido já toma.
+  it('ignora pagamento de fatura pra não contar a mesma compra duas vezes', () => {
+    const totals = dayFlowTotals([
+      transaction({ type: 'card_purchase', amountCents: 30000 }),
+      transaction({ type: 'card_payment', amountCents: 30000 })
+    ]);
+
+    expect(totals).toEqual({ spentCents: 30000, receivedCents: 0 });
+  });
+
+  it('conta compra parcelada pelo valor cheio (o que foi comprometido no dia)', () => {
+    const totals = dayFlowTotals([
+      transaction({ type: 'card_purchase', amountCents: 131076, installments: 12 })
+    ]);
+
+    expect(totals.spentCents).toBe(131076);
+  });
+
+  it('devolve zero para um dia sem lançamento nenhum', () => {
+    expect(dayFlowTotals([])).toEqual({ spentCents: 0, receivedCents: 0 });
   });
 });

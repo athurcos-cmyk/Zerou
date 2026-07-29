@@ -1118,10 +1118,33 @@ span.category-mark {
   color: var(--text-secondary);
 }
 
+/* Resumo do dia: estrutura, não dado. Fica em `--text-secondary` com peso 700 pra recuar um
+   nível abaixo do valor de cada linha (DM Sans 800, colorido) — antes os dois eram vermelho
+   800 e o cabeçalho se disfarçava de transação. Verde só quando o dia entrou mais do que
+   saiu, que é a única vez em que a cor diz algo. */
 .day-group-total {
-  font-size: 0.82rem;
-  font-weight: 800;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  /* Data longa ("8 jul 2025") + "RECEBIDO R$ 15.500,00" aperta a 375px; o número nunca
+     quebra no meio — quem cede é o rótulo da data, à esquerda. */
+  white-space: nowrap;
+}
+
+.day-group-total-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.day-group-total--received {
+  color: var(--success);
 }
 
 .day-group .list-row--tap:first-of-type {

@@ -2,6 +2,20 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-29 (parte 3) — design(transações): o resumo do dia parou de mentir e de se disfarçar de transação
+
+Passada de `/frontend-design` na tela de Transações (mobile), a partir de um incômodo do dono com o total por dia. A avaliação achou que o número não era só barulhento — **estava errado em dois sentidos**:
+
+1. **Contradizia as linhas logo abaixo dele.** O cálculo só contava `income`/`expense`/`card_purchase`; `adjustment`, `refund` e `reimbursement` ficavam de fora. Um dia com `+R$ 1,44`, `−R$ 1,44`, `+R$ 1,44` na tela exibia **"−R$ 1,44"** no cabeçalho. Somar com o dedo não fechava.
+2. **`adjustment`/`refund`/`reimbursement` apareciam pretos e sem sinal** nas linhas, sem dar pra saber se creditavam ou debitavam.
+
+E, como design: o total era **vermelho peso 800**, igual ao valor de cada linha, empilhado logo acima dele — o resumo se disfarçava de transação. Pior, como todo dia tem gasto, o vermelho era constante e portanto não informava nada.
+
+- **`transactionFlowByType` + `dayFlowTotals`** (`financeCalculations.ts`, novos): classificam cada tipo em `spent`/`received`/`internal`, com a direção derivada da mesma leitura que `transactionAccountEffects` usa pra mover o saldo — não de uma regra paralela. `card_payment` e `transfer` são **internos** (contar o pagamento da fatura somaria de novo a compra já contada no dia dela). `satisfies Record<TransactionType, …>` faz um tipo novo no enum sem entrada aqui virar **erro de compilação**.
+- **Resumo rotulado**: "gasto R$ 27,26" (`--text-secondary`, peso 700, rótulo micro em maiúscula) em vez de um número cru; "recebido" em verde quando o dia entrou mais do que saiu. Compra parcelada conta pelo **valor cheio** (decisão do dono — foi o que se comprometeu naquele dia).
+- **Linha colorida entra na conta, linha neutra não**: transferência e pagamento de fatura ficam neutros e fora do total; ajuste/estorno/reembolso passam a verde com `+`.
+- Verificado ao vivo em 375px: o dia que exibia "−R$ 1,44" agora mostra "recebido R$ 2,88" e bate com as linhas; um dia com dois pagamentos de fatura + uma compra de R$ 1.000 mostra "gasto R$ 1.000,00", igual à única linha vermelha. 6 testes novos; `typecheck` + `test` (444) + `build` verdes. 100% client-side. Regras visuais registradas em `docs/design/DESIGN.md`.
+
 ## 2026-07-29 (parte 2) — fix: a ordem do dia agora vale de verdade (o meio-dia de enfeite era a causa real)
 
 O fix da parte 1 (abaixo) resolvia só empate exato — e **não corrigia o caso do dono**. Investigando os dados reais dele (script somente leitura), apareceu a causa de verdade: **o app grava data de duas formas diferentes** e ninguém tinha percebido.

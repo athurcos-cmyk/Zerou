@@ -1,6 +1,6 @@
 import { addDays, compareAsc, endOfDay } from 'date-fns';
 import { compareByDateDesc, formatFriendlyMonth, toDate } from './financeDates';
-import type { Account, Bill, CreditCard, Invoice, Receivable, RecurringRule, Transaction } from '../types/contracts';
+import type { Account, Bill, CreditCard, Invoice, Receivable, RecurringRule, Transaction, TransactionType } from '../types/contracts';
 import type { LocalSynced } from './financeService';
 
 export interface AccountBalance extends Account {
@@ -106,6 +106,65 @@ export function transactionAccountEffects(
   }
 
   return [];
+}
+
+/**
+ * Para onde o dinheiro vai, do ponto de vista de quem lê o Extrato — a base do resumo do dia
+ * e da cor/sinal de cada linha.
+ *
+ * A direção vem da mesma leitura que `transactionAccountEffects` usa pra mover o saldo, não de
+ * uma regra paralela: crédito (`income`/`refund`/`reimbursement`/`adjustment`) é `received`,
+ * despesa é `spent`.
+ *
+ * Dois casos merecem explicação:
+ * - **`card_purchase` é `spent`** mesmo sem efeito imediato em conta (vai pra fatura). No
+ *   Extrato o que importa é "eu gastei", e é o mesmo regime de competência que a Análise já
+ *   adota desde 2026-07-28.
+ * - **`card_payment` é `internal`**, apesar de debitar a conta de verdade: a compra já contou
+ *   como gasto no dia dela, então contar o pagamento da fatura de novo somaria duas vezes.
+ *   `transfer` também é interno — dinheiro que anda entre contas suas não é gasto.
+ *
+ * O `satisfies Record<TransactionType, ...>` é proposital: um tipo novo no enum sem entrada
+ * aqui vira **erro de compilação**, em vez de cair silenciosamente num `default` errado.
+ */
+export type TransactionFlow = 'spent' | 'received' | 'internal';
+
+export const transactionFlowByType = {
+  income: 'received',
+  expense: 'spent',
+  transfer: 'internal',
+  adjustment: 'received',
+  refund: 'received',
+  reimbursement: 'received',
+  card_purchase: 'spent',
+  card_payment: 'internal'
+} as const satisfies Record<TransactionType, TransactionFlow>;
+
+export interface DayFlowTotals {
+  spentCents: number;
+  receivedCents: number;
+}
+
+/**
+ * Quanto saiu e quanto entrou num conjunto de lançamentos (o resumo de um dia no Extrato).
+ *
+ * Somas separadas, não um líquido: "gastei 27" e "recebi 5.200" são fatos diferentes, e o
+ * líquido de um dia só significa alguma coisa no dia em que se recebe. Compra parcelada entra
+ * pelo **valor cheio** (decisão do dono, 29/07/2026) — foi o que se comprometeu naquele dia.
+ */
+export function dayFlowTotals(
+  transactions: ReadonlyArray<Pick<Transaction, 'type' | 'amountCents'>>
+): DayFlowTotals {
+  let spentCents = 0;
+  let receivedCents = 0;
+
+  for (const transaction of transactions) {
+    const flow = transactionFlowByType[transaction.type];
+    if (flow === 'spent') spentCents += transaction.amountCents;
+    else if (flow === 'received') receivedCents += transaction.amountCents;
+  }
+
+  return { spentCents, receivedCents };
 }
 
 /**

@@ -12,10 +12,34 @@ import { useConfirm } from '../components/ConfirmDialog';
 import { defaultCategoryColors } from '../theme/palette';
 import { compareByDateDesc, formatFriendlyDate, toDateInputValue } from '../finance/financeDates';
 import { transactionTypeLabels } from '../finance/financeLabels';
+import { dayFlowTotals, transactionFlowByType, type DayFlowTotals } from '../finance/financeCalculations';
 import { dedupeById, loadMoreTransactions, softDeleteTransaction, type LocalSynced } from '../finance/financeService';
 import { formatMoney } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
 import type { Transaction } from '../types/contracts';
+
+/**
+ * Resumo do dia no cabeçalho do grupo.
+ *
+ * Mostra **um** fato rotulado, não um líquido: "gasto" na maioria dos dias, "recebido" quando
+ * entrou mais do que saiu (dia de salário) — aí a cor verde aparece e significa alguma coisa.
+ * O vermelho saiu de propósito: como todo dia tinha gasto, um cabeçalho sempre vermelho não
+ * carregava informação nenhuma e ainda competia com o valor de cada linha, no mesmo peso e na
+ * mesma cor. Cor que nunca varia é decoração, não dado.
+ */
+function DayGroupSummary({ totals }: { totals: DayFlowTotals }) {
+  const received = totals.receivedCents > totals.spentCents;
+  const value = received ? totals.receivedCents : totals.spentCents;
+
+  if (value === 0) return null;
+
+  return (
+    <span className={`day-group-total${received ? ' day-group-total--received' : ''}`}>
+      <span className="day-group-total-label">{received ? 'recebido' : 'gasto'}</span>
+      {formatMoney(value)}
+    </span>
+  );
+}
 
 export function TransactionsPage() {
   const { user, profile } = useAuth();
@@ -128,21 +152,24 @@ export function TransactionsPage() {
   }, [activeTransactions, cardFilter, typeFilter, tagFilter, normalizedQuery, categoryMap]);
 
   // Extrato agrupado por dia (padrão de app financeiro nativo): cabeçalho "Hoje/Ontem/12 jul"
-  // com o líquido do dia. A lista já vem ordenada por data; agrupar preserva a ordem.
+  // com o resumo do dia. A lista já vem ordenada por data; agrupar preserva a ordem.
+  //
+  // O resumo é rotulado ("gasto"/"recebido") em vez de um líquido cru: um número sozinho não
+  // diz se é gasto, saldo ou entrada, e o líquido de um dia só significa algo no dia em que se
+  // recebe. Antes, o cálculo ignorava ajuste/estorno/reembolso e o cabeçalho **contradizia as
+  // linhas logo abaixo** (dia com +1,44, −1,44, +1,44 exibia "−R$ 1,44"). Ver `dayFlowTotals`.
   const dayGroups = useMemo(() => {
-    const groups: Array<{ key: string; label: string; netCents: number; transactions: Array<LocalSynced<Transaction>> }> = [];
+    const groups: Array<{ key: string; label: string; transactions: Array<LocalSynced<Transaction>> }> = [];
     let current: (typeof groups)[number] | undefined;
     for (const transaction of visibleTransactions) {
       const key = toDateInputValue(transaction.date);
       if (!current || current.key !== key) {
-        current = { key, label: formatFriendlyDate(transaction.date), netCents: 0, transactions: [] };
+        current = { key, label: formatFriendlyDate(transaction.date), transactions: [] };
         groups.push(current);
       }
       current.transactions.push(transaction);
-      if (transaction.type === 'income') current.netCents += transaction.amountCents;
-      else if (transaction.type === 'expense' || transaction.type === 'card_purchase') current.netCents -= transaction.amountCents;
     }
-    return groups;
+    return groups.map((group) => ({ ...group, totals: dayFlowTotals(group.transactions) }));
   }, [visibleTransactions]);
 
   // Com busca textual ativa o "total do dia" seria o total do subconjunto encontrado —
@@ -320,16 +347,15 @@ export function TransactionsPage() {
               <section className="day-group" key={group.key} aria-label={group.label}>
                 <header className="day-group-header">
                   <span className="day-group-label">{group.label}</span>
-                  {showDayTotals && group.netCents !== 0 ? (
-                    <span className={`day-group-total${group.netCents > 0 ? ' amount--income' : ' amount--expense'}`}>
-                      {group.netCents > 0 ? '+' : '−'}{formatMoney(Math.abs(group.netCents))}
-                    </span>
-                  ) : null}
+                  {showDayTotals ? <DayGroupSummary totals={group.totals} /> : null}
                 </header>
                 {group.transactions.map((transaction) => {
                   const isIncome = transaction.type === 'income';
-                  const isExpense = transaction.type === 'expense' || transaction.type === 'card_purchase';
-                  const amountClass = isIncome ? 'amount--income' : isExpense ? 'amount--expense' : '';
+                  // Cor e sinal saem da mesma classificação do resumo do dia, então dá pra
+                  // somar as linhas coloridas com o dedo e bater com o cabeçalho. Linha neutra
+                  // (transferência, pagamento de fatura) é movimento interno e não entra.
+                  const flow = transactionFlowByType[transaction.type];
+                  const amountClass = flow === 'received' ? 'amount--income' : flow === 'spent' ? 'amount--expense' : '';
                   const category = transaction.categoryId ? categoryMap.get(transaction.categoryId) : null;
                   const fallback = isIncome
                     ? { icon: 'money', color: defaultCategoryColors.income_salary }
@@ -354,7 +380,7 @@ export function TransactionsPage() {
                       </div>
                       <div className="list-row-end">
                         <strong className={amountClass}>
-                          {isIncome ? '+' : isExpense ? '−' : ''}{formatMoney(transaction.amountCents)}
+                          {flow === 'received' ? '+' : flow === 'spent' ? '−' : ''}{formatMoney(transaction.amountCents)}
                         </strong>
                         <SyncStatusBadge status={transaction.localSyncStatus} />
                       </div>
