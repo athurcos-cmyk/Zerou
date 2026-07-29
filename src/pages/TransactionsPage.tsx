@@ -23,6 +23,12 @@ import type { Transaction } from '../types/contracts';
  * Dashboard, voltando no tempo. Lendo a lista de cima pra baixo vira a trajetória do dinheiro
  * ("nesse dia eu tinha tanto; depois desse gasto, tanto").
  *
+ * O rótulo é **"saldo do dia", único pra todos os dias** (decisão do dono, 29/07/2026): a
+ * versão anterior alternava "saldo agora" (hoje) com "no fim do dia" (passado), e dois rótulos
+ * pro mesmo número confundiam mais do que o rótulo genérico resolvia. O texto "saldo no fim do
+ * dia" chegou a ser tentado, mas foi medido no cabeçalho real e **não cabe**: com data de outro
+ * ano ("8 jul 2025") e valor de 6 dígitos faltavam 6px a 375px.
+ *
  * Fica em `--text-secondary` peso 700: é referência, não o dado da linha. Vermelho só quando o
  * saldo fica negativo — a única vez em que a cor diz algo aqui.
  */
@@ -31,7 +37,7 @@ function DayGroupBalance({ balanceCents }: { balanceCents: number | undefined })
 
   return (
     <span className={`day-group-total${balanceCents < 0 ? ' day-group-total--negative' : ''}`}>
-      <span className="day-group-total-label">saldo</span>
+      <span className="day-group-total-label">saldo do dia</span>
       {formatMoney(balanceCents)}
     </span>
   );

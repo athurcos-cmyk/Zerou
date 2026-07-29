@@ -66,6 +66,15 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
   pergunta todo dia e não depende da natureza do lançamento. Lido de cima pra baixo, vira a
   trajetória do dinheiro. **Dois dias seguidos com o mesmo saldo não é bug** — é dia em que só
   houve compra no cartão, que não tira do banco.
+- **O saldo é rotulado "saldo do dia" — um rótulo só, em todos os dias.** Chegou a existir uma
+  versão que alternava "saldo agora" (hoje) com "no fim do dia" (passado), pra deixar explícito
+  que o número não é o saldo atual da pessoa; foi descartada pelo dono (29/07/2026) porque dois
+  rótulos pro mesmo número confundem mais do que o rótulo genérico resolve. **Regra**: um número
+  recorrente merece um rótulo estável — variação de texto por contexto faz o leitor procurar
+  diferença de significado onde não existe.
+- **Microcópia de slot apertado se mede no DOM, não no olho.** "saldo no fim do dia" parecia
+  caber e **não cabia**: com data de outro ano ("8 jul 2025") e valor de 6 dígitos faltavam 6px
+  a 375px. `.day-group-header` tem ~301px úteis nessa largura — meça antes de escolher a frase.
 - **Resumo não usa a mesma roupa do dado que resume** (`.day-group-total`, refeito 2026-07-29):
   o total do dia era vermelho peso 800 — igual ao valor de cada linha — e empilhado logo acima
   dele se disfarçava de transação. Agora é `--text-secondary` peso 700 com um rótulo micro em
