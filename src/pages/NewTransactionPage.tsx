@@ -9,7 +9,7 @@ import { CategoryField } from '../components/CategoryField';
 import { FormMessage } from '../components/FormMessage';
 import { SelectField } from '../components/SelectField';
 import { TagInput } from '../components/TagInput';
-import { fromDateInputValue, todayInputValue } from '../finance/financeDates';
+import { fromDateInputValueForWrite, todayInputValue } from '../finance/financeDates';
 import { accountTypeLabels, transactionTypeLabels } from '../finance/financeLabels';
 import { createCategory, createTransaction, deleteCategory, updateCategory } from '../finance/financeService';
 import { type SupportedTransactionType } from '../finance/financeSchemas';
@@ -104,7 +104,7 @@ export function NewTransactionPage() {
           cardId: cardId!,
           description,
           amountCents: parseMoneyToCents(amount),
-          purchaseDate: fromDateInputValue(date),
+          purchaseDate: fromDateInputValueForWrite(date),
           categoryId: categoryId || undefined,
           installments
         }).catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível criar a compra no cartão agora.')));
@@ -120,7 +120,7 @@ export function NewTransactionPage() {
         categoryId,
         accountId,
         destinationAccountId: type === 'transfer' ? destinationAccountId : undefined,
-        date: fromDateInputValue(date),
+        date: fromDateInputValueForWrite(date),
         tags,
         notes
       });

@@ -2,6 +2,21 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-29 (parte 2) — fix: a ordem do dia agora vale de verdade (o meio-dia de enfeite era a causa real)
+
+O fix da parte 1 (abaixo) resolvia só empate exato — e **não corrigia o caso do dono**. Investigando os dados reais dele (script somente leitura), apareceu a causa de verdade: **o app grava data de duas formas diferentes** e ninguém tinha percebido.
+
+- **Formulário do app** → `date` = **12:00:00** fixo (`fromDateInputValue`), hora sem significado nenhum.
+- **WhatsApp/Vic ao vivo** → `date` = o **instante real** da mensagem.
+
+Num dia que mistura as duas origens, o meio-dia de enfeite compete com hora de verdade e a ordem sai errada — não por empate, mas por horas diferentes pelo motivo errado. Caso real de 25/07: "Fotos no shopping" foi lançada às **20:41** pelo app e caía **atrás** de três despesas do WhatsApp das 12:16/13:45/14:08. Dos 7 dias com 2+ lançamentos na conta do dono, **4 eram mistos** (23, 24, 25 e 28/07) e nenhum era corrigido pela parte 1.
+
+- **`compareByDateDesc` refeito em dois níveis**: primeiro o **dia** do `date`, só depois o instante dentro do dia. O dia precisa mandar sozinho porque a lista é agrupada por dia percorrendo a ordenação — sem isso, um lançamento retroativo (cujo `createdAt` é de outro dia) saltaria pra fora do seu grupo e o **mesmo cabeçalho de dia apareceria duas vezes** na tela. Dentro do dia vale a hora real do `date`; quando ela é o sentinela meio-dia, vale o `createdAt`.
+- **`fromDateInputValueForWrite`** (novo): lançar com data = **hoje** passa a gravar a hora real, mesma convenção que o WhatsApp já usava — sem campo novo pra preencher. Data passada continua no meio-dia (não dá pra inventar hora que ninguém informou) e cai no desempate por `createdAt`.
+- **`resolveEditedDate`** (novo): editar um lançamento sem mexer no dia **preserva o timestamp original** — antes, editar a descrição de uma despesa vinda do WhatsApp reancorava ela no meio-dia, apagando a hora real e jogando ela pra outro lugar da lista.
+- Decisão do dono: lançamento retroativo (sem hora real) fica **no topo do seu dia**, na ordem em que foi digitado.
+- **Verificado contra os dados reais de produção** rodando a função de verdade sobre a conta do dono: 25/07 corrigido, e **0 cabeçalhos de dia repetidos** em 13 grupos. Confirmado no dev server que lançamento novo grava a hora real (`15:14:36`, não `12:00`). 10 testes novos em `financeDates.test.ts`; `typecheck` + `test` (438) + `build` verdes. 100% client-side.
+
 ## 2026-07-29 — fix(transações): ordem dentro do mesmo dia respeita a hora real do lançamento
 
 O dono notou: gasto de R$16 lançado primeiro, R$10 lançado depois — mas o de R$10 aparecia embaixo. Causa: `Transaction.date` só grava o **dia** (o formulário sempre grava meio-dia, `fromDateInputValue`), então duas transações do mesmo dia empatam nesse campo e a ordem exibida virava a ordem arbitrária de chegada do snapshot do Firestore, não a ordem real do lançamento.
@@ -9,6 +24,7 @@ O dono notou: gasto de R$16 lançado primeiro, R$10 lançado depois — mas o de
 - Novo `compareByDateDesc` (`financeDates.ts`): ordena por `date` desc, desempatando por `createdAt` (hora real do registro, já gravado em toda transação) quando a data é igual.
 - Aplicado no Extrato (`TransactionsPage.tsx`) e nas "transações recentes" do Dashboard (`financeCalculations.ts`), que tinha o mesmo bug pelo mesmo motivo.
 - Verificado ao vivo na conta de teste: lançou A e depois B no mesmo dia — B passou a aparecer acima de A. `typecheck` + `test` (260 de `src/finance`) + `build` verdes. 100% client-side, sem mudança em regras/functions.
+- **Insuficiente** — ver a parte 2 acima, que achou a causa real.
 
 ## 2026-07-28 — análise: categoria com orçamento mostra os DOIS % (fatia do total + % do limite)
 

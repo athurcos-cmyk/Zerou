@@ -7,7 +7,7 @@ import { CategoryField } from '../components/CategoryField';
 import { FormMessage } from '../components/FormMessage';
 import { SelectField } from '../components/SelectField';
 import { TagInput } from '../components/TagInput';
-import { fromDateInputValue, toDateInputValue } from '../finance/financeDates';
+import { resolveEditedDate, toDateInputValue } from '../finance/financeDates';
 import { accountTypeLabels, transactionTypeLabels } from '../finance/financeLabels';
 import { createCategory, deleteCategory, updateCategory, updateTransaction } from '../finance/financeService';
 import { updateCardPurchase } from '../cards/cardService';
@@ -127,7 +127,7 @@ export function EditTransactionPage() {
         categoryId,
         accountId,
         destinationAccountId: type === 'transfer' ? destinationAccountId : undefined,
-        date: fromDateInputValue(date),
+        date: resolveEditedDate(date, transaction.date),
         tags,
         notes
       });

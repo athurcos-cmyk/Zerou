@@ -1,4 +1,4 @@
-import { format, isToday, isYesterday } from 'date-fns';
+import { format, isToday, isYesterday, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { Timestamp } from 'firebase/firestore';
 
@@ -44,17 +44,46 @@ interface DatedRecord {
   createdAt?: DateLike;
 }
 
-/** Ordena por `date` desc. `date` só grava o dia — o formulário sempre grava meio-dia
- * (`fromDateInputValue`) — então duas transações do mesmo dia empatam; desempata por
- * `createdAt` (hora real do registro) pra refletir a ordem em que a pessoa lançou, não a
- * ordem arbitrária de chegada do snapshot (achado do dono, 29/07: despesas do mesmo dia
- * trocadas de lugar). */
+/**
+ * `true` quando o `date` do lançamento é o **sentinela meio-dia** — ou seja, a hora ali não
+ * significa nada.
+ *
+ * O app grava data de duas formas: o formulário sempre ancora no meio-dia
+ * (`fromDateInputValue`, e o WhatsApp faz igual em lançamento retroativo), enquanto o
+ * WhatsApp ao vivo grava o instante real da mensagem. Sem distinguir os dois, a lista mistura
+ * "hora de verdade" com "12:00 de enfeite" e a ordem do dia sai errada — foi exatamente o que
+ * o dono viu em 25/07/2026: uma despesa lançada às 20:41 pelo app caía atrás de três do
+ * WhatsApp das 12:16/13:45/14:08, porque o app tinha gravado 12:00 nela.
+ */
+function hasNoRecordedTime(value: DateLike) {
+  const date = toDate(value);
+  return date.getHours() === 12 && date.getMinutes() === 0 && date.getSeconds() === 0 && date.getMilliseconds() === 0;
+}
+
+/** O instante que representa "quando isto entrou na vida da pessoa", pra ordenar dentro do
+ * dia: a hora real do `date` quando ela existe; senão a hora do registro (`createdAt`). */
+function orderingInstant(record: DatedRecord) {
+  const date = toDate(record.date);
+  if (!hasNoRecordedTime(date) || !record.createdAt) return date.getTime();
+  return toDate(record.createdAt).getTime();
+}
+
+/**
+ * Ordena lançamentos do mais recente pro mais antigo.
+ *
+ * **Dois níveis, de propósito**: primeiro o DIA do `date`, só depois o instante dentro do dia.
+ * O dia precisa mandar sozinho porque a lista é agrupada por dia (`dayGroups` em
+ * `TransactionsPage`) percorrendo a lista já ordenada — se um lançamento retroativo pudesse
+ * saltar pra fora do seu dia (o `createdAt` dele é de outro dia), o mesmo cabeçalho de dia
+ * apareceria duas vezes na tela.
+ *
+ * Dentro do dia, vale o `orderingInstant`: lançamento retroativo (sem hora real) fica no topo
+ * do seu dia, na ordem em que foi digitado — decisão do dono, 29/07/2026.
+ */
 export function compareByDateDesc(a: DatedRecord, b: DatedRecord) {
-  const dateDiff = toDate(b.date).getTime() - toDate(a.date).getTime();
-  if (dateDiff !== 0) return dateDiff;
-  const aCreated = a.createdAt ? toDate(a.createdAt).getTime() : 0;
-  const bCreated = b.createdAt ? toDate(b.createdAt).getTime() : 0;
-  return bCreated - aCreated;
+  const dayDiff = startOfDay(toDate(b.date)).getTime() - startOfDay(toDate(a.date)).getTime();
+  if (dayDiff !== 0) return dayDiff;
+  return orderingInstant(b) - orderingInstant(a);
 }
 
 export function fromDateInputValue(value: string) {
@@ -65,4 +94,25 @@ export function fromDateInputValue(value: string) {
   }
 
   return new Date(year, month - 1, day, 12, 0, 0, 0);
+}
+
+/**
+ * Versão de `fromDateInputValue` pra **gravar um lançamento**: quando a data escolhida é HOJE,
+ * grava o instante real (mesma convenção que o WhatsApp ao vivo já usa), pra que a ordem do
+ * dia seja fiel sem a pessoa precisar digitar hora nenhuma. Data passada continua no
+ * meio-dia — não dá pra inventar uma hora que ninguém informou; nesse caso quem ordena é o
+ * `createdAt` (ver `compareByDateDesc`).
+ */
+export function fromDateInputValueForWrite(value: string) {
+  return value === todayInputValue() ? new Date() : fromDateInputValue(value);
+}
+
+/**
+ * Data pra uma **edição**: se a pessoa não mexeu no dia, preserva o timestamp original em vez
+ * de reancorar no meio-dia — senão editar a descrição de uma despesa vinda do WhatsApp
+ * apagaria a hora real dela e a jogaria pra outro lugar da lista.
+ */
+export function resolveEditedDate(value: string, originalDate: DateLike) {
+  const original = toDate(originalDate);
+  return value === toDateInputValue(original) ? original : fromDateInputValueForWrite(value);
 }
