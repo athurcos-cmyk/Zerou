@@ -2,6 +2,26 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-28 — feat: Análise em regime de competência (compra à vista no cartão conta no mês da compra)
+
+O dono notou que gastos à vista no cartão feitos em julho apareciam só na Análise de agosto. Não era bug: a Análise usava **regime de caixa** (gasto do cartão pelo mês da fatura). Como o cartão dele **fecha dia 2**, quase tudo caía na fatura do mês seguinte — um atraso sistemático de ~1 mês entre "quando gastei" e "onde aparece". Decisão do dono: mudar pra **regime de competência**.
+
+- **`spendingAnalysis.ts`**: compra **à vista** no cartão passa a contar pela **data da compra** (via a transação `card_purchase`, no `cashMonth`), como uma despesa comum. Compra **parcelada** continua 1 parcela por fatura (pelo ledger). Tarifas/juros/IOF/estorno/antecipação seguem pela fatura. Novo `installmentPurchaseIds(invoices)` separa à vista de parcelado de forma robusta (por `installmentTotal > 1` **ou** ocorrência do mesmo `sourceTransactionId` em >1 fatura — cobre dado antigo sem o campo). Sem dupla contagem: à vista entra só pela transação; a parcela única no ledger é ignorada.
+- Propaga pra tudo que usa `spendingByCategoryForMonth`/`monthlyTotals`: donut e histórico da Análise, tendência por categoria, orçamentos, Resumo Anual e "Resumo de gastos" do Dashboard. Trade-off aceito: a Análise deixa de bater 1:1 com a fatura no mês corrente (é sobre comportamento de gasto, não sobre o extrato).
+- Verificado nos dados reais do dono: R$ 1.103,18 em compras à vista de julho (Fatura, Cinema, 2×99) migraram de agosto pra julho — exatamente o valor inteiro da fatura de agosto. 4 testes de regressão novos (inclui o caso real: 99 de 26/07 → conta em julho, não agosto). `typecheck` + `test` (409) + `build` verdes.
+- Detalhe e a discussão conceitual em `docs/history/2026-07.md`.
+
+## 2026-07-28 — feat: "Acertar saldo com o banco" (+ auditoria da divergência fixa de 1,44)
+
+O dono relatava uma diferença **fixa de R$ 1,44** entre o saldo do app e o do banco, corrigida sempre na mão com uma receita de ajuste. Code review completo do pipeline de dinheiro (efeitos de saldo, edição/exclusão, parcelas, totais de fatura, antecipação, parse, porta do WhatsApp) + diagnóstico com script só-leitura (`scripts/reconcileAccountBalances.mjs`): **0 divergência interna em 6 contas** — o `currentBalanceCents` bate exatamente com `abertura + soma dos lançamentos`. Conclusão: **não é bug de cálculo**; o 1,44 é externo (mais provável: rendimento automático do Nubank, que credita centavos que ninguém lança).
+
+Em vez de mexer em código correto, virou uma feature que automatiza o costume do dono:
+- **`reconcileAccountBalance`** (`financeService.ts`): leva a conta ao saldo real informado criando UM lançamento de acerto pela diferença. Direção vem do **tipo** (a regra exige `amountCents >= 0`): banco maior → `adjustment` (credita), banco menor → `expense` (debita). Sem diferença, não grava nada. Fire-and-forget, offline-first. **Sem mudança em `firestore.rules`** (os tipos já eram aceitos).
+- **`AccountReconcileSheet`** (novo, `src/finance/`): sheet na tela de Contas (ícone balança em cada card) com prévia ao vivo — digita o saldo do banco e vê a diferença exata + o que vai acontecer, antes de confirmar. Estilos `.reconcile-diff`/`.reconcile-current` (só tokens, tema-aware).
+- Verificado ao vivo no navegador (conta de teste): +1,44 levou o saldo de 4.000,00 → 4.001,44 com a mensagem de acerto; direções crédito/débito/"já bate" conferidas; 0 erro no console.
+- Testes: `reconcileAccountBalance` (crédito/débito/no-op) — 405 cliente verdes. `typecheck` + `build` ok.
+- Detalhe e a auditoria completa em `docs/history/2026-07.md`.
+
 ## 2026-07-28 — Vic: WhatsApp redireciona toda pergunta pro app, Vic vê a Projeção, prompt atualizado, WhatsApp ganha data retroativa
 
 Rodada de trabalho na Vic (tudo em functions, deployado):

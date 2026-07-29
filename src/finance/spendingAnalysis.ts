@@ -1,20 +1,28 @@
 import type { InvoiceLedgerEntry, InvoiceLedgerEntryType, InvoiceStatus, Transaction } from '../types/contracts';
 
 /**
- * Análise de gastos em **regime de caixa (por parcela)**.
+ * Análise de gastos em **regime de competência** para a compra à vista no cartão.
  *
- * Uma compra parcelada de R$3.000 em 10x NÃO é gasto de R$3.000 no mês da compra: é
- * R$300 em cada uma das 10 faturas. Quem sabe disso é o ledger da fatura (uma parcela
- * `purchase` por mês), não a transação `card_purchase` (que guarda o valor cheio no mês
- * da compra, pra outros fins). Por isso a Análise conta o cartão pela parcela que cai na
- * fatura de cada mês — e não pela transação.
+ * Compra à vista no cartão conta no mês da **COMPRA** (data do lançamento), como uma despesa
+ * comum — não no mês da fatura. Reflete "quando você gastou", não "quando a fatura vence":
+ * num cartão que fecha cedo (ex.: dia 2), quase tudo cairia na fatura do mês seguinte, e o
+ * gasto de julho apareceria em agosto. Decisão do dono (2026-07-28).
  *
- * Bônus de graça: como antecipar parcela grava um débito na fatura atual
- * (`installment_anticipation`) e um crédito na futura (`installment_anticipation_credit`),
- * antecipar naturalmente move o gasto do mês futuro pro mês atual aqui também.
+ * Compra **parcelada** continua contando 1 parcela por fatura (pelo ledger): uma compra de
+ * R$3.000 em 10x não é R$3.000 no mês da compra, é R$300 em cada uma das 10 faturas.
  *
- * Os sinais abaixo espelham `calculateInvoice` (`recognizedExpenseCents`): se divergirem,
- * a Análise deixa de bater com a fatura.
+ * Como isso divide as fontes:
+ *  - à vista   → pela TRANSAÇÃO `card_purchase` (`installmentGroupId` vazio), no mês da compra;
+ *    a parcela única no ledger é IGNORADA aqui pra não contar duas vezes.
+ *  - parcelado → pelo LEDGER (parcela `purchase` com `installmentTotal > 1`), no mês da fatura.
+ *    Antecipar move o gasto do mês futuro pro atual naturalmente (débito na fatura atual,
+ *    crédito na futura).
+ *  - tarifa/juros/IOF/estorno/antecipação → pelo ledger, no mês da fatura (eventos da fatura,
+ *    sem "data de compra").
+ *
+ * Consequência aceita de propósito: a Análise **deixa de bater 1:1 com a fatura** no mês
+ * corrente (à vista migra pro mês da compra) — a Análise é sobre comportamento de gasto, não
+ * sobre o extrato da fatura.
  */
 
 const cardChargeTypes = new Set<InvoiceLedgerEntryType>([
@@ -60,12 +68,48 @@ export interface InvoiceForSpending {
 
 const refundLikeTypes = new Set<Transaction['type']>(['refund', 'reimbursement', 'adjustment']);
 
-function isCountableExpense(t: Transaction, month: string): boolean {
+/**
+ * Ids das transações `card_purchase` que são PARCELADAS — essas contam pela fatura (por
+ * parcela, no ledger), não pela data da compra. Uma compra é parcelada se alguma parcela
+ * `purchase` sua tem `installmentTotal > 1` OU se o mesmo `sourceTransactionId` aparece em
+ * mais de uma fatura (robusto a dado antigo sem o campo, mesma lógica de
+ * `collectFutureInstallments`/`anticipation.ts`). Quem NÃO está aqui é compra à vista, contada
+ * pela transação no mês da compra.
+ */
+export function installmentPurchaseIds(invoices: InvoiceForSpending[]): Set<string> {
+  const occurrences = new Map<string, number>();
+  const parceled = new Set<string>();
+  for (const invoice of invoices) {
+    for (const entry of invoice.ledgerEntries) {
+      if (entry.type !== 'purchase' || !entry.sourceTransactionId) continue;
+      occurrences.set(entry.sourceTransactionId, (occurrences.get(entry.sourceTransactionId) ?? 0) + 1);
+      if ((entry.installmentTotal ?? 0) > 1) parceled.add(entry.sourceTransactionId);
+    }
+  }
+  for (const [id, count] of occurrences) if (count > 1) parceled.add(id);
+  return parceled;
+}
+
+/** Compra no cartão à vista (1x): `card_purchase` cujo id NÃO está no conjunto de parcelados.
+ * Na Análise por competência conta pela DATA DA COMPRA (via transação), como despesa comum. */
+function isSingleCardPurchase(t: Pick<Transaction, 'type' | 'id'>, parceledIds: Set<string>): boolean {
+  return t.type === 'card_purchase' && !parceledIds.has(t.id);
+}
+
+/** Parcela `purchase` à vista no ledger — IGNORADA (já contada pela transação). */
+function isSinglePurchaseLedgerEntry(
+  entry: Pick<InvoiceLedgerEntry, 'type' | 'sourceTransactionId'>,
+  parceledIds: Set<string>
+): boolean {
+  return entry.type === 'purchase' && !!entry.sourceTransactionId && !parceledIds.has(entry.sourceTransactionId);
+}
+
+function isCountableExpense(t: Transaction, month: string, parceledIds: Set<string>): boolean {
   if (t.deletedAt) return false;
-  // Cartão entra pelo ledger (por parcela), nunca pela transação (valor cheio no mês da compra).
-  // Estorno/reembolso/ajuste também entram — como crédito negativo na própria categoria, igual
-  // ao crédito de cartão logo abaixo (signedCharge) — não como "gasto" positivo.
-  if (t.type !== 'expense' && !refundLikeTypes.has(t.type)) return false;
+  // Cartão à vista entra pela transação, no mês da COMPRA (competência). Parcela de cartão
+  // continua pelo ledger (por fatura), nunca pela transação (valor cheio no mês da compra).
+  // Estorno/reembolso/ajuste entram como crédito negativo na própria categoria (não gasto +).
+  if (t.type !== 'expense' && !refundLikeTypes.has(t.type) && !isSingleCardPurchase(t, parceledIds)) return false;
   if ((t.cashMonth ?? t.competenceMonth) !== month) return false;
   // Aporte a meta/cofrinho não é "gasto".
   if (t.tags?.includes('meta') || t.tags?.includes('cofrinho')) return false;
@@ -85,6 +129,7 @@ export function spendingByCategoryForMonth(
   categoryOfTransaction: (transactionId: string | undefined) => string | undefined
 ): Map<string, number> {
   const totals = new Map<string, number>();
+  const parceledIds = installmentPurchaseIds(invoices);
   const add = (categoryId: string | undefined, cents: number) => {
     if (cents === 0) return;
     const key = categoryId || NO_CATEGORY;
@@ -92,13 +137,14 @@ export function spendingByCategoryForMonth(
   };
 
   for (const t of transactions) {
-    if (!isCountableExpense(t, month)) continue;
+    if (!isCountableExpense(t, month, parceledIds)) continue;
     add(t.categoryId, refundLikeTypes.has(t.type) ? -t.amountCents : t.amountCents);
   }
 
   for (const invoice of invoices) {
     if (invoice.referenceMonth !== month) continue;
     for (const entry of invoice.ledgerEntries) {
+      if (isSinglePurchaseLedgerEntry(entry, parceledIds)) continue; // à vista → contado pela transação
       const signed = signedCharge(entry);
       if (signed === 0) continue;
       add(categoryOfTransaction(entry.sourceTransactionId), signed);
@@ -203,9 +249,18 @@ export function computeCategoryTrend(
   return { series, averageCents, currentCents, vsAveragePct, maxMonth, minMonth, totalCents };
 }
 
-/** Soma dos sinais de todas as parcelas de uma fatura = gasto reconhecido dela. */
-export function invoiceRecognizedExpense(invoice: InvoiceForSpending): number {
-  return invoice.ledgerEntries.reduce((sum, entry) => sum + signedCharge(entry), 0);
+/**
+ * Gasto de uma fatura que a Análise conta PELA FATURA — parcelas + tarifas/juros/estornos/
+ * antecipação. Exclui a compra à vista (contada pela data da compra, via transação), pra bater
+ * com `spendingByCategoryForMonth`. Não é mais o "recognizedExpenseCents" cru da fatura.
+ */
+export function invoiceRecognizedExpense(invoice: InvoiceForSpending, parceledIds: Set<string>): number {
+  let sum = 0;
+  for (const entry of invoice.ledgerEntries) {
+    if (isSinglePurchaseLedgerEntry(entry, parceledIds)) continue; // à vista entra pela transação, não pela fatura
+    sum += signedCharge(entry);
+  }
+  return sum;
 }
 
 export interface MonthlyTotals {
@@ -223,9 +278,10 @@ export function monthlyTotals(
   transactions: Transaction[],
   invoices: InvoiceForSpending[]
 ): MonthlyTotals[] {
+  const parceledIds = installmentPurchaseIds(invoices);
   const cardExpenseByMonth = new Map<string, number>();
   for (const invoice of invoices) {
-    const recognized = invoiceRecognizedExpense(invoice);
+    const recognized = invoiceRecognizedExpense(invoice, parceledIds);
     if (recognized === 0) continue;
     cardExpenseByMonth.set(invoice.referenceMonth, (cardExpenseByMonth.get(invoice.referenceMonth) ?? 0) + recognized);
   }
@@ -238,7 +294,8 @@ export function monthlyTotals(
       const m = t.cashMonth ?? t.competenceMonth;
       if (m !== month) continue;
       if (t.tags?.includes('meta') || t.tags?.includes('cofrinho')) continue;
-      if (t.type === 'expense') expenseCents += t.amountCents;
+      // Cartão à vista conta como saída no mês da compra (competência); parcelas vêm do ledger acima.
+      if (t.type === 'expense' || isSingleCardPurchase(t, parceledIds)) expenseCents += t.amountCents;
       else if (t.type === 'income' || t.type === 'refund' || t.type === 'reimbursement' || t.type === 'adjustment') incomeCents += t.amountCents;
     }
     return { month, incomeCents, expenseCents };
@@ -410,9 +467,10 @@ export function lastCommittedMonth(
   invoices: InvoiceForSpending[],
   bills: BillForCommitment[]
 ): string {
+  const parceledIds = installmentPurchaseIds(invoices);
   let max = currentMonth;
   for (const invoice of invoices) {
-    if (invoice.referenceMonth > max && invoiceRecognizedExpense(invoice) > 0) max = invoice.referenceMonth;
+    if (invoice.referenceMonth > max && invoiceRecognizedExpense(invoice, parceledIds) > 0) max = invoice.referenceMonth;
   }
   for (const bill of bills) {
     if (bill.dueMonth > max && isOpenBill(bill)) max = bill.dueMonth;

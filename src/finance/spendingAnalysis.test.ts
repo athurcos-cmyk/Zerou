@@ -509,3 +509,61 @@ describe('computeCategoryTrend', () => {
     expect(trend.maxMonth).toBeNull();               // só o mês atual (parcial) tem gasto → sem maior/menor mês fechado
   });
 });
+
+describe('cartão à vista conta pela data da compra (regime de competência)', () => {
+  // Caso real do dono: cartão fecha dia 2, então uma compra de domingo 26/07 cai na fatura
+  // de agosto. Antes aparecia só em agosto; agora conta em JULHO (mês da compra).
+  function ride99() {
+    const purchaseTxn = txn({
+      id: 'ride99',
+      type: 'card_purchase',
+      amountCents: 1660,
+      categoryId: 'transporte',
+      cardId: 'card',
+      competenceMonth: '2026-07',
+      cashMonth: '2026-07'
+    });
+    // Fatura de AGOSTO (a compra de 26/07 caiu no ciclo que fecha em 02/08). À vista: sem installmentTotal.
+    const invoices: InvoiceForSpending[] = [
+      { referenceMonth: '2026-08', ledgerEntries: [entry({ id: 'ride99_p1', type: 'purchase', amountCents: 1660, sourceTransactionId: 'ride99' })] }
+    ];
+    const catOf = (id?: string) => (id === 'ride99' ? 'transporte' : undefined);
+    return { purchaseTxn, invoices, catOf };
+  }
+
+  it('conta no mês da COMPRA (julho), não no mês da fatura (agosto)', () => {
+    const { purchaseTxn, invoices, catOf } = ride99();
+    const julho = spendingByCategoryForMonth('2026-07', [purchaseTxn], invoices, catOf);
+    const agosto = spendingByCategoryForMonth('2026-08', [purchaseTxn], invoices, catOf);
+    expect(julho.get('transporte')).toBe(1660);   // aparece em julho
+    expect(agosto.get('transporte')).toBeUndefined(); // NÃO aparece em agosto (era o comportamento antigo)
+  });
+
+  it('não conta duas vezes (transação + ledger)', () => {
+    const { purchaseTxn, invoices, catOf } = ride99();
+    const total = [...spendingByCategoryForMonth('2026-07', [purchaseTxn], invoices, catOf).values()]
+      .concat([...spendingByCategoryForMonth('2026-08', [purchaseTxn], invoices, catOf).values()])
+      .reduce((a, b) => a + b, 0);
+    expect(total).toBe(1660); // uma vez só, no total dos dois meses
+  });
+
+  it('monthlyTotals: saída de julho inclui a compra à vista; agosto não', () => {
+    const { purchaseTxn, invoices } = ride99();
+    const totals = monthlyTotals(['2026-07', '2026-08'], [purchaseTxn], invoices);
+    expect(totals.find((m) => m.month === '2026-07')?.expenseCents).toBe(1660);
+    expect(totals.find((m) => m.month === '2026-08')?.expenseCents).toBe(0);
+  });
+
+  it('parcelada continua pela fatura, mesmo sem installmentTotal no ledger (detecta por ocorrência)', () => {
+    // Compra antiga em 3x sem o campo installmentTotal: 1 ocorrência por fatura em 3 meses.
+    const purchaseTxn = txn({ id: 'legacy3x', type: 'card_purchase', amountCents: 30000, categoryId: 'compras', cashMonth: '2026-07', competenceMonth: '2026-07' });
+    const invoices: InvoiceForSpending[] = ['2026-07', '2026-08', '2026-09'].map((month, i) => ({
+      referenceMonth: month,
+      ledgerEntries: [entry({ id: `legacy3x_p${i + 1}`, type: 'purchase', amountCents: 10000, sourceTransactionId: 'legacy3x' })]
+    }));
+    const catOf = (id?: string) => (id === 'legacy3x' ? 'compras' : undefined);
+    // Não conta os R$300 cheios em julho: conta R$100 por fatura (parcela detectada por ocorrência > 1).
+    expect(spendingByCategoryForMonth('2026-07', [purchaseTxn], invoices, catOf).get('compras')).toBe(10000);
+    expect(spendingByCategoryForMonth('2026-08', [purchaseTxn], invoices, catOf).get('compras')).toBe(10000);
+  });
+});
