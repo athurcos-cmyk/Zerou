@@ -2,6 +2,14 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-28 — perf(análise): donut de categorias refeito em SVG puro (fim do travamento no celular)
+
+O donut "Por categoria" era Recharts (`PieChart`) dentro de `ResponsiveContainer` — a animação de "formação" em JS + o ResizeObserver do container demoravam pra carregar e engasgavam no celular (relatado pelo dono). Refeito em **SVG puro** (arcos via `stroke-dasharray`): render instantâneo, sem ResizeObserver, com entrada suave em CSS (fade+scale, GPU, respeita `prefers-reduced-motion`) no lugar do sweep em JS.
+
+- Mantém tudo: clique pra selecionar categoria, esmaecer as outras, label central (categoria/total).
+- Removidos os imports Recharts do donut (`PieChart`/`Pie`/`Cell`) e o `DonutTooltip` morto; as barras do histórico mensal seguem em Recharts.
+- Só `SearchPage.tsx` + `global.css`. Verificado ao vivo (mobile, multi-categoria). `test` (428) + `build` verdes.
+
 ## 2026-07-28 — fix: parcelada excluída também some de "Compras parceladas em andamento"
 
 Continuação do fix de exclusão anterior (que cobriu o donut/categorias via `signedCharge`). O card "Compras parceladas em andamento" da Análise usa outra função — `ongoingInstallmentPurchases` — que somava as parcelas `purchase` do ledger e **ignorava o `purchase_reversal`**. Resultado: uma parcelada errada excluída continuava aparecendo enquanto a fatura daquele mês tivesse outra parcela mantendo o saldo devedor > 0 (o único caso que sumia era a fatura zerar por completo). Achado pelo dono ("as que coloquei errado e excluí vão continuar?"). Confirmado nos dados reais dele: **5 parceladas excluídas** ainda lingering (Mercado Livre, Dr Consulta, Game, 2× Limite convertido), cada uma com a versão recadastrada certa ao lado.

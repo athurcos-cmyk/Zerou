@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Calendar, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, EllipsisVertical, Gauge, HelpCircle, LineChart, Minus, Plus, Search, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
 import {
-  PieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer,
+  Tooltip as ReTooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from 'recharts';
 import { useAuth } from '../auth/AuthContext';
@@ -88,17 +88,6 @@ function sumPositive(totals: Map<string, number>) {
 }
 
 // ─── tooltips ─────────────────────────────────────────────────────────────────
-
-function DonutTooltip({ active, payload }: { active?: boolean; payload?: { payload: { name: string; amountCents: number } }[] }) {
-  if (!active || !payload?.length) return null;
-  const { name, amountCents } = payload[0].payload;
-  return (
-    <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: '0.65rem', padding: '0.5rem 0.85rem', boxShadow: 'var(--shadow-md)' }}>
-      <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{name}</p>
-      <p style={{ margin: 0, fontWeight: 700, fontSize: '0.9rem' }}>{formatMoney(amountCents)}</p>
-    </div>
-  );
-}
 
 function BarTooltip({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: string }) {
   if (!active || !payload?.length) return null;
@@ -559,38 +548,50 @@ export function SearchPage() {
             <p className="text-secondary" style={{ margin: '0.1rem 0 1rem' }}>{formatMoney(totalSpent)} no total</p>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem' }}>
 
-              {/* donut */}
+              {/* donut — SVG puro (sem Recharts): render instantâneo, sem ResizeObserver, animação
+                  de entrada em CSS (GPU) em vez do "forming" em JS que engasgava no celular. */}
               <div style={{ position: 'relative', flexShrink: 0, width: 200, height: 200 }}>
-                <ResponsiveContainer width={200} height={200}>
-                  <PieChart>
-                    <Pie
-                      data={spendingByCategory}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={62}
-                      outerRadius={88}
-                      dataKey="amountCents"
-                      nameKey="name"
-                      paddingAngle={2}
-                      startAngle={90}
-                      endAngle={-270}
-                      onClick={(_, index) => setSelectedCatIndex(index === selectedCatIndex ? null : index)}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      {spendingByCategory.map((cat, i) => (
-                        <Cell
+                <svg
+                  viewBox="0 0 200 200"
+                  width={200}
+                  height={200}
+                  className="category-donut"
+                  role="img"
+                  aria-label={`Gastos por categoria — total ${formatMoney(totalSpent)}`}
+                >
+                  {(() => {
+                    const R = 74;
+                    const C = 2 * Math.PI * R;
+                    // gap entre fatias (só quando há mais de uma); cada fatia desenha um pouco menos
+                    // que seu comprimento real pra deixar o respiro.
+                    const gapPx = spendingByCategory.length > 1 ? 3.5 : 0;
+                    let acc = 0; // comprimento acumulado (px) = onde a fatia começa
+                    return spendingByCategory.map((cat, i) => {
+                      const segLen = (cat.amountCents / totalSpent) * C;
+                      const drawn = Math.max(1, segLen - gapPx);
+                      const dimmed = selectedCatIndex !== null && selectedCatIndex !== i;
+                      const circle = (
+                        <circle
                           key={cat.name}
-                          fill={cat.color}
-                          opacity={selectedCatIndex === null || selectedCatIndex === i ? 1 : 0.2}
-                          stroke={selectedCatIndex === i ? 'var(--bg-surface)' : 'transparent'}
-                          strokeWidth={selectedCatIndex === i ? 3 : 0}
-                          style={{ outline: 'none', transition: 'opacity var(--duration-normal) ease' }}
+                          cx={100}
+                          cy={100}
+                          r={R}
+                          fill="none"
+                          stroke={cat.color}
+                          strokeWidth={26}
+                          strokeDasharray={`${drawn} ${C - drawn}`}
+                          strokeDashoffset={-acc}
+                          transform="rotate(-90 100 100)"
+                          opacity={dimmed ? 0.22 : 1}
+                          style={{ cursor: 'pointer', transition: 'opacity 180ms ease' }}
+                          onClick={() => setSelectedCatIndex(i === selectedCatIndex ? null : i)}
                         />
-                      ))}
-                    </Pie>
-                    <ReTooltip content={<DonutTooltip />} />
-                  </PieChart>
-                </ResponsiveContainer>
+                      );
+                      acc += segLen;
+                      return circle;
+                    });
+                  })()}
+                </svg>
 
                 {/* label central */}
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', gap: '0.1rem' }}>
