@@ -2,6 +2,14 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-29 (parte 5) — fix(ux): o "Salvando…" parou de piscar a cada lançamento
+
+O dono notou o badge aparecendo ao salvar uma transação. Causa: `SyncStatusBadge` reflete `metadata.hasPendingWrites` — a escrita está no cache local mas o servidor ainda não confirmou. Como o app é fire-and-forget por regra, a linha aparece na lista **antes** do ack; online isso dura frações de segundo, então o aviso só piscava, bem no instante em que a UI deveria transmitir confiança.
+
+- **Não foi removido, foi atrasado**: o aviso de `pending` só entra na tela depois de **1,2s**. Online ninguém vê; offline ou em rede ruim ele aparece e fica até sincronizar, que é quando é legítimo. `failed` continua imediato — erro não se esconde.
+- **Por que não apagar de vez**: o badge é usado em 10 pontos (Transações, Contas, Metas, Cartões, Contas a Pagar/Receber, Dashboard) e é o **único sinal visível** de "isto ainda não está no servidor". Num app cujo padrão offline-first engole o erro de propósito — e que já teve duas features quebradas em silêncio por semanas por causa disso — remover o indicador de sincronia anda na direção contrária do aprendizado.
+- 5 testes novos (`SyncStatusBadge.test.tsx`, com timer falso): segura antes do prazo, mostra depois, cancela se sincronizar antes, e falha aparece na hora. `typecheck` + `test` (449) + `build` verdes. 100% client-side.
+
 ## 2026-07-29 (parte 4) — feat(transações): o cabeçalho do dia virou SALDO, não resumo de gasto
 
 Decisão do dono, olhando o resultado da parte 3: **qualquer** resumo de fluxo esbarra em "o que conta como gasto?". No dia 23, com dois pagamentos de fatura (R$ 1.000) mais uma compra de tênis no cartão (R$ 1.000), nem "gasto R$ 1.000" nem "gasto R$ 2.000" respondiam bem — a pergunta é que estava errada. Agora o cabeçalho mostra o **saldo no fim daquele dia**: mesma pergunta todo dia, resposta que não depende da natureza do lançamento, e lido de cima pra baixo vira a trajetória do dinheiro ("nesse dia eu tinha tanto").

@@ -72,6 +72,15 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
   rótulos pro mesmo número confundem mais do que o rótulo genérico resolve. **Regra**: um número
   recorrente merece um rótulo estável — variação de texto por contexto faz o leitor procurar
   diferença de significado onde não existe.
+- **Aviso de estado transitório espera antes de aparecer** (`SyncStatusBadge`, 2026-07-29): o
+  "Salvando…" (`localSyncStatus: 'pending'`, vindo de `metadata.hasPendingWrites`) só entra na
+  tela depois de **1,2s** de escrita pendente. Como o app é fire-and-forget, online o servidor
+  confirma em frações de segundo e o aviso só piscava — bem no instante em que a UI deveria
+  transmitir confiança. Offline ou em rede ruim ele aparece e fica, que é quando é legítimo.
+  `failed` **não** espera: erro se mostra na hora. Vale como regra pra qualquer indicador de
+  carregamento/sincronia novo — e note que **remover o badge não era opção**: ele é o único
+  sinal visível de "isto ainda não está no servidor", num app cujo padrão offline-first engole
+  o erro de propósito (ver os incidentes de enum em `CLAUDE.md`).
 - **Microcópia de slot apertado se mede no DOM, não no olho.** "saldo no fim do dia" parecia
   caber e **não cabia**: com data de outro ano ("8 jul 2025") e valor de 6 dígitos faltavam 6px
   a 375px. `.day-group-header` tem ~301px úteis nessa largura — meça antes de escolher a frase.
