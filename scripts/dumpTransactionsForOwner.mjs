@@ -5,7 +5,11 @@
 // ajustes, pagamentos de fatura e tarifas.
 import { initAdminApp } from './backfillShared.mjs';
 
-const OWNER_EMAIL = process.argv[2] ?? 'arthurzika3@gmail.com';
+// Email da conta REAL do dono em produção. Já foi `arthurzika3@gmail.com` (a conta do
+// Claude Code, que não existe no banco) — o script respondia "Dono não encontrado" e parecia
+// quebrado. Passe outro email como argumento pra inspecionar outra conta; com um email
+// inexistente, ele lista todos os que existem.
+const OWNER_EMAIL = process.argv[2] ?? 'a.thurcos@gmail.com';
 const brl = (c) => (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const isoDay = (ts) => {
   try { return ts?.toDate ? ts.toDate().toISOString().slice(0, 10) : String(ts).slice(0, 10); }

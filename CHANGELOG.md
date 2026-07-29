@@ -16,6 +16,7 @@ Num dia que mistura as duas origens, o meio-dia de enfeite compete com hora de v
 - **`resolveEditedDate`** (novo): editar um lançamento sem mexer no dia **preserva o timestamp original** — antes, editar a descrição de uma despesa vinda do WhatsApp reancorava ela no meio-dia, apagando a hora real e jogando ela pra outro lugar da lista.
 - Decisão do dono: lançamento retroativo (sem hora real) fica **no topo do seu dia**, na ordem em que foi digitado.
 - **Verificado contra os dados reais de produção** rodando a função de verdade sobre a conta do dono: 25/07 corrigido, e **0 cabeçalhos de dia repetidos** em 13 grupos. Confirmado no dev server que lançamento novo grava a hora real (`15:14:36`, não `12:00`). 10 testes novos em `financeDates.test.ts`; `typecheck` + `test` (438) + `build` verdes. 100% client-side.
+- De brinde, achado no caminho: `scripts/dumpTransactionsForOwner.mjs` tinha `arthurzika3@gmail.com` (a conta do Claude Code, que não existe no banco) como email padrão — respondia "Dono não encontrado" e parecia quebrado. Corrigido pra `a.thurcos@gmail.com`, a conta real do dono em produção.
 
 ## 2026-07-29 — fix(transações): ordem dentro do mesmo dia respeita a hora real do lançamento
 
