@@ -9,7 +9,8 @@ import { SelectField } from '../components/SelectField';
 import { TagInput } from '../components/TagInput';
 import { resolveEditedDate, toDateInputValue } from '../finance/financeDates';
 import { accountTypeLabels, transactionTypeLabels } from '../finance/financeLabels';
-import { createCategory, deleteCategory, updateCategory, updateTransaction } from '../finance/financeService';
+import { updateTransaction } from '../finance/financeService';
+import { useCategoryActions } from '../finance/useCategoryActions';
 import { updateCardPurchase } from '../cards/cardService';
 import { type SupportedTransactionType } from '../finance/financeSchemas';
 import { centsToInputValue, parseMoneyToCents } from '../finance/money';
@@ -36,6 +37,7 @@ export function EditTransactionPage() {
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const categoryActions = useCategoryActions(setCategoryId);
   const [accountId, setAccountId] = useState('');
   const [destinationAccountId, setDestinationAccountId] = useState('');
   const [date, setDate] = useState('');
@@ -74,22 +76,6 @@ export function EditTransactionPage() {
   const today = toDateInputValue(new Date());
   const yesterday = yesterdayInputValue();
   const datePreset = date === today ? 'today' : date === yesterday ? 'yesterday' : 'other';
-
-  async function handleCreateCategory(name: string, icon: string, catType: 'income' | 'expense' | 'both', color: string) {
-    if (!workspaceId || !user) return;
-    const id = await createCategory(workspaceId, user.uid, { name, icon, type: catType, color });
-    setCategoryId(id);
-  }
-
-  async function handleDeleteCategory(id: string) {
-    if (!workspaceId) return;
-    await deleteCategory(workspaceId, id);
-  }
-
-  async function handleUpdateCategory(id: string, patch: { name?: string; icon?: string; color?: string }) {
-    if (!workspaceId) return;
-    await updateCategory(workspaceId, id, patch);
-  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -230,9 +216,7 @@ export function EditTransactionPage() {
           onChange={setCategoryId}
           categories={finance.categories}
           filterType={categoryFilterType as 'income' | 'expense' | 'all'}
-          onCreateCategory={handleCreateCategory}
-          onUpdateCategory={handleUpdateCategory}
-          onDeleteCategory={handleDeleteCategory}
+          {...categoryActions}
         />
 
         {!isCardPurchase && (

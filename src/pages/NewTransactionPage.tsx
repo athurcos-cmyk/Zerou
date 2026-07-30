@@ -11,7 +11,8 @@ import { SelectField } from '../components/SelectField';
 import { TagInput } from '../components/TagInput';
 import { fromDateInputValueForWrite, todayInputValue } from '../finance/financeDates';
 import { accountTypeLabels, transactionTypeLabels } from '../finance/financeLabels';
-import { createCategory, createTransaction, deleteCategory, updateCategory } from '../finance/financeService';
+import { createTransaction } from '../finance/financeService';
+import { useCategoryActions } from '../finance/useCategoryActions';
 import { type SupportedTransactionType } from '../finance/financeSchemas';
 import { parseMoneyToCents } from '../finance/money';
 import { CARD_PREFIX, buildAccountOrCardOptions, installmentOptions, parseAccountOrCard } from '../finance/accountOrCardOptions';
@@ -36,6 +37,9 @@ export function NewTransactionPage() {
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  // `setCategoryId` é estável (setter de useState), então o objeto de handlers não é recriado a
+  // cada render — importante porque `CategoryField` é memo.
+  const categoryActions = useCategoryActions(setCategoryId);
   const [accountId, setAccountId] = useState('');
   const [destinationAccountId, setDestinationAccountId] = useState('');
   const [installments, setInstallments] = useState(1);
@@ -64,22 +68,6 @@ export function NewTransactionPage() {
   const today = todayInputValue();
   const yesterday = yesterdayInputValue();
   const datePreset = date === today ? 'today' : date === yesterday ? 'yesterday' : 'other';
-
-  async function handleCreateCategory(name: string, icon: string, catType: 'income' | 'expense' | 'both', color: string) {
-    if (!workspaceId || !user) return;
-    const id = await createCategory(workspaceId, user.uid, { name, icon, type: catType, color });
-    setCategoryId(id);
-  }
-
-  async function handleDeleteCategory(id: string) {
-    if (!workspaceId) return;
-    await deleteCategory(workspaceId, id);
-  }
-
-  async function handleUpdateCategory(id: string, patch: { name?: string; icon?: string; color?: string }) {
-    if (!workspaceId) return;
-    await updateCategory(workspaceId, id, patch);
-  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -201,9 +189,7 @@ export function NewTransactionPage() {
           onChange={setCategoryId}
           categories={finance.categories}
           filterType={categoryFilterType as 'income' | 'expense' | 'all'}
-          onCreateCategory={handleCreateCategory}
-          onUpdateCategory={handleUpdateCategory}
-          onDeleteCategory={handleDeleteCategory}
+          {...categoryActions}
         />
 
         <SelectField

@@ -2,11 +2,11 @@ import { useMemo, useState } from 'react';
 import { addMonths, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { BottomSheet } from '../components/BottomSheet';
+import { useCategoryActions } from '../finance/useCategoryActions';
 import { CategoryField } from '../components/CategoryField';
 import { FormMessage } from '../components/FormMessage';
 import { registerOngoingInstallments } from './cardService';
 import { resolveInstallmentCycle } from './cardDates';
-import { createCategory, deleteCategory, updateCategory } from '../finance/financeService';
 import { fromDateInputValue, todayInputValue } from '../finance/financeDates';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
@@ -47,6 +47,7 @@ export function OngoingInstallmentsSheet({
   const [total, setTotal] = useState('2');
   const [alreadyPaid, setAlreadyPaid] = useState('0');
   const [categoryId, setCategoryId] = useState('');
+  const categoryActions = useCategoryActions(setCategoryId);
   const [message, setMessage] = useState<string | null>(null);
 
   const totalNum = Number(total) || 0;
@@ -84,22 +85,6 @@ export function OngoingInstallmentsSheet({
     alreadyPaidNum >= 0 &&
     alreadyPaidNum < totalNum &&
     Boolean(nextCycle);
-
-  async function handleCreateCategory(name: string, icon: string, catType: 'income' | 'expense' | 'both', color: string) {
-    if (!workspaceId || !userId) return;
-    const id = await createCategory(workspaceId, userId, { name, icon, type: catType, color });
-    setCategoryId(id);
-  }
-
-  async function handleUpdateCategory(id: string, patch: { name?: string; icon?: string; color?: string }) {
-    if (!workspaceId) return;
-    await updateCategory(workspaceId, id, patch);
-  }
-
-  async function handleDeleteCategory(id: string) {
-    if (!workspaceId) return;
-    await deleteCategory(workspaceId, id);
-  }
 
   function reset() {
     setDescription('');
@@ -163,9 +148,7 @@ export function OngoingInstallmentsSheet({
             onChange={setCategoryId}
             categories={categories}
             filterType="expense"
-            onCreateCategory={handleCreateCategory}
-            onUpdateCategory={handleUpdateCategory}
-            onDeleteCategory={handleDeleteCategory}
+            {...categoryActions}
           />
 
           <div className="form-grid-2">

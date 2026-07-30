@@ -17,9 +17,7 @@ import { CARD_PREFIX, buildAccountOrCardOptions, installmentOptions, parseAccoun
 import {
   canRegisterRecurrence,
   createBill,
-  createCategory,
   createRecurringRule,
-  deleteCategory,
   deleteRecurringRule,
   isRecurrenceDue,
   nextOccurrenceDate,
@@ -27,9 +25,9 @@ import {
   recordRecurringPayment,
   updateBill,
   updateBillStatus,
-  updateCategory,
   updateRecurringRule,
 } from '../finance/financeService';
+import { useCategoryActions } from '../finance/useCategoryActions';
 import { recurringFrequencies, type CreateRecurringRuleInput } from '../finance/financeSchemas';
 import { centsToInputValue, formatMoney, parseMoneyToCents } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
@@ -59,6 +57,8 @@ export function BillsPage() {
   const [amount, setAmount] = useState('');
   const [dueDate, setDueDate] = useState(todayInputValue());
   const [categoryId, setCategoryId] = useState('');
+  // Quatro instâncias de CategoryField nesta tela, cada uma preenchendo um campo diferente.
+  const categoryActions = useCategoryActions(setCategoryId);
   const [accountId, setAccountId] = useState('');
   const [installments, setInstallments] = useState(1);
   const [message, setMessage] = useState<string | null>(null);
@@ -73,6 +73,7 @@ export function BillsPage() {
   const [payAmount, setPayAmount] = useState('');
   const [payDescription, setPayDescription] = useState('');
   const [payCategoryId, setPayCategoryId] = useState('');
+  const payCategoryActions = useCategoryActions(setPayCategoryId);
 
   // ── edit recorrência sheet state ──
   const [editingRule, setEditingRule] = useState<RecurringRule | null>(null);
@@ -81,6 +82,7 @@ export function BillsPage() {
   const [editFrequency, setEditFrequency] = useState<CreateRecurringRuleInput['frequency']>('monthly');
   const [editAccountId, setEditAccountId] = useState('');
   const [editCategoryId, setEditCategoryId] = useState('');
+  const editCategoryActions = useCategoryActions(setEditCategoryId);
   const [editNextOccurrenceAt, setEditNextOccurrenceAt] = useState(todayInputValue());
 
   // ── edit conta avulsa sheet state ──
@@ -88,6 +90,7 @@ export function BillsPage() {
   const [editBillDescription, setEditBillDescription] = useState('');
   const [editBillAmount, setEditBillAmount] = useState('');
   const [editBillCategoryId, setEditBillCategoryId] = useState('');
+  const editBillCategoryActions = useCategoryActions(setEditBillCategoryId);
   const [editBillAccountId, setEditBillAccountId] = useState('');
   const [editBillInstallments, setEditBillInstallments] = useState(1);
   const [editBillDueDate, setEditBillDueDate] = useState(todayInputValue());
@@ -411,19 +414,7 @@ export function BillsPage() {
               onChange={setCategoryId}
               categories={finance.categories}
               filterType="expense"
-              onCreateCategory={async (name, icon, type, color) => {
-                if (!workspaceId || !user) return;
-                const id = await createCategory(workspaceId, user.uid, { name, icon, type, color });
-                setCategoryId(id);
-              }}
-              onUpdateCategory={async (id, patch) => {
-                if (!workspaceId) return;
-                await updateCategory(workspaceId, id, patch);
-              }}
-              onDeleteCategory={async (id) => {
-                if (!workspaceId) return;
-                await deleteCategory(workspaceId, id);
-              }}
+              {...categoryActions}
             />
 
             <SelectField
@@ -614,13 +605,7 @@ export function BillsPage() {
                 onChange={setPayCategoryId}
                 categories={finance.categories}
                 filterType="expense"
-                onCreateCategory={async (name, icon, type, color) => {
-                  if (!workspaceId || !user) return;
-                  const id = await createCategory(workspaceId, user.uid, { name, icon, type, color });
-                  setPayCategoryId(id);
-                }}
-                onUpdateCategory={async (id, patch) => { if (!workspaceId) return; await updateCategory(workspaceId, id, patch); }}
-                onDeleteCategory={async (id) => { if (!workspaceId) return; await deleteCategory(workspaceId, id); }}
+                {...payCategoryActions}
               />
             </>
           )}
@@ -692,13 +677,7 @@ export function BillsPage() {
             onChange={setEditCategoryId}
             categories={finance.categories}
             filterType="expense"
-            onCreateCategory={async (name, icon, type, color) => {
-              if (!workspaceId || !user) return;
-              const id = await createCategory(workspaceId, user.uid, { name, icon, type, color });
-              setEditCategoryId(id);
-            }}
-            onUpdateCategory={async (id, patch) => { if (!workspaceId) return; await updateCategory(workspaceId, id, patch); }}
-            onDeleteCategory={async (id) => { if (!workspaceId) return; await deleteCategory(workspaceId, id); }}
+            {...editCategoryActions}
           />
           <SelectField
             label="Conta ou cartão"
@@ -742,13 +721,7 @@ export function BillsPage() {
             onChange={setEditBillCategoryId}
             categories={finance.categories}
             filterType="expense"
-            onCreateCategory={async (name, icon, type, color) => {
-              if (!workspaceId || !user) return;
-              const id = await createCategory(workspaceId, user.uid, { name, icon, type, color });
-              setEditBillCategoryId(id);
-            }}
-            onUpdateCategory={async (id, patch) => { if (!workspaceId) return; await updateCategory(workspaceId, id, patch); }}
-            onDeleteCategory={async (id) => { if (!workspaceId) return; await deleteCategory(workspaceId, id); }}
+            {...editBillCategoryActions}
           />
           <SelectField
             label="Conta ou cartão"
