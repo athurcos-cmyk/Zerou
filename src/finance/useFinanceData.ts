@@ -269,7 +269,10 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
     }
 
     const existingIds = new Set(state.categories.map((category) => category.id));
-    const missingDefaults = defaultCategories
+    // Tipo explícito: sem ele o objeto inferido é mais ESTREITO que `Category` (ids literais, e
+    // sem campos opcionais como `parentCategoryId`), e a união vazava pra quem consome
+    // `finance.categories` — quebrava ao ler um campo opcional. Elas são categorias de verdade.
+    const missingDefaults: Array<LocalSynced<Category>> = defaultCategories
       .filter((category) => !existingIds.has(category.id))
       .map((category) => ({
         ...buildDefaultCategory(workspaceId, category),

@@ -18,8 +18,7 @@ import {
   MessageCircle,
   Users,
   WalletCards,
-  X
-} from 'lucide-react';
+  X, FolderTree } from 'lucide-react';
 import { UserAvatar } from '../profile/UserAvatar';
 import { BottomSheet } from '../components/BottomSheet';
 import { BrandLockup } from '../components/BrandLogo';
@@ -116,6 +115,9 @@ export function AppShell() {
           <NavLink className={getNavClass} to="/app/settings/onboarding">
             <Compass size={19} aria-hidden="true" /> Objetivo e desafio
           </NavLink>
+          <NavLink className={getNavClass} to="/app/settings/categories">
+            <FolderTree size={19} aria-hidden="true" /> Categorias
+          </NavLink>
           <NavLink className={getNavClass} to="/app/settings/appearance">
             <Palette size={19} aria-hidden="true" /> Aparência
           </NavLink>
@@ -185,6 +187,9 @@ export function AppShell() {
           <div className="menu-tiles menu-tiles--compact">
             <NavLink className={getTileClass} to="/app/settings/onboarding" onClick={() => setMobileMenuOpen(false)}>
               <Compass size={18} aria-hidden="true" /> <span>Objetivo e desafio</span>
+            </NavLink>
+            <NavLink className={getTileClass} to="/app/settings/categories" onClick={() => setMobileMenuOpen(false)}>
+              <FolderTree size={18} aria-hidden="true" /> <span>Categorias</span>
             </NavLink>
             <NavLink className={getTileClass} to="/app/settings/appearance" onClick={() => setMobileMenuOpen(false)}>
               <Palette size={18} aria-hidden="true" /> <span>Aparência</span>

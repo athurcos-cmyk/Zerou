@@ -1,5 +1,6 @@
 import { memo, useState } from 'react';
-import { Check, ChevronRight, Pencil, Plus, Settings2, Tag } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Check, ChevronRight, FolderTree, Pencil, Plus, Settings2, Tag } from 'lucide-react';
 import type { Category } from '../types/contracts';
 import { BottomSheet } from './BottomSheet';
 import { useConfirm } from './ConfirmDialog';
@@ -229,6 +230,11 @@ export const CategoryField = memo(function CategoryField({
                   <Settings2 size={16} aria-hidden="true" /> {manage ? 'Concluir' : 'Editar categorias'}
                 </button>
               )}
+              {/* Descoberta da tela dedicada: sem este link ela ficaria escondida em
+                  Configurações, e a explicação de subcategoria nunca seria lida. */}
+              <Link className="list-toggle" to="/app/settings/categories" onClick={() => setOpen(false)}>
+                <FolderTree size={15} aria-hidden="true" /> Organizar em subcategorias
+              </Link>
             </div>
             {manage && <p className="sheet-hint">Toque numa categoria para mudar cor, ícone ou nome.</p>}
           </>

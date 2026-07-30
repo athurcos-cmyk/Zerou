@@ -6116,3 +6116,61 @@ button.category-group-header:hover {
   flex: 1;
   min-width: 0;
 }
+
+/* --- Tela de Categorias (/app/settings/categories, 2026-07-29) --- */
+.category-explainer {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.category-explainer-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  flex: 0 0 auto;
+  border-radius: 0.75rem;
+  background: var(--action-primary-soft);
+  color: var(--action-primary);
+}
+
+.category-explainer p {
+  margin: 0.35rem 0 0;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.category-explainer em {
+  font-style: normal;
+  font-weight: 600;
+}
+
+/* Subcategoria recuada, com um fio ligando ela à principal — a indentação sozinha se perde
+   quando o nome da principal é curto e o da filha é longo. */
+.category-child-row {
+  padding-left: 1.5rem;
+  position: relative;
+}
+
+.category-child-row::before {
+  content: '';
+  position: absolute;
+  left: 0.55rem;
+  top: 0;
+  bottom: 50%;
+  width: 1px;
+  background: var(--border-subtle);
+}
+
+.category-child-row::after {
+  content: '';
+  position: absolute;
+  left: 0.55rem;
+  top: 50%;
+  width: 0.5rem;
+  height: 1px;
+  background: var(--border-subtle);
+}

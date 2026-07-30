@@ -83,6 +83,33 @@ export function parentCandidates<T extends CategoryLike>(
   return all.filter((cat) => canBeParentOf(cat.id, targetId, all));
 }
 
+export interface CategoryDependents {
+  bills: number;
+  recurring: number;
+}
+
+/**
+ * Quantas contas a pagar e recorrências apontam pra uma categoria.
+ *
+ * Serve pro aviso ao dividir uma categoria em subcategorias: `recordRecurringPayment` e `payBill`
+ * criam transações **usando a categoria da regra**, então uma recorrência apontando pra um pai
+ * continuaria gerando lançamento nele todo mês — a linha "· geral" cresceria pra sempre em vez
+ * de esvaziar. O app avisa e a pessoa reaponta cada uma pra subcategoria certa (movê-las em massa
+ * pra um destino único erraria, porque cada uma pertence a uma sub diferente).
+ */
+export function dependentsOnCategory(
+  categoryId: string,
+  source: {
+    bills: ReadonlyArray<{ categoryId?: string; status?: string }>;
+    recurringRules: ReadonlyArray<{ categoryId?: string; isActive?: boolean }>;
+  }
+): CategoryDependents {
+  return {
+    bills: source.bills.filter((b) => b.categoryId === categoryId && b.status !== 'paid' && b.status !== 'cancelled').length,
+    recurring: source.recurringRules.filter((r) => r.categoryId === categoryId && r.isActive !== false).length
+  };
+}
+
 export interface DeleteCheck {
   ok: boolean;
   /** Quantas filhas seguram a exclusão (0 quando `ok`). */

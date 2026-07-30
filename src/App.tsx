@@ -37,6 +37,7 @@ const OnboardingPage = lazy(() => import('./onboarding/OnboardingPage').then((m)
 const AppearanceSettingsPage = lazy(() => import('./settings/AppearanceSettingsPage').then((m) => ({ default: m.AppearanceSettingsPage })));
 const LoginMethodsPage = lazy(() => import('./settings/LoginMethodsPage').then((m) => ({ default: m.LoginMethodsPage })));
 const OnboardingAnswersSettingsPage = lazy(() => import('./settings/OnboardingAnswersSettingsPage').then((m) => ({ default: m.OnboardingAnswersSettingsPage })));
+const CategoriesSettingsPage = lazy(() => import('./settings/CategoriesSettingsPage').then((m) => ({ default: m.CategoriesSettingsPage })));
 const WhatsAppLinkPage = lazy(() => import('./settings/WhatsAppLinkPage').then((m) => ({ default: m.WhatsAppLinkPage })));
 const JoinInvitePage = lazy(() => import('./pages/JoinInvitePage').then((m) => ({ default: m.JoinInvitePage })));
 const FeaturesPage = lazy(() => import('./pages/PublicPages').then((m) => ({ default: m.FeaturesPage })));
@@ -128,6 +129,7 @@ export function App() {
                 <Route path="settings/appearance" element={<Suspense fallback={<LazyFallback />}><AppearanceSettingsPage /></Suspense>} />
                 <Route path="settings/billing" element={<Navigate to="/app/settings/appearance" replace />} />
                 <Route path="settings/onboarding" element={<Suspense fallback={<LazyFallback />}><OnboardingAnswersSettingsPage /></Suspense>} />
+                <Route path="settings/categories" element={<Suspense fallback={<LazyFallback />}><CategoriesSettingsPage /></Suspense>} />
                 <Route path="settings/security/login-methods" element={<Suspense fallback={<LazyFallback />}><LoginMethodsPage /></Suspense>} />
                 <Route path="settings/whatsapp" element={<Suspense fallback={<LazyFallback />}><WhatsAppLinkPage /></Suspense>} />
               </Route>
