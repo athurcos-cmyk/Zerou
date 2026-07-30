@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { createCategory, deleteCategory, updateCategory } from './financeService';
+import type { Category } from '../types/contracts';
 import type { CategoryPatch } from '../components/CategoryField';
 
 export interface CategoryActions {
@@ -8,7 +9,9 @@ export interface CategoryActions {
     name: string,
     icon: string,
     type: 'income' | 'expense' | 'both',
-    color: string
+    color: string,
+    /** Presente = criar subcategoria. O serviço deriva id e cor deste objeto. */
+    parent?: Category
   ) => Promise<void>;
   onUpdateCategory: (id: string, patch: CategoryPatch) => Promise<void>;
   onDeleteCategory: (id: string) => Promise<void>;
@@ -37,14 +40,14 @@ export function useCategoryActions(onCreated?: (categoryId: string) => void): Ca
 
   return useMemo<CategoryActions>(
     () => ({
-      async onCreateCategory(name, icon, type, color) {
+      async onCreateCategory(name, icon, type, color, parent) {
         if (!workspaceId || !userId) return;
-        const id = await createCategory(workspaceId, userId, { name, icon, type, color });
+        const id = await createCategory(workspaceId, userId, { name, icon, type, color, parent });
         onCreated?.(id);
       },
-      async onUpdateCategory(id, patch) {
+      async onUpdateCategory(id, { children, ...patch }) {
         if (!workspaceId) return;
-        await updateCategory(workspaceId, id, patch);
+        await updateCategory(workspaceId, id, patch, { children });
       },
       async onDeleteCategory(id) {
         if (!workspaceId) return;

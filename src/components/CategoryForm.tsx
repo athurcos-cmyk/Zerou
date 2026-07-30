@@ -2,8 +2,9 @@ import { useState, type FormEvent } from 'react';
 import { Check, ChevronRight, Trash2, X } from 'lucide-react';
 import type { Category } from '../types/contracts';
 import { BottomSheet } from './BottomSheet';
+import { SelectField } from './SelectField';
 import {
-  CategoryIcon, categoryColors, categoryIconGroups, categoryIconKeys, iconGroupIndexOf
+  CategoryIcon, categoryColors, categoryIconGroups, categoryIconKeys, iconGroupIndexOf, resolveCategoryColor
 } from './categoryIcons';
 import { ACCENT_FOREGROUND } from '../theme/palette';
 
@@ -12,6 +13,8 @@ export interface CategoryFormValues {
   icon: string;
   color: string;
   type: 'income' | 'expense' | 'both';
+  /** `undefined` = categoria principal; id = subcategoria daquele pai. */
+  parentCategoryId?: string;
 }
 
 interface CategoryFormProps {
@@ -21,9 +24,17 @@ interface CategoryFormProps {
   editingColor?: string;
   /** Quando `all`, o formulário deixa escolher o tipo (só na criação). */
   filterType?: 'income' | 'expense' | 'both' | 'all';
+  /**
+   * Categorias que podem ser pai desta — já filtradas por `parentCandidates`, que aplica as
+   * travas de 1 nível. Lista vazia esconde o campo (ex.: editando uma categoria que já tem
+   * filhas: ela não pode virar subcategoria de ninguém).
+   */
+  parentOptions?: Category[];
   onSubmit: (values: CategoryFormValues) => Promise<void>;
   /** Devolve `true` se a exclusão foi confirmada e executada. */
   onDelete?: () => Promise<boolean>;
+  /** Preenchido quando a exclusão está bloqueada — vira aviso no lugar do botão. */
+  deleteBlockedReason?: string | null;
   onCancel: () => void;
   onDeleted?: () => void;
 }
@@ -44,8 +55,10 @@ export function CategoryForm({
   editing = null,
   editingColor,
   filterType = 'all',
+  parentOptions = [],
   onSubmit,
   onDelete,
+  deleteBlockedReason,
   onCancel,
   onDeleted
 }: CategoryFormProps) {
@@ -55,9 +68,16 @@ export function CategoryForm({
   const [type, setType] = useState<'income' | 'expense' | 'both'>(
     editing?.type ?? (filterType === 'income' ? 'income' : 'expense')
   );
+  const [parentCategoryId, setParentCategoryId] = useState(editing?.parentCategoryId ?? '');
   const [iconSheetOpen, setIconSheetOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  const parent = parentOptions.find((cat) => cat.id === parentCategoryId) ?? null;
+  // Com pai, a cor é herdada — o seletor de cor SAI de cena em vez de mostrar uma escolha que
+  // vai ser sobrescrita na gravação. Interface que oferece controle sem efeito é interface que
+  // mente. O preview usa a cor do pai pra pessoa ver o resultado real.
+  const effectiveColor = parent ? resolveCategoryColor(parent) : color;
 
   // Grupo do ícone escolhido — vira o subtítulo da linha ("Comida e bebida"), pra ela dizer algo
   // além de repetir o desenho que já está no tile ao lado.
@@ -72,7 +92,13 @@ export function CategoryForm({
     if (!name.trim()) return;
     setBusy(true);
     try {
-      await onSubmit({ name: name.trim(), icon, color, type });
+      await onSubmit({
+        name: name.trim(),
+        icon,
+        color: effectiveColor,
+        type,
+        parentCategoryId: parentCategoryId || undefined
+      });
     } finally {
       setBusy(false);
     }
@@ -91,7 +117,7 @@ export function CategoryForm({
   return (
     <form className="category-create" onSubmit={(event) => void handleSubmit(event)}>
       <div className="category-create-preview">
-        <span className="category-tile-mark category-tile-mark--lg" style={{ background: color }}>
+        <span className="category-tile-mark category-tile-mark--lg" style={{ background: effectiveColor }}>
           <CategoryIcon icon={icon} size={26} />
         </span>
       </div>
@@ -120,6 +146,34 @@ export function CategoryForm({
         </div>
       )}
 
+      {/* Campo de pai. Some quando não há candidato — ex.: editando uma categoria que já tem
+          filhas, que pela trava de 1 nível não pode virar subcategoria de ninguém. */}
+      {parentOptions.length > 0 && (
+        <div className="field">
+          <span className="field-label">Dentro de</span>
+          <SelectField
+            label=""
+            value={parentCategoryId}
+            onChange={setParentCategoryId}
+            options={[
+              { value: '', label: 'Nenhuma — é uma categoria principal' },
+              ...parentOptions.map((cat) => ({
+                value: cat.id,
+                label: cat.name,
+                icon: <CategoryIcon icon={cat.icon} size={17} />
+              }))
+            ]}
+            sheetTitle="Categoria principal"
+            sheetSubtitle="Subcategoria herda a cor da principal"
+          />
+        </div>
+      )}
+
+      {parent ? (
+        <p className="sheet-hint">
+          Herda a cor de <strong>{parent.name}</strong>. Mudar a cor da principal muda esta também.
+        </p>
+      ) : (
       <div className="field">
         <span className="field-label">Cor</span>
         <div className="color-grid" role="radiogroup" aria-label="Cor">
@@ -139,6 +193,7 @@ export function CategoryForm({
           ))}
         </div>
       </div>
+      )}
 
       {/* Escolher ícone vive numa folha própria: com 122 ícones, grade rolável dentro de um sheet
           que também rola esconde o tamanho do conteúdo (não se sabe se ainda tem ícone embaixo),
@@ -146,7 +201,7 @@ export function CategoryForm({
       <div className="field">
         <span className="field-label">Ícone</span>
         <button className="select-row" type="button" onClick={() => setIconSheetOpen(true)}>
-          <span className="select-row-icon select-row-icon--category" style={{ background: color }} aria-hidden="true">
+          <span className="select-row-icon select-row-icon--category" style={{ background: effectiveColor }} aria-hidden="true">
             <CategoryIcon icon={icon} size={17} />
           </span>
           <span className="select-row-text">
@@ -160,7 +215,9 @@ export function CategoryForm({
         <button className="button button--primary" type="submit" disabled={busy || !name.trim()}>
           {busy ? 'Salvando...' : editing ? 'Salvar alterações' : 'Criar categoria'}
         </button>
-        {editing && onDelete && (
+        {editing && deleteBlockedReason ? (
+          <p className="sheet-hint">{deleteBlockedReason}</p>
+        ) : editing && onDelete ? (
           <button
             className="button button--ghost button--danger-text"
             type="button"
@@ -169,7 +226,7 @@ export function CategoryForm({
           >
             <Trash2 size={16} aria-hidden="true" /> Excluir categoria
           </button>
-        )}
+        ) : null}
         <button className="button button--ghost" type="button" onClick={onCancel}>
           <X size={16} aria-hidden="true" /> Cancelar
         </button>
@@ -191,7 +248,7 @@ export function CategoryForm({
                     key={key}
                     type="button"
                     className={`icon-cell${icon === key ? ' icon-cell--selected' : ''}`}
-                    style={icon === key ? { background: color, borderColor: color, color: ACCENT_FOREGROUND } : undefined}
+                    style={icon === key ? { background: effectiveColor, borderColor: effectiveColor, color: ACCENT_FOREGROUND } : undefined}
                     role="radio"
                     aria-checked={icon === key}
                     onClick={() => { setIcon(key); setIconSheetOpen(false); }}

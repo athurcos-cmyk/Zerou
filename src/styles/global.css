@@ -6064,3 +6064,55 @@ span.service-mark--brand {
     grid-template-columns: repeat(3, 1fr);
   }
 }
+
+/* --- Grupo de subcategorias no seletor (2026-07-29) ---
+   Categoria-pai não é um tile: ela é só agrupamento e não recebe lançamento. Vira o cabeçalho
+   do grupo, com as filhas em grade abaixo. No modo "Editar categorias" o cabeçalho é tocável
+   (é o único caminho pra editar um pai, já que ele não tem tile). */
+.category-group {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
+  min-width: 0;
+}
+
+.category-group-header {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.1rem 0;
+  background: none;
+  border: 0;
+  text-align: left;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* Só o cabeçalho tocável (modo editar) ganha cursor e realce. */
+button.category-group-header {
+  cursor: pointer;
+}
+
+button.category-group-header:hover {
+  color: var(--action-primary);
+}
+
+.category-group-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  color: var(--accent-foreground);
+}
+
+.category-group-name {
+  flex: 1;
+  min-width: 0;
+}

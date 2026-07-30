@@ -3,13 +3,20 @@ import { Check, ChevronRight, Pencil, Plus, Settings2, Tag } from 'lucide-react'
 import type { Category } from '../types/contracts';
 import { BottomSheet } from './BottomSheet';
 import { useConfirm } from './ConfirmDialog';
-import { CategoryForm } from './CategoryForm';
+import { CategoryForm, type CategoryFormValues } from './CategoryForm';
 import { CategoryIcon, resolveCategoryColor } from './categoryIcons';
+import {
+  canDeleteCategory, childrenOf, isParentCategory, parentCandidates, selectableCategories
+} from '../finance/categoryHierarchy';
 
 export interface CategoryPatch {
   name?: string;
   icon?: string;
   color?: string;
+  /** `undefined` = não mexe; `null` = limpa (promove a categoria principal). */
+  parentCategoryId?: string | null;
+  /** Filhas desta categoria — a cor é propagada pra elas no mesmo batch. */
+  children?: ReadonlyArray<{ id: string }>;
 }
 
 interface CategoryFieldProps {
@@ -18,7 +25,13 @@ interface CategoryFieldProps {
   onChange: (id: string) => void;
   categories: Category[];
   filterType?: 'income' | 'expense' | 'both' | 'all';
-  onCreateCategory?: (name: string, icon: string, type: 'income' | 'expense' | 'both', color: string) => Promise<void>;
+  onCreateCategory?: (
+    name: string,
+    icon: string,
+    type: 'income' | 'expense' | 'both',
+    color: string,
+    parent?: Category
+  ) => Promise<void>;
   onUpdateCategory?: (id: string, patch: CategoryPatch) => Promise<void>;
   onDeleteCategory?: (id: string) => Promise<void>;
 }
@@ -45,8 +58,16 @@ export const CategoryField = memo(function CategoryField({
     if (filterType === 'all') return true;
     return cat.type === filterType || cat.type === 'both';
   });
-  const selected = filtered.find((cat) => cat.id === value);
+  // Pai é só agrupamento: quem tem filhas sai das opções selecionáveis. `selectableCategories`
+  // é a MESMA função que a Vic no WhatsApp espelha — se os dois discordarem, dá pra gravar por
+  // mensagem numa categoria que o app não deixa escolher.
+  const selectable = selectableCategories(filtered);
+  const parents = filtered.filter((cat) => isParentCategory(cat.id, filtered));
+  const rootLeaves = selectable.filter((cat) => !cat.parentCategoryId);
+
+  const selected = selectable.find((cat) => cat.id === value);
   const editingCategory = editingId ? filtered.find((cat) => cat.id === editingId) ?? null : null;
+  const deleteCheck = editingId ? canDeleteCategory(editingId, filtered) : null;
 
   function startCreate() {
     setEditingId(null);
@@ -58,11 +79,25 @@ export const CategoryField = memo(function CategoryField({
     setMode('form');
   }
 
-  async function handleSubmit(values: { name: string; icon: string; color: string; type: 'income' | 'expense' | 'both' }) {
+  async function handleSubmit(values: CategoryFormValues) {
+    const parent = values.parentCategoryId
+      ? filtered.find((cat) => cat.id === values.parentCategoryId)
+      : undefined;
+
     if (editingId) {
-      if (onUpdateCategory) await onUpdateCategory(editingId, { name: values.name, icon: values.icon, color: values.color });
+      if (onUpdateCategory) {
+        await onUpdateCategory(editingId, {
+          name: values.name,
+          icon: values.icon,
+          color: values.color,
+          // `null` limpa o campo (promove a categoria principal); string troca de pai.
+          parentCategoryId: values.parentCategoryId ?? null,
+          // Propaga a cor pras filhas quando ESTA categoria é um pai.
+          children: childrenOf(editingId, filtered)
+        });
+      }
     } else if (onCreateCategory) {
-      await onCreateCategory(values.name, values.icon, values.type, values.color);
+      await onCreateCategory(values.name, values.icon, values.type, values.color, parent);
     }
     setMode('list');
     setManage(false);
@@ -93,6 +128,28 @@ export const CategoryField = memo(function CategoryField({
     await onDeleteCategory(id);
     if (value === id) onChange('');
     return true;
+  }
+
+  function renderTile(cat: Category) {
+    const isSelected = cat.id === value;
+    return (
+      <button
+        key={cat.id}
+        type="button"
+        className={`category-tile${isSelected && !manage ? ' category-tile--selected' : ''}`}
+        onClick={() => (manage ? startEdit(cat) : pick(cat.id))}
+      >
+        <span className="category-tile-mark" style={{ background: resolveCategoryColor(cat) }}>
+          <CategoryIcon icon={cat.icon} size={20} />
+        </span>
+        <span className="category-tile-name">{cat.name}</span>
+        {/* Só UM adorno por canto: a lixeira saiu daqui porque disputava o canto com o lápis.
+            Excluir vive no formulário de edição — e o sistema não põe ação destrutiva a um
+            toque em lista rolável (ver docs/design/DESIGN.md). */}
+        {isSelected && !manage && <Check size={14} className="category-tile-check" aria-hidden="true" />}
+        {manage && <Pencil size={13} className="category-tile-check" aria-hidden="true" />}
+      </button>
+    );
   }
 
   function pick(id: string) {
@@ -128,32 +185,38 @@ export const CategoryField = memo(function CategoryField({
       >
         {mode === 'list' ? (
           <>
-            <div className="category-grid">
-              {filtered.map((cat) => {
-                const isSelected = cat.id === value;
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    className={`category-tile${isSelected && !manage ? ' category-tile--selected' : ''}`}
-                    onClick={() => (manage ? startEdit(cat) : pick(cat.id))}
-                  >
-                    <span className="category-tile-mark" style={{ background: resolveCategoryColor(cat) }}>
-                      <CategoryIcon icon={cat.icon} size={20} />
+            {/* Um tile por categoria selecionável. Folhas de raiz primeiro, depois cada grupo.
+                Categoria-pai NÃO aparece como tile: ela é só agrupamento e não recebe
+                lançamento — no modo editar vira o cabeçalho tocável do grupo. */}
+            {rootLeaves.length > 0 && (
+              <div className="category-grid">
+                {rootLeaves.map((cat) => renderTile(cat))}
+              </div>
+            )}
+
+            {parents.map((parent) => (
+              <div className="category-group" key={parent.id}>
+                {manage && onUpdateCategory ? (
+                  <button type="button" className="category-group-header" onClick={() => startEdit(parent)}>
+                    <span className="category-group-mark" style={{ background: resolveCategoryColor(parent) }}>
+                      <CategoryIcon icon={parent.icon} size={13} />
                     </span>
-                    <span className="category-tile-name">{cat.name}</span>
-                    {/* Só UM adorno por canto. A lixeira ficava aqui também, sobreposta ao
-                        lápis (`.category-tile-check` em top/right 0.4rem vs `.category-tile-delete`
-                        em -0.35rem): dois ícones disputando o mesmo canto. Excluir agora vive
-                        dentro do formulário de edição — que é o lugar certo de qualquer jeito,
-                        já que o sistema não põe ação destrutiva a um toque em lista rolável
-                        (ver docs/design/DESIGN.md). */}
-                    {isSelected && !manage && <Check size={14} className="category-tile-check" aria-hidden="true" />}
-                    {manage && <Pencil size={13} className="category-tile-check" aria-hidden="true" />}
+                    <span className="category-group-name">{parent.name}</span>
+                    <Pencil size={13} aria-hidden="true" />
                   </button>
-                );
-              })}
-            </div>
+                ) : (
+                  <span className="category-group-header">
+                    <span className="category-group-mark" style={{ background: resolveCategoryColor(parent) }}>
+                      <CategoryIcon icon={parent.icon} size={13} />
+                    </span>
+                    <span className="category-group-name">{parent.name}</span>
+                  </span>
+                )}
+                <div className="category-grid">
+                  {childrenOf(parent.id, selectable).map((cat) => renderTile(cat))}
+                </div>
+              </div>
+            ))}
 
             <div className="sheet-actions">
               {onCreateCategory && (
@@ -177,6 +240,12 @@ export const CategoryField = memo(function CategoryField({
             editing={editingCategory}
             editingColor={editingCategory ? resolveCategoryColor(editingCategory) : undefined}
             filterType={filterType}
+            parentOptions={parentCandidates(filtered, editingId)}
+            deleteBlockedReason={
+              deleteCheck && !deleteCheck.ok
+                ? `Esta categoria tem ${deleteCheck.blockedByChildren} subcategoria${deleteCheck.blockedByChildren > 1 ? 's' : ''}. Exclua ou mova elas antes.`
+                : null
+            }
             onSubmit={handleSubmit}
             onDelete={editingId && onDeleteCategory ? () => handleDelete(editingId) : undefined}
             onDeleted={() => setMode('list')}
