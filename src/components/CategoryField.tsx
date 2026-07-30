@@ -4,7 +4,7 @@ import type { Category } from '../types/contracts';
 import { BottomSheet } from './BottomSheet';
 import { useConfirm } from './ConfirmDialog';
 import {
-  CategoryIcon, categoryColors, categoryIconGroups, resolveCategoryColor
+  CategoryIcon, categoryColors, categoryIconGroups, categoryIconKeys, iconGroupIndexOf, resolveCategoryColor
 } from './categoryIcons';
 import { ACCENT_FOREGROUND } from '../theme/palette';
 
@@ -43,6 +43,7 @@ export const CategoryField = memo(function CategoryField({
 
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('shopping-bag');
+  const [iconSheetOpen, setIconSheetOpen] = useState(false);
   const [color, setColor] = useState(categoryColors[0]);
   const [type, setType] = useState<'income' | 'expense' | 'both'>('expense');
   const [busy, setBusy] = useState(false);
@@ -54,6 +55,9 @@ export const CategoryField = memo(function CategoryField({
     return cat.type === filterType || cat.type === 'both';
   });
   const selected = filtered.find((cat) => cat.id === value);
+  // Grupo do ícone escolhido — vira o subtítulo do seletor ("Comida e bebida"), pra linha dizer
+  // algo além de repetir o desenho que já está no tile ao lado.
+  const activeIconGroup = categoryIconGroups[iconGroupIndexOf(icon)] ?? categoryIconGroups[0];
 
   function startCreate() {
     setEditingId(null);
@@ -245,32 +249,23 @@ export const CategoryField = memo(function CategoryField({
               </div>
             </div>
 
-            {/* Agrupado por tema: com ~120 ícones, uma grade plana viraria rolagem cega. Cada
-                grupo é um radiogroup próprio, com o rótulo da seção como nome acessível. */}
+            {/* Escolher ícone virou uma folha própria, como categoria e conta já fazem.
+                Tentativas anteriores no mesmo dia falharam por esconder conteúdo: grade
+                rolável dentro do sheet (rolagem dentro de rolagem — não se sabe se ainda tem
+                ícone embaixo) e trilho de chips (os grupos fora da tela dependiam da pessoa
+                adivinhar que dava pra arrastar). Numa folha dedicada, os 122 ícones vivem numa
+                rolagem só, com o nome do grupo à vista. */}
             <div className="field">
               <span className="field-label">Ícone</span>
-              <div className="icon-picker">
-                {categoryIconGroups.map((group) => (
-                  <div className="icon-picker-group" key={group.label}>
-                    <span className="icon-picker-label">{group.label}</span>
-                    <div className="icon-grid" role="radiogroup" aria-label={`Ícone — ${group.label}`}>
-                      {Object.keys(group.icons).map((key) => (
-                        <button
-                          key={key}
-                          type="button"
-                          className={`icon-cell${icon === key ? ' icon-cell--selected' : ''}`}
-                          style={icon === key ? { background: color, borderColor: color, color: ACCENT_FOREGROUND } : undefined}
-                          role="radio"
-                          aria-checked={icon === key}
-                          onClick={() => setIcon(key)}
-                        >
-                          <CategoryIcon icon={key} size={19} />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <button className="select-row" type="button" onClick={() => setIconSheetOpen(true)}>
+                <span className="select-row-icon select-row-icon--category" style={{ background: color }} aria-hidden="true">
+                  <CategoryIcon icon={icon} size={17} />
+                </span>
+                <span className="select-row-text">
+                  <span className="select-row-value">{activeIconGroup.label}</span>
+                </span>
+                <ChevronRight size={18} className="select-row-chevron" aria-hidden="true" />
+              </button>
             </div>
 
             <div className="sheet-actions">
@@ -296,6 +291,37 @@ export const CategoryField = memo(function CategoryField({
             </div>
           </form>
         )}
+      </BottomSheet>
+      {/* Folha dedicada ao ícone. Tudo numa rolagem só (a da própria folha) e o rótulo do grupo
+          gruda no topo enquanto rola, então dá sempre pra saber onde se está na lista. */}
+      <BottomSheet
+        open={iconSheetOpen}
+        onClose={() => setIconSheetOpen(false)}
+        title="Escolher ícone"
+        subtitle={`${categoryIconKeys.length} ícones`}
+      >
+        <div className="icon-sheet">
+          {categoryIconGroups.map((group) => (
+            <div className="icon-sheet-group" key={group.label}>
+              <span className="icon-sheet-label">{group.label}</span>
+              <div className="icon-grid" role="radiogroup" aria-label={`Ícone — ${group.label}`}>
+                {Object.keys(group.icons).map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`icon-cell${icon === key ? ' icon-cell--selected' : ''}`}
+                    style={icon === key ? { background: color, borderColor: color, color: ACCENT_FOREGROUND } : undefined}
+                    role="radio"
+                    aria-checked={icon === key}
+                    onClick={() => { setIcon(key); setIconSheetOpen(false); }}
+                  >
+                    <CategoryIcon icon={key} size={19} />
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       </BottomSheet>
       {confirmDialog}
     </div>

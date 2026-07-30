@@ -219,6 +219,13 @@ export const categoryIcons: Record<string, LucideIcon> = Object.assign(
 
 export const categoryIconKeys = Object.keys(categoryIcons);
 
+/** Índice do grupo que contém uma chave — usado pra abrir o seletor já no grupo do ícone atual. */
+export function iconGroupIndexOf(iconKey: string | undefined): number {
+  if (!iconKey) return 0;
+  const index = categoryIconGroups.findIndex((group) => iconKey in group.icons);
+  return index === -1 ? 0 : index;
+}
+
 /** Render a category icon by key at a given size. Falls back to the sliders icon. */
 export function CategoryIcon({ icon, size = 18 }: { icon?: string; size?: number }) {
   const Icon = categoryIcons[icon ?? ''] ?? SlidersHorizontal;

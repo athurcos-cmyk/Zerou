@@ -2,6 +2,14 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-29 (parte 7) — design(categorias): paleta em ordem de cor + folha própria pra escolher ícone
+
+Dois acertos pedidos pelo dono depois de ver a parte 6 no celular.
+
+- **A paleta não estava ordenada de verdade** — as 12 cores novas foram só acrescentadas no fim, então a grade lia como mosaico. Agora percorre o círculo cromático (vermelho → laranja → amarelo → verde → azul → roxo → rosa) e fecha nos neutros. Isso exigiu **separar as duas responsabilidades do array**: `categoryColors` é a ordem de exibição (livre pra reordenar) e a nova `hashPaletteColors` (privada, congelada nas 12 originais) alimenta o sorteio de `resolveCategoryColor` — sem essa separação, reordenar a paleta repintaria toda categoria sem cor escolhida.
+- **Escolher ícone virou uma folha dedicada** ("Escolher ícone", com a contagem no subtítulo); o formulário voltou a ter uma linha `.select-row` mostrando o ícone atual e o grupo dele. Duas tentativas anteriores falharam pelo mesmo motivo — **esconder conteúdo**: primeiro uma grade rolável dentro do sheet (rolagem dentro de rolagem não revela o tamanho do conteúdo: "não dá pra saber se tem ou não"), depois um trilho de chips por grupo (dependia da pessoa adivinhar que dava pra arrastar de lado, aposta ruim numa tela que se abre raramente). Numa folha própria, os 122 ícones vivem numa rolagem só, com rótulo de grupo `sticky`.
+- Verificado ao vivo em 375px: paleta em degradê, folha abrindo com "122 ícones", grupos com rótulo grudando no topo, e selecionar um ícone de Transporte fechando a folha e atualizando preview e rótulo da linha. `typecheck` + `test` (449) + `build` verdes.
+
 ## 2026-07-29 (parte 6) — feat(categorias): 24 cores, 122 ícones agrupados, e as embutidas voltaram a ser excluíveis
 
 Pedido do dono (mais cor e mais ícone) somado a dois bugs relatados no mesmo fôlego.

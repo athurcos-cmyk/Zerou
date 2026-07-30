@@ -39,7 +39,7 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
 | `CategoryField` | Sheet de categorias com ícone+cor, criar/editar/excluir. |
 | `ConfirmDialog` (`useConfirm`) | Confirmação destrutiva em sheet — nunca `window.confirm`. |
 | `EmptyState` | Estado vazio com ilustração SVG própria. 6 variantes: `transactions`, `cards`, `wallet`, `shared`, `goals`, `bills`. Sempre usar uma ilustração existente ou criar uma nova nesse padrão — nunca cair pra texto seco sem ilustração num card que tem vizinho ilustrado (inconsistência perceptível lado a lado). |
-| `categoryIcons` / `palette` | **122 ícones em 11 grupos temáticos** (`categoryIconGroups` — fonte única; o mapa plano `categoryIcons` é derivado dela) + **24 cores** (`categoryColors`). **Nunca renomeie/remova chave de ícone nem reordene as 12 primeiras cores**: a chave fica gravada em `Category.icon`, e `resolveCategoryColor` faz hash sobre o array de cores — mexer troca ícone/cor de categorias que já existem. Só acrescente ao fim. |
+| `categoryIcons` / `palette` | **122 ícones em 11 grupos temáticos** (`categoryIconGroups` — fonte única; o mapa plano `categoryIcons` é derivado dela) + **24 cores** (`categoryColors`, ordenadas pelo círculo cromático e fechando nos neutros). **Nunca renomeie nem remova chave de ícone**: ela fica gravada em `Category.icon`, e mudá-la apaga o ícone de categorias existentes. A paleta do seletor pode ser reordenada à vontade — quem exige ordem congelada é `hashPaletteColors` (privada, `palette.ts`), usada só pelo sorteio de `resolveCategoryColor`: mexer nela repinta categoria sem cor escolhida. |
 | `.metric-card` / `.metric-icon` / `.metric-strip` (`global.css`) | Cartão de métrica/KPI compacto (usado em `SearchPage.tsx`). `.metric-card--accent` para o destaque principal (mesmo tratamento gradiente do `.dash-hero`). Valor de **texto longo** (não dinheiro/porcentagem) precisa do modificador `.metric-card-value--compact` — a tipografia padrão do card é grande demais e corta nomes como "Alimentação". |
 | `.form-accordion-toggle` (`global.css`) | Botão de expandir/recolher formulário (usado em AccountsPage, BillsPage, CardsPage, ReceivablesPage). Substitui o inline style de 7 propriedades que estava duplicado 4×. |
 | `.list-toggle` (`global.css`, 2026-07-23) | "Ver todas as N / Ver menos" no fim de uma lista `.item-list` colapsada (ex.: Compras de uma fatura longa em `InvoicePage.tsx`, limite de 5 linhas). Link discreto (`--action-primary`), não botão cheio. |
@@ -64,10 +64,16 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
   lixeira saiu; excluir vive dentro do formulário de edição, que é onde já deveria estar pela
   regra de não pôr ação destrutiva a um toque em lista rolável. Dois indicadores absolutos
   ancorados no mesmo canto é sempre colisão esperando acontecer.
-- **Seletor com muitas opções se agrupa, não só cresce** (`.icon-picker`, 29/07/2026): ao passar
-  de 36 pra 122 ícones, grade plana viraria rolagem cega. Grupos temáticos com rótulo **sticky**,
-  e a rolagem no contêiner (`.icon-picker`), nunca em cada grade — senão cada grupo vira sua
-  própria janelinha rolável e a pessoa rola dentro de rolagem.
+- **Seletor com muitas opções ganha folha própria** (`.icon-sheet`, 29/07/2026): ao passar de 36
+  pra 122 ícones, escolher ícone virou um `BottomSheet` dedicado ("Escolher ícone", com a
+  contagem no subtítulo), como categoria e conta já fazem — o formulário volta a ser uma linha
+  `.select-row` com o ícone atual e o nome do grupo. Duas tentativas anteriores no mesmo dia
+  falharam pelo mesmo motivo, **esconder conteúdo**: (1) grade rolável dentro do sheet —
+  **rolagem dentro de rolagem nunca revela o tamanho do conteúdo**, não se sabe se ainda tem
+  item embaixo; (2) trilho de chips por grupo — os grupos fora da tela dependiam da pessoa
+  adivinhar que dava pra arrastar de lado, aposta ruim numa tela que se abre raramente. Regra:
+  **quando a escolha não cabe à vista, dê a ela a própria folha** em vez de comprimir num
+  contêiner rolável; e rótulo de grupo `sticky` responde "onde eu estou" durante a rolagem.
 - **Excluir dado que a pessoa criou pede confirmação que diz a consequência**, não só "tem
   certeza?". Categoria explicita que sai da lista, que lançamentos antigos ficam como estão e
   que **não dá pra desfazer** — a exclusão é lógica (`isActive: false`), mas não há UI de
