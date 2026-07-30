@@ -39,7 +39,6 @@ export const CategoryField = memo(function CategoryField({
   const [manage, setManage] = useState(false);
   const { confirm, dialog: confirmDialog } = useConfirm();
 
-  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const filtered = categories.filter((cat) => {
     if (!cat.isActive) return false;
@@ -89,14 +88,11 @@ export const CategoryField = memo(function CategoryField({
     });
     if (!ok) return false;
 
-    setDeletingId(id);
-    try {
-      await onDeleteCategory(id);
-      if (value === id) onChange('');
-      return true;
-    } finally {
-      setDeletingId(null);
-    }
+    // Sem estado de "excluindo" aqui: quem desabilita o botão durante a exclusão é o próprio
+    // `CategoryForm`, que tem o estado local dele. Duplicar aqui só criaria estado morto.
+    await onDeleteCategory(id);
+    if (value === id) onChange('');
+    return true;
   }
 
   function pick(id: string) {
