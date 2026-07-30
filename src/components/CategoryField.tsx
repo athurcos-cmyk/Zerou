@@ -1,12 +1,10 @@
-import { memo, useState, type FormEvent } from 'react';
-import { Check, ChevronRight, Pencil, Plus, Settings2, Tag, Trash2, X } from 'lucide-react';
+import { memo, useState } from 'react';
+import { Check, ChevronRight, Pencil, Plus, Settings2, Tag } from 'lucide-react';
 import type { Category } from '../types/contracts';
 import { BottomSheet } from './BottomSheet';
 import { useConfirm } from './ConfirmDialog';
-import {
-  CategoryIcon, categoryColors, categoryIconGroups, categoryIconKeys, iconGroupIndexOf, resolveCategoryColor
-} from './categoryIcons';
-import { ACCENT_FOREGROUND } from '../theme/palette';
+import { CategoryForm } from './CategoryForm';
+import { CategoryIcon, resolveCategoryColor } from './categoryIcons';
 
 export interface CategoryPatch {
   name?: string;
@@ -41,12 +39,6 @@ export const CategoryField = memo(function CategoryField({
   const [manage, setManage] = useState(false);
   const { confirm, dialog: confirmDialog } = useConfirm();
 
-  const [name, setName] = useState('');
-  const [icon, setIcon] = useState('shopping-bag');
-  const [iconSheetOpen, setIconSheetOpen] = useState(false);
-  const [color, setColor] = useState(categoryColors[0]);
-  const [type, setType] = useState<'income' | 'expense' | 'both'>('expense');
-  const [busy, setBusy] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const filtered = categories.filter((cat) => {
@@ -55,48 +47,26 @@ export const CategoryField = memo(function CategoryField({
     return cat.type === filterType || cat.type === 'both';
   });
   const selected = filtered.find((cat) => cat.id === value);
-  // Grupo do ícone escolhido — vira o subtítulo do seletor ("Comida e bebida"), pra linha dizer
-  // algo além de repetir o desenho que já está no tile ao lado.
-  const activeIconGroup = categoryIconGroups[iconGroupIndexOf(icon)] ?? categoryIconGroups[0];
+  const editingCategory = editingId ? filtered.find((cat) => cat.id === editingId) ?? null : null;
 
   function startCreate() {
     setEditingId(null);
-    setName('');
-    setIcon('shopping-bag');
-    setColor(categoryColors[0]);
-    setType(filterType === 'income' ? 'income' : 'expense');
     setMode('form');
   }
 
   function startEdit(cat: Category) {
     setEditingId(cat.id);
-    setName(cat.name);
-    setIcon(cat.icon ?? 'shopping-bag');
-    setColor(resolveCategoryColor(cat));
-    setType(cat.type);
     setMode('form');
   }
 
-  async function handleSubmit(event: FormEvent) {
-    // O sheet é renderizado via portal (BottomSheet/createPortal), mas continua
-    // filho do <form> externo (transação/conta/recorrência) na árvore React —
-    // sem stopPropagation, o submit daqui também dispara o onSubmit de fora e
-    // salva o registro pai incompleto junto com a categoria.
-    event.preventDefault();
-    event.stopPropagation();
-    if (!name.trim()) return;
-    setBusy(true);
-    try {
-      if (editingId) {
-        if (onUpdateCategory) await onUpdateCategory(editingId, { name: name.trim(), icon, color });
-      } else if (onCreateCategory) {
-        await onCreateCategory(name.trim(), icon, type, color);
-      }
-      setMode('list');
-      setManage(false);
-    } finally {
-      setBusy(false);
+  async function handleSubmit(values: { name: string; icon: string; color: string; type: 'income' | 'expense' | 'both' }) {
+    if (editingId) {
+      if (onUpdateCategory) await onUpdateCategory(editingId, { name: values.name, icon: values.icon, color: values.color });
+    } else if (onCreateCategory) {
+      await onCreateCategory(values.name, values.icon, values.type, values.color);
     }
+    setMode('list');
+    setManage(false);
   }
 
   /**
@@ -204,124 +174,19 @@ export const CategoryField = memo(function CategoryField({
             {manage && <p className="sheet-hint">Toque numa categoria para mudar cor, ícone ou nome.</p>}
           </>
         ) : (
-          <form className="category-create" onSubmit={(event) => void handleSubmit(event)}>
-            <div className="category-create-preview">
-              <span className="category-tile-mark category-tile-mark--lg" style={{ background: color }}>
-                <CategoryIcon icon={icon} size={26} />
-              </span>
-            </div>
-
-            <label className="field">
-              <span>Nome</span>
-              <input className="input" value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex: Pets, Streaming, Uber..." autoFocus />
-            </label>
-
-            {!editingId && filterType === 'all' && (
-              <div className="field">
-                <span className="field-label">Tipo</span>
-                <div className="segmented" role="radiogroup" aria-label="Tipo de categoria">
-                  {(['expense', 'income', 'both'] as const).map((t) => (
-                    <button key={t} type="button" role="radio" aria-checked={type === t} onClick={() => setType(t)}>
-                      {t === 'expense' ? 'Gasto' : t === 'income' ? 'Receita' : 'Ambos'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="field">
-              <span className="field-label">Cor</span>
-              <div className="color-grid" role="radiogroup" aria-label="Cor">
-                {categoryColors.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    className={`color-dot${color === c ? ' color-dot--selected' : ''}`}
-                    style={{ background: c, color: c }}
-                    aria-label={`Cor ${c}`}
-                    role="radio"
-                    aria-checked={color === c}
-                    onClick={() => setColor(c)}
-                  >
-                    {color === c && <Check size={15} color={ACCENT_FOREGROUND} />}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Escolher ícone virou uma folha própria, como categoria e conta já fazem.
-                Tentativas anteriores no mesmo dia falharam por esconder conteúdo: grade
-                rolável dentro do sheet (rolagem dentro de rolagem — não se sabe se ainda tem
-                ícone embaixo) e trilho de chips (os grupos fora da tela dependiam da pessoa
-                adivinhar que dava pra arrastar). Numa folha dedicada, os 122 ícones vivem numa
-                rolagem só, com o nome do grupo à vista. */}
-            <div className="field">
-              <span className="field-label">Ícone</span>
-              <button className="select-row" type="button" onClick={() => setIconSheetOpen(true)}>
-                <span className="select-row-icon select-row-icon--category" style={{ background: color }} aria-hidden="true">
-                  <CategoryIcon icon={icon} size={17} />
-                </span>
-                <span className="select-row-text">
-                  <span className="select-row-value">{activeIconGroup.label}</span>
-                </span>
-                <ChevronRight size={18} className="select-row-chevron" aria-hidden="true" />
-              </button>
-            </div>
-
-            <div className="sheet-actions">
-              <button className="button button--primary" type="submit" disabled={busy || !name.trim()}>
-                {busy ? 'Salvando...' : editingId ? 'Salvar alterações' : 'Criar categoria'}
-              </button>
-              {/* Vale também pras embutidas: `isDefault` bloqueava a exclusão sem explicar
-                  por quê, e a pessoa ficava com categorias que nunca usa entupindo a lista.
-                  Só volta pra lista se a exclusão foi confirmada de fato. */}
-              {editingId && onDeleteCategory && (
-                <button
-                  className="button button--ghost button--danger-text"
-                  type="button"
-                  disabled={busy || deletingId === editingId}
-                  onClick={() => { void handleDelete(editingId).then((deleted) => { if (deleted) setMode('list'); }); }}
-                >
-                  <Trash2 size={16} aria-hidden="true" /> Excluir categoria
-                </button>
-              )}
-              <button className="button button--ghost" type="button" onClick={() => setMode('list')}>
-                <X size={16} aria-hidden="true" /> Cancelar
-              </button>
-            </div>
-          </form>
+          /* `key` remonta o formulário ao alternar criar/editar, resetando os campos sem
+             efeito de sincronização. O mesmo componente serve a tela /app/settings/categories. */
+          <CategoryForm
+            key={editingId ?? 'new'}
+            editing={editingCategory}
+            editingColor={editingCategory ? resolveCategoryColor(editingCategory) : undefined}
+            filterType={filterType}
+            onSubmit={handleSubmit}
+            onDelete={editingId && onDeleteCategory ? () => handleDelete(editingId) : undefined}
+            onDeleted={() => setMode('list')}
+            onCancel={() => setMode('list')}
+          />
         )}
-      </BottomSheet>
-      {/* Folha dedicada ao ícone. Tudo numa rolagem só (a da própria folha) e o rótulo do grupo
-          gruda no topo enquanto rola, então dá sempre pra saber onde se está na lista. */}
-      <BottomSheet
-        open={iconSheetOpen}
-        onClose={() => setIconSheetOpen(false)}
-        title="Escolher ícone"
-        subtitle={`${categoryIconKeys.length} ícones`}
-      >
-        <div className="icon-sheet">
-          {categoryIconGroups.map((group) => (
-            <div className="icon-sheet-group" key={group.label}>
-              <span className="icon-sheet-label">{group.label}</span>
-              <div className="icon-grid" role="radiogroup" aria-label={`Ícone — ${group.label}`}>
-                {Object.keys(group.icons).map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    className={`icon-cell${icon === key ? ' icon-cell--selected' : ''}`}
-                    style={icon === key ? { background: color, borderColor: color, color: ACCENT_FOREGROUND } : undefined}
-                    role="radio"
-                    aria-checked={icon === key}
-                    onClick={() => { setIcon(key); setIconSheetOpen(false); }}
-                  >
-                    <CategoryIcon icon={key} size={19} />
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
       </BottomSheet>
       {confirmDialog}
     </div>
