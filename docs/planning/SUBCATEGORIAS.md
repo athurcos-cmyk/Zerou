@@ -24,6 +24,46 @@ SELECIONÁVEL?                         Categoria sem filhas  →  SIM
                                       Subcategoria          →  SIM (é folha)
 ```
 
+### O campo `type` não é mais perguntado (30/07/2026)
+
+O formulário tinha um seletor "Tipo" (Gasto / Receita / Ambos). O dono apontou que **não faz
+sentido**: quem define se um lançamento é gasto ou receita é a **transação**, não a categoria.
+
+O campo continua existindo no dado, porque é ele que **filtra a lista no momento do lançamento**
+(Salário não deve aparecer numa despesa). Mas passou a ser inferido:
+
+```
+subcategoria              →  herda o tipo do PAI
+editando                  →  mantém o que já estava
+criando dentro de um lançamento →  o tipo da própria transação
+criando na aba Categorias →  `both` (aparece em qualquer lançamento)
+```
+
+A herança do pai não é cosmética — ver o bug abaixo.
+
+### Bug corrigido: pai voltava a ser selecionável `[D10]`
+
+Achado em produção pelo dono. O seletor filtrava por **tipo** ANTES de perguntar quem era pai:
+
+```
+                    ERRADO                              CERTO
+  todas ──filtra tipo──▶ recorte ──quem é pai?──▶   todas ──quem é pai?──▶ ids
+                             ▲                             │
+              filha some do recorte                        ▼
+              pai vira "folha"                    recorte ──remove os ids──▶ selecionáveis
+              e volta a ser SELECIONÁVEL
+```
+
+Com pai `both` e filha `expense`, a filha sumia do recorte de uma transação de **receita**, o pai
+deixava de parecer pai e voltava a ser selecionável — furando a regra justamente onde ela mais
+importa. `parentCategoryIds` agora calcula o parentesco na lista completa, e a herança de tipo
+elimina a divergência na origem. Regressão travada em `categoryHierarchy.test.ts`.
+
+Segundo bug do mesmo lote: a linha do seletor procurava a categoria escolhida só entre as
+**selecionáveis**. Um lançamento antigo apontando pra uma categoria que virou pai depois exibia
+"Selecione", como se a categoria tivesse sumido. Agora a exibição busca na lista completa — não é
+mais oferecida, mas continua sendo mostrada.
+
 ## Modelo de dados: zero migração
 
 `Category.parentCategoryId?: string` **já existe** (`src/types/contracts.ts:175`) e está morto —

@@ -40,14 +40,33 @@ export function isSubcategory(category: CategoryLike): boolean {
 }
 
 /**
+ * Ids das categorias que agrupam outras.
+ *
+ * **Calcule SEMPRE sobre a lista completa de categorias ativas**, nunca sobre um recorte.
+ * Bug real (29/07/2026): o seletor filtrava por tipo ANTES de perguntar quem era pai. Com pai
+ * `both` e filha `expense`, a filha sumia do recorte de uma transação de receita, o pai deixava
+ * de parecer pai — e voltava a ser selecionável, quebrando a regra `[D10]` justamente onde ela
+ * mais importa. Por isso esta função existe separada: primeiro descubra os pais na lista
+ * inteira, só depois filtre por tipo.
+ */
+export function parentCategoryIds(all: readonly CategoryLike[]): Set<string> {
+  const ativos = all.filter((cat) => cat.isActive !== false);
+  return new Set(ativos.filter((cat) => isParentCategory(cat.id, ativos)).map((cat) => cat.id));
+}
+
+/**
  * As categorias que podem receber um lançamento: as folhas.
  *
  * Exclui quem tem filhas (virou agrupamento) e quem está inativa. É isto que o seletor mostra
  * e o que a Vic no WhatsApp precisa espelhar — se os dois discordarem, dá pra gravar por
  * mensagem numa categoria que o app não deixa escolher.
+ *
+ * **Passe a lista COMPLETA.** Recorte (ex.: só as de despesa) esconde filhas e faz pai virar
+ * folha — ver `parentCategoryIds`.
  */
 export function selectableCategories<T extends CategoryLike>(all: readonly T[]): T[] {
-  return all.filter((cat) => cat.isActive !== false && !isParentCategory(cat.id, all));
+  const paiIds = parentCategoryIds(all);
+  return all.filter((cat) => cat.isActive !== false && !paiIds.has(cat.id));
 }
 
 /**

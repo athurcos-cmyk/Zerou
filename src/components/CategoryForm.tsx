@@ -68,15 +68,31 @@ export function CategoryForm({
   const [name, setName] = useState(editing?.name ?? '');
   const [icon, setIcon] = useState(editing?.icon ?? 'shopping-bag');
   const [color, setColor] = useState(editingColor ?? categoryColors[0]);
-  const [type, setType] = useState<'income' | 'expense' | 'both'>(
-    editing?.type ?? (filterType === 'income' ? 'income' : 'expense')
-  );
   const [parentCategoryId, setParentCategoryId] = useState(editing?.parentCategoryId ?? initialParentId ?? '');
   const [iconSheetOpen, setIconSheetOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const parent = parentOptions.find((cat) => cat.id === parentCategoryId) ?? null;
+
+  /**
+   * O tipo (gasto/receita) NÃO é mais perguntado — quem define se um lançamento é gasto ou
+   * receita é a transação, não a categoria. O campo continua existindo no dado porque é ele que
+   * filtra a lista no momento do lançamento (Salário não deve aparecer numa despesa), mas agora
+   * é inferido:
+   *
+   *   subcategoria      → herda o tipo do pai (Energia dentro de Casa é gasto porque Casa é)
+   *   editando          → mantém o que já estava
+   *   criando no lançamento → o tipo da própria transação (`filterType`)
+   *   criando na aba Categorias → `both`, que aparece em qualquer lançamento
+   *
+   * A herança do pai não é cosmética: com pai e filha de tipos diferentes, a filha sumia da
+   * lista filtrada e o pai voltava a ser SELECIONÁVEL, furando a regra [D10].
+   */
+  const type: 'income' | 'expense' | 'both' =
+    parent?.type ??
+    editing?.type ??
+    (filterType === 'all' ? 'both' : filterType);
   // Com pai, a cor é herdada — o seletor de cor SAI de cena em vez de mostrar uma escolha que
   // vai ser sobrescrita na gravação. Interface que oferece controle sem efeito é interface que
   // mente. O preview usa a cor do pai pra pessoa ver o resultado real.
@@ -135,19 +151,6 @@ export function CategoryForm({
           autoFocus
         />
       </label>
-
-      {!editing && filterType === 'all' && (
-        <div className="field">
-          <span className="field-label">Tipo</span>
-          <div className="segmented" role="radiogroup" aria-label="Tipo de categoria">
-            {(['expense', 'income', 'both'] as const).map((t) => (
-              <button key={t} type="button" role="radio" aria-checked={type === t} onClick={() => setType(t)}>
-                {t === 'expense' ? 'Gasto' : t === 'income' ? 'Receita' : 'Ambos'}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Campo de pai. Some quando não há candidato — ex.: editando uma categoria que já tem
           filhas, que pela trava de 1 nível não pode virar subcategoria de ninguém. */}

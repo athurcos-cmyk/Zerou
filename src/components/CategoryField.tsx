@@ -7,7 +7,7 @@ import { useConfirm } from './ConfirmDialog';
 import { CategoryForm, type CategoryFormValues } from './CategoryForm';
 import { CategoryIcon, resolveCategoryColor } from './categoryIcons';
 import {
-  canDeleteCategory, childrenOf, isParentCategory, parentCandidates, selectableCategories
+  canDeleteCategory, childrenOf, parentCandidates, parentCategoryIds
 } from '../finance/categoryHierarchy';
 
 export interface CategoryPatch {
@@ -54,21 +54,26 @@ export const CategoryField = memo(function CategoryField({
   const { confirm, dialog: confirmDialog } = useConfirm();
 
 
-  const filtered = categories.filter((cat) => {
-    if (!cat.isActive) return false;
+  const allActive = categories.filter((cat) => cat.isActive !== false);
+  // Quem é pai se decide na lista COMPLETA, antes de qualquer filtro de tipo. Filtrar primeiro
+  // escondia a filha (quando o tipo dela diferia do pai) e fazia o pai voltar a ser
+  // selecionável — bug real de 29/07/2026, contra a regra [D10].
+  const parentIds = parentCategoryIds(allActive);
+
+  const filtered = allActive.filter((cat) => {
     if (filterType === 'all') return true;
     return cat.type === filterType || cat.type === 'both';
   });
-  // Pai é só agrupamento: quem tem filhas sai das opções selecionáveis. `selectableCategories`
-  // é a MESMA função que a Vic no WhatsApp espelha — se os dois discordarem, dá pra gravar por
-  // mensagem numa categoria que o app não deixa escolher.
-  const selectable = selectableCategories(filtered);
-  const parents = filtered.filter((cat) => isParentCategory(cat.id, filtered));
+  const selectable = filtered.filter((cat) => !parentIds.has(cat.id));
+  const parents = filtered.filter((cat) => parentIds.has(cat.id));
   const rootLeaves = selectable.filter((cat) => !cat.parentCategoryId);
 
-  const selected = selectable.find((cat) => cat.id === value);
-  const editingCategory = editingId ? filtered.find((cat) => cat.id === editingId) ?? null : null;
-  const deleteCheck = editingId ? canDeleteCategory(editingId, filtered) : null;
+  // Busca na lista COMPLETA (não só nas selecionáveis): um lançamento antigo pode apontar pra
+  // uma categoria que virou pai depois. Ela não é mais oferecida, mas precisa continuar sendo
+  // EXIBIDA — senão a pessoa vê "Selecione" e acha que perdeu a categoria.
+  const selected = allActive.find((cat) => cat.id === value);
+  const editingCategory = editingId ? allActive.find((cat) => cat.id === editingId) ?? null : null;
+  const deleteCheck = editingId ? canDeleteCategory(editingId, allActive) : null;
 
   function startCreate() {
     setEditingId(null);
@@ -82,7 +87,7 @@ export const CategoryField = memo(function CategoryField({
 
   async function handleSubmit(values: CategoryFormValues) {
     const parent = values.parentCategoryId
-      ? filtered.find((cat) => cat.id === values.parentCategoryId)
+      ? allActive.find((cat) => cat.id === values.parentCategoryId)
       : undefined;
 
     if (editingId) {
@@ -94,7 +99,7 @@ export const CategoryField = memo(function CategoryField({
           // `null` limpa o campo (promove a categoria principal); string troca de pai.
           parentCategoryId: values.parentCategoryId ?? null,
           // Propaga a cor pras filhas quando ESTA categoria é um pai.
-          children: childrenOf(editingId, filtered)
+          children: childrenOf(editingId, allActive)
         });
       }
     } else if (onCreateCategory) {
@@ -246,7 +251,7 @@ export const CategoryField = memo(function CategoryField({
             editing={editingCategory}
             editingColor={editingCategory ? resolveCategoryColor(editingCategory) : undefined}
             filterType={filterType}
-            parentOptions={parentCandidates(filtered, editingId)}
+            parentOptions={parentCandidates(allActive, editingId)}
             deleteBlockedReason={
               deleteCheck && !deleteCheck.ok
                 ? `Esta categoria tem ${deleteCheck.blockedByChildren} subcategoria${deleteCheck.blockedByChildren > 1 ? 's' : ''}. Exclua ou mova elas antes.`

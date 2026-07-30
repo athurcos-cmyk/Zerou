@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   canBeParentOf,
+  parentCategoryIds,
   canDeleteCategory,
   childrenOf,
   isParentCategory,
@@ -133,5 +134,43 @@ describe('canDeleteCategory', () => {
     const semFilhas = [cat('casa'), cat('energia', 'casa', false), cat('agua', 'casa', false)];
 
     expect(canDeleteCategory('casa', semFilhas)).toEqual({ ok: true, blockedByChildren: 0 });
+  });
+});
+
+/**
+ * Regressão do bug achado em produção pelo dono (29/07/2026): o seletor filtrava por TIPO antes
+ * de perguntar quem era pai. Com pai `both` e filha `expense`, a filha sumia do recorte de uma
+ * transação de receita, o pai deixava de parecer pai e voltava a ser SELECIONÁVEL — furando a
+ * regra [D10] ("pai é só agrupamento") justamente onde ela mais importa.
+ */
+describe('parentCategoryIds — parentesco se decide na lista COMPLETA', () => {
+  type ComTipo = Cat & { type: 'income' | 'expense' | 'both' };
+
+  const paiBoth: ComTipo = { id: 'casa', type: 'both', isActive: true };
+  const filhaExpense: ComTipo = { id: 'energia', parentCategoryId: 'casa', type: 'expense', isActive: true };
+  const todas = [paiBoth, filhaExpense];
+
+  it('reconhece o pai mesmo quando a filha tem tipo diferente', () => {
+    expect(parentCategoryIds(todas).has('casa')).toBe(true);
+  });
+
+  it('CRÍTICO: pai NÃO volta a ser selecionável num recorte por tipo que esconde a filha', () => {
+    // O recorte de uma transação de RECEITA não inclui a filha (expense).
+    const recorteReceita = todas.filter((c) => c.type === 'income' || c.type === 'both');
+    const paiIds = parentCategoryIds(todas); // <- lista COMPLETA, não o recorte
+
+    expect(recorteReceita.map((c) => c.id)).toContain('casa'); // o pai está no recorte...
+    expect(recorteReceita.filter((c) => !paiIds.has(c.id)).map((c) => c.id)).toEqual([]); // ...mas não é selecionável
+  });
+
+  it('o jeito ERRADO (calcular no recorte) deixaria o pai selecionável — este é o bug', () => {
+    const recorteReceita = todas.filter((c) => c.type === 'income' || c.type === 'both');
+    const paiIdsErrado = parentCategoryIds(recorteReceita);
+
+    expect(paiIdsErrado.has('casa')).toBe(false);
+  });
+
+  it('ignora categoria inativa ao decidir parentesco', () => {
+    expect(parentCategoryIds([cat('casa'), cat('energia', 'casa', false)]).has('casa')).toBe(false);
   });
 });
