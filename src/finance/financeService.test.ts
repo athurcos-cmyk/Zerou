@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Timestamp, deleteField } from 'firebase/firestore';
+// Cores vêm da paleta, nunca literais: o teste `noHardcodedColors` cobre todo o src/.
+import { ACCENT_FOREGROUND, defaultCategoryColors } from '../theme/palette';
 
 const firestoreMocks = vi.hoisted(() => ({
   updateDoc: vi.fn().mockResolvedValue(undefined),
+  setDoc: vi.fn().mockResolvedValue(undefined),
   doc: vi.fn().mockReturnValue({ id: 'doc-ref' }),
   serverTimestamp: vi.fn().mockReturnValue('server-timestamp'),
   batch: { set: vi.fn(), update: vi.fn(), commit: vi.fn().mockResolvedValue(undefined) },
@@ -15,6 +18,7 @@ vi.mock('firebase/firestore', async (importOriginal) => ({
   ...(await importOriginal<typeof import('firebase/firestore')>()),
   doc: firestoreMocks.doc,
   updateDoc: firestoreMocks.updateDoc,
+  setDoc: firestoreMocks.setDoc,
   serverTimestamp: firestoreMocks.serverTimestamp,
   writeBatch: firestoreMocks.writeBatch
 }));
@@ -31,7 +35,7 @@ vi.mock('../cards/cardService', () => ({
   addCardPurchaseToBatch: cardServiceMocks.addCardPurchaseToBatch
 }));
 
-const { markOverdueBills, payBill, reconcileAccountBalance, recordRecurringPayment, recurringOccurrenceTransactionId, updateBill } = await import(
+const { createCategory, markOverdueBills, payBill, reconcileAccountBalance, recordRecurringPayment, recurringOccurrenceTransactionId, updateBill, updateCategory } = await import(
   './financeService'
 );
 
@@ -266,5 +270,118 @@ describe('reconcileAccountBalance', () => {
     expect(result).toEqual({ applied: false, deltaCents: 0 });
     expect(firestoreMocks.batch.set).not.toHaveBeenCalled();
     expect(firestoreMocks.batch.update).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Subcategorias: a herança de cor é **copiada na gravação** e propagada quando o pai muda.
+ *
+ * Estes testes existem por um motivo específico: a propagação falhando é **silenciosa**. Nada
+ * quebra, nenhum erro aparece — a filha só fica com a cor velha do pai. Foi apontado como o gap
+ * crítico do plano (`docs/planning/SUBCATEGORIAS.md`).
+ */
+describe('createCategory — herança de cor', () => {
+  it('copia a cor do pai, ignorando a cor recebida', () => {
+    firestoreMocks.setDoc.mockClear();
+
+    void createCategory('workspace-1', 'alice', {
+      name: 'Energia',
+      icon: 'zap',
+      type: 'expense',
+      color: ACCENT_FOREGROUND, // seria ignorada: quem manda é o pai
+      parent: { id: 'casa', color: defaultCategoryColors.expense_home }
+    });
+
+    const payload = firestoreMocks.setDoc.mock.calls[0][1];
+    expect(payload.color).toBe(defaultCategoryColors.expense_home);
+    expect(payload.parentCategoryId).toBe('casa');
+  });
+
+  it('usa a cor escolhida quando não há pai, e não grava parentCategoryId', () => {
+    firestoreMocks.setDoc.mockClear();
+
+    void createCategory('workspace-1', 'alice', {
+      name: 'Transporte',
+      icon: 'car',
+      type: 'expense',
+      color: defaultCategoryColors.expense_transport
+    });
+
+    const payload = firestoreMocks.setDoc.mock.calls[0][1];
+    expect(payload.color).toBe(defaultCategoryColors.expense_transport);
+    expect('parentCategoryId' in payload).toBe(false);
+  });
+
+  // Categoria embutida não tem `color` própria — a cor vem do mapa por id. Se o pai for uma
+  // dessas, a filha precisa herdar a cor RESOLVIDA, não `undefined`.
+  it('resolve a cor de um pai embutido sem campo color', () => {
+    firestoreMocks.setDoc.mockClear();
+
+    void createCategory('workspace-1', 'alice', {
+      name: 'Energia',
+      icon: 'zap',
+      type: 'expense',
+      parent: { id: 'expense_home' } // Casa embutida: cor vem de defaultCategoryColors
+    });
+
+    expect(firestoreMocks.setDoc.mock.calls[0][1].color).toBe(defaultCategoryColors.expense_home);
+  });
+});
+
+describe('updateCategory — propagação de cor pras filhas', () => {
+  it('atualiza pai e TODAS as filhas no mesmo batch quando a cor muda', () => {
+    firestoreMocks.batch.update.mockClear();
+    firestoreMocks.batch.commit.mockClear();
+    firestoreMocks.updateDoc.mockClear();
+
+    void updateCategory('workspace-1', 'casa', { color: defaultCategoryColors.income_salary }, {
+      children: [{ id: 'energia' }, { id: 'agua' }]
+    });
+
+    // 1 pai + 2 filhas, num commit só — atômico e offline-safe.
+    expect(firestoreMocks.batch.update).toHaveBeenCalledTimes(3);
+    expect(firestoreMocks.batch.commit).toHaveBeenCalledTimes(1);
+    expect(firestoreMocks.updateDoc).not.toHaveBeenCalled();
+
+    const coresGravadas = firestoreMocks.batch.update.mock.calls.map((c) => c[1].color);
+    expect(coresGravadas).toEqual(Array(3).fill(defaultCategoryColors.income_salary));
+  });
+
+  it('NÃO propaga quando só o nome muda', () => {
+    firestoreMocks.batch.update.mockClear();
+    firestoreMocks.updateDoc.mockClear();
+
+    void updateCategory('workspace-1', 'casa', { name: 'Moradia' }, {
+      children: [{ id: 'energia' }, { id: 'agua' }]
+    });
+
+    expect(firestoreMocks.batch.update).not.toHaveBeenCalled();
+    expect(firestoreMocks.updateDoc).toHaveBeenCalledTimes(1);
+  });
+
+  it('usa updateDoc simples quando a categoria não tem filhas', () => {
+    firestoreMocks.batch.update.mockClear();
+    firestoreMocks.updateDoc.mockClear();
+
+    void updateCategory('workspace-1', 'transporte', { color: defaultCategoryColors.both_transfer });
+
+    expect(firestoreMocks.updateDoc).toHaveBeenCalledTimes(1);
+    expect(firestoreMocks.batch.update).not.toHaveBeenCalled();
+  });
+
+  it('limpa parentCategoryId com deleteField ao promover a categoria principal', () => {
+    firestoreMocks.updateDoc.mockClear();
+
+    void updateCategory('workspace-1', 'energia', { parentCategoryId: null });
+
+    expect(firestoreMocks.updateDoc.mock.calls[0][1].parentCategoryId).toEqual(deleteField());
+  });
+
+  it('não toca em parentCategoryId quando não é informado', () => {
+    firestoreMocks.updateDoc.mockClear();
+
+    void updateCategory('workspace-1', 'energia', { name: 'Luz' });
+
+    expect('parentCategoryId' in firestoreMocks.updateDoc.mock.calls[0][1]).toBe(false);
   });
 });

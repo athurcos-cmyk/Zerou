@@ -1171,6 +1171,54 @@ describe('firestore security rules', () => {
     );
   });
 
+  // Subcategorias (2026-07-29). `parentCategoryId` já estava em `validCategoryCreate` e
+  // `validCategoryUpdate` desde antes, mas NENHUM teste passava o campo — o `categoryPayload`
+  // não o incluía. É o buraco exato que a regra 2 do CLAUDE.md descreve: teste que não espelha
+  // o payload real do cliente deixa passar regra desatualizada.
+  it('allows creating a subcategory with parentCategoryId', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    const parentReference = doc(aliceDb, 'workspaces/workspaceA/categories/parentCat');
+    const childReference = doc(aliceDb, 'workspaces/workspaceA/categories/childCat');
+
+    await assertSucceeds(setDoc(parentReference, categoryPayload('workspaceA', 'parentCat', 'alice')));
+    await assertSucceeds(
+      setDoc(childReference, categoryPayload('workspaceA', 'childCat', 'alice', { parentCategoryId: 'parentCat' }))
+    );
+  });
+
+  it('allows re-parenting and clearing parentCategoryId on update', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    const childReference = doc(aliceDb, 'workspaces/workspaceA/categories/childUpd');
+
+    await assertSucceeds(
+      setDoc(childReference, categoryPayload('workspaceA', 'childUpd', 'alice', { parentCategoryId: 'parentCat' }))
+    );
+    // Trocar de pai.
+    await assertSucceeds(updateDoc(childReference, { parentCategoryId: 'outroPai', updatedAt: serverTimestamp() }));
+    // Promover a categoria principal — `deleteField` remove a chave, e `validOptionalString`
+    // aceita campo ausente.
+    await assertSucceeds(updateDoc(childReference, { parentCategoryId: deleteField(), updatedAt: serverTimestamp() }));
+  });
+
+  // A propagação de cor grava pai + filhas num writeBatch. Se a regra recusasse um `update` que
+  // só muda cor+updatedAt, a propagação falharia inteira — e em silêncio, porque fireWrite
+  // engole o erro de propósito.
+  it('allows the color propagation batch: parent and children updating color together', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    const parentReference = doc(aliceDb, 'workspaces/workspaceA/categories/propPai');
+    const childReference = doc(aliceDb, 'workspaces/workspaceA/categories/propFilha');
+
+    await assertSucceeds(setDoc(parentReference, categoryPayload('workspaceA', 'propPai', 'alice')));
+    await assertSucceeds(
+      setDoc(childReference, categoryPayload('workspaceA', 'propFilha', 'alice', { parentCategoryId: 'propPai' }))
+    );
+
+    const propagated = writeBatch(aliceDb as unknown as Parameters<typeof writeBatch>[0]);
+    propagated.update(parentReference, { color: '#2F7D46', updatedAt: serverTimestamp() });
+    propagated.update(childReference, { color: '#2F7D46', updatedAt: serverTimestamp() });
+    await assertSucceeds(propagated.commit());
+  });
+
   it('allows seeding a default category without createdBy, but not a custom category', async () => {
     const aliceDb = testEnv.authenticatedContext('alice').firestore();
 

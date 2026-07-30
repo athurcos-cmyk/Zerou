@@ -27,6 +27,8 @@ import { fireWrite } from '../firebase/fireWrite';
 import { readSnapshotData, readSnapshotDoc } from '../firebase/snapshotData';
 import { startOfDay } from 'date-fns';
 import { buildDefaultCategory, defaultCategories } from './defaultCategories';
+// `palette.ts` é módulo folha (zero imports), então não há risco de ciclo aqui.
+import { resolveCategoryColor } from '../theme/palette';
 import { monthKeyFromDate } from './financeDates';
 import { mergeAccountEffects, invertAccountEffects, transactionAccountEffects } from './financeCalculations';
 import { applyAccountEffectsToBatch } from './accountBatchEffects';
@@ -257,10 +259,24 @@ export function reconcileAccountBalance(
   return { applied: true, deltaCents };
 }
 
+/**
+ * Cria categoria — ou subcategoria, quando `parent` vem preenchido.
+ *
+ * **`parent` é o objeto, não o id, de propósito**: a subcategoria herda a COR do pai, e passar o
+ * objeto faz o serviço derivar id e cor da MESMA fonte. Se recebesse `parentCategoryId` e `color`
+ * separados, um caller poderia passar uma cor que não é a do pai e a herança quebraria em
+ * silêncio — o tipo agora impede isso.
+ */
 export async function createCategory(
   workspaceId: string,
   userId: string,
-  input: { name: string; icon: string; type: 'income' | 'expense' | 'both'; color?: string }
+  input: {
+    name: string;
+    icon: string;
+    type: 'income' | 'expense' | 'both';
+    color?: string;
+    parent?: Pick<Category, 'id' | 'color'>;
+  }
 ) {
   const id = createId('cat');
   const now = serverTimestamp();
@@ -269,7 +285,8 @@ export async function createCategory(
     workspaceId,
     name: input.name.trim(),
     icon: input.icon,
-    color: input.color,
+    color: input.parent ? resolveCategoryColor(input.parent) : input.color,
+    parentCategoryId: input.parent?.id,
     type: input.type,
     isDefault: false,
     isActive: true,
@@ -280,17 +297,43 @@ export async function createCategory(
   return id;
 }
 
+/**
+ * Edita categoria e, quando a COR de um pai muda, **propaga pras filhas no mesmo batch atômico**.
+ *
+ * Sem a propagação a filha ficaria com a cor velha do pai — e o pior é que isso falharia em
+ * silêncio: nada quebra, a cor só fica errada. Por isso `children` é parâmetro explícito em vez
+ * de uma query aqui dentro: quem chama já tem a lista de categorias em memória (`useFinanceData`),
+ * então propagar não custa leitura nenhuma e continua funcionando offline.
+ *
+ * `parentCategoryId`: `undefined` = não mexe; `null` = limpa (promove a categoria principal).
+ */
 export async function updateCategory(
   workspaceId: string,
   categoryId: string,
-  patch: { name?: string; icon?: string; color?: string }
+  patch: { name?: string; icon?: string; color?: string; parentCategoryId?: string | null },
+  opts: { children?: ReadonlyArray<{ id: string }> } = {}
 ) {
-  fireWrite(updateDoc(documentRef(workspaceId, 'categories', categoryId), omitUndefined({
+  const now = serverTimestamp();
+  const changes = omitUndefined({
     name: patch.name?.trim(),
     icon: patch.icon,
     color: patch.color,
-    updatedAt: serverTimestamp()
-  })));
+    parentCategoryId: patch.parentCategoryId === null ? deleteField() : patch.parentCategoryId,
+    updatedAt: now
+  });
+
+  const children = patch.color ? (opts.children ?? []) : [];
+  if (children.length === 0) {
+    fireWrite(updateDoc(documentRef(workspaceId, 'categories', categoryId), changes));
+    return;
+  }
+
+  const batch = writeBatch(getFirebaseDb());
+  batch.update(documentRef(workspaceId, 'categories', categoryId), changes);
+  for (const child of children) {
+    batch.update(documentRef(workspaceId, 'categories', child.id), { color: patch.color, updatedAt: now });
+  }
+  fireWrite(batch.commit());
 }
 
 export async function deleteCategory(workspaceId: string, categoryId: string) {
