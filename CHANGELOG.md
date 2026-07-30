@@ -2,6 +2,42 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-30 — feat(categorias): subcategorias, de ponta a ponta
+
+Feature grande, planejada com `/plan-eng-review` e executada nos passos 1–7 de
+`docs/planning/SUBCATEGORIAS.md` (decisões do dono marcadas `[D1]`…`[D13]` lá).
+
+- **Modelo sem migração**: campo opcional `parentCategoryId`. Categoria sem ele continua sendo o
+  que sempre foi — nenhum dado existente precisou mudar. Profundidade travada em **1 nível**
+  (`[D2]`): três travas em `canBeParentOf`, incluindo a que passa desapercebido (mover uma
+  categoria que JÁ tem filhas pra dentro de outra faria netas).
+- **Pai é só agrupamento** (`[D10]`, decisão do dono): quem ganha subcategoria deixa de receber
+  lançamento. É o que mantém o percentual da Análise sem ambiguidade. A regra vale só enquanto
+  existe filha ativa — categoria sem filha continua selecionável, e obrigar todo mundo a criar
+  hierarquia seria trabalho puro.
+- **Cor herdada de verdade**: a filha copia a cor do pai na gravação, e editar a cor do pai
+  propaga pras filhas num `writeBatch` (atômico e offline-first). O seletor de cor some do
+  formulário quando há pai — interface que oferece controle sem efeito é interface que mente.
+- **Campo "Tipo" removido** do formulário: quem define gasto ou receita é a transação. O dado
+  continua existindo (é ele que filtra a lista no lançamento), mas agora é inferido — e
+  subcategoria herda o do pai.
+- **Tela `/app/settings/categories`**, com explicação do que são categorias e subcategorias e
+  atalho "+" pra criar subcategoria direto na linha da principal. O seletor dentro do lançamento
+  **não saiu** (pedido do dono, pensando em quem abre o app pela primeira vez).
+- **Análise com drill-down** (`[D1]`): o donut mostra só categorias principais; tocar na **linha
+  da lista** (não no donut) abre as subcategorias com o % relativo ao pai. Lançamentos feitos na
+  categoria antes de ela virar agrupamento aparecem como `Casa · geral`, então os percentuais
+  fecham 100%.
+- **O roll-up NÃO vazou** pro orçamento nem pro Resumo Anual (`[D9]`) — a mesma função alimenta as
+  três telas e só a Análise quer agrupamento. Travado por teste nas duas pontas e provado ao vivo:
+  com limite de R$8.000 em Casa, o banner disse "94%" (gasto direto) enquanto a Análise mostrava o
+  grupo em R$15.501,44.
+- **Dois bugs achados pelo dono em produção e corrigidos**: o pai voltava a ser selecionável num
+  recorte por tipo que escondia a filha, e um lançamento antigo apontando pra categoria que virou
+  pai exibia "Selecione", como se ela tivesse sumido.
+- 496 testes verdes. ⚠️ **Falta o passo 8**: filtrar categorias-pai da lista que a Vic usa no
+  WhatsApp — sem isso ela ainda consegue gravar num pai. Exige deploy manual de function.
+
 ## 2026-07-29 (parte 9) — fix(whatsapp): pedido sobre CATEGORIA caía na mensagem de "editar lançamento"
 
 Achado nos logs do deploy da parte 8: uma mensagem real do dono, `"Vic exclua uma categoria pra mim"`, foi classificada `out_of_scope` com `suggestedScreen: "transacoes"` — e a resposta falava de **"editar, corrigir ou excluir um lançamento"**. Destino certo, texto errado.

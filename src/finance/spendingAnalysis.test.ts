@@ -14,6 +14,7 @@ import {
   spendingByCategoryForMonth,
   spendingByCategoryAcrossMonths,
   computeCategoryTrend,
+  rollUpByParent,
   NO_CATEGORY,
   type BillForCommitment,
   type InvoiceForSpending,
@@ -651,5 +652,133 @@ describe('exclusão de compra no cartão some da Análise (regressão do purchas
       ] }
     ];
     expect(spendingByCategoryForMonth('2026-09', [], invoices, catOf).get('compras') ?? 0).toBe(0);
+  });
+});
+
+/**
+ * Roll-up pai↔filha — só a Análise (donut + lista) usa. Ver `[D1]`/`[D8]` em
+ * `docs/planning/SUBCATEGORIAS.md`.
+ */
+describe('rollUpByParent', () => {
+  /**
+   *  Casa (pai)          Transporte (folha)
+   *   ├── Energia
+   *   └── Água
+   */
+  const cats = new Map<string, { parentCategoryId?: string }>([
+    ['casa', {}],
+    ['energia', { parentCategoryId: 'casa' }],
+    ['agua', { parentCategoryId: 'casa' }],
+    ['transporte', {}]
+  ]);
+
+  it('soma as filhas no pai e guarda cada uma na expansão', () => {
+    const rolled = rollUpByParent(new Map([['energia', 50000], ['agua', 20000]]), cats);
+
+    expect(rolled.get('casa')?.totalCents).toBe(70000);
+    expect([...(rolled.get('casa')?.children ?? [])]).toEqual([['energia', 50000], ['agua', 20000]]);
+    // O pai não aparece como linha própria além do bucket — quem soma é ele.
+    expect([...rolled.keys()]).toEqual(['casa']);
+  });
+
+  it('folha continua linha de primeiro nível, sem expansão', () => {
+    const rolled = rollUpByParent(new Map([['transporte', 30000]]), cats);
+
+    expect(rolled.get('transporte')).toEqual({ totalCents: 30000, children: new Map() });
+  });
+
+  // [D11]: lançamentos feitos em Casa ANTES de ela virar agrupamento continuam apontando pra ela.
+  it('gasto direto no pai vira a linha "· geral" dentro da expansão', () => {
+    const rolled = rollUpByParent(new Map([['casa', 10000], ['energia', 50000]]), cats);
+    const casa = rolled.get('casa')!;
+
+    expect(casa.totalCents).toBe(60000);
+    expect(casa.children.get('casa')).toBe(10000); // chave = id do próprio pai
+    // Os percentuais da expansão fecham 100% do pai.
+    expect([...casa.children.values()].reduce((s, c) => s + c, 0)).toBe(casa.totalCents);
+  });
+
+  it('pai SEM filha no período não ganha linha "geral" — seria uma linha sozinha dentro dela mesma', () => {
+    const rolled = rollUpByParent(new Map([['casa', 10000]]), cats);
+
+    expect(rolled.get('casa')).toEqual({ totalCents: 10000, children: new Map() });
+  });
+
+  it('sem categoria e categoria desconhecida ficam no primeiro nível', () => {
+    const rolled = rollUpByParent(new Map([[NO_CATEGORY, 5000], ['fantasma', 900]]), cats);
+
+    expect(rolled.get(NO_CATEGORY)?.totalCents).toBe(5000);
+    expect(rolled.get('fantasma')?.totalCents).toBe(900);
+  });
+
+  // Perder o agrupamento é aceitável; sumir com o gasto não.
+  it('filha órfã (pai excluído do mapa) vira linha de primeiro nível', () => {
+    const semCasa = new Map([['energia', { parentCategoryId: 'casa' }]]);
+    const rolled = rollUpByParent(new Map([['energia', 50000]]), semCasa);
+
+    expect(rolled.get('energia')?.totalCents).toBe(50000);
+    expect(rolled.has('casa')).toBe(false);
+  });
+
+  it('ciclo trivial (categoria apontando pra si mesma) não entra em loop nem se auto-soma', () => {
+    const cíclica = new Map([['casa', { parentCategoryId: 'casa' }]]);
+    const rolled = rollUpByParent(new Map([['casa', 10000]]), cíclica);
+
+    expect(rolled.get('casa')).toEqual({ totalCents: 10000, children: new Map() });
+  });
+
+  // [D8]: `spendingByCategoryForMonth` devolve negativo em mês só de estorno. O roll-up NÃO
+  // filtra — quem exibe é que decide. Aqui só se prova que o total pode chegar a zero, que é o
+  // divisor do "% relativo ao pai" e viraria "NaN%" na tela sem a guarda.
+  it('preserva negativo e deixa o total do pai chegar a zero', () => {
+    const rolled = rollUpByParent(new Map([['energia', -50000], ['agua', 50000]]), cats);
+
+    expect(rolled.get('casa')?.totalCents).toBe(0);
+    expect(rolled.get('casa')?.children.get('energia')).toBe(-50000);
+  });
+
+  it('mapa vazio devolve mapa vazio', () => {
+    expect(rollUpByParent(new Map(), cats).size).toBe(0);
+  });
+
+  it('não perde nem inventa centavo: a soma dos primeiros níveis é a soma da entrada', () => {
+    const entrada = new Map([['energia', 50000], ['agua', 20000], ['casa', 10000], ['transporte', 30000], [NO_CATEGORY, 700]]);
+    const rolled = rollUpByParent(entrada, cats);
+
+    const antes = [...entrada.values()].reduce((s, c) => s + c, 0);
+    const depois = [...rolled.values()].reduce((s, b) => s + b.totalCents, 0);
+    expect(depois).toBe(antes);
+  });
+});
+
+/**
+ * `[D9]` — a fonte crua não pode agrupar filha no pai. Ela alimenta três telas e só uma quer
+ * roll-up (ver o aviso em `rollUpByParent`):
+ *
+ *   • BudgetAlertBanner  → lê `spending.get(budget.categoryId)` direto deste mapa. Se o pai
+ *     passasse a vir somado, um orçamento em "Casa" começaria a estourar por causa de Energia,
+ *     sem ninguém ter decidido isso.
+ *   • annualSummaryCalculations → mesmo risco no "Top categorias" (teste irmão lá).
+ *
+ * O teste é a tripwire: hoje a função nem recebe as categorias, então não TEM como agrupar.
+ * No dia em que alguém passar esse mapa pra cá, ele falha e a decisão volta pra mesa.
+ */
+describe('spendingByCategoryForMonth NÃO agrupa subcategoria no pai [D9]', () => {
+  it('gasto na filha fica na filha; o pai só tem o que foi lançado nele', () => {
+    const energia = txn({ id: 'e', type: 'expense', amountCents: 50000, categoryId: 'energia' });
+    const casa = txn({ id: 'c', type: 'expense', amountCents: 10000, categoryId: 'casa' });
+
+    const result = spendingByCategoryForMonth('2026-07', [energia, casa], [], () => undefined);
+
+    expect(result.get('energia')).toBe(50000);
+    expect(result.get('casa')).toBe(10000); // não 60000
+  });
+
+  it('gasto só na filha não cria linha nenhuma pro pai', () => {
+    const energia = txn({ id: 'e', type: 'expense', amountCents: 50000, categoryId: 'energia' });
+
+    const result = spendingByCategoryForMonth('2026-07', [energia], [], () => undefined);
+
+    expect(result.has('casa')).toBe(false);
   });
 });

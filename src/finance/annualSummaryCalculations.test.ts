@@ -118,3 +118,28 @@ describe('computeAnnualSummary', () => {
     expect(result.worstMonth).toBeNull();
   });
 });
+
+/**
+ * `[D9]` — o roll-up pai↔filha existe SÓ no donut/lista da Análise (`rollUpByParent`, aplicado
+ * na SearchPage). O Resumo Anual lê o cru: se um dia alguém mover o roll-up pra dentro de
+ * `spendingByCategoryForMonth`, o "Top categorias" muda de significado sem ninguém pedir — e
+ * silenciosamente, porque o número continua parecendo plausível.
+ */
+describe('Resumo Anual NÃO agrupa subcategoria no pai [D9]', () => {
+  it('pai e filha continuam linhas separadas no Top categorias', () => {
+    const txns = [
+      makeTxn({ id: 't1', amountCents: 50000, type: 'expense', categoryId: 'energia', competenceMonth: '2026-01', date: Timestamp.fromDate(new Date(2026, 0, 5)) }),
+      makeTxn({ id: 't2', amountCents: 10000, type: 'expense', categoryId: 'casa', competenceMonth: '2026-01', date: Timestamp.fromDate(new Date(2026, 0, 6)) }),
+    ];
+    const names = new Map([['casa', 'Casa'], ['energia', 'Energia']]);
+
+    const result = computeAnnualSummary(2026, txns, [], names);
+
+    expect(result.topCategories.map((c) => [c.categoryId, c.amountCents])).toEqual([
+      ['energia', 50000],
+      ['casa', 10000],
+    ]);
+    // Se rolasse, Casa apareceria com 60000 e Energia sumiria.
+    expect(result.topCategories.find((c) => c.categoryId === 'casa')?.amountCents).not.toBe(60000);
+  });
+});

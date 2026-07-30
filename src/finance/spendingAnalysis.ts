@@ -1,4 +1,4 @@
-import type { InvoiceLedgerEntry, InvoiceLedgerEntryType, InvoiceStatus, Transaction } from '../types/contracts';
+import type { Category, InvoiceLedgerEntry, InvoiceLedgerEntryType, InvoiceStatus, Transaction } from '../types/contracts';
 
 /**
  * Análise de gastos em **regime de competência** para a compra à vista no cartão.
@@ -169,6 +169,79 @@ export function spendingByCategoryForMonth(
   }
 
   return totals;
+}
+
+export interface CategoryRollUp {
+  /** Gasto próprio + o de todas as subcategorias. Pode vir **zero ou negativo** (mês de estorno). */
+  totalCents: number;
+  /**
+   * Subcategorias com movimento no período, `id → centavos`.
+   *
+   * Uma chave é especial: **o id do próprio pai** representa a linha "· geral" — lançamentos
+   * feitos na categoria antes de ela virar agrupamento. Sem ela os percentuais da expansão não
+   * fechariam 100%. Só existe quando há pelo menos uma subcategoria de verdade.
+   *
+   * Vazio = categoria folha (não agrupa nada). É o que a lista usa pra decidir se a linha expande.
+   */
+  children: Map<string, number>;
+}
+
+/**
+ * Agrupa o gasto das subcategorias no pai — **só pra exibição no donut/lista da Análise**.
+ *
+ * ⚠️ **Não mova isto pra dentro de `spendingByCategoryForMonth`.** Aquela função tem três
+ * consumidores e só um quer roll-up:
+ *
+ * ```
+ * spendingByCategoryForMonth
+ *   ├── SearchPage (donut + lista)   → roll-up SÓ aqui
+ *   ├── BudgetAlertBanner            → NÃO: orçamento em Casa passaria a incluir Energia e Água
+ *   └── annualSummaryCalculations    → NÃO: mudaria número que hoje está certo
+ * ```
+ *
+ * Somar filha no pai dentro do orçamento é uma decisão de produto ainda **em aberto** — fazer
+ * isso de lambuja, por efeito colateral, é o modo de falha silencioso que este projeto já pagou
+ * caro. Travado pelos testes de regressão `[D9]`.
+ *
+ * Filha órfã (pai excluído por caminho não previsto) vira linha de primeiro nível com o próprio
+ * valor: perder o agrupamento é aceitável, sumir com o gasto não é.
+ */
+export function rollUpByParent(
+  totals: ReadonlyMap<string, number>,
+  categoriesById: ReadonlyMap<string, Pick<Category, 'parentCategoryId'>>
+): Map<string, CategoryRollUp> {
+  const rolled = new Map<string, CategoryRollUp>();
+  const bucketOf = (categoryId: string): CategoryRollUp => {
+    let bucket = rolled.get(categoryId);
+    if (!bucket) {
+      bucket = { totalCents: 0, children: new Map() };
+      rolled.set(categoryId, bucket);
+    }
+    return bucket;
+  };
+
+  for (const [categoryId, cents] of totals) {
+    const parentId = categoriesById.get(categoryId)?.parentCategoryId;
+    if (parentId && parentId !== categoryId && categoriesById.has(parentId)) {
+      const bucket = bucketOf(parentId);
+      bucket.totalCents += cents;
+      bucket.children.set(categoryId, cents);
+    } else {
+      bucketOf(categoryId).totalCents += cents;
+    }
+  }
+
+  // A linha "· geral": só faz sentido quando existe subcategoria pra contrastar. Categoria folha
+  // com gasto próprio continua com `children` vazio — uma linha "geral" solitária dentro dela
+  // mesma seria ruído.
+  for (const [categoryId, cents] of totals) {
+    const bucket = rolled.get(categoryId);
+    if (bucket && bucket.children.size > 0 && !bucket.children.has(categoryId)) {
+      bucket.children.set(categoryId, cents);
+    }
+  }
+
+  return rolled;
 }
 
 /**

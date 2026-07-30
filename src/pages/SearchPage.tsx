@@ -31,12 +31,14 @@ import {
   ongoingInstallmentPurchases,
   projectedRecurringForMonth,
   recurringByCategoryForMonth,
+  rollUpByParent,
   spendingByCategoryForMonth,
   NO_CATEGORY,
   type BillForCommitment,
   type InvoiceForSpending,
   type RecurringForProjection
 } from '../finance/spendingAnalysis';
+import { parentCategoryIds } from '../finance/categoryHierarchy';
 import { defaultCategoryColor, resolveCategoryColor } from '../theme/palette';
 import { CategoryMark } from '../components/categoryIcons';
 
@@ -132,6 +134,9 @@ export function SearchPage() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [selectedCatIndex, setSelectedCatIndex] = useState<number | null>(null);
+  // Uma categoria principal aberta por vez (acordeão): abrir várias empurraria as outras pra
+  // fora da tela no celular, que é onde essa lista é lida.
+  const [expandedCatId, setExpandedCatId] = useState<string | null>(null);
   const [showAllCategories, setShowAllCategories] = useState(false);
   const [showAllRecurring, setShowAllRecurring] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -279,16 +284,30 @@ export function SearchPage() {
     } else {
       totals = spendingByCategoryForMonth(selectedMonth, knownTransactions, invoicesForSpending, catOf);
     }
-    return [...totals.entries()]
-      .filter(([, amountCents]) => amountCents > 0) // mês só de estorno pode zerar/inverter uma categoria
-      .map(([catId, amountCents]) => {
+    // Subcategoria soma no pai — SÓ aqui. Orçamento e Resumo Anual continuam lendo o cru
+    // (ver o aviso em `rollUpByParent`).
+    return [...rollUpByParent(totals, categoryMap).entries()]
+      .filter(([, rollUp]) => rollUp.totalCents > 0) // mês só de estorno pode zerar/inverter uma categoria
+      .map(([catId, rollUp]) => {
         const isNone = catId === NO_CATEGORY;
         const cat = isNone ? null : categoryMap.get(catId);
+        const name = isNone ? 'Sem categoria' : (categoryNames.get(catId) ?? 'Sem categoria');
         return {
           categoryId: isNone ? null : catId,
-          name: isNone ? 'Sem categoria' : (categoryNames.get(catId) ?? 'Sem categoria'),
-          amountCents,
-          color: cat ? resolveCategoryColor(cat) : defaultCategoryColor
+          name,
+          amountCents: rollUp.totalCents,
+          color: cat ? resolveCategoryColor(cat) : defaultCategoryColor,
+          // Linhas da expansão. A chave igual à do pai é o gasto feito na própria categoria antes
+          // de ela virar agrupamento ("Casa · geral"). Filha negativa (mês de estorno) FICA: sem
+          // ela os valores da expansão não explicariam o total do pai.
+          children: [...rollUp.children.entries()]
+            .filter(([, cents]) => cents !== 0)
+            .map(([childId, cents]) => ({
+              id: childId,
+              name: childId === catId ? `${name} · geral` : (categoryNames.get(childId) ?? 'Sem categoria'),
+              amountCents: cents
+            }))
+            .sort((a, b) => b.amountCents - a.amountCents)
         };
       })
       .sort((a, b) => b.amountCents - a.amountCents);
@@ -300,6 +319,19 @@ export function SearchPage() {
     () => new Map(finance.budgets.filter((b) => b.isActive).map((b) => [b.categoryId, b])),
     [finance.budgets]
   );
+
+  /**
+   * Orçamento só em categoria que pode receber lançamento. Numa que virou agrupamento o limite
+   * mediria só o gasto direto nela — não o do grupo, que é o número que a pessoa está vendo na
+   * lista. Somar as filhas no orçamento é decisão de produto ainda em aberto (`[D1]`).
+   *
+   * Quem já tem orçamento continua listado mesmo virando pai: senão o limite antigo ficaria ativo
+   * e invisível, sem como remover.
+   */
+  const budgetableCategories = useMemo(() => {
+    const paiIds = parentCategoryIds(finance.categories); // parentesco na lista COMPLETA, nunca no recorte
+    return expenseCategories.filter((cat) => !paiIds.has(cat.id) || budgetByCategoryId.has(cat.id));
+  }, [expenseCategories, finance.categories, budgetByCategoryId]);
 
   useEffect(() => {
     if (budgetOpen) {
@@ -409,6 +441,7 @@ export function SearchPage() {
 
   function changeMonth(delta: number) {
     setSelectedCatIndex(null);
+    setExpandedCatId(null);
     setShowAllCategories(false);
     setSelectedMonth((m) => shiftMonth(m, delta));
   }
@@ -572,7 +605,7 @@ export function SearchPage() {
                       const dimmed = selectedCatIndex !== null && selectedCatIndex !== i;
                       const circle = (
                         <circle
-                          key={cat.name}
+                          key={cat.categoryId ?? NO_CATEGORY}
                           cx={100}
                           cy={100}
                           r={R}
@@ -622,8 +655,15 @@ export function SearchPage() {
                   const pct = Math.round((cat.amountCents / totalSpent) * 100);
                   const isSelected = selectedCatIndex === i;
                   const isDimmed = selectedCatIndex !== null && !isSelected;
+                  const isParent = cat.children.length > 0;
+                  const isExpanded = isParent && expandedCatId === cat.categoryId;
+                  // Orçamento numa categoria que virou agrupamento: o valor da linha agora é o
+                  // roll-up, mas o BudgetAlertBanner mede só o gasto DIRETO. Uma barra aqui seria
+                  // dois números diferentes com o mesmo rótulo — vira um aviso dentro da expansão.
                   const budget = cat.categoryId ? budgetByCategoryId.get(cat.categoryId) : undefined;
-                  const budgetPct = budget ? Math.round((cat.amountCents / budget.limitCents) * 100) : null;
+                  const groupBudget = isParent ? budget : undefined;
+                  const leafBudget = isParent ? undefined : budget;
+                  const budgetPct = leafBudget ? Math.round((cat.amountCents / leafBudget.limitCents) * 100) : null;
                   const barColor = budgetPct !== null
                     ? budgetPct >= 100 ? 'var(--danger)' : budgetPct >= 80 ? 'var(--warning)' : 'var(--success)'
                     : cat.color;
@@ -636,15 +676,22 @@ export function SearchPage() {
                     ? (Math.min(budgetPct, BUDGET_SCALE_CAP_PCT) / BUDGET_SCALE_CAP_PCT) * 100
                     : null;
                   return (
+                    <div
+                      key={cat.categoryId ?? NO_CATEGORY}
+                      style={{ opacity: isDimmed ? 0.35 : 1, transition: 'opacity var(--duration-normal) ease' }}
+                    >
                     <button
-                      key={cat.name}
                       type="button"
-                      onClick={() => setSelectedCatIndex(i === selectedCatIndex ? null : i)}
+                      aria-expanded={isParent ? isExpanded : undefined}
+                      onClick={() => {
+                        setSelectedCatIndex(i === selectedCatIndex ? null : i);
+                        // Só a LISTA abre a subcategoria — tocar no donut continua sendo só
+                        // destacar a fatia (decisão do dono).
+                        if (isParent) setExpandedCatId(isExpanded ? null : cat.categoryId);
+                      }}
                       style={{
                         background: 'none', border: 'none', padding: 0,
                         cursor: 'pointer', textAlign: 'left', width: '100%',
-                        opacity: isDimmed ? 0.35 : 1,
-                        transition: 'opacity var(--duration-normal) ease',
                       }}
                     >
                       {/* nome + valor */}
@@ -653,11 +700,17 @@ export function SearchPage() {
                         <span style={{ flex: 1, fontSize: '0.82rem', fontWeight: isSelected ? 700 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {cat.name}
                         </span>
+                        {/* A seta é o único aviso de que a linha abre — sem ela, ninguém descobre. */}
+                        {isParent && (
+                          isExpanded
+                            ? <ChevronUp size={13} className="text-secondary" style={{ flexShrink: 0 }} aria-hidden="true" />
+                            : <ChevronDown size={13} className="text-secondary" style={{ flexShrink: 0 }} aria-hidden="true" />
+                        )}
                         {/* Fatia do total (contexto do donut). O % do LIMITE fica ao lado da barra, abaixo. */}
                         <span title="do total gasto" style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', flexShrink: 0 }}>{pct}%</span>
                         <span style={{ fontSize: '0.82rem', fontWeight: 700, flexShrink: 0, minWidth: '4.5rem', textAlign: 'right' }}>
                           {formatMoney(cat.amountCents)}
-                          {budget ? ` / ${formatMoney(budget.limitCents)}` : ''}
+                          {leafBudget ? ` / ${formatMoney(leafBudget.limitCents)}` : ''}
                         </span>
                       </div>
                       {/* barra de progresso + % do LIMITE (quando há orçamento) */}
@@ -669,9 +722,9 @@ export function SearchPage() {
                             width: budgetBarWidthPct !== null ? `${budgetBarWidthPct}%` : `${pct}%`,
                             transition: 'width var(--duration-slow) ease',
                           }} />
-                          {budget && (
+                          {leafBudget && (
                             <div
-                              title={`Limite: ${formatMoney(budget.limitCents)}`}
+                              title={`Limite: ${formatMoney(leafBudget.limitCents)}`}
                               style={{
                                 position: 'absolute', top: 0, height: 4,
                                 left: `${budgetMarkerLeftPct}%`, width: 2,
@@ -688,6 +741,52 @@ export function SearchPage() {
                         )}
                       </div>
                     </button>
+
+                    {/* expansão: as subcategorias, com % relativo ao PAI (não ao total do mês) */}
+                    {isExpanded && (
+                      <div
+                        style={{
+                          margin: '0.55rem 0 0.1rem 0.25rem',
+                          paddingLeft: '0.8rem',
+                          borderLeft: `2px solid ${cat.color}`,
+                          display: 'flex', flexDirection: 'column', gap: '0.45rem',
+                        }}
+                      >
+                        {cat.children.map((child) => {
+                          const isGeral = child.id === cat.categoryId;
+                          // Guarda de NaN `[D8]`: o total do pai é o divisor e pode ser zero num
+                          // mês de estorno. A lista já filtra total > 0, então isto é defesa em
+                          // profundidade — "NaN%" é erro que a pessoa vê antes da gente.
+                          const childPct = cat.amountCents > 0
+                            ? Math.round((child.amountCents / cat.amountCents) * 100)
+                            : null;
+                          return (
+                            <div key={child.id} style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                              <span
+                                title={isGeral ? `Lançado direto em ${cat.name}, sem subcategoria` : undefined}
+                                style={{ flex: 1, fontSize: '0.78rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                              >
+                                {child.name}
+                              </span>
+                              {childPct !== null && (
+                                <span title={`de ${cat.name}`} style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', flexShrink: 0 }}>
+                                  {childPct}%
+                                </span>
+                              )}
+                              <span style={{ fontSize: '0.78rem', fontWeight: 600, flexShrink: 0, minWidth: '4.5rem', textAlign: 'right' }}>
+                                {formatMoney(child.amountCents)}
+                              </span>
+                            </div>
+                          );
+                        })}
+                        {groupBudget && (
+                          <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                            Orçamento de {formatMoney(groupBudget.limitCents)} — conta só o que for lançado direto em {cat.name}, não as subcategorias.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    </div>
                   );
                 })}
 
@@ -990,7 +1089,7 @@ export function SearchPage() {
         subtitle="Defina um limite por categoria — ele vale todo mês"
       >
         <div className="form-stack">
-          {expenseCategories.map((cat) => {
+          {budgetableCategories.map((cat) => {
             const value = budgetValues[cat.id] ?? '';
             const existingBudget = budgetByCategoryId.get(cat.id);
             return (
@@ -1035,7 +1134,7 @@ export function SearchPage() {
               </div>
             );
           })}
-          {expenseCategories.length === 0 && (
+          {budgetableCategories.length === 0 && (
             <p className="text-secondary" style={{ margin: 0 }}>Nenhuma categoria de despesa cadastrada.</p>
           )}
         </div>

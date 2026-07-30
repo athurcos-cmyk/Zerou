@@ -1,6 +1,7 @@
 # Subcategorias — plano de implementação
 
-Status: **planejado, não implementado**. Revisado com `/plan-eng-review` em 2026-07-29.
+Status: **implementado, menos o filtro da Vic** (passo 8). Revisado com `/plan-eng-review` em
+2026-07-29; passos 1–7 entregues até 30/07/2026 (ver "Ordem sugerida" no fim).
 Decisões tomadas pelo dono durante a revisão estão marcadas com `[D1]`…`[D13]`.
 
 ## O que é
@@ -147,17 +148,39 @@ Se o roll-up entrasse dentro dela, um orçamento em `Casa` passaria a incluir En
 sozinho — que é exatamente a decisão adiada. Por isso é uma função **separada**
 (`rollUpByParent`) aplicada só na chamada do donut. Travado por teste de regressão `[D9]`.
 
-### Assinatura proposta
+### Assinatura (implementada em `spendingAnalysis.ts`, 30/07/2026)
 
 ```ts
 rollUpByParent(
-  totals: Map<string, number>,          // saída de spendingByCategoryForMonth
-  categoriesById: Map<string, Category>
-): Map<string, { totalCents: number; children: Map<string, number> }>
+  totals: ReadonlyMap<string, number>,   // saída de spendingByCategoryForMonth
+  categoriesById: ReadonlyMap<string, Pick<Category, 'parentCategoryId'>>
+): Map<string, CategoryRollUp>           // { totalCents, children: Map<id, cents> }
 ```
 
 Devolve os dois níveis numa passada só — a lista renderiza colapsada e expandida sem
-recalcular.
+recalcular. Detalhes que só apareceram ao escrever:
+
+- **A linha "· geral" usa o id do PRÓPRIO PAI como chave** dentro de `children`, em vez de um
+  marcador tipo `casa::geral`. Não precisa de parsing e não colide com id de categoria real.
+- **Filha órfã** (pai fora do mapa) vira linha de primeiro nível com o próprio valor: perder o
+  agrupamento é aceitável, sumir com o gasto não.
+- **Filha negativa fica na expansão** (mês de estorno). Sem ela os valores mostrados não
+  explicariam o total do pai — e o objetivo da expansão é exatamente esse.
+- Teste `não perde nem inventa centavo` compara a soma da entrada com a da saída: é o que pega
+  qualquer erro de bucketização.
+
+### Orçamento em categoria que virou agrupamento
+
+Caiu de lambuja com o roll-up e precisou de decisão: a linha da Análise agora mostra o total do
+grupo, mas o `BudgetAlertBanner` mede só o gasto **direto**. Barra de orçamento na linha do pai
+seriam dois números diferentes com o mesmo rótulo.
+
+- A barra **sai** da linha do pai; no lugar, a expansão traz o aviso "conta só o que for lançado
+  direto em Casa, não as subcategorias".
+- O seletor de orçamentos passa a **listar só categorias folha** — limite em algo que não recebe
+  lançamento não mede nada. Exceção: quem já tem orçamento continua listado mesmo virando pai,
+  senão o limite antigo ficaria ativo e sem como remover.
+- Somar filhas no orçamento continua sendo `[D1]`, em aberto.
 
 ### Guarda de NaN `[D8]`
 
@@ -168,6 +191,20 @@ comentário em `spendingAnalysis.ts:139` avisa). Então o total do pai pode ser 
 `filha ÷ pai × 100` com pai zero vira `Infinity`/`NaN` e imprime "NaN%" na tela.
 
 **Regra**: total do pai zero ou negativo → esconde o %, mostra só o valor em reais.
+
+Implementado como defesa em profundidade: a lista já filtra `totalCents > 0` antes de renderizar,
+então a guarda não deveria ser alcançável hoje. Ela fica porque "NaN%" é erro que o usuário vê
+antes da gente — e o filtro de cima é uma linha que qualquer refactor pode mexer.
+
+### Pendente: `CategoryTrendSheet` não rola pro pai
+
+A tendência por categoria monta a própria lista a partir do gasto cru
+(`spendingByCategoryAcrossMonths`), não da prop `categories` — filtrar a prop só apagaria o nome
+e deixaria o item lá como "Sem categoria". Então, hoje, abrir a tendência de uma categoria que
+virou agrupamento mostra **só o gasto direto** nela, enquanto a Análise mostra o total do grupo:
+mesmo nome, números diferentes. Não é regressão (nunca foi rolado), mas é divergência visível.
+Resolver exige decidir o que "tendência de Casa" significa — provavelmente o total do grupo — e
+rolar mês a mês lá dentro. Fora do escopo desta rodada.
 
 ## Histórico: a linha "Casa · geral" `[D11]`
 
@@ -309,11 +346,19 @@ Conflito: nenhum. A toca `src/components/`, B toca `src/finance/`, C toca `funct
 
 ## Ordem sugerida
 
-1. Refactor: `useCategoryActions` (`[D6]`)
-2. Refactor: `<CategoryForm>` (`[D7]`)
-3. Modelo: `parentCategoryId` no create/update + propagação de cor + travas (`[D2]`, `[D3]`, `[D4]`)
-4. Seletor: hierarquia + pai não-selecionável + link "Gerenciar categorias" (`[D10]`)
-5. Tela nova (`[D5]`) — depende do `/frontend-design`
-6. Análise: `rollUpByParent` + expansão na lista + guarda de NaN (`[D1]`, `[D8]`)
-7. Testes de regressão (`[D9]`) + payload das regras
-8. Vic: filtro de pais + deploy de function (`[D12]`)
+1. ✅ Refactor: `useCategoryActions` (`[D6]`)
+2. ✅ Refactor: `<CategoryForm>` (`[D7]`)
+3. ✅ Modelo: `parentCategoryId` no create/update + propagação de cor + travas (`[D2]`, `[D3]`, `[D4]`)
+4. ✅ Seletor: hierarquia + pai não-selecionável + link "Gerenciar categorias" (`[D10]`)
+5. ✅ Tela nova (`[D5]`) — `/frontend-design` fica pra quando estiver tudo implementado (pedido do dono)
+6. ✅ Análise: `rollUpByParent` + expansão na lista + guarda de NaN (`[D1]`, `[D8]`) — 30/07/2026
+7. ✅ Testes de regressão (`[D9]`) + `parentCategoryId` nos testes de regra (feito no passo 3)
+8. ⬜ Vic: filtro de pais + deploy de function (`[D12]`)
+
+### Como o `[D9]` foi provado ao vivo (30/07/2026)
+
+Teste unitário nas duas pontas (`spendingByCategoryForMonth` e `computeAnnualSummary`) + prova
+na conta de teste: com orçamento de R$8.000 em `Casa` e `Casa · geral` = R$7.500, o banner do
+Dashboard mostrou **"Limite próximo: Casa R$7.500,00 de R$8.000,00 (94%)"** enquanto a Análise
+mostrava o grupo em R$15.501,44. Se o roll-up tivesse vazado pra fonte crua, o banner diria
+"Orçamento estourado" com 194%.
