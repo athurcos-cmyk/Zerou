@@ -4,6 +4,7 @@ import { logger } from 'firebase-functions';
 import crypto from 'crypto';
 import { sendWhatsAppMessage, getVerifyToken, whatsappAppSecret } from './metaClient.js';
 import { interpretMessage, type AccountOption, type CategoryOption, type MessageInterpretation } from './interpretMessage.js';
+import { selectableCategoryOptions } from './categorySelection.js';
 import { createTransactionFromMessage } from './createTransactionFromMessage.js';
 import { createCategoryFromMessage } from './createCategoryFromMessage.js';
 import { createCardPurchaseFromMessage } from './createCardPurchaseFromMessage.js';
@@ -346,11 +347,17 @@ export const whatsappWebhook = onRequest(
         .where('isActive', '==', true)
         .get();
 
-      const categories: CategoryOption[] = catsSnap.docs.map((d) => ({
-        id: d.id,
-        name: d.data().name as string,
-        type: d.data().type as 'income' | 'expense' | 'both',
-      }));
+      // Categoria-pai fica de fora: agrupamento nao recebe lancamento (ver
+      // `selectableCategoryOptions`). O snapshot ja vem filtrado por isActive, que e o que a
+      // regra pede — filha excluida nao segura o pai.
+      const categories: CategoryOption[] = selectableCategoryOptions(
+        catsSnap.docs.map((d) => ({
+          id: d.id,
+          name: d.data().name as string,
+          type: d.data().type as 'income' | 'expense' | 'both',
+          parentCategoryId: d.data().parentCategoryId as string | undefined,
+        })),
+      );
 
       // ── Load contas ativas (usadas pra casar nome na mensagem e como fallback) ──
       const acctsSnap = await db

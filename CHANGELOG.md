@@ -35,8 +35,12 @@ Feature grande, planejada com `/plan-eng-review` e executada nos passos 1–7 de
 - **Dois bugs achados pelo dono em produção e corrigidos**: o pai voltava a ser selecionável num
   recorte por tipo que escondia a filha, e um lançamento antigo apontando pra categoria que virou
   pai exibia "Selecione", como se ela tivesse sumido.
-- 496 testes verdes. ⚠️ **Falta o passo 8**: filtrar categorias-pai da lista que a Vic usa no
-  WhatsApp — sem isso ela ainda consegue gravar num pai. Exige deploy manual de function.
+- **A Vic também respeita a regra** (`[D12]`): a lista de categorias que vai pro modelo no
+  WhatsApp agora exclui as que viraram agrupamento (`selectableCategoryOptions`, cópia da regra
+  do app porque Cloud Functions não importa `src/`). O filtro entra na montagem da lista, então
+  cobre o prompt e a resolução do id de uma vez. ⚠️ **Precisa de deploy manual** — `git push`
+  não reimplanta functions.
+- 496 testes do app + 117 das functions verdes.
 
 ## 2026-07-29 (parte 9) — fix(whatsapp): pedido sobre CATEGORIA caía na mensagem de "editar lançamento"
 

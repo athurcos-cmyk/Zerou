@@ -1,7 +1,8 @@
 # Subcategorias — plano de implementação
 
-Status: **implementado, menos o filtro da Vic** (passo 8). Revisado com `/plan-eng-review` em
-2026-07-29; passos 1–7 entregues até 30/07/2026 (ver "Ordem sugerida" no fim).
+Status: **implementado** (passos 1–8). Revisado com `/plan-eng-review` em 2026-07-29; entregue
+até 30/07/2026 (ver "Ordem sugerida" no fim). ⚠️ O filtro da Vic só vale em produção depois do
+**deploy manual da function** — `git push` não reimplanta.
 Decisões tomadas pelo dono durante a revisão estão marcadas com `[D1]`…`[D13]`.
 
 ## O que é
@@ -252,6 +253,15 @@ lançamento numa categoria que o app não deixa escolher.
 
 Exige **deploy de function** (`git push` não reimplanta).
 
+**Implementado em 30/07/2026**: `functions/src/whatsapp/categorySelection.ts` —
+`selectableCategoryOptions`, cópia da regra do app (Cloud Functions não importa `src/`), com 5
+testes próprios. O filtro entra na hora de montar a lista, então cobre os dois caminhos de uma
+vez: o prompt que vai pro modelo e o `resolveOrCreateCategory` (id de pai devolvido pelo modelo
+não casa mais, e o lançamento fica sem categoria em vez de cair no pai).
+
+⚠️ **Ainda não deployado** — enquanto `whatsappWebhook` não for reimplantado, a Vic em produção
+continua oferecendo categoria-pai.
+
 ## Refatorações que vêm ANTES da feature
 
 Duas, ambas no espírito "make the change easy, then make the easy change":
@@ -353,7 +363,7 @@ Conflito: nenhum. A toca `src/components/`, B toca `src/finance/`, C toca `funct
 5. ✅ Tela nova (`[D5]`) — `/frontend-design` fica pra quando estiver tudo implementado (pedido do dono)
 6. ✅ Análise: `rollUpByParent` + expansão na lista + guarda de NaN (`[D1]`, `[D8]`) — 30/07/2026
 7. ✅ Testes de regressão (`[D9]`) + `parentCategoryId` nos testes de regra (feito no passo 3)
-8. ⬜ Vic: filtro de pais + deploy de function (`[D12]`)
+8. ✅ Vic: filtro de pais (`[D12]`) — ⚠️ **falta o deploy manual da function**
 
 ### Como o `[D9]` foi provado ao vivo (30/07/2026)
 
