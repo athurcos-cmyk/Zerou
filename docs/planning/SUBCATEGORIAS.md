@@ -1,0 +1,279 @@
+# Subcategorias — plano de implementação
+
+Status: **planejado, não implementado**. Revisado com `/plan-eng-review` em 2026-07-29.
+Decisões tomadas pelo dono durante a revisão estão marcadas com `[D1]`…`[D13]`.
+
+## O que é
+
+Categoria principal agrupa subcategorias. `Casa` → `Energia`, `Água`, `Internet`.
+A subcategoria herda **apenas a cor** do pai; nome e ícone são próprios.
+
+## A decisão que define tudo: pai é só agrupamento `[D10]`
+
+**Uma categoria que tem filhas deixa de ser selecionável.** Não dá pra lançar em `Casa`,
+só em `Energia` ou `Água`.
+
+O dono chegou nessa conclusão derrubando a recomendação inicial (pai selecionável), e o
+argumento é sólido: se `Casa` tem R$ 1.000 lançados direto e `Energia` tem R$ 500, o "% da
+Energia" não tem denominador óbvio — 50% de 1.000, ou 33% de 1.500? Dá pra resolver na
+exibição, mas vira regra que precisa ser explicada. Regra que precisa de explicação confunde.
+
+```
+SELECIONÁVEL?                         Categoria sem filhas  →  SIM
+                                      Categoria COM filhas  →  NÃO (virou grupo)
+                                      Subcategoria          →  SIM (é folha)
+```
+
+## Modelo de dados: zero migração
+
+`Category.parentCategoryId?: string` **já existe** (`src/types/contracts.ts:175`) e está morto —
+zero usos no repo. `firestore.rules` **já aceita** o campo em `validCategoryCreate` (`hasOnly`)
+e `validCategoryUpdate` (`affectedKeys`), com `validOptionalString(..., 120)` nos dois.
+
+Consequência: **nenhuma coleção nova, nenhuma migração, nenhum deploy de regra** para o campo.
+Falta só o teste — ver "Gap nas regras" abaixo.
+
+```
+Category {
+  id, workspaceId, name, type, icon, color, isDefault, isActive
+  parentCategoryId?  ← ativado agora; ausente = categoria principal
+}
+
+Casa            { id: 'expense_home',  parentCategoryId: undefined, color: '#3B82C4' }
+  └─ Energia    { id: 'cat_a1b2',      parentCategoryId: 'expense_home', color: '#3B82C4' }
+  └─ Água       { id: 'cat_c3d4',      parentCategoryId: 'expense_home', color: '#3B82C4' }
+                                                                        ↑ cor COPIADA [D4]
+```
+
+## Herança de cor: copiar ao gravar, propagar na edição `[D4]`
+
+A filha guarda a cor no próprio documento. **O lado da leitura não muda em lugar nenhum** —
+`resolveCategoryColor` e `CategoryMark` mantêm a assinatura atual, e eles são chamados de seis
+telas (Extrato, Dashboard, Análise, Resumo Anual, seletor, Contas a Receber).
+
+```
+criar filha          →  color = cor do pai (copiada no createCategory)
+editar cor do PAI    →  writeBatch: pai + TODAS as filhas, no mesmo commit atômico
+editar nome do pai   →  nenhuma propagação
+editar filha         →  nunca propaga pra cima
+```
+
+Offline: o batch é `fireWrite` (fire-and-forget), igual todo o resto — funciona na fila.
+
+**Risco aceito**: é um segundo caminho de escrita. Se alguém adicionar outra forma de mudar
+cor no futuro e esquecer de propagar, as filhas ficam pra trás. Mitigado por teste unitário.
+
+## Profundidade: travada em 1 nível `[D2]`
+
+Subcategoria não pode ter subcategoria. A trava é client-side, em três pontos:
+1. Categoria que **tem filhas** não aparece como opção de pai.
+2. Categoria não pode ser pai de si mesma.
+3. Uma **filha** não aparece como opção de pai.
+
+Sem isso, a agregação vira recursão e um ciclo (`A→B→A`) trava a tela.
+
+## Análise: roll-up no donut + expansão na lista `[D1]`
+
+**O donut mostra só categorias principais.** A expansão acontece na **lista de percentuais**,
+não no donut — tocar numa linha abre as subcategorias com o **% relativo ao pai**.
+
+Isso resolve a colisão de cor que a herança cria: se as filhas de Casa são todas azul-Casa,
+5 fatias idênticas no donut seriam indistinguíveis. Com roll-up, o donut tem 1 fatia azul e a
+lista expandida distingue pelo rótulo e ícone.
+
+```
+DONUT                       LISTA (colapsada)          LISTA (Casa expandida)
+   ╭───────╮                Casa        R$ 800  40%    Casa        R$ 800  40%  ▼
+  ╱ Casa    ╲               Alimentação R$ 600  30%      Energia   R$ 500  63%
+ │  ███████  │              Transporte  R$ 400  20%      Água      R$ 200  25%
+  ╲ (1 azul)╱               Lazer       R$ 200  10%      Casa·geral R$ 100  12%  ← [D11]
+   ╰───────╯                                           Alimentação R$ 600  30%
+                                                       ...
+   % relativo ao TOTAL  ────────────────┘                 % relativo ao PAI ──┘
+```
+
+### O roll-up NÃO pode entrar em `spendingByCategoryForMonth`
+
+Essa função tem **três** consumidores:
+
+```
+spendingByCategoryForMonth
+  ├── SearchPage.tsx:280        → donut          ← roll-up SÓ aqui
+  ├── BudgetAlertBanner.tsx:25  → orçamento      ← NÃO pode rolar (contaria dobrado)
+  └── annualSummaryCalculations.ts:57 → Resumo Anual ← NÃO pode rolar
+```
+
+Se o roll-up entrasse dentro dela, um orçamento em `Casa` passaria a incluir Energia e Água
+sozinho — que é exatamente a decisão adiada. Por isso é uma função **separada**
+(`rollUpByParent`) aplicada só na chamada do donut. Travado por teste de regressão `[D9]`.
+
+### Assinatura proposta
+
+```ts
+rollUpByParent(
+  totals: Map<string, number>,          // saída de spendingByCategoryForMonth
+  categoriesById: Map<string, Category>
+): Map<string, { totalCents: number; children: Map<string, number> }>
+```
+
+Devolve os dois níveis numa passada só — a lista renderiza colapsada e expandida sem
+recalcular.
+
+### Guarda de NaN `[D8]`
+
+`spendingByCategoryForMonth` **pode devolver valores negativos** (mês só de estorno — o
+comentário em `spendingAnalysis.ts:139` avisa). Então o total do pai pode ser **zero**
+(gastou 100 em Energia, estornou 100) mesmo sendo só a soma das filhas.
+
+`filha ÷ pai × 100` com pai zero vira `Infinity`/`NaN` e imprime "NaN%" na tela.
+
+**Regra**: total do pai zero ou negativo → esconde o %, mostra só o valor em reais.
+
+## Histórico: a linha "Casa · geral" `[D11]`
+
+Quando uma categoria que já tem lançamentos vira pai, esses lançamentos continuam apontando
+pra ela. Eles aparecem na expansão como uma linha `Casa · geral`, tratada como se fosse mais
+uma filha — então os % continuam somando 100%.
+
+**Nenhum dado é tocado.** A linha só existe se houver gasto no pai.
+
+### Recorrências e contas a pagar `[D13]`
+
+`Bill.categoryId` e `RecurringRule.categoryId` também apontam pra categoria, e
+`recordRecurringPayment` (`financeService.ts:1190`) e `payBill` (`financeService.ts:1060`)
+criam transações **usando a categoria da regra**. Uma recorrência em `Casa` continuaria
+gerando lançamento novo no pai todo mês.
+
+- **Novas**: resolvido de graça — a BillsPage usa o **mesmo** `CategoryField`, então filtrar os
+  pais do seletor impede recorrência/conta nova de apontar pra um pai.
+- **Existentes**: **o app avisa, no momento certo, só quem precisa.** Ao criar a primeira
+  subcategoria dentro de uma categoria que tem recorrência/conta apontando pra ela, aparece
+  "Casa tem 3 recorrências apontando pra ela" com atalho pra Contas a Pagar. Não bloqueia e não
+  escreve nada — a pessoa reaponta cada uma pra sub certa (as 3 de Casa vão pra 3 subs
+  diferentes, então mover em massa erraria).
+- **Os dados do próprio dono**: ele decidiu excluir e refazer as 13 recorrências na mão.
+
+### Por que NÃO apagar as recorrências de todo mundo
+
+Avaliado e **descartado** em 2026-07-29. A ideia era zerar recorrências/contas de todos os
+usuários e mandar um email explicando. Números reais na época: **9 usuários, só 3 com dados**
+(um deles o próprio dono), então **2 pessoas afetadas** — uma delas com **23 recorrências
+configuradas**, a usuária mais engajada por essa métrica.
+
+Descartado porque a premissa não se sustenta: **nada quebra**. Recorrência apontando pra um
+pai continua funcionando; a linha "geral" só aparece pra quem *também* decidir dividir aquela
+categoria específica. Apagar 45 registros pra prevenir uma linha cosmética que talvez atinja
+uma pessoa é desproporcional — e "apagamos seus dados por causa de uma atualização" é a pior
+mensagem que um app de dinheiro pode mandar. O aviso pontual cobre o mesmo caso sem destruir
+nada.
+
+## Vic / WhatsApp `[D12]`
+
+A lista de categorias vai pro modelo em `webhookHandler.ts:349`, montada de um snapshot que já
+traz todas. **Filtrar as que têm filhas** custa quase nada e impede a Vic de casar/criar
+lançamento numa categoria que o app não deixa escolher.
+
+Exige **deploy de function** (`git push` não reimplanta).
+
+## Refatorações que vêm ANTES da feature
+
+Duas, ambas no espírito "make the change easy, then make the easy change":
+
+### 1. `useCategoryActions` `[D6]`
+
+Existem **21 closures duplicadas** de criar/editar/excluir categoria em 4 arquivos
+(BillsPage sozinha tem 12, de 4 instâncias do `CategoryField`). Adicionar `parentCategoryId`
+significaria tocar nas 21 — e uma esquecida **não dá erro de compilação**, vira uma tela onde
+subcategoria falha em silêncio.
+
+### 2. `<CategoryForm>` compartilhado `[D7]`
+
+A tela nova e a folha do seletor precisam do mesmo formulário (nome, 24 cores, 122 ícones,
+campo de pai, excluir). Duplicar garante divergência — é a mesma classe de problema que criou
+as 21 closures.
+
+## Tela nova `[D5]`
+
+Rota `/app/settings/categories`, no grupo **"Sua conta"** da nav (junto de Aparência, WhatsApp,
+Segurança) — sidebar no desktop, tiles no menu mobile.
+
+Organizar categoria é tarefa de configuração, feita de vez em quando; a nav principal fica só
+com fluxo de dinheiro. **Descoberta** resolvida por um link "Gerenciar categorias" dentro do
+seletor do lançamento.
+
+**O seletor do lançamento NÃO sai** — requisito explícito do dono, pensando em quem abre o app
+pela primeira vez e cai lá sem querer.
+
+A tela explica o que são categorias e subcategorias (conteúdo e visual definidos no
+`/frontend-design`, ainda não feito).
+
+## Falha em produção — por caminho novo
+
+| Caminho | Como falha | Tem teste? | Erro visível? |
+|---|---|---|---|
+| Propagação de cor | Batch falha offline → filhas com cor velha | a escrever | Não — silencioso |
+| `rollUpByParent` | Pai com total 0 → `NaN%` | a escrever | Sim, na cara: "NaN%" |
+| Guarda de exclusão | Client-side apenas; regra não conta filhas | a escrever | Só na UI |
+| Trava de 1 nível | Ciclo `A→B→A` trava a tela | a escrever | Tela branca |
+| Filha órfã | Pai sumiu por caminho não previsto | a escrever | Cor cai pro cinza |
+| Filtro da Vic | Function não deployada → Vic escreve no pai | — | Não — silencioso |
+
+**Gap crítico**: a propagação de cor falhando é silenciosa **e** sem teste hoje. É o primeiro
+teste a escrever.
+
+## Cobertura de teste planejada
+
+26 caminhos novos, 0 cobertos hoje. Detalhe em
+`~/.gstack/projects/athurcos-cmyk-Zerou/Thurcos-main-eng-review-test-plan-*.md`.
+
+Seguindo a convenção do projeto (lógica de negócio ganha teste unitário pesado; wiring de
+página se verifica ao vivo no browser), **não** há teste RTL proativo pra `CategoriesPage`.
+
+Prioridade:
+1. `rollUpByParent` — incl. negativos, pai zero, órfã, `NO_CATEGORY`
+2. Propagação de cor — pai muda, só nome muda, sem filhas, filha nunca sobe
+3. Trava de 1 nível e guarda de exclusão
+4. **Regressão `[D9]`**: orçamento e Resumo Anual NÃO rolam pro pai
+5. `parentCategoryId` no `categoryPayload` de `tests/firestore.rules.test.ts`
+
+### Gap nas regras
+
+`categoryPayload` (`tests/firestore.rules.test.ts:113`) **não inclui `parentCategoryId`** —
+exatamente o buraco que a regra 2 do `CLAUDE.md` descreve: teste que não espelha o payload real
+deixa passar regra desatualizada. A regra aceita o campo, mas nada prova isso.
+
+## NÃO está no escopo
+
+| Item | Por quê |
+|---|---|
+| **Orçamento no pai somando filhas** | Semântica de dupla contagem precisa de decisão de produto; `Budget.id === categoryId` é 1:1 hoje |
+| **Vic criar subcategoria** | Ela só precisa parar de escrever no pai `[D12]`; criar hierarquia por mensagem é outra feature |
+| **Roll-up no Resumo Anual** | Mesmo motivo do orçamento — mudaria número que hoje está certo |
+| **Hierarquia de 3+ níveis** | `[D2]` — sem pedido real, e vira recursão + risco de ciclo |
+| **Mover recorrências em massa** | `[D13]` — as 3 de Casa iriam pra 3 subs diferentes; destino único erraria 2 de 3 |
+| **Validar nome duplicado** | TODO pré-existente (linha 26); subcategoria torna duplicata *legítima* ("Água" em Casa e em Mercado) — a decisão muda de natureza e merece rodada própria |
+| **Redesenho visual da Análise** | TODO pré-existente (linha 27); drill-down cai no meio dele, mas juntar as duas coisas dobra o diff |
+
+## Paralelização
+
+```
+Lane A: useCategoryActions → <CategoryForm>     (sequencial — mesmo módulo, components/)
+Lane B: rollUpByParent + testes                 (independente — finance/, função pura)
+Lane C: filtro de pais na Vic + deploy          (independente — functions/)
+
+Lane A e B em paralelo. C a qualquer momento.
+CategoriesPage e o seletor hierárquico dependem de A → vêm depois.
+```
+
+Conflito: nenhum. A toca `src/components/`, B toca `src/finance/`, C toca `functions/src/`.
+
+## Ordem sugerida
+
+1. Refactor: `useCategoryActions` (`[D6]`)
+2. Refactor: `<CategoryForm>` (`[D7]`)
+3. Modelo: `parentCategoryId` no create/update + propagação de cor + travas (`[D2]`, `[D3]`, `[D4]`)
+4. Seletor: hierarquia + pai não-selecionável + link "Gerenciar categorias" (`[D10]`)
+5. Tela nova (`[D5]`) — depende do `/frontend-design`
+6. Análise: `rollUpByParent` + expansão na lista + guarda de NaN (`[D1]`, `[D8]`)
+7. Testes de regressão (`[D9]`) + payload das regras
+8. Vic: filtro de pais + deploy de function (`[D12]`)
