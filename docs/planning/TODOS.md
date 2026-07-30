@@ -34,10 +34,14 @@ Itens acionáveis. Fechou? Mova para "Concluído" ou remova. Detalhe histórico 
 - [ ] **Tendência por categoria — entrada pela fatia do donut** (2026-07-21, refinamento deferido): hoje a entrada é o ícone do header (abre com a categoria destacada pré-selecionada). Seria natural também abrir a tendência tocando direto numa fatia/linha da legenda do donut na Análise. Baixa prioridade; sem custo de leitura (mesmos dados em memória).
 - [ ] Dar a mesma voz de copy às páginas legais/ajuda, se fizer sentido.
 
+- [x] **Subcategorias — feature entregue** (2026-07-30, plano em `docs/planning/SUBCATEGORIAS.md`, detalhe em `docs/history/2026-07.md`): passos 1–8 completos, function da Vic deployada. Modelo sem migração, pai como agrupamento puro, herança de cor e tipo, tela nova com tutorial, roll-up na Análise sem vazar pro orçamento/Resumo Anual.
+
+- [ ] **Subcategorias: `CategoryTrendSheet` não rola pro pai** (2026-07-30, divergência conhecida): a tendência por categoria monta a própria lista a partir do gasto cru (`spendingByCategoryAcrossMonths`), **não** da prop `categories` — filtrar a prop só apagaria o nome e deixaria o item lá como "Sem categoria". Resultado: abrir a tendência de uma categoria que virou agrupamento mostra **só o gasto direto** nela, enquanto a Análise mostra o total do grupo — mesmo nome, números diferentes. Não é regressão (nunca foi rolado). Resolver exige decidir o que "tendência de Casa" significa (provavelmente o total do grupo) e rolar mês a mês dentro do sheet, sem tocar em `spendingByCategoryAcrossMonths` de forma que vaze pros outros consumidores (`[D9]`).
+
 - [ ] **Subcategorias — itens adiados no `/plan-eng-review`** (2026-07-29, plano completo em `docs/planning/SUBCATEGORIAS.md`): a feature foi planejada e teve escopo cortado de propósito. Ficaram de fora, cada um por um motivo concreto:
   - **Orçamento no pai somando as filhas.** Hoje `Budget.id === categoryId` é 1:1. Fazer um limite em "Casa" cobrir Energia+Água exige decidir o que acontece se existir orçamento no pai E na filha ao mesmo tempo (dupla contagem). Decisão de produto, não de código. Retomar quando alguém pedir orçamento por área.
   - **Roll-up no Resumo Anual e no alerta de orçamento.** Mesmo motivo: mudaria número que hoje está certo. O roll-up existe só no donut da Análise, e há teste de regressão travando isso (`[D9]`).
-  - **Vic criar subcategoria por mensagem.** No escopo atual ela só para de escrever em categoria-pai (filtro em `webhookHandler.ts`). Criar hierarquia por WhatsApp é outra feature.
+  - **Vic criar subcategoria por mensagem.** O filtro de pais foi implementado e deployado em 2026-07-30 (`selectableCategoryOptions`, `functions/src/whatsapp/categorySelection.ts`) — ela para de escrever em categoria-pai. **Criar** hierarquia por WhatsApp continua fora.
   - *(Este item saiu da lista de adiados em 2026-07-29: o aviso ao dividir categoria com recorrência VOLTOU pro escopo. Junto veio a decisão de **não** apagar recorrências dos usuários — ver "Por que NÃO apagar" em `SUBCATEGORIAS.md`.)*
 
 ### Produto / UX (ação pendente do dono)

@@ -25,6 +25,21 @@ Rodar só os unitários estáveis: `npx vitest run src`.
 
 Sessão de auditoria completa em `granativa.com.br` com a conta de teste: ciclo de vida de transação (criar/editar/excluir + saldo), categoria nova, conta (multi-conta, transferência, bloqueio de exclusão com histórico), compromisso, recorrência (criar + registrar pagamento), cartão (compra simples/parcelada, pagamento de fatura, antecipação de parcelas, exclusão de compra antecipada), e Comprometido/Disponível em vários cenários de payday. 4 bugs reais encontrados e corrigidos — ver `../history/2026-07.md`. Testado em viewport desktop/tablet/mobile no navegador, **não em celular físico** — isso continua pendente abaixo.
 
+## QA manual de subcategorias (feita pelo dono, 2026-07-30)
+
+Ciclo completo em produção, na conta dele: lançar transação numa categoria comum → criar
+subcategoria nela → lançar na subcategoria → **excluir a subcategoria** → conferir a Análise →
+excluir transação. Veredito: *"a Análise ficou do jeito que queria, salva o que precisa salvar"*.
+
+Confirmou também o comportamento de **exclusão lógica** de categoria (ícone e nome continuam no
+lançamento antigo e na tela de edição), que é intencional — ver a regra em `../design/DESIGN.md` e
+o detalhe em `../history/2026-07.md`.
+
+Antes disso, os dois bugs que o próprio dono achou em produção (pai selecionável num recorte por
+tipo; categoria que virou pai exibindo "Selecione" num lançamento antigo) valem como lembrete:
+**a verificação que pega esse tipo de coisa é usar o app com dado real**, não o teste unitário —
+os dois passavam verdes com o bug no ar.
+
 ## QA manual pendente (no celular físico)
 
 Fluxos a validar fim a fim num aparelho real: cadastro, login (email + Google), onboarding (questionário), **espaço do casal** (convite, divisão flexível, acerto) e **cofrinho** (guardar com e sem desconto de conta pessoal). Ver `../planning/TODOS.md`.

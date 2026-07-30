@@ -35,6 +35,11 @@ Feature grande, planejada com `/plan-eng-review` e executada nos passos 1–7 de
 - **Dois bugs achados pelo dono em produção e corrigidos**: o pai voltava a ser selecionável num
   recorte por tipo que escondia a filha, e um lançamento antigo apontando pra categoria que virou
   pai exibia "Selecione", como se ela tivesse sumido.
+- **Excluir categoria continua sendo exclusão lógica** (`isActive: false`, documento fica) —
+  comportamento antigo, confirmado nos testes do dono e agora documentado: ela some dos seletores,
+  mas o ícone, a cor e o nome nos lançamentos antigos ficam pra sempre; excluir a única
+  subcategoria devolve o pai pra lista; e o gasto de uma subcategoria excluída continua somando no
+  pai na Análise. O histórico não muda de forma quando a pessoa reorganiza o presente.
 - **A Vic também respeita a regra** (`[D12]`): a lista de categorias que vai pro modelo no
   WhatsApp agora exclui as que viraram agrupamento (`selectableCategoryOptions`, cópia da regra
   do app porque Cloud Functions não importa `src/`). O filtro entra na montagem da lista, então

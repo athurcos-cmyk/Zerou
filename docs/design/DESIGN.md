@@ -36,7 +36,8 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
 |---|---|
 | `BottomSheet` | Folha que sobe de baixo (portal, ESC, backdrop, **swipe-to-dismiss** desde 2026-07-18 — drag só no grabber/header via `.sheet-drag-zone`, nunca no corpo). Base de todos os pickers/modais, **inclusive o menu mobile** (`.menu-sheet` no `AppShell`). |
 | `SelectField` | Campo que abre sheet com lista de opções + ícones. Substitui `<select>`. |
-| `CategoryField` | Sheet de categorias com ícone+cor, criar/editar/excluir. |
+| `CategoryField` | Sheet de categorias com ícone+cor, criar/editar/excluir. Desde 30/07/2026 mostra a **hierarquia**: subcategoria recuada sob a principal, e **categoria com subcategoria vira só cabeçalho de grupo, não selecionável**. Quem já foi escolhida continua sendo *exibida* mesmo que tenha virado agrupamento — não oferecer é diferente de sumir. |
+| `CategoryForm` | Formulário de categoria (nome, 24 cores, 122 ícones, campo "Dentro de", excluir), compartilhado pelo `CategoryField` e pela tela `/app/settings/categories`. Com pai escolhido, o seletor de cor **some** (a cor é herdada) — controle sem efeito é interface que mente. |
 | `ConfirmDialog` (`useConfirm`) | Confirmação destrutiva em sheet — nunca `window.confirm`. |
 | `EmptyState` | Estado vazio com ilustração SVG própria. 6 variantes: `transactions`, `cards`, `wallet`, `shared`, `goals`, `bills`. Sempre usar uma ilustração existente ou criar uma nova nesse padrão — nunca cair pra texto seco sem ilustração num card que tem vizinho ilustrado (inconsistência perceptível lado a lado). |
 | `categoryIcons` / `palette` | **122 ícones em 11 grupos temáticos** (`categoryIconGroups` — fonte única; o mapa plano `categoryIcons` é derivado dela) + **24 cores** (`categoryColors`, ordenadas pelo círculo cromático e fechando nos neutros). **Nunca renomeie nem remova chave de ícone**: ela fica gravada em `Category.icon`, e mudá-la apaga o ícone de categorias existentes. A paleta do seletor pode ser reordenada à vontade — quem exige ordem congelada é `hashPaletteColors` (privada, `palette.ts`), usada só pelo sorteio de `resolveCategoryColor`: mexer nela repinta categoria sem cor escolhida. |
@@ -74,10 +75,29 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
   adivinhar que dava pra arrastar de lado, aposta ruim numa tela que se abre raramente. Regra:
   **quando a escolha não cabe à vista, dê a ela a própria folha** em vez de comprimir num
   contêiner rolável; e rótulo de grupo `sticky` responde "onde eu estou" durante a rolagem.
+- **Detalhe de um total agrupado abre na LISTA, nunca no gráfico** (Análise, 30/07/2026): o donut
+  mostra só categorias principais (subcategoria soma no pai); tocar numa **linha da lista** expande
+  as subcategorias com o % relativo ao pai, tocar no donut segue só destacando a fatia. Decisão do
+  dono, e o motivo se generaliza: fatia de gráfico é alvo pequeno e sem espaço pra hierarquia — a
+  lista tem linha inteira, indentação e lugar pro segundo nível. Acordeão de um por vez (abrir
+  vários empurra o resto pra fora da tela no celular) e **a seta é o único aviso de que a linha
+  abre** — sem ela ninguém descobre.
+- **Percentual precisa de guarda quando o divisor pode ser zero** (`[D8]`): o total de uma
+  categoria pode ser zero ou negativo num mês só de estorno, e `filha ÷ pai × 100` vira "NaN%" na
+  cara da pessoa. Total ≤ 0 → esconde o %, mostra só o valor.
+- **Tutorial de tela é um `SlideTour`, e o texto fixo encolhe quando ele existe** (Categorias,
+  30/07/2026): tour abre sozinho na primeira visita (depois do tour global, pra não empilhar dois
+  modais) e volta por um botão discreto. Se a tela também tem um bloco explicativo permanente, ele
+  vira **resumo** — manter os dois completos faz a pessoa ler a mesma explicação duas vezes
+  seguidas. Priorize no tour o que muda o comportamento de **outra** tela; é o que ninguém adivinha.
 - **Excluir dado que a pessoa criou pede confirmação que diz a consequência**, não só "tem
   certeza?". Categoria explicita que sai da lista, que lançamentos antigos ficam como estão e
   que **não dá pra desfazer** — a exclusão é lógica (`isActive: false`), mas não há UI de
   restauração e `ensureDefaultCategories` não recria (o documento continua existindo).
+  Consequência boa que cai disso, e que é regra: **o que já foi lançado não muda de aparência
+  quando a pessoa reorganiza o presente.** Só os *seletores* filtram por `isActive`; quem *exibe*
+  lê a lista completa, então ícone, cor e nome do lançamento antigo continuam certos pra sempre —
+  inclusive na Análise, onde o gasto de uma subcategoria excluída segue somando no pai.
 - **Cabeçalho do dia mostra SALDO, não um total de fluxo** (`.day-group-total` +
   `balanceByDayEnd`, 2026-07-29): o saldo consolidado no fim daquele dia — o mesmo número do
   "Saldo total" do Dashboard, voltando no tempo. **Por que não "gasto"**: resumo de fluxo sempre

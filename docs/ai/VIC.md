@@ -17,6 +17,8 @@ Vic é a assistente de IA do Granativa. Ela responde perguntas sobre os gastos d
 | `functions/src/ai/deepseekClient.ts` | Cliente HTTP para API DeepSeek (`deepseek-v4-flash`, modo não-thinking — thinking desligado por padrão, não precisa de parâmetro extra). Timeout 45s, retry único para 429/503, validação de API key. |
 | `functions/src/ai/buildFinancialContext.ts` | Agrega dados do workspace (transações 90 dias, bills, contas, budgets, goals, perfil) em string de texto ≤ 5000 chars para o prompt. Lê também o objetivo/desafio do onboarding e o espaço do casal. Usa BRT (`nowInBRT()`), conta `expense` + `card_purchase`, trata null/undefined/vazio defensivamente. Comprometido sem corte por data desde 2026-07-27 (ver seção COMPROMETIDO). |
 | `functions/src/ai/onboardingLabels.ts` | Espelha `src/onboarding/onboardingOptions.tsx` (id → label legível, sem ícone) — Cloud Functions não importa `src/` do app cliente. Usado por `buildFinancialContext.ts` pra traduzir `onboardingGoal`/`onboardingChallenge` num texto natural. Manter em sincronia manualmente. |
+| `functions/src/whatsapp/categorySelection.ts` | `selectableCategoryOptions` — tira as **categorias-pai** (que têm subcategoria ativa) da lista que vai pro modelo. Cópia da regra do app (`selectableCategories`, `src/finance/categoryHierarchy.ts`), porque Cloud Functions não importa `src/`; **manter em sincronia manualmente**, com 5 testes próprios travando o comportamento. Aplicado na montagem da lista em `webhookHandler.ts`, o que cobre os dois caminhos: o prompt e o `resolveOrCreateCategory`. Ver `docs/planning/SUBCATEGORIAS.md` `[D12]`. |
+| `functions/src/whatsapp/categoryPalette.ts` | Espelho dos **122 ícones e 24 cores** do app (`src/components/categoryIcons.tsx`, `src/theme/palette.ts`) — usado no prompt, na validação e na gravação de categoria criada por mensagem. Trava anti-drift: `src/theme/categoryPaletteSync.test.ts`. |
 | `functions/src/ai/verifyWorkspaceMembership.ts` | Verifica `workspaces/{id}/members/{uid}` com `status == 'active'`. |
 | `functions/src/ai/financialAssistant.ts` | Cloud Function `onCall` principal. Fluxo: auth → membership → rate limit pre-check → contexto → DeepSeek → rate limit increment. |
 | `functions/src/ai/buildFinancialContext.test.ts` | 26 testes: gastos com categoria, card_purchase, fallback string vazia, deletados, bills, null dueDate, workspace vazio, payday, missing profile, budgets, goals, trend, couple goals, couple sem workspace, objetivo/desafio declarado (label legível + id desconhecido ignorado), + 5 sobre o cutoff dinâmico (2026-07-22): receita futura estende o Comprometido além de 30 dias, conta depois da receita não entra, modo conservador respeita `committedWindowDays` do perfil, fatura aberta além do cutoff não entra, fatura fechada sempre entra. |
@@ -152,6 +154,24 @@ O cliente (`AssistantPage.tsx`) converte `**negrito**` → `<strong>` e `*itáli
 | 2026-07-22 | Vic podia relatar "Comprometido" diferente do Dashboard | `buildFinancialContext.ts` calculava a janela do COMPROMETIDO com `now + 30 dias` fixo, hardcoded, ignorando o `AvailableMode` (conservador/até o recebimento) e a receita futura já lançada que o Dashboard já considera via `resolveCommittedCutoff` | Portado `resolveCommittedCutoff`/`findNextIncomeDate`/`nextPaydayFrom` pra `functions/src/shared/committedCutoff.ts` (mesmo padrão de `accountEffects.ts`) e usado no lugar da janela fixa — verificado ao vivo (Vic e Dashboard reportando o mesmo valor pro mesmo workspace). Planejado com `/plan-eng-review`. Deployado (`functions:billing:financialAssistantChat`) |
 | 2026-07-25 | Vic (app e WhatsApp) parou de responder a QUALQUER mensagem — silenciosamente, sem erro visível pro usuário | A DeepSeek descontinuou o modelo `deepseek-chat` em 2026-07-24 15:59 UTC (`"The supported API model names are deepseek-v4-pro or deepseek-v4-flash"`) — toda chamada em `callDeepSeek()` passou a retornar erro 400. Achado só porque o dono reportou a Vic do WhatsApp não respondendo (investigação revelou que a causa real não tinha nada a ver com o motivo suspeitado — ver `docs/whatsapp/WHATSAPP.md` 2026-07-25) | `deepseekClient.ts`: `model: 'deepseek-chat'` → `'deepseek-v4-flash'` (thinking mode desligado por padrão, comportamento equivalente ao antigo). Deployado (`whatsappWebhook` + `financialAssistantChat`) |
 | 2026-07-25 | Log de erro escondia a mensagem real do erro (achado durante a investigação acima) | `logger.error('label', { message: err.message })` do `firebase-functions`: ao montar o log estruturado, `entryFromArgs()` SEMPRE sobrescreve `message` com um stack trace sintético quando a severidade é ERROR e nenhum argumento é uma instância de `Error` — o `message` do objeto passado é silenciosamente descartado. Sem isso, o erro real do DeepSeek acima ficou invisível nos logs até a correção | `webhookHandler.ts`/`metaClient.ts`: mensagem real movida pra dentro da própria string (`` `whatsapp_webhook_error: ${err.message}` ``) em vez de um campo `message` do objeto — sobrevive ao comportamento da lib |
+
+### Categorias: o que a Vic pode e não pode escolher (2026-07-30)
+
+Com subcategorias, a Vic do WhatsApp passou a respeitar a mesma regra do app: **categoria que tem
+subcategoria ativa é só agrupamento e não recebe lançamento** (`[D10]`). Sem o filtro ela gravaria
+num destino que o app não deixa escolher, e o gasto ficaria na linha "· geral" do pai sem ninguém
+ter pedido.
+
+- **Onde**: `selectableCategoryOptions` na montagem da lista (`webhookHandler.ts`), antes do
+  prompt. Se o modelo devolver o id de um pai mesmo assim, ele não casa e o lançamento fica **sem
+  categoria** — nunca no pai.
+- **Risco de drift**: é uma cópia manual da regra do app. Este é o **quinto** ponto de sincronia da
+  Vic (junto de ícones, cores, `onboardingLabels` e `committedCutoff`) — mudar
+  `selectableCategories` em `src/` sem mexer aqui volta a soltar a Vic no pai, em silêncio.
+- **Fora de escopo**: criar subcategoria por mensagem. A Vic continua criando só categoria
+  principal.
+- **Deploy**: feito em 2026-07-30 (`--only functions:billing:whatsappWebhook`), com o
+  `--no-cpu-throttling` reaplicado depois.
 
 ### Comportamentos esperados (não são bugs)
 
