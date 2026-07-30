@@ -2,6 +2,16 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-29 (parte 8) — fix(vic): a Vic do WhatsApp estava presa nos 36 ícones e 12 cores antigos
+
+Pergunta do dono depois das partes 6 e 7 ("veja como a Vic responde a isso, pois sei que ela cria categorias também") — e era um **quarto ponto de sincronia** que ninguém tinha lembrado.
+
+- **O problema**: Cloud Functions não importa `src/` do app, então `functions/src/whatsapp/categoryPalette.ts` é uma cópia manual dos ícones e cores. Ela ficou em **36 ícones / 12 cores** enquanto o app foi pra 122 / 24. A cópia alimenta **três** pontos do caminho da Vic: o prompt que lista as chaves válidas (`interpretMessage`), a validação da resposta do modelo, e a gravação (`createCategoryFromMessage`). Resultado: categoria criada pela Vic saía com o conjunto antigo — **em silêncio**, porque nada falha, só degrada. Mesma família dos incidentes de enum do `CLAUDE.md`.
+- **Espelho atualizado** pros 122 ícones e 24 cores, gerado a partir dos arquivos do app (não digitado à mão). Custo medido antes de decidir: a lista de ícones vai no prompt de toda mensagem do WhatsApp, +671 chars (~168 tokens) — centavos por ano na DeepSeek, então valeu incluir tudo em vez de curar um subconjunto.
+- **Trava anti-drift nova**: `src/theme/categoryPaletteSync.test.ts` compara o espelho com a fonte do app (ícones, cores e cor padrão, ordem inclusa — a ordem das cores importa porque a cor de categoria nova sai por rotação no índice) e roda no `npm test`. **Verificado que falha de verdade**: removi uma chave do espelho e o teste quebrou.
+- **A Vic do app não é afetada** — ela é 100% consultiva (regra 15 do prompt: não cria, edita nem exclui nada). Só o WhatsApp cria categoria.
+- ⚠️ **Pendente de deploy**: `git push` não reimplanta Cloud Functions. Enquanto `whatsappWebhook` não for reimplantado, a Vic continua com o conjunto antigo em produção.
+
 ## 2026-07-29 (parte 7) — design(categorias): paleta em ordem de cor + folha própria pra escolher ícone
 
 Dois acertos pedidos pelo dono depois de ver a parte 6 no celular.
