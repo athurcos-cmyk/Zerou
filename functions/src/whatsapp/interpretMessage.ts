@@ -31,6 +31,7 @@ export type MessageIntent =
  */
 export type OutOfScopeScreen =
   | 'transacoes'
+  | 'categorias'
   | 'contas'
   | 'contas_a_pagar'
   | 'contas_a_receber'
@@ -85,9 +86,9 @@ Retorne SOMENTE um JSON com este formato:
     dinheiro), ou null se a mensagem nao citar conta nenhuma ou nenhuma bater com confianca,
   "sourceAccountId": id da conta EXISTENTE de origem, so pra intent transfer, ou null se nao identificavel,
   "destinationAccountId": id da conta EXISTENTE de destino, so pra intent transfer, ou null se nao identificavel,
-  "suggestedScreen": "transacoes" | "contas" | "contas_a_pagar" | "contas_a_receber" | "cartoes" | "metas" |
-    "analise" | "assistente" | "geral" — SO preenchido quando intent="out_of_scope" (tela do app que resolve
-    o pedido), null nos outros casos,
+  "suggestedScreen": "transacoes" | "categorias" | "contas" | "contas_a_pagar" | "contas_a_receber" |
+    "cartoes" | "metas" | "analise" | "assistente" | "geral" — SO preenchido quando intent="out_of_scope"
+    (tela do app que resolve o pedido), null nos outros casos,
   "occurredOn": "YYYY-MM-DD" da data em que o gasto/receita/compra aconteceu, SE a mensagem citar uma data;
     null se nao citar nenhuma (o app vai usar hoje),
   "confidence": "high" | "low"
@@ -118,7 +119,12 @@ out_of_scope (ver abaixo), nunca force numa das 6 so porque a mensagem tem valor
   ou da question. Preencha "suggestedScreen" com a tela do app mais provavel pra resolver o pedido. Casos
   comuns (lista NAO exaustiva — use o espirito da regra pra casos parecidos que nao estao aqui):
   * Editar, excluir, apagar ou corrigir uma transacao ja lancada ("exclui essa transacao", "corrige o valor
-    pra 50", "muda a categoria daquela despesa") -> suggestedScreen "transacoes".
+    pra 50", "muda a categoria daquela despesa") -> suggestedScreen "transacoes". Atencao: aqui o pedido e
+    sobre UM LANCAMENTO; se for sobre a CATEGORIA em si, use "categorias" (proximo item).
+  * Editar, renomear, mudar cor/icone ou EXCLUIR uma categoria — a categoria em si, nao a categoria de um
+    lancamento ("exclui a categoria Lazer", "renomeia a categoria Mercado pra Supermercado", "muda a cor da
+    categoria Saude", "apaga essa categoria que nao uso") -> suggestedScreen "categorias". CRIAR categoria
+    NAO cai aqui: e o intent create_category, que a Vic executa.
   * Editar, excluir ou renomear uma conta bancaria/carteira ja cadastrada ("renomeia minha conta nubank",
     "apaga a conta poupanca que nao uso mais") -> suggestedScreen "contas".
   * Criar, editar ou excluir conta a pagar, recorrencia, conta fixa ou assinatura recorrente — compromisso
@@ -289,8 +295,11 @@ export async function interpretMessage(
       destinationAccountId = null;
     }
 
+    // TERCEIRO ponto de sincronia do enum `OutOfScopeScreen`: o tipo (acima), esta lista de
+    // validação e a linha do schema no prompt. O `switch` de `outOfScopeMessage` é barrado pelo
+    // compilador, mas estes dois não — valor novo esquecido aqui cai calado em 'geral'.
     const validScreens: OutOfScopeScreen[] = [
-      'transacoes', 'contas', 'contas_a_pagar', 'contas_a_receber', 'cartoes', 'metas', 'analise', 'assistente', 'geral',
+      'transacoes', 'categorias', 'contas', 'contas_a_pagar', 'contas_a_receber', 'cartoes', 'metas', 'analise', 'assistente', 'geral',
     ];
     const suggestedScreen: OutOfScopeScreen | null = intent === 'out_of_scope'
       ? (validScreens.includes(parsed.suggestedScreen as OutOfScopeScreen) ? (parsed.suggestedScreen as OutOfScopeScreen) : 'geral')

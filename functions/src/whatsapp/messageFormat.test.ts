@@ -88,6 +88,7 @@ describe('pendingChoicePrompt', () => {
 describe('outOfScopeMessage', () => {
   it('aponta a aba certa por tela', () => {
     expect(outOfScopeMessage('transacoes')).toContain('*Transações*');
+    expect(outOfScopeMessage('categorias')).toContain('*Editar categorias*');
     expect(outOfScopeMessage('contas')).toContain('*Contas*');
     expect(outOfScopeMessage('contas_a_pagar')).toContain('*Contas a Pagar*');
     expect(outOfScopeMessage('contas_a_receber')).toContain('*Contas a Receber*');

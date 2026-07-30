@@ -110,6 +110,13 @@ export function outOfScopeMessage(screen: OutOfScopeScreen): string {
   switch (screen) {
     case 'transacoes':
       return '✋ Editar, corrigir ou excluir um lançamento que você já registrou é melhor fazer direto pelo app, na aba *Transações* — evita eu mexer na coisa errada sem querer.\n\nPor aqui eu só registro lançamentos novos (gasto, receita, transferência, compra no cartão).';
+    // Único caso que precisa ensinar o CAMINHO, não só a aba: não existe tela "Categorias" no
+    // app — editar/excluir categoria vive dentro do seletor de categoria (`CategoryField`), atrás
+    // do botão "Editar categorias". Mandar só "vai em Transações" faria a pessoa chegar lá e não
+    // achar nada sobre categoria (era o que acontecia antes de 2026-07-29, quando pedido de
+    // categoria caía no texto de "editar um lançamento").
+    case 'categorias':
+      return '🏷️ Renomear, mudar a cor/ícone ou excluir uma categoria é pelo app: abra um lançamento em *Transações*, toque no campo *Categoria* e depois em *Editar categorias*.\n\nCriar categoria nova eu faço por aqui, é só pedir: "cria uma categoria chamada Farmácia". 💛';
     case 'contas':
       return '🏦 Criar, editar ou excluir uma conta (banco, carteira, dinheiro) é melhor fazer direto pelo app, na aba *Contas*.';
     case 'contas_a_pagar':

@@ -2,6 +2,16 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-29 (parte 9) — fix(whatsapp): pedido sobre CATEGORIA caía na mensagem de "editar lançamento"
+
+Achado nos logs do deploy da parte 8: uma mensagem real do dono, `"Vic exclua uma categoria pra mim"`, foi classificada `out_of_scope` com `suggestedScreen: "transacoes"` — e a resposta falava de **"editar, corrigir ou excluir um lançamento"**. Destino certo, texto errado.
+
+- **Causa**: o enum `OutOfScopeScreen` não tinha valor pra categoria, e o prompt não tinha regra pra esse pedido. O modelo chutou `transacoes` (o mais próximo) e caiu num texto que responde outra coisa.
+- **Novo valor `categorias`**, sincronizado nos **três** pontos que o compilador não cobre sozinho: o tipo, a lista `validScreens` (valor fora dela cai calado em `geral`) e a linha do schema no prompt. Mais uma regra de classificação distinguindo "mudar a categoria de um lançamento" (→ `transacoes`) de "mexer na categoria em si" (→ `categorias`).
+- **A mensagem ensina o caminho, não só a aba** — este é o único caso que precisa disso, porque **não existe tela "Categorias"**: editar/excluir vive dentro do seletor (`CategoryField`), atrás do botão "Editar categorias". Mandar só "vai em Transações" faria a pessoa chegar lá e não achar nada. O texto também lembra que **criar** categoria a Vic faz por mensagem.
+- **Trava verificada**: o `switch` de `outOfScopeMessage` não tem `default`, então valor novo sem mensagem quebra o build — confirmado removendo o `case` e vendo o `tsc` falhar (TS2366).
+- 112 testes das functions + 452 do app verdes. Deployado.
+
 ## 2026-07-29 (parte 8) — fix(vic): a Vic do WhatsApp estava presa nos 36 ícones e 12 cores antigos
 
 Pergunta do dono depois das partes 6 e 7 ("veja como a Vic responde a isso, pois sei que ela cria categorias também") — e era um **quarto ponto de sincronia** que ninguém tinha lembrado.
