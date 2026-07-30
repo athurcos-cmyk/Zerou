@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { FolderTree, Plus } from 'lucide-react';
+import { FolderTree, HelpCircle, Plus } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useFinanceContext } from '../finance/FinanceDataContext';
 import { BottomSheet } from '../components/BottomSheet';
@@ -9,6 +9,8 @@ import { useConfirm } from '../components/ConfirmDialog';
 import { CategoryForm, type CategoryFormValues } from '../components/CategoryForm';
 import { CategoryIcon, resolveCategoryColor } from '../components/categoryIcons';
 import { useCategoryActions } from '../finance/useCategoryActions';
+import { CategoriesTour } from '../onboarding/CategoriesTour';
+import { useCategoriesTour } from '../onboarding/categoriesTour.store';
 import {
   canDeleteCategory,
   childrenOf,
@@ -38,6 +40,7 @@ export function CategoriesSettingsPage() {
   // Atalho "+" na linha da principal: abre o formulário com o pai já escolhido.
   const [creatingUnderId, setCreatingUnderId] = useState<string | null>(null);
   const categoryActions = useCategoryActions();
+  const openTour = useCategoriesTour((state) => state.openTour);
 
   const active = useMemo(
     () => finance.categories.filter((cat) => cat.isActive !== false),
@@ -153,17 +156,18 @@ export function CategoriesSettingsPage() {
         <span className="category-explainer-icon" aria-hidden="true">
           <FolderTree size={20} />
         </span>
+        {/* Resumo curto — o detalhe vive no tutorial, que abre sozinho na primeira visita. Repetir
+            tudo aqui faria a pessoa ler a mesma explicação duas vezes seguidas. */}
         <div>
           <strong>Categoria é o rótulo do seu gasto.</strong>
           <p>
-            Uma <strong>subcategoria</strong> detalha uma principal: dentro de <em>Casa</em> você pode ter
-            <em> Energia</em> e <em>Água</em>. Ela herda a cor da principal, e na Análise o gasto das
-            subcategorias aparece somado na fatia da principal — você abre a linha pra ver a divisão.
+            Uma <strong>subcategoria</strong> detalha uma principal — <em>Energia</em> e <em>Água</em>{' '}
+            dentro de <em>Casa</em> — e herda a cor dela. Categoria com subcategorias vira só um
+            agrupamento: o lançamento passa a ser feito direto na subcategoria.
           </p>
-          <p className="text-secondary">
-            Uma categoria com subcategorias vira só um agrupamento: o lançamento passa a ser feito
-            direto na subcategoria.
-          </p>
+          <button className="button button--subtle category-explainer-action" type="button" onClick={openTour}>
+            <HelpCircle size={15} aria-hidden="true" /> Como funciona
+          </button>
         </div>
       </article>
 
@@ -255,6 +259,7 @@ export function CategoriesSettingsPage() {
         />
       </BottomSheet>
       {confirmDialog}
+      <CategoriesTour />
     </section>
   );
 }

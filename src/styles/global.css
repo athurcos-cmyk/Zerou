@@ -6148,6 +6148,14 @@ button.category-group-header:hover {
   font-weight: 600;
 }
 
+/* Reabrir o tutorial é ação secundária: menor que os botões da tela, pra não competir com
+   "Nova" nem com as linhas da lista. */
+.category-explainer-action {
+  margin-top: 0.7rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+}
+
 /* Subcategoria recuada, com um fio ligando ela à principal — a indentação sozinha se perde
    quando o nome da principal é curto e o da filha é longo. */
 .category-child-row {

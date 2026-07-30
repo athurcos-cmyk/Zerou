@@ -37,6 +37,7 @@ Use este arquivo como mapa antes de abrir documentos grandes. Regra: leia o meno
 | Telas autenticadas | `src/pages/` |
 | Shell + nav inferior/FAB | `src/layout/AppShell.tsx` |
 | Onboarding (questionário) | `src/onboarding/OnboardingPage.tsx`, opções compartilhadas em `src/onboarding/onboardingOptions.tsx`. Objetivo/desafio editável depois em `/app/settings/onboarding` (`src/settings/OnboardingAnswersSettingsPage.tsx`) — alimenta a Vic via `functions/src/ai/onboardingLabels.ts` |
+| Tutoriais de tela (carrossel) | `src/onboarding/SlideTour.tsx` é o carrossel genérico; cada tela tem um par componente+store: `WelcomeTour` (global), `AnalysisTour`, `CategoriesTour`. O "já viu" mora no `localStorage` (`zerou.*TourSeen`), não no Firestore — é estado por aparelho. Tour de tela só abre depois do global, pra não empilhar dois modais |
 | Componentes-base de UX | `src/components/` (`BottomSheet`, `SelectField`, `CategoryField`, `ConfirmDialog`, `EmptyState`, `LoadingState` — placeholder "carregando" pra nunca confundir com EmptyState de "vazio de verdade", ver `docs/history/2026-07.md`) |
 | Ícones + cores de categoria | `src/components/categoryIcons.tsx`, `src/theme/palette.ts` |
 | Serviço financeiro | `src/finance/financeService.ts` |

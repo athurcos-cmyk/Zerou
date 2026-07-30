@@ -38,8 +38,13 @@ Feature grande, planejada com `/plan-eng-review` e executada nos passos 1–7 de
 - **A Vic também respeita a regra** (`[D12]`): a lista de categorias que vai pro modelo no
   WhatsApp agora exclui as que viraram agrupamento (`selectableCategoryOptions`, cópia da regra
   do app porque Cloud Functions não importa `src/`). O filtro entra na montagem da lista, então
-  cobre o prompt e a resolução do id de uma vez. ⚠️ **Precisa de deploy manual** — `git push`
-  não reimplanta functions.
+  cobre o prompt e a resolução do id de uma vez. **Deployado** (`whatsappWebhook`), com o
+  `--no-cpu-throttling` reaplicado depois, como manda o `docs/RUNBOOK.md`.
+- **Tutorial ao entrar na tela** (pedido do dono): 5 slides no `SlideTour` — o que é categoria,
+  o que é subcategoria, **o que muda quando ela vira agrupamento** (o único efeito da tela que
+  aparece em OUTRA tela: a principal some da lista na hora de lançar), como isso aparece na
+  Análise, e onde ficam os dois botões de criar. Abre sozinho na primeira visita e volta pelo
+  botão "Como funciona". O texto fixo do topo encolheu pra não dizer a mesma coisa duas vezes.
 - 496 testes do app + 117 das functions verdes.
 
 ## 2026-07-29 (parte 9) — fix(whatsapp): pedido sobre CATEGORIA caía na mensagem de "editar lançamento"
