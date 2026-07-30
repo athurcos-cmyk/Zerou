@@ -6174,3 +6174,38 @@ button.category-group-header:hover {
   height: 1px;
   background: var(--border-subtle);
 }
+
+/* Atalho "+ subcategoria" na linha da categoria principal. Fica AO LADO em flex, nunca
+   empilhado por cima — dois absolutos no mesmo canto já causaram colisão neste código. */
+.category-parent-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.category-parent-row > .list-row {
+  flex: 1;
+  min-width: 0;
+}
+
+.category-add-child {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  flex: 0 0 auto;
+  border: 1px dashed var(--border-default);
+  border-radius: 0.7rem;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color var(--duration-fast) ease, border-color var(--duration-fast) ease;
+}
+
+.category-add-child:hover {
+  color: var(--action-primary);
+  border-color: var(--action-primary);
+  border-style: solid;
+}

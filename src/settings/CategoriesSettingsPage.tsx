@@ -35,6 +35,8 @@ export function CategoriesSettingsPage() {
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Atalho "+" na linha da principal: abre o formulário com o pai já escolhido.
+  const [creatingUnderId, setCreatingUnderId] = useState<string | null>(null);
   const categoryActions = useCategoryActions();
 
   const active = useMemo(
@@ -56,11 +58,19 @@ export function CategoriesSettingsPage() {
 
   function startCreate() {
     setEditingId(null);
+    setCreatingUnderId(null);
+    setFormOpen(true);
+  }
+
+  function startCreateUnder(parentId: string) {
+    setEditingId(null);
+    setCreatingUnderId(parentId);
     setFormOpen(true);
   }
 
   function startEdit(cat: Category) {
     setEditingId(cat.id);
+    setCreatingUnderId(null);
     setFormOpen(true);
   }
 
@@ -171,19 +181,33 @@ export function CategoriesSettingsPage() {
           <div className="item-list item-list--grouped">
             {groups.map(({ parent, children }) => (
               <section className="day-group" key={parent.id}>
-                <button className="list-row list-row--with-icon list-row--tap" type="button" onClick={() => startEdit(parent)}>
-                  <span className="category-mark" style={{ background: resolveCategoryColor(parent) }}>
-                    <CategoryIcon icon={parent.icon} size={16} />
-                  </span>
-                  <div className="list-row-body">
-                    <strong>{parent.name}</strong>
-                    <span className="text-secondary">
-                      {children.length > 0
-                        ? `${children.length} subcategoria${children.length > 1 ? 's' : ''} · agrupamento`
-                        : 'Categoria principal'}
+                {/* O "+" fica AO LADO da linha, em flex — não empilhado por cima dela. Dois
+                    elementos absolutos disputando o mesmo canto foi exatamente o bug de
+                    sobreposição lápis/lixeira que este código já teve. */}
+                <div className="category-parent-row">
+                  <button className="list-row list-row--with-icon list-row--tap" type="button" onClick={() => startEdit(parent)}>
+                    <span className="category-mark" style={{ background: resolveCategoryColor(parent) }}>
+                      <CategoryIcon icon={parent.icon} size={16} />
                     </span>
-                  </div>
-                </button>
+                    <div className="list-row-body">
+                      <strong>{parent.name}</strong>
+                      <span className="text-secondary">
+                        {children.length > 0
+                          ? `${children.length} subcategoria${children.length > 1 ? 's' : ''} · agrupamento`
+                          : 'Categoria principal'}
+                      </span>
+                    </div>
+                  </button>
+                  <button
+                    className="category-add-child"
+                    type="button"
+                    aria-label={`Nova subcategoria em ${parent.name}`}
+                    title={`Nova subcategoria em ${parent.name}`}
+                    onClick={() => startCreateUnder(parent.id)}
+                  >
+                    <Plus size={16} aria-hidden="true" />
+                  </button>
+                </div>
                 {children.map((child) => (
                   <button
                     className="list-row list-row--with-icon list-row--tap category-child-row"
@@ -213,11 +237,12 @@ export function CategoriesSettingsPage() {
         subtitle={profile?.defaultWorkspaceId ? undefined : 'Carregando sua conta...'}
       >
         <CategoryForm
-          key={editingId ?? 'new'}
+          key={editingId ?? `new-${creatingUnderId ?? 'root'}`}
           editing={editing}
           editingColor={editing ? resolveCategoryColor(editing) : undefined}
           filterType="all"
           parentOptions={parentCandidates(active, editingId)}
+          initialParentId={creatingUnderId ?? undefined}
           deleteBlockedReason={
             deleteCheck && !deleteCheck.ok
               ? `Esta categoria tem ${deleteCheck.blockedByChildren} subcategoria${deleteCheck.blockedByChildren > 1 ? 's' : ''}. Exclua ou mova elas antes.`

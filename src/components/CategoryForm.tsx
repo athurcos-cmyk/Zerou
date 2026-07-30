@@ -30,6 +30,8 @@ interface CategoryFormProps {
    * filhas: ela não pode virar subcategoria de ninguém).
    */
   parentOptions?: Category[];
+  /** Pai já escolhido ao abrir em modo criação (atalho "+" na linha da principal). */
+  initialParentId?: string;
   onSubmit: (values: CategoryFormValues) => Promise<void>;
   /** Devolve `true` se a exclusão foi confirmada e executada. */
   onDelete?: () => Promise<boolean>;
@@ -56,6 +58,7 @@ export function CategoryForm({
   editingColor,
   filterType = 'all',
   parentOptions = [],
+  initialParentId,
   onSubmit,
   onDelete,
   deleteBlockedReason,
@@ -68,7 +71,7 @@ export function CategoryForm({
   const [type, setType] = useState<'income' | 'expense' | 'both'>(
     editing?.type ?? (filterType === 'income' ? 'income' : 'expense')
   );
-  const [parentCategoryId, setParentCategoryId] = useState(editing?.parentCategoryId ?? '');
+  const [parentCategoryId, setParentCategoryId] = useState(editing?.parentCategoryId ?? initialParentId ?? '');
   const [iconSheetOpen, setIconSheetOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
