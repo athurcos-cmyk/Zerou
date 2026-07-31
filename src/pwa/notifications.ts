@@ -65,11 +65,14 @@ export async function requestAndRegisterPushToken(): Promise<void> {
     });
     saveCachedPushToken(user.uid, token);
 
-    // O token anterior DESTE aparelho ficou órfão (mudou de service worker, ou o
-    // browser renovou a inscrição). Sem apagar, ele fica no Firestore pra sempre:
-    // o FCM aceita o envio pra ele e nada aparece, então a limpeza de token stale
-    // do `sendPushToUser` nunca chega a removê-lo. Apagado DEPOIS de gravar o novo,
-    // pra que uma falha no meio nunca deixe o usuário sem token nenhum.
+    // O token anterior DESTE aparelho ficou órfão. Trocar de service worker gera uma
+    // inscrição nova, com endpoint novo — e `isTokenValid` (SDK do Messaging) compara
+    // endpoint/auth/p256dh, então o SDK descarta o token velho e emite outro.
+    // O `sendPushToUser` acabaria limpando o doc órfão sozinho (o SDK revoga o token
+    // antigo no FCM, então o envio pra ele passa a falhar e cai na limpeza de stale),
+    // mas só no próximo disparo — apagar aqui evita mandar push pra um token morto no
+    // meio tempo. DEPOIS de gravar o novo, pra que uma falha no meio nunca deixe o
+    // usuário sem token nenhum.
     if (previousToken) {
       await deleteDoc(
         doc(getFirebaseDb(), 'users', user.uid, 'fcmTokens', previousToken)
