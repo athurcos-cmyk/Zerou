@@ -29,10 +29,17 @@ const messaging = firebase.messaging();
 // Notificações recebidas com o app fechado ou em background
 messaging.onBackgroundMessage(function(payload) {
   var n = payload.notification || {};
-  self.registration.showNotification(n.title || 'Granativa', {
-    body: n.body || '',
+  var title = n.title || 'Granativa';
+  var body = n.body || '';
+  self.registration.showNotification(title, {
+    body: body,
     icon: '/brand/granativa-app-icon-192.png',
     badge: '/brand/granativa-app-icon-192.png',
+    // Mesma 'tag' usada pelo handler de foreground (src/pwa/notifications.ts):
+    // a mesma mensagem nunca aparece duas vezes. Inclui o corpo de proposito —
+    // 'sendDueReminders' manda um push POR CONTA com o mesmo titulo, e agrupar
+    // so pelo titulo esconderia todas menos a ultima.
+    tag: title + '|' + body,
     data: { link: (payload.fcmOptions || {}).link || '/app' }
   });
 });
@@ -97,6 +104,9 @@ export default defineConfig(({ mode }) => {
           clientsClaim: true,
           cleanupOutdatedCaches: true,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest,jpg,jpeg,webp}'],
+          // O SW do Firebase Messaging tem que vir sempre da rede: precachear o
+          // script de um service worker é pedir pra fixar uma versão velha dele.
+          globIgnores: ['firebase-messaging-sw.js'],
           maximumFileSizeToCacheInBytes: 2 * 1024 * 1024,
           navigateFallback: '/index.html',
           runtimeCaching: [

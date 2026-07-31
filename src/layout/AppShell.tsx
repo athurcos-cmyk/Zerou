@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { requestAndRegisterPushToken } from '../pwa/notifications';
+import { listenForForegroundPush, requestAndRegisterPushToken } from '../pwa/notifications';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   BarChart2,
@@ -43,10 +43,13 @@ export function AppShell() {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const openTour = useWelcomeTour((state) => state.openTour);
 
-  // Pede permissão de push e registra o token FCM após o Firebase confirmar a sessão
+  // Pede permissão de push e registra o token FCM após o Firebase confirmar a sessão.
+  // O listener de foreground vem depois, porque só faz sentido com permissão já dada.
   useEffect(() => {
     if (!authFromCache) {
-      requestAndRegisterPushToken().catch(() => {});
+      requestAndRegisterPushToken()
+        .then(() => listenForForegroundPush())
+        .catch(() => {});
     }
   }, [authFromCache]);
   const isFoundationPending = location.pathname.startsWith('/app/onboarding') || Boolean(user && !profile?.defaultWorkspaceId);
