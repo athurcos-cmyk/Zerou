@@ -314,6 +314,8 @@ export async function deleteAccountData(userId: string) {
   refs.push(...workspaceRefs.map((workspaceRef) => workspaceRef.ref));
   refs.push(...(await collectBillingRefs(userId)));
   refs.push(...(await collectFcmTokens(userId)));
+  // pushDebug é diagnóstico TEMPORÁRIO (ver notifications.ts) — remover esta linha junto.
+  refs.push(...(await collectCollectionDocs(`users/${userId}/pushDebug`)));
   refs.push(doc(getFirebaseDb(), 'users', userId));
 
   await commitDeletes(refs);

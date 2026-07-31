@@ -143,8 +143,11 @@ describe('requestAndRegisterPushToken', () => {
     const { requestAndRegisterPushToken } = await loadModule();
     await requestAndRegisterPushToken();
 
-    expect(setDocMock).toHaveBeenCalledTimes(1);
-    expect(setDocMock.mock.calls[0][0].path).toContain('token-novo');
+    // setDoc também é chamado pro diagnóstico temporário (pushDebug) — filtra pelo
+    // caminho de fcmTokens especificamente.
+    const tokenWrites = setDocMock.mock.calls.filter((call) => call[0].path.includes('fcmTokens'));
+    expect(tokenWrites).toHaveLength(1);
+    expect(tokenWrites[0][0].path).toContain('token-novo');
 
     // Sem isso o token velho fica no Firestore pra sempre: o FCM aceita o envio
     // pra ele, nada aparece, e a limpeza de token stale nunca o remove.
@@ -152,13 +155,15 @@ describe('requestAndRegisterPushToken', () => {
     expect(deleteDocMock.mock.calls[0][0].path).toContain('token-antigo');
   });
 
-  it('não toca o Firestore quando o token não mudou', async () => {
+  it('não regrava o token FCM quando ele não mudou', async () => {
     cache.set('uid-1', 'token-novo');
 
     const { requestAndRegisterPushToken } = await loadModule();
     await requestAndRegisterPushToken();
 
-    expect(setDocMock).not.toHaveBeenCalled();
+    // O diagnóstico temporário (pushDebug) sempre grava — só o doc de fcmTokens não deve.
+    const tokenWrites = setDocMock.mock.calls.filter((call) => call[0].path.includes('fcmTokens'));
+    expect(tokenWrites).toHaveLength(0);
     expect(deleteDocMock).not.toHaveBeenCalled();
   });
 
@@ -173,7 +178,10 @@ describe('requestAndRegisterPushToken', () => {
 
     expect(registerMock).not.toHaveBeenCalled();
     expect(getTokenMock).not.toHaveBeenCalled();
-    expect(setDocMock).not.toHaveBeenCalled();
+    // O diagnóstico temporário (pushDebug) ainda grava, pra registrar QUE foi bloqueado aqui —
+    // só o doc de fcmTokens não deve existir.
+    const tokenWrites = setDocMock.mock.calls.filter((call) => call[0].path.includes('fcmTokens'));
+    expect(tokenWrites).toHaveLength(0);
   });
 
   it('reconhece o PWA instalado no iOS via navigator.standalone, mesmo sem display-mode', async () => {
@@ -184,6 +192,39 @@ describe('requestAndRegisterPushToken', () => {
     await requestAndRegisterPushToken();
 
     expect(registerMock).toHaveBeenCalledTimes(1);
+  });
+
+  // Diagnóstico temporário (pushDebug, ver comentário em notifications.ts) — prova que ele
+  // captura o suficiente pra diagnosticar sem acesso ao aparelho.
+  it('grava um retrato de diagnóstico com as decisões-chave, mesmo quando tudo dá certo', async () => {
+    const { requestAndRegisterPushToken } = await loadModule();
+    await requestAndRegisterPushToken();
+
+    const debugWrite = setDocMock.mock.calls.find((call) => call[0].path.includes('pushDebug'));
+    expect(debugWrite).toBeDefined();
+    expect(debugWrite![1]).toMatchObject({
+      isStandalone: true,
+      permissionAfter: 'granted',
+      tokenObtained: true,
+      firestoreWriteSucceeded: true,
+      result: 'registered',
+    });
+  });
+
+  it('o diagnóstico registra o motivo quando bloqueado por não estar no PWA instalado', async () => {
+    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: false }));
+
+    const { requestAndRegisterPushToken } = await loadModule();
+    await requestAndRegisterPushToken();
+
+    const debugWrite = setDocMock.mock.calls.find((call) => call[0].path.includes('pushDebug'));
+    expect(debugWrite![1]).toMatchObject({
+      isStandalone: false,
+      displayModeStandalone: false,
+      navigatorStandalone: null,
+    });
+    // Não deve ter chegado a checar permissão/token — parou no gate do PWA.
+    expect(debugWrite![1]).not.toHaveProperty('permissionAfter');
   });
 });
 
