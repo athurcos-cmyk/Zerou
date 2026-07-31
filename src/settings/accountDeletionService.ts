@@ -37,10 +37,15 @@ const WORKSPACE_COLLECTIONS = [
 
 async function commitDeletes(refs: DocumentReference[]) {
   const db = getFirebaseDb();
+  // Alguns caminhos de coleta podem apontar pro mesmo doc (ex.: um coupleInvites pode bater
+  // tanto na query por workspaceId quanto na query por usedBy, achado em auditoria
+  // 2026-07-31) — dedup por path evita depender de comportamento não-documentado do SDK
+  // pra múltiplos deletes do mesmo doc dentro do mesmo batch.
+  const uniqueRefs = [...new Map(refs.map((reference) => [reference.path, reference])).values()];
 
-  for (let index = 0; index < refs.length; index += BATCH_LIMIT) {
+  for (let index = 0; index < uniqueRefs.length; index += BATCH_LIMIT) {
     const batch = writeBatch(db);
-    refs.slice(index, index + BATCH_LIMIT).forEach((reference) => batch.delete(reference));
+    uniqueRefs.slice(index, index + BATCH_LIMIT).forEach((reference) => batch.delete(reference));
     await batch.commit();
   }
 }
@@ -94,6 +99,25 @@ async function collectFcmTokens(userId: string) {
 async function collectCoupleInvites(workspaceId: string) {
   const snapshot = await getDocs(query(collection(getFirebaseDb(), 'coupleInvites'), where('workspaceId', '==', workspaceId)));
   return snapshot.docs.map((item) => item.ref);
+}
+
+// Convite que o usuário USOU (como parceiro não-dono) pra entrar NESTE espaço de casal — o
+// ramo "dono" acima já limpa os invites que o usuário CRIOU (`collectCoupleInvites`, só
+// `workspaceId`); faltava este, achado em auditoria 2026-07-31 espelhando o mesmo gap na
+// exclusão via admin (functions-admin/src/index.ts).
+//
+// ⚠️ NÃO faz uma query (`where('usedBy', ...)`) em `coupleInvites` — tentei, e o motor de
+// regras do Firestore rejeita qualquer LIST nessa coleção que não fixe TODOS os campos que a
+// regra de leitura referencia (`status`, `expiresAt`, `workspaceId`, o token de `isAdmin()`),
+// mesmo quando o documento real tem todos eles — é uma limitação de "prova de segurança" de
+// queries com regra complexa em OR, não falta de dado. Em vez disso, lê o `acceptedInviteId`
+// já gravado no doc do membro (`sharedService.ts`, `contracts.ts` — `Member.acceptedInviteId`)
+// e apaga o convite POR ID: `get`/`delete` de um doc específico não passa pela mesma checagem
+// de "provabilidade de lista", só avalia a regra contra o documento real.
+async function collectAcceptedInviteRef(workspaceId: string, userId: string) {
+  const memberSnap = await getDoc(doc(getFirebaseDb(), 'workspaces', workspaceId, 'members', userId));
+  const acceptedInviteId = memberSnap.exists() ? (memberSnap.data() as { acceptedInviteId?: string }).acceptedInviteId : undefined;
+  return acceptedInviteId ? [doc(getFirebaseDb(), 'coupleInvites', acceptedInviteId)] : [];
 }
 
 async function collectBillingRefs(userId: string) {
@@ -273,6 +297,12 @@ export async function deleteAccountData(userId: string) {
       refs.push(...(await collectWorkspaceTree(workspaceRef.id)));
       continue;
     }
+
+    // Precisa rodar ANTES de `leavePartnerWorkspace`: a leitura do doc do membro (de onde vem
+    // `acceptedInviteId`) exige `isActiveMember(workspaceId)`, e `leavePartnerWorkspace` marca
+    // o membro como 'removed'. Coletar depois faria essa leitura ser negada, deixando o
+    // convite usado órfão pra sempre (ver comentário em `collectAcceptedInviteRef`).
+    refs.push(...(await collectAcceptedInviteRef(workspaceRef.id, userId)));
 
     await leavePartnerWorkspace(workspaceRef.id, userId);
     refs.push(doc(getFirebaseDb(), 'workspaces', workspaceRef.id, 'members', userId));

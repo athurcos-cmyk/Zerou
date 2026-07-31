@@ -1964,6 +1964,60 @@ describe('firestore security rules', () => {
     );
   });
 
+  // Trava o exato caminho que `collectAcceptedInviteRef` (accountDeletionService.ts) usa pra
+  // limpar o convite que um parceiro usou, achado numa auditoria de exclusão de conta
+  // (2026-07-31). Duas descobertas por trás desta implementação:
+  //
+  // (1) Uma QUERY em `coupleInvites` filtrando só por `usedBy` (ou até por `workspaceId` +
+  // `usedBy` + `status`) falha com "Property X is undefined for 'list'" — não é dado faltando,
+  // é o motor de regras do Firestore recusando avaliar uma `list` cuja regra (esta, com um OR
+  // de 3 ramos tocando `status`/`expiresAt`/`workspaceId`/`isAdmin()`) não fica inteiramente
+  // "provável" só com os campos que a query fixa. Por isso a implementação NÃO faz query
+  // nenhuma em `coupleInvites` — em vez disso lê `acceptedInviteId` do doc do membro (campo já
+  // gravado no aceite, `sharedService.ts`) e apaga o convite POR ID.
+  // (2) `get`/`delete` de um doc especifico não tem essa restrição de "list" — mas a LEITURA do
+  // doc do membro (de onde vem o id) exige `isActiveMember(workspaceId)`, e
+  // `leavePartnerWorkspace` marca o membro como 'removed'. Por isso o client lê ANTES de tocar
+  // na filiação — este teste prova as duas pontas que tornam essa ordem obrigatória.
+  it('a partner can read acceptedInviteId and delete that invite by id — but only while still an active member', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice', { email: 'alice@zerou.test' }).firestore();
+    const bobDb = testEnv.authenticatedContext('bob', { email: 'bob@zerou.test' }).firestore();
+    const modularBobDb = bobDb as unknown as Parameters<typeof writeBatch>[0];
+    const inviteId = 'invite_' + 'b'.repeat(32);
+
+    await assertSucceeds(createCoupleWorkspaceBatch(aliceDb).commit());
+    await assertSucceeds(setDoc(doc(aliceDb, 'coupleInvites', inviteId), invitePayload(inviteId, 'couple_a', 'alice')));
+
+    const acceptBatch = writeBatch(modularBobDb);
+    acceptBatch.update(doc(modularBobDb, 'workspaces/couple_a'), {
+      partnerUserId: 'bob',
+      activeMemberCount: 2,
+      updatedAt: serverTimestamp()
+    });
+    acceptBatch.update(doc(modularBobDb, 'coupleInvites', inviteId), {
+      status: 'accepted',
+      usedBy: 'bob',
+      usedAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    acceptBatch.set(doc(modularBobDb, 'workspaces/couple_a/members/bob'), coupleMemberPayload('couple_a', 'bob', 'partner', { acceptedInviteId: inviteId }));
+    acceptBatch.set(doc(modularBobDb, 'users/bob/workspaceRefs/couple_a'), workspaceRefPayload('couple_a', 'partner'));
+    await assertSucceeds(acceptBatch.commit());
+
+    // Ainda membro ativo: lê o próprio doc de membro (permitido — `isActiveMember`) e apaga o
+    // convite que ele acabou de aceitar. Esta é a ordem certa: ler ANTES de leavePartnerWorkspace.
+    const memberSnap = await assertSucceeds(getDoc(doc(bobDb, 'workspaces/couple_a/members/bob')));
+    expect(memberSnap.data()?.acceptedInviteId).toBe(inviteId);
+    await assertSucceeds(deleteDoc(doc(bobDb, 'coupleInvites', inviteId)));
+
+    // Prova a armadilha que a ordem evita: depois que o membro é removido, a MESMA leitura é
+    // negada — não é dado sumindo, é a regra barrando quem não é mais membro ativo.
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().doc('workspaces/couple_a/members/bob').update({ status: 'removed' });
+    });
+    await assertFails(getDoc(doc(bobDb, 'workspaces/couple_a/members/bob')));
+  });
+
   it('blocks expired, revoked and reused invites from being accepted', async () => {
     const bobDb = testEnv.authenticatedContext('bob').firestore();
     const modularBobDb = bobDb as unknown as Parameters<typeof writeBatch>[0];

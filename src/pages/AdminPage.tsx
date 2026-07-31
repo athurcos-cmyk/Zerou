@@ -1415,10 +1415,15 @@ export function AdminPage() {
 
   const [whatsappLinks, setWhatsappLinks] = useState<AdminWhatsappLink[]>([]);
 
+  // Ao contrário de users/couples/invites/whatsapp (carregados sempre no boot do admin,
+  // padrão pré-existente), o histórico de Mensagens só é lido quando a aba abre pela
+  // primeira vez — é a única das 5 fontes de dado que a maioria das visitas ao admin nunca
+  // usa, então carregá-la sempre seria leitura sem propósito (ver docs/COSTS.md).
   const [messages, setMessages] = useState<AdminMessage[]>([]);
   const [messagesCursor, setMessagesCursor] = useState<AdminCursor>(null);
   const [messagesHasMore, setMessagesHasMore] = useState(false);
   const [messagesLoadingMore, setMessagesLoadingMore] = useState(false);
+  const [messagesLoaded, setMessagesLoaded] = useState(false);
   const [pendingMessageRecipient, setPendingMessageRecipient] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
@@ -1436,12 +1441,11 @@ export function AdminPage() {
     setLoading(true);
     setError(null);
     try {
-      const [u, c, i, w, m] = await Promise.all([
+      const [u, c, i, w] = await Promise.all([
         getAdminUsers(),
         getAdminCoupleWorkspaces(),
         getAdminInvites(),
         getAdminWhatsappLinks(),
-        getAdminMessages(),
       ]);
       setUsers(u.items);
       setUsersCursor(u.cursor);
@@ -1453,9 +1457,11 @@ export function AdminPage() {
       setInvitesCursor(i.cursor);
       setInvitesHasMore(i.hasMore);
       setWhatsappLinks(w);
-      setMessages(m.items);
-      setMessagesCursor(m.cursor);
-      setMessagesHasMore(m.hasMore);
+      // Só recarrega Mensagens se ela já tiver sido aberta nesta sessão — senão "Recarregar
+      // dados" reativaria a leitura que o lazy-load acima existe pra evitar.
+      if (messagesLoaded) {
+        await refreshMessages();
+      }
     } catch (err) {
       setError(getUserFacingErrorMessage(err, 'Erro ao carregar dados.'));
     } finally {
@@ -1466,6 +1472,14 @@ export function AdminPage() {
   useEffect(() => {
     void loadAll();
   }, []);
+
+  // Lê o histórico de Mensagens só quando a aba abre pela primeira vez — ver o comentário
+  // no state acima.
+  useEffect(() => {
+    if (tab !== 'messages' || messagesLoaded) return;
+    setMessagesLoaded(true);
+    refreshMessages().catch(() => setMessagesLoaded(false));
+  }, [tab, messagesLoaded]);
 
   async function loadMoreUsers() {
     setUsersLoadingMore(true);
@@ -1590,7 +1604,7 @@ export function AdminPage() {
     { id: 'couples', label: 'Casais', count: formatCount(couples.length, couplesHasMore) },
     { id: 'invites', label: 'Convites', count: formatCount(invites.length, invitesHasMore) },
     { id: 'whatsapp', label: 'WhatsApp', count: formatCount(whatsappLinks.length, false) },
-    { id: 'messages', label: 'Mensagens', count: formatCount(messages.length, messagesHasMore) },
+    { id: 'messages', label: 'Mensagens', count: messagesLoaded ? formatCount(messages.length, messagesHasMore) : undefined },
   ];
 
   return (
