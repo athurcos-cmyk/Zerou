@@ -6,7 +6,9 @@ Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/histor
 
 Relato do dono: *"nenhuma notificação está sendo enviada"*. Tudo indicava sucesso — as 5 functions
 agendadas no ar, 5 tokens FCM válidos, e o log dizendo `{"sentUsers":3,"staleRemoved":0}` todo dia.
-Detalhe em `docs/history/2026-07.md`. **Ainda não deployado** (ver `docs/planning/TODOS.md`).
+Detalhe em `docs/history/2026-07.md`. **Deployado** (commit `81750bf`): cliente na Vercel, mais
+`firestore:indexes` e `functions:billing:sendBudgetAlerts`. ⚠️ O filtro `--only functions:<nome>`
+falha — o projeto tem dois codebases, o certo é `functions:billing:<nome>`.
 
 - **Causa raiz (mata 100% dos pushes, desde 14/07)**: `getRegistration('/firebase-messaging-sw.js')`
   casa por **escopo**, não por script — devolvia a registration do VitePWA (`/sw.js`, escopo `/`),
