@@ -104,6 +104,42 @@ Roteiro usado em 2026-07-16/17 (detalhe completo em `docs/whatsapp/WHATSAPP.md`)
    - Responde `{"error":{"message":"API access blocked."...}}` → **bloqueio da conta de desenvolvedor Meta**, não é bug de código. Ver `docs/whatsapp/WHATSAPP.md` (seção "Conta de desenvolvedor Meta bloqueada") — resolução é inteiramente do lado da Meta (o dono confirma identidade no painel), nada pra corrigir no repo.
 3. Depois de qualquer resolução do lado da Meta, reconfirmar com o mesmo curl do passo 2, e então testar uma mensagem real de ponta a ponta antes de considerar resolvido.
 
+## Diagnosticar "não estou recebendo notificação"
+
+Roteiro usado em 2026-07-30, quando **nenhum** push chegava havia 16 dias (detalhe em
+`docs/history/2026-07.md`). A ordem importa: o sintoma engana, porque **os três primeiros passos
+podem estar 100% verdes com o push completamente morto**.
+
+1. **A function rodou?** `npx firebase functions:log --only sendDailyLogReminder -n 20`. As
+   agendadas e seus horários (BRT): `closeInvoicesDue` 00h, `generateRecurrences` 06h,
+   `sendDueReminders` 08h, `sendBudgetAlerts` 10h, `sendDailyLogReminder` 20h.
+   **Confira o log de cada uma** — foi assim que apareceu o `FAILED_PRECONDITION` diário do
+   `sendBudgetAlerts`, que as outras não tinham. Erro de índice aqui → passo 5.
+2. **Existe token no banco?** `db.collectionGroup('fcmTokens').get()` com o Admin SDK
+   (`serviceAccountKey.json` na raiz, apagar depois). Zero tokens → o cliente nunca registrou:
+   confira `VITE_FIREBASE_VAPID_KEY` nas env vars da **Vercel** (não basta o `.env.local`; ela não
+   está no `.env.example`) e se a permissão de notificação foi concedida no aparelho.
+3. **O FCM aceitou o envio?** No log, `staleRemoved: 0` com `sentUsers > 0` significa que o FCM
+   aceitou **todos**. ⚠️ **Isso não quer dizer que alguém viu a notificação** — é exatamente o
+   estado observado durante os 16 dias de apagão. Se os passos 1-3 estão verdes e ninguém recebe
+   nada, o problema é do lado do **aparelho**: vá pro passo 4.
+4. **Qual service worker está com a inscrição de push?** No navegador, na origem de produção:
+   ```js
+   (await navigator.serviceWorker.getRegistrations()).map(r => ({ scope: r.scope, script: r.active?.scriptURL }))
+   ```
+   Tem que aparecer **dois**: `/sw.js` no escopo `/` (VitePWA) **e**
+   `/firebase-messaging-sw.js` no escopo `/firebase-cloud-messaging-push-scope` (FCM). Se só houver
+   o `/sw.js`, o token foi emitido sobre um SW **sem listener de `push`** e toda notificação é
+   descartada em silêncio — foi a causa raiz do apagão. Cheque também que `/firebase-messaging-sw.js`
+   responde 200 (ele é gerado em build pelo `vite.config.ts`, não é commitado).
+5. **Erro de índice numa function**: consulta de **campo único** em `collectionGroup` precisa de
+   `fieldOverrides` com `queryScope: COLLECTION_GROUP` em `firestore.indexes.json` — o índice
+   automático do Firestore é por coleção e não cobre esse escopo. Deploy:
+   `npx firebase deploy --only firestore:indexes --project zerou-26757` (aditivo, não apaga índice
+   nem toca em regras/functions; leva alguns minutos até ficar `READY`).
+6. Lembre que **`git push` não reimplanta Cloud Functions** — mudança em `functions/src/` só vale
+   depois do `firebase deploy` (ver seção Deploy). Correção no cliente (`src/`) sai pela Vercel.
+
 ## Rollback
 
 1. Revert or fix forward on `main`.

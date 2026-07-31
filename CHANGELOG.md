@@ -2,6 +2,32 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-30 (parte 3) — fix(push): nenhuma notificação chegava — dois bugs independentes
+
+Relato do dono: *"nenhuma notificação está sendo enviada"*. Tudo indicava sucesso — as 5 functions
+agendadas no ar, 5 tokens FCM válidos, e o log dizendo `{"sentUsers":3,"staleRemoved":0}` todo dia.
+Detalhe em `docs/history/2026-07.md`. **Ainda não deployado** (ver `docs/planning/TODOS.md`).
+
+- **Causa raiz (mata 100% dos pushes, desde 14/07)**: `getRegistration('/firebase-messaging-sw.js')`
+  casa por **escopo**, não por script — devolvia a registration do VitePWA (`/sw.js`, escopo `/`),
+  nunca `undefined`. O SW do FCM **nunca era registrado**, e o `getToken` amarrava a inscrição de
+  push ao service worker do Workbox, **que não tem listener de `push`**. O FCM aceitava o envio, o
+  token nunca virava stale, e nada aparecia no aparelho.
+- **Fix**: registrar em escopo próprio (`/firebase-cloud-messaging-push-scope`, o padrão do SDK).
+  Dois SWs **não** coexistem no mesmo escopo — em `/` um substituiria o outro e o offline quebraria.
+  Verificado ao vivo em produção: os dois passam a coexistir, `/sw.js` intacto.
+- **Push com o app aberto também sumia**: sem `onMessage`, o SDK entrega na página e nada é exibido.
+  Novo `listenForForegroundPush`, com a mesma `tag` do SW pra nunca duplicar.
+- **Token órfão agora é apagado** ao trocar: o FCM aceita envio pra token morto, então a limpeza de
+  stale nunca o removeria. `firestore.rules` não mudou (`write` já cobre delete).
+- **Bug 2, independente — `sendBudgetAlerts` quebrava todo dia** com `FAILED_PRECONDITION`: faltava
+  a exceção `budgets.isActive` (COLLECTION_GROUP) em `firestore.indexes.json`. Nenhum alerta de
+  orçamento jamais saiu (`budgetAlertState` vazia). Mesmo bug de `whatsappLinkCodes.code`.
+- **Bug 3, que só apareceria depois**: o link do push de orçamento era relativo (`/app/search`) e o
+  FCM exige URL absoluta. Corrigido, e o loop ganhou `try/catch` por item.
+- Trava: `src/pwa/notifications.test.ts` (novo), 4 dos 5 casos falham sem o fix. 501 + 125 + 74
+  testes verdes.
+
 ## 2026-07-30 (parte 2) — feat(vic): criar subcategoria por mensagem, sem adivinhar
 
 Pergunta do dono: *"como que ela vai saber quando for pra criar uma subcategoria?"* — ele levantou
