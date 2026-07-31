@@ -122,7 +122,7 @@ export const adminDeleteUser = onCall({ region: REGION, maxInstances: 5 }, async
     catch (err) {
         logger.error('Falha ao coletar workspace pessoal', { userId, err });
     }
-    for (const subPath of [`users/${userId}/fcmTokens`, `users/${userId}/whatsappLinkCodes`]) {
+    for (const subPath of [`users/${userId}/fcmTokens`, `users/${userId}/whatsappLinkCodes`, `users/${userId}/pushDebug`]) {
         try {
             refs.push(...(await collectSubcollection(subPath)));
         }
