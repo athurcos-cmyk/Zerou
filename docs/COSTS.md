@@ -181,6 +181,23 @@ Meta e **processa depois**; com a CPU cortada, a confirmação demora dezenas de
 (`docs/RUNBOOK.md`). Manter quente com ping do Cloud Scheduler também não ajuda no preço — instância
 viva com CPU sempre alocada é cobrada igual.
 
+### "Do jeito que está hoje, eu pago?" — não, mas é uso cobrável
+
+Pergunta do dono, e a distinção importa: o Cloud Run **cobra pelo tempo em que a instância existe**
+(com `cpu-throttling=false`, o ocioso enquanto ela espera mais tráfego conta também). O que salva é
+o **free tier permanente** — ~180 mil vCPU-s, ~360 mil GiB-s e 2 milhões de requisições/mês.
+
+Medido nos logs de julho/2026: **108 mensagens** e **49 cold starts**. Com a instância ociosa
+vivendo de 5 a 15 min (o Google não publica esse tempo), dá **15.000–44.000 vCPU-s** no mês — entre
+**8% e 25% da cota grátis**. Dá pra multiplicar o tráfego por 4 e continuar em R$ 0.
+
+É a mesma conta que explica por que `minInstances: 1` é caro: 2.628.000 vCPU-s/mês ≈ **15× o free
+tier inteiro** (que cobre menos de 2 dias de instância sempre ligada). Não é diferença de
+eficiência, é de ordem de grandeza.
+
+O custo que **não** é zero nesse fluxo é a **DeepSeek** — por token, externo ao Firebase, fora de
+qualquer free tier. Centavos por mensagem, mas é o único que já sai do bolso hoje.
+
 **Alternativa gratuita, ainda não feita**: `functions/src/index.ts` re-exporta **17 functions**, e o
 contêiner do `whatsappWebhook` carrega esse índice inteiro no boot — Stripe, Resend, automações,
 tudo. Separar o WhatsApp num **codebase próprio** faria o contêiner carregar só o que ele usa.
