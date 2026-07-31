@@ -17,14 +17,17 @@ Duas perguntas de acompanhamento depois da feature de Mensagens. Detalhe em
   entrar num casal nunca eram limpos — este último também corrigido na auto-exclusão
   (`accountDeletionService.ts`), mesmo gap nos dois fluxos.
 - **Achado técnico no caminho**: uma query em `coupleInvites` filtrando por `usedBy` falha no
-  Firestore com "Property X is undefined for 'list'" — o motor de regras recusa `list()` que não
-  "prova" estaticamente toda a regra (um OR de 3 ramos), mesmo com todo documento real tendo o
-  campo. Resolvido lendo `acceptedInviteId` do doc do membro (já gravado no aceite) e apagando o
-  convite por ID — sem `list()` nenhum.
+  Firestore com "Property X is undefined for 'list'" — o motor de regras recusa `list()` quando
+  a query não fixa, por igualdade, TODOS os campos de PELO MENOS UM ramo inteiro da regra (um OR
+  de 3 ramos aqui) — não precisa fixar todo campo de todo ramo, só fechar um. `usedBy` não
+  participa de nenhum ramo, então nunca ajudaria. Resolvido lendo `acceptedInviteId` do doc do
+  membro (já gravado no aceite) e apagando o convite por ID — sem `list()` nenhum. Verificado em
+  revisão que o código pré-existente (`collectCoupleInvites`, ramo do dono, só fixa
+  `workspaceId`) continua seguro — fecha o ramo do `isActiveMember` sozinho.
 - `commitDeletes` (client + admin) ganhou dedup por `.path` antes de montar os lotes — defensivo,
   não custava depender de comportamento não documentado do SDK numa operação irreversível.
-- 78/78 testes de regras verdes (1 novo, prova a ordem obrigatória: ler antes de
-  `leavePartnerWorkspace` remover a filiação).
+- 79/79 testes de regras verdes (2 novos: a ordem obrigatória de leitura antes de
+  `leavePartnerWorkspace`, e a confirmação de que `collectCoupleInvites` continua seguro).
 
 ## 2026-07-31 — feat(admin): enviar push/email pro usuário e pra todos, com histórico
 

@@ -25,6 +25,10 @@ const WORKSPACE_COLLECTIONS = [
     'aiUsage',
     'budgetAlertState',
     'whatsappTransactionUsage',
+    // recurringNotifyState (generateRecurrences, automation.ts) faltava aqui — achado em
+    // auditoria 2026-07-31: apagar o workspace sem isso deixava o doc órfão pra sempre
+    // (Firestore não faz cascade delete). Mesmo molde do budgetAlertState, que já estava na lista.
+    'recurringNotifyState',
 ];
 function assertAdmin(email) {
     if (email !== ADMIN_EMAIL) {
@@ -33,9 +37,14 @@ function assertAdmin(email) {
 }
 async function commitDeletes(refs) {
     const db = getFirestore();
+    // Alguns caminhos de coleta podem apontar pro mesmo doc (ex.: um coupleInvites pode bater
+    // tanto na query por workspaceId quanto na query por usedBy, achado em auditoria
+    // 2026-07-31) — dedup por path evita depender de comportamento não-documentado do SDK
+    // pra múltiplos deletes do mesmo doc dentro do mesmo batch.
+    const uniqueRefs = [...new Map(refs.map((ref) => [ref.path, ref])).values()];
     let processed = 0;
-    for (let i = 0; i < refs.length; i += BATCH_LIMIT) {
-        const slice = refs.slice(i, i + BATCH_LIMIT);
+    for (let i = 0; i < uniqueRefs.length; i += BATCH_LIMIT) {
+        const slice = uniqueRefs.slice(i, i + BATCH_LIMIT);
         try {
             const batch = db.batch();
             slice.forEach((ref) => batch.delete(ref));
@@ -146,6 +155,11 @@ export const adminDeleteUser = onCall({ region: REGION, maxInstances: 5 }, async
                         updatedAt: FieldValue.serverTimestamp(),
                     });
                 }
+                // Achado em auditoria 2026-07-31: este ramo só limpava a filiação ao workspace,
+                // nunca o coupleInvites que o usuário usou pra entrar como parceiro — ficava com
+                // `usedBy` apontando pra um uid que não existe mais. O ramo de dono acima já cobre
+                // os invites DELE (`workspaceId == wsId`); aqui cobre os que ELE usou, seja qual
+                // workspace for — feito uma vez fora do loop, ver abaixo.
             }
             catch (err) {
                 logger.error('Falha ao processar workspaceRef', { userId, wsId, err });
@@ -156,11 +170,26 @@ export const adminDeleteUser = onCall({ region: REGION, maxInstances: 5 }, async
     catch (err) {
         logger.error('Falha ao consultar workspaceRefs', { userId, err });
     }
+    // Convites que o usuário USOU (como parceiro não-dono) pra entrar em algum espaço de
+    // casal — em qualquer workspace, não só os que ainda existem. Sem isso o doc ficava
+    // preso com `usedBy` apontando pra um uid inexistente (achado em auditoria 2026-07-31).
+    // Deletar o mesmo ref duas vezes no mesmo batch (se também coletado acima como dono de
+    // outro espaço) é inofensivo — Firestore idempotentemente ignora a repetição.
+    try {
+        const usedInvitesSnap = await db.collection('coupleInvites').where('usedBy', '==', userId).get();
+        refs.push(...usedInvitesSnap.docs.map((d) => d.ref));
+    }
+    catch (err) {
+        logger.error('Falha ao coletar coupleInvites usados', { userId, err });
+    }
     const billingId = `billing_${userId}`;
     try {
         const billingSnap = await db.doc(`billingAccounts/${billingId}`).get();
         if (billingSnap.exists) {
             refs.push(...(await collectSubcollection(`billingAccounts/${billingId}/subscriptions`)));
+            // billingEvents (histórico bruto de webhooks do Stripe) não era coletado — sobrevivia
+            // pra sempre sob um doc pai já apagado (achado em auditoria 2026-07-31).
+            refs.push(...(await collectSubcollection(`billingAccounts/${billingId}/billingEvents`)));
             refs.push(db.doc(`billingAccounts/${billingId}`));
         }
     }
@@ -173,6 +202,15 @@ export const adminDeleteUser = onCall({ region: REGION, maxInstances: 5 }, async
     }
     catch (err) {
         logger.error('Falha ao coletar privacyRequests', { userId, err });
+    }
+    // Histórico de mensagens do admin (push/email) endereçadas a este usuário — mesma
+    // filosofia de "apaga tudo" das outras coleções (achado em auditoria 2026-07-31).
+    try {
+        const adminMessagesSnap = await db.collection('adminMessages').where('targetUserId', '==', userId).get();
+        refs.push(...adminMessagesSnap.docs.map((d) => d.ref));
+    }
+    catch (err) {
+        logger.error('Falha ao coletar adminMessages', { userId, err });
     }
     refs.push(db.doc(`users/${userId}`));
     // Deleta do Auth primeiro. Se falhar, nada foi tocado no Firestore.

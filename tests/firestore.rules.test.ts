@@ -2018,6 +2018,27 @@ describe('firestore security rules', () => {
     await assertFails(getDoc(doc(bobDb, 'workspaces/couple_a/members/bob')));
   });
 
+  // Confirma que `collectCoupleInvites` (accountDeletionService.ts, ramo do DONO — código
+  // que já existia desde 2026-06-17, não tocado na auditoria de 2026-07-31) continua seguro.
+  // Fixar só `workspaceId` basta porque esse é o único campo que o SEGUNDO ramo do OR da
+  // regra (`isActiveMember(resource.data.workspaceId)`) precisa — o Firestore só exige que
+  // PELO MENOS UM ramo inteiro fique resolvível pelos filtros da query, não que a query fixe
+  // todo campo citado em QUALQUER ramo (essa era minha primeira hipótese, errada — corrigida
+  // depois de rodar este teste). `usedBy` (o campo da correção nova) não participa de nenhum
+  // ramo da regra, então fixá-lo sozinho nunca ajudaria — só workspaceId ou (status+expiresAt)
+  // resolvem algum ramo.
+  it('collectCoupleInvites (workspaceId only) stays provable — the pre-existing owner-branch query is safe', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice', { email: 'alice@zerou.test' }).firestore();
+    const inviteId = 'invite_' + 'd'.repeat(32);
+
+    await assertSucceeds(createCoupleWorkspaceBatch(aliceDb).commit());
+    await assertSucceeds(setDoc(doc(aliceDb, 'coupleInvites', inviteId), invitePayload(inviteId, 'couple_a', 'alice')));
+
+    const { collection, getDocs, query, where } = await import('firebase/firestore');
+    const snap = await getDocs(query(collection(aliceDb, 'coupleInvites'), where('workspaceId', '==', 'couple_a')));
+    expect(snap.docs.map((d) => d.id)).toEqual([inviteId]);
+  });
+
   it('blocks expired, revoked and reused invites from being accepted', async () => {
     const bobDb = testEnv.authenticatedContext('bob').firestore();
     const modularBobDb = bobDb as unknown as Parameters<typeof writeBatch>[0];

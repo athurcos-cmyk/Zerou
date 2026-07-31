@@ -106,14 +106,17 @@ async function collectCoupleInvites(workspaceId: string) {
 // `workspaceId`); faltava este, achado em auditoria 2026-07-31 espelhando o mesmo gap na
 // exclusão via admin (functions-admin/src/index.ts).
 //
-// ⚠️ NÃO faz uma query (`where('usedBy', ...)`) em `coupleInvites` — tentei, e o motor de
-// regras do Firestore rejeita qualquer LIST nessa coleção que não fixe TODOS os campos que a
-// regra de leitura referencia (`status`, `expiresAt`, `workspaceId`, o token de `isAdmin()`),
-// mesmo quando o documento real tem todos eles — é uma limitação de "prova de segurança" de
-// queries com regra complexa em OR, não falta de dado. Em vez disso, lê o `acceptedInviteId`
-// já gravado no doc do membro (`sharedService.ts`, `contracts.ts` — `Member.acceptedInviteId`)
-// e apaga o convite POR ID: `get`/`delete` de um doc específico não passa pela mesma checagem
-// de "provabilidade de lista", só avalia a regra contra o documento real.
+// ⚠️ NÃO faz uma query (`where('usedBy', ...)`) em `coupleInvites` — tentei, e falhou. A regra
+// de leitura é um OR de 3 ramos (`status`+`expiresAt`, `isActiveMember(workspaceId)`,
+// `isAdmin()`), e o Firestore só permite uma LIST se a query fixar, por igualdade, TODOS os
+// campos de PELO MENOS UM ramo inteiro — não precisa fixar todo campo que aparece em QUALQUER
+// ramo (hipótese que eu tinha, errada — corrigida depois de confirmar com um teste que
+// `collectCoupleInvites`, que só fixa `workspaceId`, continua seguro: sozinho já resolve o
+// ramo do `isActiveMember`). `usedBy` não participa de ramo nenhum, então fixá-lo — sozinho ou
+// junto de outros campos que também não fecham um ramo — nunca ajudaria. Por isso: lê o
+// `acceptedInviteId` já gravado no doc do membro (`sharedService.ts`, `contracts.ts` —
+// `Member.acceptedInviteId`) e apaga o convite POR ID — `get`/`delete` de um doc específico
+// não passa pela checagem de "provabilidade de lista", só avalia a regra contra o doc real.
 async function collectAcceptedInviteRef(workspaceId: string, userId: string) {
   const memberSnap = await getDoc(doc(getFirebaseDb(), 'workspaces', workspaceId, 'members', userId));
   const acceptedInviteId = memberSnap.exists() ? (memberSnap.data() as { acceptedInviteId?: string }).acceptedInviteId : undefined;

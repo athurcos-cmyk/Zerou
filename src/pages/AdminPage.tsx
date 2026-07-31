@@ -1114,9 +1114,13 @@ const CHANNEL_LABELS: Record<AdminMessageChannel, string> = {
   both: 'Push + Email',
 };
 
+// `channel` guarda o canal REALMENTE usado na requisição, não o estado ao vivo do formulário
+// — achado em revisão: nada desabilitava os chips de canal enquanto `sending` estava true, e
+// o painel de resultado lia `channel` (state) em vez do `outcome`. Trocar de canal entre
+// clicar "Enviar" e a resposta chegar fazia o resultado sumir ou mostrar o canal errado.
 type SendOutcome =
-  | { kind: 'individual'; push: { tokensFound: number; sent: number }; email: { sent: boolean; reason?: string } | null }
-  | { kind: 'broadcast'; pushFound: number; pushSent: number; emailAttempted: number; emailSent: number };
+  | { kind: 'individual'; channel: AdminMessageChannel; push: { tokensFound: number; sent: number }; email: { sent: boolean; reason?: string } | null }
+  | { kind: 'broadcast'; channel: AdminMessageChannel; pushFound: number; pushSent: number; emailAttempted: number; emailSent: number };
 
 function MessagesTab({
   users,
@@ -1126,6 +1130,7 @@ function MessagesTab({
   onLoadMore,
   onRefreshMessages,
   presetUserId,
+  onPresetConsumed,
 }: {
   users: UserProfile[];
   messages: AdminMessage[];
@@ -1134,6 +1139,7 @@ function MessagesTab({
   onLoadMore: () => void;
   onRefreshMessages: () => Promise<void>;
   presetUserId: string | null;
+  onPresetConsumed: () => void;
 }) {
   const [recipientMode, setRecipientMode] = useState<'one' | 'all'>('one');
   const [recipientId, setRecipientId] = useState('');
@@ -1146,15 +1152,20 @@ function MessagesTab({
   const [confirmBroadcastOpen, setConfirmBroadcastOpen] = useState(false);
 
   // Vindo do botão "Enviar mensagem" no detalhe de um usuário (UserDetailModal) — pré-seleciona
-  // o destinatário ao trocar de aba, sem duplicar o formulário num modal separado.
+  // o destinatário ao trocar de aba, sem duplicar o formulário num modal separado. Consome o
+  // preset na hora (`onPresetConsumed`, limpa o state no AdminPage): sem isso, como esta aba
+  // desmonta a cada troca de aba, o MESMO preset era reaplicado toda vez que a aba Mensagens
+  // reabria — sobrescrevendo silenciosamente qualquer destinatário/modo que o admin tivesse
+  // escolhido depois (achado em revisão).
   useEffect(() => {
     if (presetUserId) {
       setRecipientMode('one');
       setRecipientId(presetUserId);
       setOutcome(null);
       setError(null);
+      onPresetConsumed();
     }
-  }, [presetUserId]);
+  }, [presetUserId, onPresetConsumed]);
 
   const recipientOptions = useMemo(
     () => users.map((u) => ({ value: u.id, label: u.name || u.email, description: u.name ? u.email : undefined })),
@@ -1168,17 +1179,21 @@ function MessagesTab({
     (recipientMode === 'all' || Boolean(recipientId));
 
   async function doSendIndividual() {
+    // Captura o canal DESTA requisição — os controles ficam desabilitados durante `sending`
+    // (abaixo), mas o outcome também guarda o valor usado, não o estado ao vivo, como
+    // segunda trava contra o mesmo problema.
+    const sentChannel = channel;
     setSending(true);
     setError(null);
     setOutcome(null);
     try {
       const result = await callAdminSendMessage({
         userId: recipientId,
-        channel,
+        channel: sentChannel,
         subject: needsSubject ? subject.trim() : undefined,
         message: message.trim(),
       });
-      setOutcome({ kind: 'individual', push: result.push, email: result.email });
+      setOutcome({ kind: 'individual', channel: sentChannel, push: result.push, email: result.email });
       await onRefreshMessages();
       setMessage('');
       setSubject('');
@@ -1190,16 +1205,17 @@ function MessagesTab({
   }
 
   async function doSendBroadcast() {
+    const sentChannel = channel;
     setSending(true);
     setError(null);
     setOutcome(null);
     try {
       const result = await callAdminBroadcastMessage({
-        channel,
+        channel: sentChannel,
         subject: needsSubject ? subject.trim() : undefined,
         message: message.trim(),
       });
-      setOutcome({ kind: 'broadcast', ...result });
+      setOutcome({ kind: 'broadcast', channel: sentChannel, ...result });
       await onRefreshMessages();
       setMessage('');
       setSubject('');
@@ -1232,13 +1248,13 @@ function MessagesTab({
         <div className="field">
           <span className="field-label">Canal</span>
           <div className="chip-row">
-            <button type="button" className={`chip${channel === 'push' ? ' chip--active' : ''}`} onClick={() => setChannel('push')}>
+            <button type="button" disabled={sending} className={`chip${channel === 'push' ? ' chip--active' : ''}`} onClick={() => setChannel('push')}>
               <Bell size={14} /> Push
             </button>
-            <button type="button" className={`chip${channel === 'email' ? ' chip--active' : ''}`} onClick={() => setChannel('email')}>
+            <button type="button" disabled={sending} className={`chip${channel === 'email' ? ' chip--active' : ''}`} onClick={() => setChannel('email')}>
               <Mail size={14} /> Email
             </button>
-            <button type="button" className={`chip${channel === 'both' ? ' chip--active' : ''}`} onClick={() => setChannel('both')}>
+            <button type="button" disabled={sending} className={`chip${channel === 'both' ? ' chip--active' : ''}`} onClick={() => setChannel('both')}>
               Ambos
             </button>
           </div>
@@ -1247,10 +1263,10 @@ function MessagesTab({
         <div className="field">
           <span className="field-label">Destinatário</span>
           <div className="chip-row">
-            <button type="button" className={`chip${recipientMode === 'one' ? ' chip--active' : ''}`} onClick={() => setRecipientMode('one')}>
+            <button type="button" disabled={sending} className={`chip${recipientMode === 'one' ? ' chip--active' : ''}`} onClick={() => setRecipientMode('one')}>
               Um usuário
             </button>
-            <button type="button" className={`chip${recipientMode === 'all' ? ' chip--active' : ''}`} onClick={() => setRecipientMode('all')}>
+            <button type="button" disabled={sending} className={`chip${recipientMode === 'all' ? ' chip--active' : ''}`} onClick={() => setRecipientMode('all')}>
               Todos ({users.length})
             </button>
           </div>
@@ -1277,6 +1293,7 @@ function MessagesTab({
               onChange={(e) => setSubject(e.target.value)}
               maxLength={150}
               placeholder="Assunto do email"
+              disabled={sending}
             />
           </label>
         )}
@@ -1290,6 +1307,7 @@ function MessagesTab({
             maxLength={1000}
             rows={4}
             placeholder={recipientMode === 'all' ? 'Mensagem para todos os usuários…' : 'Mensagem…'}
+            disabled={sending}
           />
           <span className="admin-char-count">{message.length}/1000</span>
         </label>
@@ -1300,7 +1318,7 @@ function MessagesTab({
           <div className="admin-message-result">
             {outcome.kind === 'individual' ? (
               <>
-                {channel !== 'email' ? (
+                {outcome.channel !== 'email' ? (
                   <p>Push: {outcome.push.sent}/{outcome.push.tokensFound} dispositivo(s)</p>
                 ) : null}
                 {outcome.email ? (
@@ -1311,8 +1329,8 @@ function MessagesTab({
               </>
             ) : (
               <>
-                {channel !== 'email' ? <p>Push: {outcome.pushSent}/{outcome.pushFound} dispositivo(s)</p> : null}
-                {channel !== 'push' ? <p>Email: {outcome.emailSent}/{outcome.emailAttempted} enviados</p> : null}
+                {outcome.channel !== 'email' ? <p>Push: {outcome.pushSent}/{outcome.pushFound} dispositivo(s)</p> : null}
+                {outcome.channel !== 'push' ? <p>Email: {outcome.emailSent}/{outcome.emailAttempted} enviados</p> : null}
               </>
             )}
           </div>
@@ -1724,6 +1742,7 @@ export function AdminPage() {
                 onLoadMore={() => void loadMoreMessages()}
                 onRefreshMessages={refreshMessages}
                 presetUserId={pendingMessageRecipient}
+                onPresetConsumed={() => setPendingMessageRecipient(null)}
               />
             )}
           </>
