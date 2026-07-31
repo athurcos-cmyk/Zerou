@@ -6,6 +6,11 @@ import { createActiveMemberCheck } from './shared/activeMember.js';
 
 const region = 'southamerica-east1';
 
+// ⚠️ O `link` do webpush precisa ser URL ABSOLUTA em HTTPS — o FCM rejeita caminho
+// relativo. Estava '/app/search' aqui, o que faria todo alerta de orçamento falhar no
+// envio assim que o índice faltante fosse criado. Os outros pushes já usavam absoluto.
+const ANALYSIS_LINK = 'https://granativa.com.br/app/search';
+
 function nowInBRT(): Date {
   return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
 }
@@ -41,7 +46,12 @@ export const sendBudgetAlerts = onSchedule(
     const year = currentYear();
     const mon = currentMonth();
 
-    // Collection group query: all active budgets across all workspaces
+    // ⚠️ Consulta de CAMPO ÚNICO em escopo de collection group NÃO é servida pelo índice
+    // automático do Firestore (que é por coleção): precisa da exceção
+    // `budgets.isActive` em `firestore.indexes.json` (fieldOverrides, COLLECTION_GROUP).
+    // Sem ela, esta function morre com FAILED_PRECONDITION todo dia — foi o que aconteceu
+    // desde que a feature nasceu (14/07) até 30/07/2026, sem nenhum alerta jamais sair.
+    // Mesmo bug que já tinha quebrado a vinculação do WhatsApp (`whatsappLinkCodes.code`).
     const budgetsSnap = await db
       .collectionGroup('budgets')
       .where('isActive', '==', true)
@@ -55,6 +65,7 @@ export const sendBudgetAlerts = onSchedule(
     logger.info(`budgetAlerts: checking ${budgetsSnap.size} active budgets`);
 
     for (const budgetDoc of budgetsSnap.docs) {
+      try {
       const budget = budgetDoc.data();
       const workspaceId = budget.workspaceId as string;
       const categoryId = budget.categoryId as string;
@@ -128,7 +139,7 @@ export const sendBudgetAlerts = onSchedule(
           createdBy,
           `Orçamento estourado: ${catName}`,
           `Você já gastou ${formatBRL(spentCents)} de ${formatBRL(limitCents)} em ${catName} este mês (${pct}%).`,
-          '/app/search',
+          ANALYSIS_LINK,
         );
         await alertStateRef.update({ notified100: true, updatedAt: new Date() });
         logger.info(`budgetAlerts: 100% alert sent for ${catName} (${workspaceId})`);
@@ -137,10 +148,13 @@ export const sendBudgetAlerts = onSchedule(
           createdBy,
           `Limite próximo: ${catName}`,
           `Você já gastou ${pct}% do orçamento de ${catName} este mês (${formatBRL(spentCents)} de ${formatBRL(limitCents)}).`,
-          '/app/search',
+          ANALYSIS_LINK,
         );
         await alertStateRef.update({ notified80: true, updatedAt: new Date() });
         logger.info(`budgetAlerts: 80% alert sent for ${catName} (${workspaceId})`);
+      }
+      } catch (err) {
+        logger.error('sendBudgetAlerts: erro ao processar orçamento — pulando', err);
       }
     }
 

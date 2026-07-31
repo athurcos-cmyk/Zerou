@@ -118,6 +118,20 @@
   ],
   "fieldOverrides": [
     {
+      "collectionGroup": "budgets",
+      "fieldPath": "isActive",
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
+    },
+    {
       "collectionGroup": "whatsappLinkCodes",
       "fieldPath": "code",
       "indexes": [
