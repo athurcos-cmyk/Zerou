@@ -2,6 +2,22 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-31 (parte 4) — fix(push): notificação só registra no PWA instalado, nunca numa aba
+
+Achado pelo dono testando: mandar um push chegou **duas vezes** no celular. Causa: ele tinha
+aceito notificação tanto pelo navegador quanto pelo PWA instalado — dois contextos, dois tokens
+FCM, toda notificação duplicada. **Já deployado.**
+
+- `isStandalonePwa()` (`src/pwa/notifications.ts`) — detecta `display-mode: standalone`
+  (Android/desktop) ou `navigator.standalone` (iOS legado). `requestAndRegisterPushToken` e
+  `listenForForegroundPush` só agem se for verdade — uma aba comum do navegador nunca mais pede
+  permissão nem registra token, então nunca mais existe um segundo token pro mesmo aparelho.
+- **Limpeza única**: apagados os 5 tokens FCM que existiam em produção (todos residuais de
+  antes do fix de escopo do SW de ontem) — cada pessoa registra um token limpo, correto, na
+  próxima abertura pelo PWA. Push fica temporariamente inativo pra todo mundo até essa reabertura.
+- 8/8 testes de `notifications.test.ts` (2 novos: bloqueia fora do PWA, reconhece
+  `navigator.standalone` no iOS). 506 testes de cliente verdes.
+
 ## 2026-07-31 (parte 2) — fix(admin): exclusão de conta deixava 4 resíduos + leitura desnecessária
 
 Duas perguntas de acompanhamento depois da feature de Mensagens. Detalhe em

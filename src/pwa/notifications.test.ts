@@ -98,6 +98,12 @@ beforeEach(() => {
     'Notification',
     Object.assign(vi.fn(), { permission: 'granted', requestPermission: async () => 'granted' })
   );
+
+  // Por padrão os testes rodam como se estivessem no PWA instalado (standalone) — é o único
+  // contexto em que o registro de push acontece de verdade (ver isStandalonePwa). Os testes
+  // que verificam o gate sobrescrevem isso.
+  vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: true }));
+  Object.defineProperty(navigator, 'standalone', { configurable: true, value: undefined });
 });
 
 afterEach(() => {
@@ -155,6 +161,30 @@ describe('requestAndRegisterPushToken', () => {
     expect(setDocMock).not.toHaveBeenCalled();
     expect(deleteDocMock).not.toHaveBeenCalled();
   });
+
+  // Decisão do dono (2026-07-31): abrir pelo navegador e aceitar notificação, depois instalar
+  // o PWA e aceitar de novo, registrava DOIS tokens pro mesmo usuário — toda notificação
+  // chegava duas vezes. A partir de agora só o PWA instalado (standalone) pede permissão.
+  it('nunca pede permissão nem registra o SW numa aba comum do navegador (display-mode != standalone)', async () => {
+    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: false }));
+
+    const { requestAndRegisterPushToken } = await loadModule();
+    await requestAndRegisterPushToken();
+
+    expect(registerMock).not.toHaveBeenCalled();
+    expect(getTokenMock).not.toHaveBeenCalled();
+    expect(setDocMock).not.toHaveBeenCalled();
+  });
+
+  it('reconhece o PWA instalado no iOS via navigator.standalone, mesmo sem display-mode', async () => {
+    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: false }));
+    Object.defineProperty(navigator, 'standalone', { configurable: true, value: true });
+
+    const { requestAndRegisterPushToken } = await loadModule();
+    await requestAndRegisterPushToken();
+
+    expect(registerMock).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('listenForForegroundPush', () => {
@@ -181,5 +211,14 @@ describe('listenForForegroundPush', () => {
         tag: 'Conta vence em breve|Luz: R$ 120,00 vence em 02/08',
       })
     );
+  });
+
+  it('não escuta push numa aba comum do navegador, mesmo com permissão já concedida antes', async () => {
+    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: false }));
+
+    const { listenForForegroundPush } = await loadModule();
+    await listenForForegroundPush();
+
+    expect(onMessageMock).not.toHaveBeenCalled();
   });
 });

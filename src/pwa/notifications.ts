@@ -18,6 +18,20 @@ const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY as string | undefined;
 // envios (nenhum token virava stale) e nenhuma notificação aparecia no aparelho.
 const FCM_SW_SCOPE = '/firebase-cloud-messaging-push-scope';
 
+// Só registra push no modo PWA instalado (standalone) — nunca numa aba comum do navegador.
+// Decisão do dono (2026-07-31): abrir pelo navegador e aceitar notificação, depois instalar o
+// PWA e aceitar de novo, registrava DOIS tokens pro mesmo usuário — toda notificação chegava
+// duas vezes. Restringir o pedido de permissão a um único caminho (o PWA instalado) elimina a
+// causa: nunca existem dois contextos concorrendo por token no mesmo aparelho. Efeito
+// colateral aceito: quem só usa pelo navegador nunca recebe push — o app funciona normalmente,
+// só sem notificação.
+function isStandalonePwa(): boolean {
+  if (window.matchMedia('(display-mode: standalone)').matches) return true;
+  // iOS Safari não suporta a media query `display-mode` — usa a propriedade legada
+  // `navigator.standalone`, `true` só quando aberto pela tela de início.
+  return (navigator as Navigator & { standalone?: boolean }).standalone === true;
+}
+
 // Pede permissão de notificação e salva o token FCM do dispositivo no Firestore.
 // É chamado uma vez após o usuário autenticar, em toda sessão. Falha
 // silenciosamente — nunca quebra o app se o usuário recusar ou o browser não
@@ -25,6 +39,7 @@ const FCM_SW_SCOPE = '/firebase-cloud-messaging-push-scope';
 export async function requestAndRegisterPushToken(): Promise<void> {
   if (!VAPID_KEY) return;
   if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
+  if (!isStandalonePwa()) return;
 
   const permission =
     Notification.permission === 'granted'
@@ -91,6 +106,7 @@ export async function requestAndRegisterPushToken(): Promise<void> {
 export async function listenForForegroundPush(): Promise<void> {
   if (!VAPID_KEY) return;
   if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
+  if (!isStandalonePwa()) return;
   if (Notification.permission !== 'granted') return;
 
   try {
