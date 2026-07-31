@@ -27,6 +27,7 @@ import {
   confirmCardPurchase,
   categoryCreatedMessage,
   categoryAlreadyExistsMessage,
+  withGroupNote,
   subcategoryCreatedMessage,
   categoryCreatedWithParentOfferMessage,
   categoryMovedMessage,
@@ -62,7 +63,7 @@ async function resolveOrCreateCategory(
   intent: 'expense' | 'income' | 'card_purchase',
   interpretation: MessageInterpretation,
   categories: CategoryOption[],
-): Promise<string | null> {
+): Promise<{ categoryId: string | null; groupRejected: string | null }> {
   const expectedType = intent === 'income' ? 'income' : 'expense';
 
   let categoryId = interpretation.categoryId;
@@ -83,10 +84,17 @@ async function resolveOrCreateCategory(
       type: interpretation.newCategoryType ?? expectedType,
       icon: interpretation.newCategoryIcon,
     });
+
+    // PORTA DOS FUNDOS pro pai: "coloca na categoria Casa" com Casa ja sendo agrupamento. O
+    // filtro da lista nao cobre este caminho (o modelo nao acha Casa na lista e pede pra criar);
+    // quem cobre e esta checagem. Lanca sem categoria e avisa, em vez de gravar no pai.
+    if (newCategory.isGroup) {
+      return { categoryId: null, groupRejected: newCategory.name };
+    }
     categoryId = newCategory.id;
   }
 
-  return categoryId;
+  return { categoryId, groupRejected: null };
 }
 
 /**
@@ -517,7 +525,7 @@ export const whatsappWebhook = onRequest(
           return;
         }
 
-        const categoryId = await resolveOrCreateCategory(workspaceId, linkedByUid, 'card_purchase', interpretation, categories);
+        const { categoryId, groupRejected } = await resolveOrCreateCategory(workspaceId, linkedByUid, 'card_purchase', interpretation, categories);
 
         const cardsSnap = await db.collection(`workspaces/${workspaceId}/cards`).get();
         // Mesmo padrao de useCardsData.ts: isActive ausente conta como ativo, so exclui isActive === false.
@@ -546,13 +554,16 @@ export const whatsappWebhook = onRequest(
 
           await sendWhatsAppMessage(
             phone,
-            confirmCardPurchase({
-              amountCents: result.amountCents,
-              description: result.description,
-              categoryName: result.categoryName,
-              cardName: result.cardName,
-              installments: interpretation.installments,
-            }),
+            withGroupNote(
+              confirmCardPurchase({
+                amountCents: result.amountCents,
+                description: result.description,
+                categoryName: result.categoryName,
+                cardName: result.cardName,
+                installments: interpretation.installments,
+              }),
+              groupRejected,
+            ),
           );
           return;
         }
@@ -571,12 +582,15 @@ export const whatsappWebhook = onRequest(
 
         await sendWhatsAppMessage(
           phone,
-          pendingChoicePrompt({
-            emoji: '💳',
-            question: 'Qual cartão usar?',
-            labels: activeCards.map((c) => c.label),
-            instructions: 'Responda com o número em até 3 minutos.',
-          }),
+          withGroupNote(
+            pendingChoicePrompt({
+              emoji: '💳',
+              question: 'Qual cartão usar?',
+              labels: activeCards.map((c) => c.label),
+              instructions: 'Responda com o número em até 3 minutos.',
+            }),
+            groupRejected,
+          ),
         );
         return;
       }
@@ -699,7 +713,7 @@ export const whatsappWebhook = onRequest(
         return;
       }
 
-      const categoryId = await resolveOrCreateCategory(workspaceId, linkedByUid, interpretation.intent, interpretation, categories);
+      const { categoryId, groupRejected } = await resolveOrCreateCategory(workspaceId, linkedByUid, interpretation.intent, interpretation, categories);
       const description = interpretation.description || cleanText.slice(0, 80);
       const accountId = resolveDebitCreditAccount(interpretation.accountId, accounts);
 
@@ -719,12 +733,15 @@ export const whatsappWebhook = onRequest(
         const verb = interpretation.intent === 'income' ? 'entra' : 'sai';
         await sendWhatsAppMessage(
           phone,
-          pendingChoicePrompt({
-            emoji: interpretation.intent === 'income' ? '💰' : '💸',
-            question: `De qual conta ${verb} esse valor?`,
-            labels: accountCandidates(accounts).map((c) => c.label),
-            instructions: 'Responda com o número em até 3 minutos.',
-          }),
+          withGroupNote(
+            pendingChoicePrompt({
+              emoji: interpretation.intent === 'income' ? '💰' : '💸',
+              question: `De qual conta ${verb} esse valor?`,
+              labels: accountCandidates(accounts).map((c) => c.label),
+              instructions: 'Responda com o número em até 3 minutos.',
+            }),
+            groupRejected,
+          ),
         );
         return;
       }
@@ -745,12 +762,15 @@ export const whatsappWebhook = onRequest(
       const confirm = interpretation.intent === 'income' ? confirmIncome : confirmExpense;
       await sendWhatsAppMessage(
         phone,
-        confirm({
-          amountCents: result.amountCents,
-          description: result.description,
-          categoryName: result.categoryName,
-          accountName,
-        }),
+        withGroupNote(
+          confirm({
+            amountCents: result.amountCents,
+            description: result.description,
+            categoryName: result.categoryName,
+            accountName,
+          }),
+          groupRejected,
+        ),
       );
 
       logger.info('whatsapp_transaction_created', {

@@ -20,6 +20,13 @@ perguntar antes (como no cartão) ou guardar ~3 mensagens de memória.
 - Nome de pai citado que não existe não vira silêncio: cria como principal e diz o motivo.
 - Filha herda **cor e tipo** do pai, igual ao app; só as raízes podem ser pai (trava de 1 nível,
   provada por sabotagem). 122 testes das functions verdes.
+- **Ela também LANÇA em subcategoria** (pergunta do dono): subcategoria é folha, então já estava na
+  lista; agora a lista mostra a **hierarquia** (`Casa > Água`), sem o que duas "Água" em ramos
+  diferentes — legítimo com subcategorias — ficariam indistinguíveis pro modelo.
+- **Porta dos fundos pro pai, achada ao responder essa pergunta e fechada**: "coloca na categoria
+  Casa" com Casa já sendo agrupamento fazia o modelo não achar Casa na lista, pedir pra criar, e a
+  criação devolver a Casa existente — **o lançamento caía no pai**, furando `[D10]`. Agora lança
+  sem categoria e avisa o motivo.
 - **Medida a lentidão que o dono notou** (`docs/COSTS.md` seção 8): **não é o prompt** — é cold
   start. Quente 2,2–3,2s, frio 4,8–6,2s, e a amostra mais lenta é de *antes* do prompt crescer.
   Matar isso custa ~US$60/mês (`minInstances: 1` com CPU sempre alocada); levantado, nada ativado.

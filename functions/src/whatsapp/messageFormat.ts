@@ -94,6 +94,16 @@ export function categoryMovedMessage(name: string, parentName: string): string {
   return `🏷️ Pronto — *${name}* agora fica dentro de *${parentName}*, herdando a cor dela.\n\n_${parentName} vira agrupamento: os lançamentos passam a ir nas subcategorias._`;
 }
 
+/**
+ * Aviso colado na confirmação quando a pessoa pediu pra lançar numa categoria que virou
+ * **agrupamento**. O lançamento acontece (sem categoria) e a mensagem diz por quê — calar seria
+ * pior: a pessoa acharia que foi categorizado como pediu.
+ */
+export function withGroupNote(message: string, groupName: string | null): string {
+  if (!groupName) return message;
+  return `${message}\n\n_Obs.: *${groupName}* virou agrupamento (tem subcategorias), então não recebe lançamento. Lancei sem categoria — me diga a subcategoria e eu corrijo pelo app._`;
+}
+
 /** O nome de pai citado na mensagem não bateu com categoria nenhuma que possa ser pai. */
 export function categoryParentNotFoundMessage(name: string, requestedParent: string): string {
   return `🏷️ Criei *${name}* como categoria principal — não achei nenhuma categoria chamada *${requestedParent}* pra colocar ela dentro.\n\n_Dá pra organizar isso no app, em Menu > Categorias._`;

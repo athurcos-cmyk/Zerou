@@ -207,6 +207,26 @@ Detalhes que valem lembrar:
 - **Fora de escopo**: criar a hierarquia inteira por mensagem (ex.: "cria Casa com Energia e Água
   dentro") e mover categoria já existente — isso é trabalho de tela.
 
+### Lançar EM subcategoria (2026-07-30)
+
+Pergunta do dono: *"ela sabe criar subcategoria agora, mas ela sabe registrar?"*. Sabe — e melhor
+do que só "sabe":
+
+- Subcategoria é **folha**, então já entra na lista que vai pro modelo (quem sai é o pai).
+- O prompt manda escolher a categoria **mais específica** que combina, então "paguei 200 de
+  energia" cai em `Casa › Energia`, não em algo genérico.
+- A lista agora mostra a **hierarquia** (`cat_x: Casa > Água (expense)`). Sem isso, duas "Água" em
+  ramos diferentes — que a hierarquia torna *legítimo* — ficariam indistinguíveis, e "paguei a água
+  de casa" viraria sorteio.
+
+**Furo achado ao responder essa pergunta, e fechado no mesmo commit:** o filtro tira o pai da
+*lista*, mas havia uma **porta dos fundos**. Quem escreve "gastei 200, coloca na categoria Casa"
+com Casa já sendo agrupamento faz o modelo não achar Casa na lista e devolver
+`newCategoryName: "Casa"`; `createCategoryFromMessage` encontrava a Casa existente pelo nome e
+devolvia o id dela — **o lançamento ia parar no pai**, exatamente o que `[D10]` proíbe. Agora essa
+função devolve `isGroup`, e o handler lança **sem categoria** com um aviso explicando o motivo
+(calar seria pior: a pessoa acharia que foi categorizado como pediu).
+
 ### Comportamentos esperados (não são bugs)
 
 - **Histórico some ao recarregar a página**: o chat é puramente em memória (React state). Não persiste em localStorage/Firestore. Decisão intencional — simplicidade.

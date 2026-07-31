@@ -5,6 +5,8 @@ export interface CategoryOption {
   id: string;
   name: string;
   type: 'income' | 'expense' | 'both';
+  /** Nome da categoria principal, quando esta é uma subcategoria — vira "Casa > Água" na lista. */
+  parentName?: string;
 }
 
 export interface AccountOption {
@@ -228,8 +230,10 @@ export async function interpretMessage(
   categories: CategoryOption[],
   accounts: AccountOption[],
 ): Promise<MessageInterpretation | null> {
+  // Subcategoria vai com o pai na frente ("Casa > Agua"): duas "Agua" em ramos diferentes sao
+  // legitimas com hierarquia, e sem essa pista o modelo nao teria como escolher entre elas.
   const categoryList = categories.length > 0
-    ? categories.map((c) => `  ${c.id}: ${c.name} (${c.type})`).join('\n')
+    ? categories.map((c) => `  ${c.id}: ${c.parentName ? `${c.parentName} > ` : ''}${c.name} (${c.type})`).join('\n')
     : 'Nenhuma categoria cadastrada.';
 
   const accountList = accounts.length > 0

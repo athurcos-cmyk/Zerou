@@ -26,10 +26,18 @@ export function selectableCategoryOptions(rows: readonly CategoryRow[]): Categor
   const parentIds = new Set(
     rows.map((row) => row.parentCategoryId).filter((id): id is string => Boolean(id)),
   );
+  const nameById = new Map(rows.map((row) => [row.id, row.name]));
 
   return rows
     .filter((row) => !parentIds.has(row.id))
-    .map((row) => ({ id: row.id, name: row.name, type: row.type }));
+    .map((row) => {
+      // O nome do pai vai junto pro modelo (a lista mostra "Casa > Agua"). Sem isso, duas
+      // subcategorias com o mesmo nome em ramos diferentes — "Agua" em Casa e em Mercado, que a
+      // hierarquia torna LEGITIMO — ficam indistinguiveis, e "paguei a agua de casa" viraria
+      // sorteio entre as duas.
+      const parentName = row.parentCategoryId ? nameById.get(row.parentCategoryId) : undefined;
+      return { id: row.id, name: row.name, type: row.type, ...(parentName ? { parentName } : {}) };
+    });
 }
 
 /**

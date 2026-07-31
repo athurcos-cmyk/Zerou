@@ -28,9 +28,25 @@ export interface CreateCategoryFromMessageInput {
   parent?: { id: string; color?: string | null; type: 'income' | 'expense' | 'both' } | null;
 }
 
+export interface CreatedCategory {
+  id: string;
+  name: string;
+  created: boolean;
+  /**
+   * `true` quando a categoria que já existia com esse nome virou **agrupamento** (tem
+   * subcategoria ativa). Quem chama **não pode lançar nela** — é a regra `[D10]`.
+   *
+   * Sem esta flag existia um furo real: o filtro de categorias-pai tira o pai da lista que vai
+   * pro modelo, mas quem pede "coloca na categoria Casa" cai por OUTRO caminho — o modelo não
+   * acha "Casa" na lista, devolve `newCategoryName: "Casa"`, e esta função, ao encontrar a Casa
+   * existente pelo nome, devolvia o id dela. O lançamento ia parar no pai pela porta dos fundos.
+   */
+  isGroup: boolean;
+}
+
 export async function createCategoryFromMessage(
   input: CreateCategoryFromMessageInput,
-): Promise<{ id: string; name: string; created: boolean }> {
+): Promise<CreatedCategory> {
   const db = getFirestore();
   const name = input.name.trim().slice(0, 80);
 
@@ -44,7 +60,8 @@ export async function createCategoryFromMessage(
   );
 
   if (existing) {
-    return { id: existing.id, name: existing.data().name as string, created: false };
+    const isGroup = activeSnap.docs.some((d) => d.data().parentCategoryId === existing.id);
+    return { id: existing.id, name: existing.data().name as string, created: false, isGroup };
   }
 
   const icon = input.icon && categoryIconKeys.includes(input.icon) ? input.icon : 'sliders';
@@ -72,7 +89,8 @@ export async function createCategoryFromMessage(
     updatedAt: now,
   });
 
-  return { id, name, created: true };
+  // Recém-criada nunca tem filha — então nunca é agrupamento.
+  return { id, name, created: true, isGroup: false };
 }
 
 /**

@@ -41,7 +41,7 @@ describe('selectableCategoryOptions', () => {
       { id: 'casa', name: 'Casa', type: 'expense' },
     ]);
 
-    expect(energia).toEqual({ id: 'energia', name: 'Energia', type: 'both' });
+    expect(energia).toEqual({ id: 'energia', name: 'Energia', type: 'both', parentName: 'Casa' });
   });
 
   it('lista vazia nao quebra', () => {
@@ -71,5 +71,38 @@ describe('parentCandidateRows', () => {
 
   it('lista vazia nao quebra', () => {
     expect(parentCandidateRows([])).toEqual([]);
+  });
+});
+
+/**
+ * Hierarquia visivel pro modelo: a lista que vai no prompt mostra "Casa > Agua". Sem isso, duas
+ * subcategorias de mesmo nome em ramos diferentes (legitimo desde as subcategorias) ficam
+ * indistinguiveis.
+ */
+describe('selectableCategoryOptions — nome do pai junto', () => {
+  const doisRamos: CategoryRow[] = [
+    { id: 'casa', name: 'Casa', type: 'expense' },
+    { id: 'agua_casa', name: 'Água', type: 'expense', parentCategoryId: 'casa' },
+    { id: 'mercado', name: 'Mercado', type: 'expense' },
+    { id: 'agua_mercado', name: 'Água', type: 'expense', parentCategoryId: 'mercado' },
+  ];
+
+  it('marca cada subcategoria com o nome da principal', () => {
+    const options = selectableCategoryOptions(doisRamos);
+
+    expect(options.find((o) => o.id === 'agua_casa')?.parentName).toBe('Casa');
+    expect(options.find((o) => o.id === 'agua_mercado')?.parentName).toBe('Mercado');
+  });
+
+  it('categoria principal nao ganha parentName', () => {
+    const [transporte] = selectableCategoryOptions([row('transporte')]);
+
+    expect(transporte.parentName).toBeUndefined();
+  });
+
+  it('pai que sumiu do mapa nao inventa nome', () => {
+    const [orfa] = selectableCategoryOptions([row('energia', 'casa')]);
+
+    expect(orfa.parentName).toBeUndefined();
   });
 });
