@@ -219,6 +219,9 @@ do que só "sabe":
   ramos diferentes — que a hierarquia torna *legítimo* — ficariam indistinguíveis, e "paguei a água
   de casa" viraria sorteio.
 
+**Deployado em 2026-07-30** (revisão `whatsappwebhook-00060-6j4`), com o `--no-cpu-throttling`
+reaplicado e conferido depois.
+
 **Furo achado ao responder essa pergunta, e fechado no mesmo commit:** o filtro tira o pai da
 *lista*, mas havia uma **porta dos fundos**. Quem escreve "gastei 200, coloca na categoria Casa"
 com Casa já sendo agrupamento faz o modelo não achar Casa na lista e devolver
@@ -296,6 +299,23 @@ npx firebase functions:secrets:list --project zerou-26757
 ```
 
 **Nunca deployar `firestore.rules` sem autorização explícita** (regra do `CLAUDE.md`).
+
+## As duas Vics cobram por caminhos diferentes (2026-07-30)
+
+Dúvida do dono: *"eu pensei que a Vic do app usava só a DeepSeek"*. Ela usa a DeepSeek **pra
+pensar**, mas quem executa é Cloud Function — então toda mensagem consome **CPU do Google +
+leituras do Firestore + tokens da DeepSeek**.
+
+O detalhe que importa: `financialAssistantChat` é `onCall` (processa e só então responde), então
+roda no modelo de cobrança **padrão** — CPU só durante a requisição, **ocioso não custa nada**. Já o
+`whatsappWebhook` responde 200 à Meta e processa depois, o que obriga o `--no-cpu-throttling` e faz
+ele pagar o tempo ocioso.
+
+Consequência prática: **CPU não é o gargalo da Vic do app; leitura é.** `buildFinancialContext` lê,
+a cada mensagem, perfil + categorias + transações de 90 dias (limite 2.000) + bills + recorrências +
+cartões e faturas + contas + orçamentos + metas + casal — da ordem de **~250 leituras por mensagem**
+pra quem tem ~200 transações no período. Quando apertar, encolher o contexto é o caminho; CPU não
+resolve nada aqui. Números e patamares em `docs/COSTS.md` seção 8.
 
 ## Custos
 

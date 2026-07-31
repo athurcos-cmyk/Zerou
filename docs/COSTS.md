@@ -203,6 +203,35 @@ contêiner do `whatsappWebhook` carrega esse índice inteiro no boot — Stripe,
 tudo. Separar o WhatsApp num **codebase próprio** faria o contêiner carregar só o que ele usa.
 Não elimina o cold start, mas ataca a parte cara dele sem custo mensal nenhum.
 
+### A Vic do app também roda no Google — mas cobra por outro caminho
+
+Dúvida do dono: *"eu pensei que a Vic do app usava só a DeepSeek"*. Usa a DeepSeek **para pensar**,
+mas quem executa é uma Cloud Function (`financialAssistantChat`), que roda em Cloud Run igual ao
+webhook do WhatsApp. Toda mensagem tem **três** superfícies de custo: CPU do Google, leituras do
+Firestore e tokens da DeepSeek.
+
+O que muda entre as duas Vics — e é a parte não óbvia:
+
+| | WhatsApp (`whatsappWebhook`) | App (`financialAssistantChat`) |
+|---|---|---|
+| CPU | **sempre alocada** (`--no-cpu-throttling`) | só **durante a requisição** (padrão) |
+| Paga o tempo ocioso? | **Sim** — é o que a seção acima mede | **Não** |
+| Memória | 512 MiB | 256 MiB |
+| Custo dominante | tempo de instância (cold start × ~15 min) | **leituras do Firestore** |
+
+O webhook precisa da CPU sempre alocada porque responde 200 à Meta e **processa depois**. A Vic do
+app é `onCall`: ela processa e só então devolve a resposta — tudo acontece dentro da requisição,
+então o modelo barato (padrão) serve, e o ocioso não custa nada. **CPU não é o gargalo dela.**
+
+O gargalo é **leitura**. `buildFinancialContext` monta o contexto lendo, a cada mensagem: perfil,
+categorias, transações dos últimos 90 dias (limite 2.000), contas a pagar, recorrências, cartões +
+faturas de cada cartão, contas, orçamentos, metas e o espaço do casal. Para alguém com ~200
+transações no período, isso é da ordem de **~250 leituras por mensagem**.
+
+Com 50.000 leituras/dia grátis no Firestore, isso dá **~200 mensagens/dia** somando todo mundo antes
+de encostar no limite — e o rate limit de 60 msg/dia por workspace já segura naturalmente. Quando
+apertar, o caminho é encolher o contexto (menos dias, menos coleções), não CPU.
+
 ### Quando o WhatsApp começa a custar (e a conta se inverter)
 
 **Não dá pra encurtar o tempo ocioso**: o Cloud Run decide sozinho quanto tempo mantém a instância

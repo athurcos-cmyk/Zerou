@@ -20,6 +20,8 @@ perguntar antes (como no cartão) ou guardar ~3 mensagens de memória.
 - Nome de pai citado que não existe não vira silêncio: cria como principal e diz o motivo.
 - Filha herda **cor e tipo** do pai, igual ao app; só as raízes podem ser pai (trava de 1 nível,
   provada por sabotagem). 122 testes das functions verdes.
+- **Deployado** (`whatsappWebhook`, revisão `00060-6j4`), com o `--no-cpu-throttling` reaplicado e
+  conferido — o Cloud Run reseta essa flag a cada deploy.
 - **Ela também LANÇA em subcategoria** (pergunta do dono): subcategoria é folha, então já estava na
   lista; agora a lista mostra a **hierarquia** (`Casa > Água`), sem o que duas "Água" em ramos
   diferentes — legítimo com subcategorias — ficariam indistinguíveis pro modelo.
@@ -29,7 +31,13 @@ perguntar antes (como no cartão) ou guardar ~3 mensagens de memória.
   sem categoria e avisa o motivo.
 - **Medida a lentidão que o dono notou** (`docs/COSTS.md` seção 8): **não é o prompt** — é cold
   start. Quente 2,2–3,2s, frio 4,8–6,2s, e a amostra mais lenta é de *antes* do prompt crescer.
-  Matar isso custa ~US$60/mês (`minInstances: 1` com CPU sempre alocada); levantado, nada ativado.
+  Matar isso custa ~US$60/mês (`minInstances: 1` com CPU sempre alocada). **Decisão do dono: não
+  mexer** — hoje o uso cabe no free tier (R$ 0) e mesmo 10 usuários dariam ~US$5,60/mês; por volta
+  de 60–70 usuários pesados a conta se inverte sozinha. Gatilho de revisão anotado nos TODOs.
+- **As duas Vics cobram por caminhos diferentes** (dúvida do dono, documentado em `VIC.md` e
+  `COSTS.md`): as duas rodam em Cloud Function, mas a do app é `onCall` — processa e só então
+  responde, então CPU só é cobrada **durante a requisição** e o ocioso é de graça. O gargalo dela
+  não é CPU, é **leitura**: ~250 documentos por mensagem pra montar o contexto.
 
 ## 2026-07-30 — feat(categorias): subcategorias, de ponta a ponta
 
