@@ -2,6 +2,28 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-31 — feat(admin): enviar push/email pro usuário e pra todos, com histórico
+
+Pedido do dono: a mesma capacidade que já existe no admin de outro projeto dele (Plantão) — mandar
+uma mensagem (push e/ou email) pra um usuário específico, ou pra todos de uma vez. Detalhe em
+`docs/history/2026-07.md`. **Já deployado** (cliente + regra + as 2 functions novas).
+
+- Nova aba "Mensagens" no admin (`AdminPage.tsx`): composer com chips de canal (Push/Email/Ambos —
+  reaproveita a classe `.chip` já usada em `GoalContributeSheet`/`SearchPage`), seletor de
+  destinatário (um usuário via `SelectField` com busca, ou todos), histórico paginado.
+- **Broadcast pra "todos" abre confirmação com a contagem real de destinatários antes de
+  disparar** — gap de segurança que o Plantão (a referência) não tem.
+- Backend novo (`functions/src/admin/adminMessaging.ts`, codebase `billing`) reaproveita
+  `sendPushToUser` (`push.ts`) e o provider de email Resend já existentes — **não** duplica infra
+  no `functions-admin` (codebase separado, sem a secret do Resend).
+- `sendPushToUser` passou a retornar `{ tokensFound, sent }` em vez de `void` (aditivo — os 3
+  callers existentes ignoram o retorno).
+- Histórico em `adminMessages/{id}`, regra copiada do padrão já existente de `whatsappPhoneIndex`
+  (`allow read: if isAdmin(); allow write: if false`). 77/77 testes de regras verdes.
+- Não verificado visualmente no browser — a rota `/admin` exige o email real do dono, sem
+  credencial disponível pra login automatizado. Validado por typecheck, build e as 3 suítes de
+  teste (503 cliente, 125 functions, 77 regras).
+
 ## 2026-07-30 (parte 3) — fix(push): nenhuma notificação chegava — dois bugs independentes
 
 Relato do dono: *"nenhuma notificação está sendo enviada"*. Tudo indicava sucesso — as 5 functions
