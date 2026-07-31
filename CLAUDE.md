@@ -92,6 +92,18 @@ Isso vale tanto pra campo novo (`createdBy`) quanto pra valor novo dentro de um 
 
 ---
 
+## ⚠️ Query (`list`) com `where()` contra uma regra em OR pode ser negada mesmo com dado correto (2026-07-31)
+
+Achado auditando exclusão de conta: uma query `where('usedBy', '==', uid)` em `coupleInvites` falhava com `"Property workspaceId is undefined for 'list'"` — nenhum documento real tinha esse campo faltando. A causa é o motor de regras do Firestore, não o dado.
+
+**Por quê**: pra uma operação `list` (query), o Firestore precisa **provar estaticamente** que a regra vale pra *qualquer* documento que a query poderia tocar — não avalia documento por documento como faz num `get()`. Se a regra é um `||` de vários ramos (ex.: `whatsappPhoneIndex`/`coupleInvites`/`adminMessages`, que testam `status`, `expiresAt`, `isActiveMember(workspaceId)`, `isAdmin()`) e a query não fixa (`where(...)`) **todos** os campos que a regra lê em pelo menos um ramo provável, a `list()` inteira é recusada — não devolve resultado parcial, nem lança erro "sem permissão" claro, lança um erro de campo indefinido que parece bug de dado.
+
+**Regra**: antes de escrever uma query nova (`getDocs(query(collection(...), where(...)))`) contra uma coleção cuja regra de leitura tenha mais de uma cláusula (`||`), verificar se os `where()` cobrem os campos de pelo menos um ramo inteiro da regra. Se não der pra restringir o suficiente (ex.: a regra depende de `isActiveMember`, que olha outro documento, ou de `isAdmin()`, que olha o token), **não force a query** — leia um campo já persistido que aponte pro doc certo (padrão usado em `accountDeletionService.ts`: `acceptedInviteId` gravado no doc do membro) e resolva por `get()`/`deleteDoc()` de um id específico, que não passa por essa checagem de "provabilidade de lista".
+
+Teste isolado o mais rápido pra confirmar: `node scripts/with-java.mjs firebase emulators:exec --only firestore,storage "npx vitest run tests/firestore.rules.test.ts --config vite.config.ts -t \"nome do teste\""`.
+
+---
+
 ## Regras de código
 
 - **Dinheiro sempre em centavos inteiros** (`amountCents`); exibir via `formatMoney()`.

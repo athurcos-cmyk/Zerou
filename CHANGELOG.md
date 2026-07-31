@@ -2,6 +2,30 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-31 (parte 2) — fix(admin): exclusão de conta deixava 4 resíduos + leitura desnecessária
+
+Duas perguntas de acompanhamento depois da feature de Mensagens. Detalhe em
+`docs/history/2026-07.md`. **Já deployado** (functions-admin + client).
+
+- **`getAdminMessages()` saiu do boot eager do admin** — só carrega quando a aba "Mensagens" abre
+  pela primeira vez (o exemplo do dono, `themeId`, não era o problema real: Firestore cobra por
+  documento, não por campo).
+- **4 gaps reais de exclusão, achados numa auditoria completa** (`adminDeleteUser`,
+  `functions-admin/src/index.ts`): `recurringNotifyState` nunca esteve na lista de subcoleções do
+  workspace, `billingEvents` (webhooks do Stripe) nunca era coletado, `adminMessages` do usuário
+  excluído ficava com `targetUserId` órfão, e convites que um **parceiro** (não-dono) usou pra
+  entrar num casal nunca eram limpos — este último também corrigido na auto-exclusão
+  (`accountDeletionService.ts`), mesmo gap nos dois fluxos.
+- **Achado técnico no caminho**: uma query em `coupleInvites` filtrando por `usedBy` falha no
+  Firestore com "Property X is undefined for 'list'" — o motor de regras recusa `list()` que não
+  "prova" estaticamente toda a regra (um OR de 3 ramos), mesmo com todo documento real tendo o
+  campo. Resolvido lendo `acceptedInviteId` do doc do membro (já gravado no aceite) e apagando o
+  convite por ID — sem `list()` nenhum.
+- `commitDeletes` (client + admin) ganhou dedup por `.path` antes de montar os lotes — defensivo,
+  não custava depender de comportamento não documentado do SDK numa operação irreversível.
+- 78/78 testes de regras verdes (1 novo, prova a ordem obrigatória: ler antes de
+  `leavePartnerWorkspace` remover a filiação).
+
 ## 2026-07-31 — feat(admin): enviar push/email pro usuário e pra todos, com histórico
 
 Pedido do dono: a mesma capacidade que já existe no admin de outro projeto dele (Plantão) — mandar
@@ -20,9 +44,9 @@ uma mensagem (push e/ou email) pra um usuário específico, ou pra todos de uma 
   callers existentes ignoram o retorno).
 - Histórico em `adminMessages/{id}`, regra copiada do padrão já existente de `whatsappPhoneIndex`
   (`allow read: if isAdmin(); allow write: if false`). 77/77 testes de regras verdes.
-- Não verificado visualmente no browser — a rota `/admin` exige o email real do dono, sem
-  credencial disponível pra login automatizado. Validado por typecheck, build e as 3 suítes de
-  teste (503 cliente, 125 functions, 77 regras).
+- **Verificado ao vivo em produção**: o dono abriu `/admin` já logado, testados os chips de
+  canal, o seletor de destinatário, o contador de caracteres e a confirmação de broadcast
+  (cancelada de propósito, sem disparar de verdade).
 
 ## 2026-07-30 (parte 3) — fix(push): nenhuma notificação chegava — dois bugs independentes
 
