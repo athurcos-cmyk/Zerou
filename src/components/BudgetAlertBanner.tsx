@@ -19,7 +19,16 @@ export function BudgetAlertBanner() {
   const alerts = useMemo(() => {
     if (finance.loading) return [];
 
-    const activeBudgets = finance.budgets.filter((b) => b.isActive && b.limitCents > 0);
+    // Orçamento de categoria excluída é ignorado. `deleteCategory` já apaga o limite junto, mas
+    // esta guarda cobre o dado ANTIGO, criado antes dessa correção (30/07/2026): sem ela, uma
+    // categoria excluída no meio do mês continuava alertando por causa dos lançamentos que já
+    // existiam, e não havia mais tela nenhuma pra remover esse limite.
+    const liveCategoryIds = new Set(
+      finance.categories.filter((c) => c.isActive !== false).map((c) => c.id)
+    );
+    const activeBudgets = finance.budgets.filter(
+      (b) => b.isActive && b.limitCents > 0 && liveCategoryIds.has(b.categoryId)
+    );
     if (activeBudgets.length === 0) return [];
 
     const spending = spendingByCategoryForMonth(
@@ -47,7 +56,7 @@ export function BudgetAlertBanner() {
         return !isAlertDismissed(a.categoryId, currentMonth);
       })
       .sort((a, b) => b.pct - a.pct);
-  }, [finance.budgets, spendingSource, finance.loading, currentMonth]);
+  }, [finance.budgets, finance.categories, spendingSource, finance.loading, currentMonth]);
 
   if (alerts.length === 0) return null;
 

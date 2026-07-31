@@ -98,6 +98,12 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
   quando a pessoa reorganiza o presente.** Só os *seletores* filtram por `isActive`; quem *exibe*
   lê a lista completa, então ícone, cor e nome do lançamento antigo continuam certos pra sempre —
   inclusive na Análise, onde o gasto de uma subcategoria excluída segue somando no pai.
+  **A régua é ação vs. exibição** (bug real, 30/07/2026): quem **exibe** dado antigo usa a lista
+  completa; quem oferece uma **ação sobre a categoria** (escolher num lançamento, definir limite)
+  filtra `isActive`. A tela de orçamentos errou nisso — listava categorias sem filtrar, então uma
+  excluída ficava lá pra sempre, e apagar o limite não a removia (a linha vinha da categoria, não
+  do orçamento). E **dado dependente vai junto na exclusão**: o limite de gasto é apagado no mesmo
+  batch, senão vira registro órfão invisível, sem tela que o remova.
 - **Cabeçalho do dia mostra SALDO, não um total de fluxo** (`.day-group-total` +
   `balanceByDayEnd`, 2026-07-29): o saldo consolidado no fim daquele dia — o mesmo número do
   "Saldo total" do Dashboard, voltando no tempo. **Por que não "gasto"**: resumo de fluxo sempre

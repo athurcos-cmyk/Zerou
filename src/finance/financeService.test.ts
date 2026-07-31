@@ -8,7 +8,7 @@ const firestoreMocks = vi.hoisted(() => ({
   setDoc: vi.fn().mockResolvedValue(undefined),
   doc: vi.fn().mockReturnValue({ id: 'doc-ref' }),
   serverTimestamp: vi.fn().mockReturnValue('server-timestamp'),
-  batch: { set: vi.fn(), update: vi.fn(), commit: vi.fn().mockResolvedValue(undefined) },
+  batch: { set: vi.fn(), update: vi.fn(), delete: vi.fn(), commit: vi.fn().mockResolvedValue(undefined) },
   writeBatch: vi.fn()
 }));
 
@@ -35,7 +35,7 @@ vi.mock('../cards/cardService', () => ({
   addCardPurchaseToBatch: cardServiceMocks.addCardPurchaseToBatch
 }));
 
-const { createCategory, markOverdueBills, payBill, reconcileAccountBalance, recordRecurringPayment, recurringOccurrenceTransactionId, updateBill, updateCategory } = await import(
+const { createCategory, deleteCategory, markOverdueBills, payBill, reconcileAccountBalance, recordRecurringPayment, recurringOccurrenceTransactionId, updateBill, updateCategory } = await import(
   './financeService'
 );
 
@@ -383,5 +383,36 @@ describe('updateCategory — propagação de cor pras filhas', () => {
     void updateCategory('workspace-1', 'energia', { name: 'Luz' });
 
     expect('parentCategoryId' in firestoreMocks.updateDoc.mock.calls[0][1]).toBe(false);
+  });
+});
+
+/**
+ * Regressão do bug achado pelo dono em produção (30/07/2026): ele excluiu uma categoria que tinha
+ * limite de gasto, e o limite continuou vivo. Como `Budget.id === categoryId` e a tela de
+ * orçamentos lista CATEGORIAS (não orçamentos), a categoria excluída ficava lá pra sempre — e
+ * apagar o limite não a removia da lista, porque a linha vinha da categoria.
+ */
+describe('deleteCategory — leva o orçamento junto', () => {
+  it('desativa a categoria E apaga o orçamento dela no mesmo batch', () => {
+    firestoreMocks.batch.update.mockClear();
+    firestoreMocks.batch.delete.mockClear();
+    firestoreMocks.batch.commit.mockClear();
+
+    void deleteCategory('ws-1', 'cat-alimentacao');
+
+    expect(firestoreMocks.batch.update).toHaveBeenCalledTimes(1);
+    expect(firestoreMocks.batch.update.mock.calls[0][1]).toMatchObject({ isActive: false });
+    // O limite some de verdade (delete), não vira outro registro inativo pra alguém tropeçar.
+    expect(firestoreMocks.batch.delete).toHaveBeenCalledTimes(1);
+    expect(firestoreMocks.batch.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it('é um batch só — categoria e orçamento nunca ficam em estados diferentes', () => {
+    firestoreMocks.batch.commit.mockClear();
+
+    void deleteCategory('ws-1', 'cat-sem-orcamento');
+
+    // `delete` em doc inexistente é no-op no Firestore: não precisa checar antes se havia limite.
+    expect(firestoreMocks.batch.commit).toHaveBeenCalledTimes(1);
   });
 });

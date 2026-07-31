@@ -336,11 +336,25 @@ export async function updateCategory(
   fireWrite(batch.commit());
 }
 
+/**
+ * Exclusão **lógica** (`isActive: false`) — o documento fica, pra lançamento antigo continuar
+ * mostrando ícone, cor e nome pra sempre (ver `docs/design/DESIGN.md`).
+ *
+ * O orçamento dela, porém, é **apagado de verdade** no mesmo batch. Um limite sobrevivendo à
+ * categoria vira dado órfão invisível: `Budget.id === categoryId`, então ele continuava ativo em
+ * `finance.budgets`, ainda podia disparar alerta no Dashboard por causa dos lançamentos que já
+ * existiam no mês, e não havia mais nenhuma tela pra removê-lo. Bug real achado pelo dono
+ * (30/07/2026).
+ */
 export async function deleteCategory(workspaceId: string, categoryId: string) {
-  fireWrite(updateDoc(documentRef(workspaceId, 'categories', categoryId), {
+  const batch = writeBatch(getFirebaseDb());
+  batch.update(documentRef(workspaceId, 'categories', categoryId), {
     isActive: false,
     updatedAt: serverTimestamp()
-  }));
+  });
+  // `delete` em doc inexistente é no-op no Firestore — não precisa checar se havia orçamento.
+  batch.delete(documentRef(workspaceId, 'budgets', categoryId));
+  fireWrite(batch.commit());
 }
 
 export async function createGoal(

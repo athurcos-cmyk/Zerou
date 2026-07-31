@@ -330,7 +330,15 @@ export function SearchPage() {
    */
   const budgetableCategories = useMemo(() => {
     const paiIds = parentCategoryIds(finance.categories); // parentesco na lista COMPLETA, nunca no recorte
-    return expenseCategories.filter((cat) => !paiIds.has(cat.id) || budgetByCategoryId.has(cat.id));
+    return expenseCategories
+      // Categoria excluída não pode receber limite — ela nem aparece mais no lançamento.
+      // `expenseCategories` NÃO filtra `isActive` de propósito (o Resumo Anual e a tendência
+      // precisam da lista completa pra resolver o NOME de uma categoria já excluída); quem
+      // filtra é quem oferece uma AÇÃO sobre ela, que é o caso aqui. Bug real: uma categoria
+      // excluída ficava pra sempre na tela de orçamentos, e apagar o limite não a removia —
+      // porque a lista vem das categorias, não dos orçamentos (30/07/2026).
+      .filter((cat) => cat.isActive !== false)
+      .filter((cat) => !paiIds.has(cat.id) || budgetByCategoryId.has(cat.id));
   }, [expenseCategories, finance.categories, budgetByCategoryId]);
 
   useEffect(() => {

@@ -30,6 +30,25 @@ falha — o projeto tem dois codebases, o certo é `functions:billing:<nome>`.
 - Trava: `src/pwa/notifications.test.ts` (novo), 4 dos 5 casos falham sem o fix. 501 + 125 + 74
   testes verdes.
 
+## 2026-07-30 (parte 3) — fix(orçamento): categoria excluída ficava pra sempre na tela de limites
+
+Achado pelo dono usando o app: ele excluiu uma categoria que tinha limite de gasto, criou uma
+subcategoria em Alimentação no lugar, e a categoria velha continuou na tela de "definir limite" —
+e apagar o limite **não** a removia de lá.
+
+- **Duas causas somadas.** (1) A lista da tela de orçamentos vem das **categorias**, não dos
+  orçamentos, e nunca filtrava `isActive` — por isso a linha ficava mesmo depois de apagar o
+  limite. (2) `deleteCategory` não mexia no orçamento, então o limite sobrevivia à categoria.
+- **Correção**: `deleteCategory` agora apaga o orçamento no **mesmo batch** (`Budget.id ===
+  categoryId`), e a tela de limites só lista categoria ativa. `expenseCategories` continua sem
+  filtrar `isActive` de propósito — o Resumo Anual e a tendência precisam da lista completa pra
+  resolver o **nome** de uma categoria já excluída; quem filtra é quem oferece uma **ação**.
+- **Guarda pro dado antigo**: `BudgetAlertBanner` ignora orçamento de categoria excluída. Sem isso,
+  uma categoria apagada no meio do mês continuava alertando por causa dos lançamentos que já
+  existiam — e não havia mais tela nenhuma pra remover esse limite. Varredura em produção
+  confirmou **zero órfãos** hoje; a guarda é pra quem estiver nesse estado sem ter percebido.
+- 503 testes verdes (+7), com a limpeza do orçamento provada por sabotagem.
+
 ## 2026-07-30 (parte 2) — feat(vic): criar subcategoria por mensagem, sem adivinhar
 
 Pergunta do dono: *"como que ela vai saber quando for pra criar uma subcategoria?"* — ele levantou
