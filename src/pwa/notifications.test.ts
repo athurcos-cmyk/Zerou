@@ -16,6 +16,11 @@ interface ForegroundPayload {
 // Mocks precisam existir antes do import dinâmico do módulo sob teste.
 const setDocMock = vi.fn<(ref: DocRef, data: unknown) => Promise<void>>(async () => undefined);
 const deleteDocMock = vi.fn<(ref: DocRef) => Promise<void>>(async () => undefined);
+// Por padrão o doc "existe" no Firestore — o caso comum (nada foi apagado por fora). O teste
+// do cache desatualizado sobrescreve pra `exists: false`.
+const getDocMock = vi.fn<(ref: DocRef) => Promise<{ exists: () => boolean }>>(async () => ({
+  exists: () => true,
+}));
 const getTokenMock = vi.fn<
   (
     messaging: unknown,
@@ -28,6 +33,7 @@ vi.mock('firebase/firestore', () => ({
   doc: (_db: unknown, ...path: string[]) => ({ path: path.join('/') }),
   setDoc: setDocMock,
   deleteDoc: deleteDocMock,
+  getDoc: getDocMock,
   serverTimestamp: () => 'ts',
 }));
 
@@ -65,6 +71,8 @@ beforeEach(() => {
   cache.clear();
   setDocMock.mockClear();
   deleteDocMock.mockClear();
+  getDocMock.mockClear();
+  getDocMock.mockResolvedValue({ exists: () => true });
   getTokenMock.mockClear();
   onMessageMock.mockClear();
   registerMock.mockReset();
@@ -155,16 +163,43 @@ describe('requestAndRegisterPushToken', () => {
     expect(deleteDocMock.mock.calls[0][0].path).toContain('token-antigo');
   });
 
-  it('não regrava o token FCM quando ele não mudou', async () => {
+  it('não regrava o token FCM quando ele não mudou E o doc ainda existe no Firestore', async () => {
     cache.set('uid-1', 'token-novo');
+    getDocMock.mockResolvedValue({ exists: () => true });
 
     const { requestAndRegisterPushToken } = await loadModule();
     await requestAndRegisterPushToken();
 
+    expect(getDocMock).toHaveBeenCalledTimes(1);
     // O diagnóstico temporário (pushDebug) sempre grava — só o doc de fcmTokens não deve.
     const tokenWrites = setDocMock.mock.calls.filter((call) => call[0].path.includes('fcmTokens'));
     expect(tokenWrites).toHaveLength(0);
     expect(deleteDocMock).not.toHaveBeenCalled();
+  });
+
+  // Achado ao vivo em 2026-07-31: uma limpeza manual de tokens mortos apagou o doc direto no
+  // Firestore, mas o cache local (localStorage) do aparelho continuou dizendo "token igual,
+  // nada a fazer" — o usuário ficava sem push registrado até fechar e reabrir o app (o que
+  // NUNCA limpa esse cache sozinho). Este teste prova a recuperação: mesmo com o token igual
+  // ao cache, se o doc não existe mais no servidor, o app tem que regravar.
+  it('regrava o token quando o cache diz "igual" mas o doc sumiu do Firestore (ex.: faxina manual)', async () => {
+    cache.set('uid-1', 'token-novo');
+    getDocMock.mockResolvedValue({ exists: () => false });
+
+    const { requestAndRegisterPushToken } = await loadModule();
+    await requestAndRegisterPushToken();
+
+    expect(getDocMock).toHaveBeenCalledTimes(1);
+    const tokenWrites = setDocMock.mock.calls.filter((call) => call[0].path.includes('fcmTokens'));
+    expect(tokenWrites).toHaveLength(1);
+    expect(tokenWrites[0][0].path).toContain('token-novo');
+
+    // O token "anterior" É o mesmo que acabou de ser escrito — não pode apagar o que
+    // acabamos de gravar.
+    expect(deleteDocMock).not.toHaveBeenCalled();
+
+    const debugWrite = setDocMock.mock.calls.find((call) => call[0].path.includes('pushDebug'));
+    expect(debugWrite![1]).toMatchObject({ tokenDocExistedInFirestore: false, result: 'registered' });
   });
 
   // Decisão do dono (2026-07-31): abrir pelo navegador e aceitar notificação, depois instalar

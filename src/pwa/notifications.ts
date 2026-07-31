@@ -1,4 +1,4 @@
-import { deleteDoc, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { getFirebaseAuth, getFirebaseDb, getFirebaseServices } from '../firebase/config';
 import { readCachedPushToken, saveCachedPushToken } from './pushTokenCache';
 
@@ -95,17 +95,29 @@ export async function requestAndRegisterPushToken(): Promise<void> {
     debug.hasUser = Boolean(user);
     if (!user) return;
 
-    // O token FCM praticamente não muda entre sessões — sem esse cache local,
-    // toda abertura do app regravava o mesmo token no Firestore só pra atualizar
-    // updatedAt. Só toca o Firestore quando o token realmente muda.
+    const tokenDocRef = doc(getFirebaseDb(), 'users', user.uid, 'fcmTokens', token);
+
+    // O token FCM praticamente não muda entre sessões — sem esse cache local, toda
+    // abertura do app regravava o mesmo token no Firestore só pra atualizar updatedAt.
     const previousToken = readCachedPushToken(user.uid);
     debug.previousToken = previousToken ? 'cached' : null;
+
     if (previousToken === token) {
-      debug.result = 'unchanged';
-      return;
+      // ⚠️ O cache local só reflete o que ESTE aparelho já escreveu antes — não o estado
+      // real do Firestore. Achado ao vivo em 2026-07-31: uma limpeza manual de tokens
+      // mortos apagou o doc direto no servidor, mas o cache do dono continuou dizendo
+      // "nada mudou" — o app pulava a escrita achando que já estava registrado, e o
+      // usuário ficava sem token nenhum até fechar o app (o que nunca limpa o
+      // localStorage sozinho). Confirma que o doc realmente existe antes de pular.
+      const existing = await getDoc(tokenDocRef);
+      debug.tokenDocExistedInFirestore = existing.exists();
+      if (existing.exists()) {
+        debug.result = 'unchanged';
+        return;
+      }
     }
 
-    await setDoc(doc(getFirebaseDb(), 'users', user.uid, 'fcmTokens', token), {
+    await setDoc(tokenDocRef, {
       token,
       platform: 'web',
       updatedAt: serverTimestamp(),
@@ -120,8 +132,9 @@ export async function requestAndRegisterPushToken(): Promise<void> {
     // antigo no FCM, então o envio pra ele passa a falhar e cai na limpeza de stale),
     // mas só no próximo disparo — apagar aqui evita mandar push pra um token morto no
     // meio tempo. DEPOIS de gravar o novo, pra que uma falha no meio nunca deixe o
-    // usuário sem token nenhum.
-    if (previousToken) {
+    // usuário sem token nenhum. `previousToken !== token` evita apagar o doc que
+    // acabamos de escrever no caso "cache desatualizado" acima.
+    if (previousToken && previousToken !== token) {
       await deleteDoc(
         doc(getFirebaseDb(), 'users', user.uid, 'fcmTokens', previousToken)
       ).catch(() => {});
