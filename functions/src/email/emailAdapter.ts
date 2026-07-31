@@ -5,7 +5,8 @@ export type EmailKind =
   | 'billing_failed'
   | 'cancellation'
   | 'privacy_request'
-  | 'follow_up';
+  | 'follow_up'
+  | 'admin_message';
 
 export interface EmailInput {
   kind: EmailKind;
@@ -48,6 +49,10 @@ export const emailTemplates: Record<EmailKind, { subject: string; purpose: strin
   follow_up: {
     subject: 'Já deu uma olhada na Granativa?',
     purpose: 'Lembrete 3 dias após cadastro para incentivar o uso do app.'
+  },
+  admin_message: {
+    subject: 'Mensagem da Granativa',
+    purpose: 'Mensagem avulsa enviada pelo admin (individual ou broadcast) — texto livre, sem propósito fixo.'
   }
 };
 

@@ -1639,6 +1639,13 @@ service cloud.firestore {
       allow write: if false; // Admin SDK only
     }
 
+    // Histórico de mensagens (push/email) enviadas pelo admin — individual ou broadcast.
+    // Gravado só pela Cloud Function adminSendMessage/adminBroadcastMessage (Admin SDK).
+    match /adminMessages/{id} {
+      allow read: if isAdmin();
+      allow write: if false; // Admin SDK only
+    }
+
     // Pergunta pendente do bot WhatsApp (ex: "qual cartão usar?"), TTL curto. Nunca lida
     // nem escrita pelo cliente — so o webhook (Admin SDK) le/escreve/apaga.
     match /whatsappPendingActions/{phone} {

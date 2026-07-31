@@ -38,6 +38,9 @@ export { cancelCoupleWorkspace } from './cancelCoupleWorkspace.js';
 // ─── Limpeza automática ───────────────────────────────────────────────────────
 export { dailyCleanup } from './cleanup.js';
 
+// ─── Admin: mensagens (push/email) individual e broadcast ────────────────────
+export { adminSendMessage, adminBroadcastMessage } from './admin/adminMessaging.js';
+
 // ─── Admin ────────────────────────────────────────────────────────────────────
 // adminDeleteUser NÃO fica aqui — vive isolado em functions-admin/ (codebase
 // "admin"), sem dependência do Stripe, pra poder deployar independente do

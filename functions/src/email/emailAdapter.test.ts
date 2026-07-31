@@ -4,6 +4,7 @@ import { emailTemplates, sendOperationalEmail } from './emailAdapter.js';
 describe('email adapter', () => {
   it('declares the required transactional templates', () => {
     expect(Object.keys(emailTemplates).sort()).toEqual([
+      'admin_message',
       'billing_failed',
       'cancellation',
       'follow_up',

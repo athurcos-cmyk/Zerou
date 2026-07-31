@@ -5,9 +5,11 @@ import {
   ArrowLeft,
   ArrowUpDown,
   Ban,
+  Bell,
   Heart,
   Loader2,
   LogOut,
+  Mail,
   MessageCircle,
   RefreshCw,
   Search,
@@ -20,17 +22,22 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import {
+  callAdminBroadcastMessage,
   callAdminDeleteUser,
   callAdminForceLogout,
+  callAdminSendMessage,
   callAdminUnlinkWhatsapp,
   getAdminCoupleWorkspaces,
   getAdminInvites,
+  getAdminMessages,
   getAdminUsers,
   getAdminUserWorkspaceRefs,
   getAdminWhatsappLinks,
   getAdminWorkspacesByIds,
   type AdminCursor,
   type AdminInvite,
+  type AdminMessage,
+  type AdminMessageChannel,
   type AdminWhatsappLink,
   type AdminWorkspaceRef,
 } from '../admin/adminService';
@@ -39,8 +46,9 @@ import { formatCount } from '../admin/adminFormat';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
 import type { UserProfile, Workspace } from '../types/contracts';
 import type { Timestamp } from 'firebase/firestore';
+import { SelectField } from '../components/SelectField';
 
-type Tab = 'overview' | 'users' | 'couples' | 'invites' | 'whatsapp';
+type Tab = 'overview' | 'users' | 'couples' | 'invites' | 'whatsapp' | 'messages';
 type SortDir = 'asc' | 'desc';
 
 function fmtDate(ts: Timestamp | null | undefined): string {
@@ -483,12 +491,14 @@ function UserDetailModal({
   onClose,
   onRequestDelete,
   onRequestForceLogout,
+  onRequestMessage,
 }: {
   user: UserProfile;
   canDelete: boolean;
   onClose: () => void;
   onRequestDelete: () => void;
   onRequestForceLogout: () => void;
+  onRequestMessage: () => void;
 }) {
   const [refs, setRefs] = useState<AdminWorkspaceRef[]>([]);
   const [workspaces, setWorkspaces] = useState<Map<string, Workspace>>(new Map());
@@ -578,9 +588,14 @@ function UserDetailModal({
         )}
 
         <div className="admin-modal__actions admin-modal__actions--spread">
-          <button type="button" className="admin-detail-action" onClick={onRequestForceLogout}>
-            <LogOut size={15} /> Forçar logout
-          </button>
+          <div className="admin-modal__actions">
+            <button type="button" className="admin-detail-action" onClick={onRequestMessage}>
+              <Send size={15} /> Enviar mensagem
+            </button>
+            <button type="button" className="admin-detail-action" onClick={onRequestForceLogout}>
+              <LogOut size={15} /> Forçar logout
+            </button>
+          </div>
           <div className="admin-modal__actions">
             {canDelete ? (
               <button type="button" className="button admin-modal__delete-btn" onClick={onRequestDelete}>
@@ -1093,6 +1108,292 @@ function WhatsappTab({
   );
 }
 
+const CHANNEL_LABELS: Record<AdminMessageChannel, string> = {
+  push: 'Push',
+  email: 'Email',
+  both: 'Push + Email',
+};
+
+type SendOutcome =
+  | { kind: 'individual'; push: { tokensFound: number; sent: number }; email: { sent: boolean; reason?: string } | null }
+  | { kind: 'broadcast'; pushFound: number; pushSent: number; emailAttempted: number; emailSent: number };
+
+function MessagesTab({
+  users,
+  messages,
+  hasMore,
+  loadingMore,
+  onLoadMore,
+  onRefreshMessages,
+  presetUserId,
+}: {
+  users: UserProfile[];
+  messages: AdminMessage[];
+  hasMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => void;
+  onRefreshMessages: () => Promise<void>;
+  presetUserId: string | null;
+}) {
+  const [recipientMode, setRecipientMode] = useState<'one' | 'all'>('one');
+  const [recipientId, setRecipientId] = useState('');
+  const [channel, setChannel] = useState<AdminMessageChannel>('push');
+  const [subject, setSubject] = useState('');
+  const [message, setMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [outcome, setOutcome] = useState<SendOutcome | null>(null);
+  const [confirmBroadcastOpen, setConfirmBroadcastOpen] = useState(false);
+
+  // Vindo do botão "Enviar mensagem" no detalhe de um usuário (UserDetailModal) — pré-seleciona
+  // o destinatário ao trocar de aba, sem duplicar o formulário num modal separado.
+  useEffect(() => {
+    if (presetUserId) {
+      setRecipientMode('one');
+      setRecipientId(presetUserId);
+      setOutcome(null);
+      setError(null);
+    }
+  }, [presetUserId]);
+
+  const recipientOptions = useMemo(
+    () => users.map((u) => ({ value: u.id, label: u.name || u.email, description: u.name ? u.email : undefined })),
+    [users]
+  );
+
+  const needsSubject = channel === 'email' || channel === 'both';
+  const canSubmit =
+    message.trim().length > 0 &&
+    (!needsSubject || subject.trim().length > 0) &&
+    (recipientMode === 'all' || Boolean(recipientId));
+
+  async function doSendIndividual() {
+    setSending(true);
+    setError(null);
+    setOutcome(null);
+    try {
+      const result = await callAdminSendMessage({
+        userId: recipientId,
+        channel,
+        subject: needsSubject ? subject.trim() : undefined,
+        message: message.trim(),
+      });
+      setOutcome({ kind: 'individual', push: result.push, email: result.email });
+      await onRefreshMessages();
+      setMessage('');
+      setSubject('');
+    } catch (err) {
+      setError(getUserFacingErrorMessage(err, 'Não foi possível enviar a mensagem.'));
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function doSendBroadcast() {
+    setSending(true);
+    setError(null);
+    setOutcome(null);
+    try {
+      const result = await callAdminBroadcastMessage({
+        channel,
+        subject: needsSubject ? subject.trim() : undefined,
+        message: message.trim(),
+      });
+      setOutcome({ kind: 'broadcast', ...result });
+      await onRefreshMessages();
+      setMessage('');
+      setSubject('');
+    } catch (err) {
+      setError(getUserFacingErrorMessage(err, 'Não foi possível enviar o broadcast.'));
+    } finally {
+      setSending(false);
+    }
+  }
+
+  function handleSubmit() {
+    if (!canSubmit || sending) return;
+    if (recipientMode === 'all') {
+      setConfirmBroadcastOpen(true);
+    } else {
+      void doSendIndividual();
+    }
+  }
+
+  return (
+    <div className="admin-content">
+      <section className="surface surface-pad">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Mensagens</p>
+            <h2>Enviar push ou email</h2>
+          </div>
+        </div>
+
+        <div className="field">
+          <span className="field-label">Canal</span>
+          <div className="chip-row">
+            <button type="button" className={`chip${channel === 'push' ? ' chip--active' : ''}`} onClick={() => setChannel('push')}>
+              <Bell size={14} /> Push
+            </button>
+            <button type="button" className={`chip${channel === 'email' ? ' chip--active' : ''}`} onClick={() => setChannel('email')}>
+              <Mail size={14} /> Email
+            </button>
+            <button type="button" className={`chip${channel === 'both' ? ' chip--active' : ''}`} onClick={() => setChannel('both')}>
+              Ambos
+            </button>
+          </div>
+        </div>
+
+        <div className="field">
+          <span className="field-label">Destinatário</span>
+          <div className="chip-row">
+            <button type="button" className={`chip${recipientMode === 'one' ? ' chip--active' : ''}`} onClick={() => setRecipientMode('one')}>
+              Um usuário
+            </button>
+            <button type="button" className={`chip${recipientMode === 'all' ? ' chip--active' : ''}`} onClick={() => setRecipientMode('all')}>
+              Todos ({users.length})
+            </button>
+          </div>
+        </div>
+
+        {recipientMode === 'one' && (
+          <SelectField
+            label="Usuário"
+            value={recipientId}
+            onChange={setRecipientId}
+            options={recipientOptions}
+            placeholder="Escolha um usuário"
+            searchable
+            sheetTitle="Enviar para"
+          />
+        )}
+
+        {needsSubject && (
+          <label className="field">
+            <span className="field-label">Assunto</span>
+            <input
+              className="input"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              maxLength={150}
+              placeholder="Assunto do email"
+            />
+          </label>
+        )}
+
+        <label className="field">
+          <span className="field-label">Mensagem</span>
+          <textarea
+            className="input textarea"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            maxLength={1000}
+            rows={4}
+            placeholder={recipientMode === 'all' ? 'Mensagem para todos os usuários…' : 'Mensagem…'}
+          />
+          <span className="admin-char-count">{message.length}/1000</span>
+        </label>
+
+        {error ? <p className="admin-modal__error">{error}</p> : null}
+
+        {outcome ? (
+          <div className="admin-message-result">
+            {outcome.kind === 'individual' ? (
+              <>
+                {channel !== 'email' ? (
+                  <p>Push: {outcome.push.sent}/{outcome.push.tokensFound} dispositivo(s)</p>
+                ) : null}
+                {outcome.email ? (
+                  <p>
+                    Email: {outcome.email.sent ? 'enviado' : `falhou${outcome.email.reason ? ` — ${outcome.email.reason}` : ''}`}
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <>
+                {channel !== 'email' ? <p>Push: {outcome.pushSent}/{outcome.pushFound} dispositivo(s)</p> : null}
+                {channel !== 'push' ? <p>Email: {outcome.emailSent}/{outcome.emailAttempted} enviados</p> : null}
+              </>
+            )}
+          </div>
+        ) : null}
+
+        <div className="admin-message-submit">
+          <button type="button" className="button button--primary" disabled={!canSubmit || sending} onClick={handleSubmit}>
+            {sending ? <Loader2 size={15} className="admin-spin" /> : <Send size={15} />}
+            {recipientMode === 'all' ? 'Enviar para todos' : 'Enviar'}
+          </button>
+        </div>
+      </section>
+
+      <section className="surface">
+        <div className="section-heading admin-section-heading--pad">
+          <div>
+            <p className="eyebrow">Histórico</p>
+            <h2>Envios recentes</h2>
+          </div>
+        </div>
+        <table className="admin-table admin-table--full">
+          <thead>
+            <tr>
+              <th>Quando</th>
+              <th>Tipo</th>
+              <th>Canal</th>
+              <th>Destinatário</th>
+              <th>Mensagem</th>
+              <th>Resultado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {messages.length === 0 ? (
+              <EmptyRow cols={6} />
+            ) : (
+              messages.map((m) => (
+                <tr key={m.id}>
+                  <td className="admin-td--muted" title={fmtDateFull(m.createdAt)}>{fmtDateRelative(m.createdAt)}</td>
+                  <td>
+                    <span className={`admin-pill ${m.type === 'broadcast' ? 'admin-pill--info' : 'admin-pill--muted'}`}>
+                      {m.type === 'broadcast' ? 'Todos' : 'Individual'}
+                    </span>
+                  </td>
+                  <td className="admin-td--muted">{CHANNEL_LABELS[m.channel]}</td>
+                  <td className="admin-td--muted">{m.targetName ?? 'Todos'}</td>
+                  <td className="admin-td--muted admin-message-cell">
+                    {m.subject ? <strong>{m.subject}: </strong> : null}
+                    {m.message}
+                  </td>
+                  <td className="admin-td--muted">
+                    {m.channel !== 'email' ? `push ${m.pushSent}/${m.pushFound}` : null}
+                    {m.channel === 'both' ? ' · ' : ''}
+                    {m.channel !== 'push' ? `email ${m.emailSent}/${m.emailAttempted}` : null}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </section>
+
+      <LoadMoreButton hasMore={hasMore} loading={loadingMore} onClick={onLoadMore} />
+
+      {confirmBroadcastOpen ? (
+        <ConfirmModal
+          title={`Enviar para todos os ${users.length} usuários?`}
+          body={`Canal: ${CHANNEL_LABELS[channel]}. Isso dispara ${
+            channel === 'push' ? 'uma notificação push' : channel === 'email' ? 'um email' : 'push e email'
+          } pra todo mundo cadastrado agora. Não pode ser desfeito.`}
+          confirmLabel="Confirmar envio"
+          onConfirm={async () => {
+            setConfirmBroadcastOpen(false);
+            await doSendBroadcast();
+          }}
+          onCancel={() => setConfirmBroadcastOpen(false)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 export function AdminPage() {
   const { user } = useAuth();
   const [tab, setTab] = useState<Tab>('overview');
@@ -1114,6 +1415,12 @@ export function AdminPage() {
 
   const [whatsappLinks, setWhatsappLinks] = useState<AdminWhatsappLink[]>([]);
 
+  const [messages, setMessages] = useState<AdminMessage[]>([]);
+  const [messagesCursor, setMessagesCursor] = useState<AdminCursor>(null);
+  const [messagesHasMore, setMessagesHasMore] = useState(false);
+  const [messagesLoadingMore, setMessagesLoadingMore] = useState(false);
+  const [pendingMessageRecipient, setPendingMessageRecipient] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pendingDetailUser, setPendingDetailUser] = useState<UserProfile | null>(null);
@@ -1129,11 +1436,12 @@ export function AdminPage() {
     setLoading(true);
     setError(null);
     try {
-      const [u, c, i, w] = await Promise.all([
+      const [u, c, i, w, m] = await Promise.all([
         getAdminUsers(),
         getAdminCoupleWorkspaces(),
         getAdminInvites(),
         getAdminWhatsappLinks(),
+        getAdminMessages(),
       ]);
       setUsers(u.items);
       setUsersCursor(u.cursor);
@@ -1145,6 +1453,9 @@ export function AdminPage() {
       setInvitesCursor(i.cursor);
       setInvitesHasMore(i.hasMore);
       setWhatsappLinks(w);
+      setMessages(m.items);
+      setMessagesCursor(m.cursor);
+      setMessagesHasMore(m.hasMore);
     } catch (err) {
       setError(getUserFacingErrorMessage(err, 'Erro ao carregar dados.'));
     } finally {
@@ -1190,6 +1501,27 @@ export function AdminPage() {
     } finally {
       setInvitesLoadingMore(false);
     }
+  }
+
+  async function loadMoreMessages() {
+    setMessagesLoadingMore(true);
+    try {
+      const page = await getAdminMessages(messagesCursor);
+      setMessages((prev) => [...prev, ...page.items]);
+      setMessagesCursor(page.cursor);
+      setMessagesHasMore(page.hasMore);
+    } finally {
+      setMessagesLoadingMore(false);
+    }
+  }
+
+  // Recarrega a primeira página do zero — usado depois de um envio, pra pegar o doc novo
+  // (com o `createdAt` real, já resolvido pelo servidor) sem inventar um registro local.
+  async function refreshMessages() {
+    const page = await getAdminMessages();
+    setMessages(page.items);
+    setMessagesCursor(page.cursor);
+    setMessagesHasMore(page.hasMore);
   }
 
   async function handleDeleteConfirm() {
@@ -1258,6 +1590,7 @@ export function AdminPage() {
     { id: 'couples', label: 'Casais', count: formatCount(couples.length, couplesHasMore) },
     { id: 'invites', label: 'Convites', count: formatCount(invites.length, invitesHasMore) },
     { id: 'whatsapp', label: 'WhatsApp', count: formatCount(whatsappLinks.length, false) },
+    { id: 'messages', label: 'Mensagens', count: formatCount(messages.length, messagesHasMore) },
   ];
 
   return (
@@ -1368,6 +1701,17 @@ export function AdminPage() {
                 onUnlink={(link) => setPendingUnlinkWhatsapp(link)}
               />
             )}
+            {tab === 'messages' && (
+              <MessagesTab
+                users={users}
+                messages={messages}
+                hasMore={messagesHasMore}
+                loadingMore={messagesLoadingMore}
+                onLoadMore={() => void loadMoreMessages()}
+                onRefreshMessages={refreshMessages}
+                presetUserId={pendingMessageRecipient}
+              />
+            )}
           </>
         )}
       </div>
@@ -1379,6 +1723,11 @@ export function AdminPage() {
           onClose={() => setPendingDetailUser(null)}
           onRequestDelete={() => setPendingDelete(pendingDetailUser)}
           onRequestForceLogout={() => setPendingForceLogout(pendingDetailUser)}
+          onRequestMessage={() => {
+            setPendingMessageRecipient(pendingDetailUser.id);
+            setTab('messages');
+            setPendingDetailUser(null);
+          }}
         />
       ) : null}
 

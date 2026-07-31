@@ -2240,4 +2240,44 @@ describe('firestore security rules', () => {
       );
     });
   });
+
+  describe('adminMessages', () => {
+    it('blocks read by non-admin authenticated user', async () => {
+      const aliceDb = testEnv.authenticatedContext('alice', { email: 'alice@zerou.test' }).firestore();
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), 'adminMessages/msg1'), {
+          type: 'broadcast',
+          channel: 'push',
+          message: 'oi',
+          createdAt: serverTimestamp()
+        });
+      });
+      await assertFails(getDoc(doc(aliceDb, 'adminMessages/msg1')));
+    });
+
+    it('allows read by admin', async () => {
+      const adminDb = testEnv.authenticatedContext('admin-uid', { email: 'a.thurcos@gmail.com' }).firestore();
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), 'adminMessages/msg1'), {
+          type: 'broadcast',
+          channel: 'push',
+          message: 'oi',
+          createdAt: serverTimestamp()
+        });
+      });
+      await assertSucceeds(getDoc(doc(adminDb, 'adminMessages/msg1')));
+    });
+
+    it('blocks client-side write', async () => {
+      const aliceDb = testEnv.authenticatedContext('alice').firestore();
+      await assertFails(
+        setDoc(doc(aliceDb, 'adminMessages/msg1'), {
+          type: 'broadcast',
+          channel: 'push',
+          message: 'oi',
+          createdAt: serverTimestamp()
+        })
+      );
+    });
+  });
 });

@@ -8,6 +8,7 @@ import { WelcomeEmail } from './templates/WelcomeEmail.js';
 import { GoodbyeEmail } from './templates/GoodbyeEmail.js';
 import { FollowUpEmail } from './templates/FollowUpEmail.js';
 import { GenericEmail } from './templates/GenericEmail.js';
+import { AdminMessageEmail } from './templates/AdminMessageEmail.js';
 
 export const resendApiKey = defineSecret('RESEND_API_KEY');
 
@@ -28,6 +29,8 @@ function pickTemplate(input: EmailInput): React.ReactElement | null {
       return FollowUpEmail({ name });
     case 'cancellation':
       return GoodbyeEmail({ name });
+    case 'admin_message':
+      return AdminMessageEmail({ name, subject: input.subject || tpl.subject, body: input.data?.body ?? '' });
     case 'security':
     case 'invite':
     case 'billing_failed':

@@ -143,3 +143,68 @@ export async function callAdminUnlinkWhatsapp(phone: string): Promise<void> {
   );
   await fn({ phone });
 }
+
+export type AdminMessageChannel = 'push' | 'email' | 'both';
+
+export interface AdminSendMessageResult {
+  success: boolean;
+  push: { tokensFound: number; sent: number };
+  email: { sent: boolean; reason?: string } | null;
+}
+
+export async function callAdminSendMessage(input: {
+  userId: string;
+  channel: AdminMessageChannel;
+  subject?: string;
+  message: string;
+}): Promise<AdminSendMessageResult> {
+  const fn = httpsCallable<typeof input, AdminSendMessageResult>(getFirebaseFunctions(), 'adminSendMessage');
+  const result = await fn(input);
+  return result.data;
+}
+
+export interface AdminBroadcastMessageResult {
+  success: boolean;
+  pushFound: number;
+  pushSent: number;
+  emailAttempted: number;
+  emailSent: number;
+}
+
+export async function callAdminBroadcastMessage(input: {
+  channel: AdminMessageChannel;
+  subject?: string;
+  message: string;
+}): Promise<AdminBroadcastMessageResult> {
+  const fn = httpsCallable<typeof input, AdminBroadcastMessageResult>(getFirebaseFunctions(), 'adminBroadcastMessage');
+  const result = await fn(input);
+  return result.data;
+}
+
+export interface AdminMessage {
+  id: string;
+  type: 'individual' | 'broadcast';
+  channel: AdminMessageChannel;
+  subject: string | null;
+  message: string;
+  targetUserId: string | null;
+  targetName: string | null;
+  pushFound: number;
+  pushSent: number;
+  emailAttempted: number;
+  emailSent: number;
+  sentBy: string | null;
+  createdAt?: Timestamp | null;
+}
+
+// Histórico de envios do admin — mesmo padrão de paginação por cursor das outras abas.
+export async function getAdminMessages(cursor: AdminCursor = null): Promise<AdminPage<AdminMessage>> {
+  const db = getFirebaseDb();
+  const constraints = [orderBy('createdAt', 'desc'), ...(cursor ? [startAfter(cursor)] : []), limit(ADMIN_PAGE_SIZE)];
+  const snap = await getDocs(query(collection(db, 'adminMessages'), ...constraints));
+  return {
+    items: snap.docs.map((d) => ({ id: d.id, ...d.data() } as AdminMessage)),
+    cursor: snap.docs.at(-1) ?? null,
+    hasMore: snap.docs.length === ADMIN_PAGE_SIZE,
+  };
+}
