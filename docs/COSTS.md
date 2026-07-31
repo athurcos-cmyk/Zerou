@@ -203,6 +203,37 @@ contêiner do `whatsappWebhook` carrega esse índice inteiro no boot — Stripe,
 tudo. Separar o WhatsApp num **codebase próprio** faria o contêiner carregar só o que ele usa.
 Não elimina o cold start, mas ataca a parte cara dele sem custo mensal nenhum.
 
+### Quando o WhatsApp começa a custar (e a conta se inverter)
+
+**Não dá pra encurtar o tempo ocioso**: o Cloud Run decide sozinho quanto tempo mantém a instância
+de pé (~15 min na prática) e não expõe isso como parâmetro. O botão que existiria — CPU cobrada só
+durante a requisição, que é o padrão — está fora de alcance por causa do `--no-cpu-throttling`, que
+essa function precisa porque responde 200 à Meta e **processa depois**. O custo ocioso é o preço
+dessa decisão, não um descuido. *(Saída arquitetural, só se o volume crescer muito: enfileirar a
+mensagem e processar numa segunda function, que trabalha durante a própria requisição e volta pro
+modelo de cobrança barato.)*
+
+**A cota que aperta é vCPU-segundo, nunca requisição**: em julho foram 108 mensagens (0,005% das 2
+milhões grátis) contra 8–25% dos 180 mil vCPU-s. O custo escala com **cold starts × ~15 min**, não
+com mensagens.
+
+| Cenário | Cold starts/mês | vCPU-s | Custo |
+|---|---|---|---|
+| Hoje (1 usuário ativo, 108 msg) | ~49 | 15–44 mil | **R$ 0** |
+| Limite do grátis | ~200 | 180 mil | **R$ 0** (~440 msg/mês, ~15/dia) |
+| 10 usuários como o dono, sem sobreposição | ~490 | 441 mil | **~US$ 5,60/mês** |
+| `minInstances: 1` (sempre ligada) | — | 2,63 mi | ~US$ 60/mês |
+
+Duas ressalvas: o free tier é **do projeto inteiro**, não desta function — `financialAssistantChat`
+(a Vic do app) é outro serviço com a mesma dinâmica e divide a mesma cota. E as mensagens que se
+sobrepõem na mesma janela de ~15 min **dividem a instância**, então o cenário de 10 usuários acima é
+o pessimista.
+
+**A conta se inverte com escala**: por volta de **60–70 usuários pesados de WhatsApp**, o
+scale-to-zero passa dos US$60 do `minInstances: 1` — a partir daí, deixar sempre ligada fica mais
+barato *e* mata o cold start. **Decisão do dono em 2026-07-30: não mexer**, o que está certo pro
+tamanho de hoje. Revisar quando o uso de WhatsApp passar de ~400 mensagens/mês.
+
 ## Fontes
 
 - Firestore — Usage and limits (quotas): https://firebase.google.com/docs/firestore/quotas
