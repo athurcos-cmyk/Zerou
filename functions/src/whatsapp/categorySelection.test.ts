@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { selectableCategoryOptions, type CategoryRow } from './categorySelection.js';
+import { parentCandidateRows, selectableCategoryOptions, type CategoryRow } from './categorySelection.js';
 
 const row = (id: string, parentCategoryId?: string): CategoryRow => ({
   id,
@@ -46,5 +46,30 @@ describe('selectableCategoryOptions', () => {
 
   it('lista vazia nao quebra', () => {
     expect(selectableCategoryOptions([])).toEqual([]);
+  });
+});
+
+describe('parentCandidateRows', () => {
+  it('oferece as raizes como pai — inclusive quem ja e pai de outra', () => {
+    expect(parentCandidateRows(arvore).map((c) => c.id)).toEqual(['casa', 'transporte']);
+  });
+
+  // Trava de 1 nivel: subcategoria virando pai criaria neta.
+  it('nunca oferece uma subcategoria como pai', () => {
+    const ids = parentCandidateRows(arvore).map((c) => c.id);
+    expect(ids).not.toContain('energia');
+    expect(ids).not.toContain('agua');
+  });
+
+  it('nao oferece a propria categoria como pai dela mesma', () => {
+    expect(parentCandidateRows(arvore, 'transporte').map((c) => c.id)).toEqual(['casa']);
+  });
+
+  it('workspace so com subcategorias nao oferece pai nenhum', () => {
+    expect(parentCandidateRows([row('energia', 'casa')])).toEqual([]);
+  });
+
+  it('lista vazia nao quebra', () => {
+    expect(parentCandidateRows([])).toEqual([]);
   });
 });

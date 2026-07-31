@@ -52,7 +52,29 @@ export interface PendingTransfer {
   occurredOnISO?: string | null;
 }
 
-export type PendingAction = PendingCardPurchase | PendingDebitCredit | PendingTransfer;
+/**
+ * Categoria acabou de ser criada como PRINCIPAL e a Vic ofereceu colocá-la dentro de outra.
+ *
+ * Diferente das outras pendências, esta **não bloqueia nada**: a categoria já existe e já pode ser
+ * usada. É só uma oferta com validade — se a pessoa ignorar e mandar outra coisa, o fluxo normal
+ * segue e a categoria fica como principal mesmo. Foi por isso que se preferiu isto a perguntar
+ * ANTES de criar: a maioria das categorias é principal, e um passo obrigatório em toda criação
+ * cobraria de todo mundo o custo do caso raro.
+ */
+export interface PendingCategoryParent {
+  kind: 'category_parent';
+  workspaceId: string;
+  /** Categoria recém-criada que pode virar subcategoria. */
+  categoryId: string;
+  categoryName: string;
+  candidates: Candidate[];
+}
+
+export type PendingAction =
+  | PendingCardPurchase
+  | PendingDebitCredit
+  | PendingTransfer
+  | PendingCategoryParent;
 
 function docRef(db: Firestore, phone: string) {
   return db.doc(`whatsappPendingActions/${phone}`);

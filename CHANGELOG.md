@@ -2,6 +2,28 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-30 (parte 2) — feat(vic): criar subcategoria por mensagem, sem adivinhar
+
+Pergunta do dono: *"como que ela vai saber quando for pra criar uma subcategoria?"* — ele levantou
+perguntar antes (como no cartão) ou guardar ~3 mensagens de memória.
+
+- **Memória foi descartada**: faria a Vic *inferir* o pai de uma mensagem anterior, e palpite errado
+  cria dado no lugar errado em silêncio. O padrão do cartão é bom justamente porque **pergunta em
+  vez de inferir**.
+- **Explícito funciona direto**: "cria Energia dentro de Casa" cria a subcategoria sem passo extra
+  (campo `newCategoryParentName`, com o prompt proibindo inferir pai por assunto ou por mensagem
+  anterior).
+- **Sem menção, a Vic cria como principal e OFERECE mover**, com a lista numerada das principais
+  (validade de 3 min, mesmo mecanismo do cartão). Perguntar *antes* cobraria de toda criação o custo
+  do caso raro — a maioria das categorias é principal. Aqui a categoria já existe e já funciona:
+  **ignorar a oferta é uma resposta válida**.
+- Nome de pai citado que não existe não vira silêncio: cria como principal e diz o motivo.
+- Filha herda **cor e tipo** do pai, igual ao app; só as raízes podem ser pai (trava de 1 nível,
+  provada por sabotagem). 122 testes das functions verdes.
+- **Medida a lentidão que o dono notou** (`docs/COSTS.md` seção 8): **não é o prompt** — é cold
+  start. Quente 2,2–3,2s, frio 4,8–6,2s, e a amostra mais lenta é de *antes* do prompt crescer.
+  Matar isso custa ~US$60/mês (`minInstances: 1` com CPU sempre alocada); levantado, nada ativado.
+
 ## 2026-07-30 — feat(categorias): subcategorias, de ponta a ponta
 
 Feature grande, planejada com `/plan-eng-review` e executada nos passos 1–7 de

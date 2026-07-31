@@ -31,3 +31,21 @@ export function selectableCategoryOptions(rows: readonly CategoryRow[]): Categor
     .filter((row) => !parentIds.has(row.id))
     .map((row) => ({ id: row.id, name: row.name, type: row.type }));
 }
+
+/**
+ * Quem pode virar pai de uma categoria: as **raizes** (quem ja e subcategoria nao pode, senao
+ * viraria neta — a hierarquia e travada em 1 nivel, `[D2]`).
+ *
+ * Espelha `parentCandidates` do app (`src/finance/categoryHierarchy.ts`) no caso de uma categoria
+ * NOVA: a trava "quem ja tem filhas nao pode virar subcategoria" nao se aplica, porque quem
+ * acabou de nascer nao tem filha. `excludeId` tira a propria categoria da lista (nada e pai de si
+ * mesmo).
+ *
+ * **Passe so as categorias ATIVAS.**
+ */
+export function parentCandidateRows<T extends CategoryRow>(
+  rows: readonly T[],
+  excludeId?: string,
+): T[] {
+  return rows.filter((row) => !row.parentCategoryId && row.id !== excludeId);
+}

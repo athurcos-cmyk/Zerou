@@ -50,6 +50,13 @@ export interface MessageInterpretation {
   newCategoryName: string | null;
   newCategoryType: 'income' | 'expense' | 'both' | null;
   newCategoryIcon: string | null;
+  /**
+   * Nome da categoria PAI, quando a mensagem diz explicitamente que a nova fica dentro de outra
+   * ("cria Energia dentro de Casa"). `null` = não citou — e aí a Vic cria como principal e
+   * *oferece* mover, em vez de adivinhar o pai pelo assunto. Ver `[D12]` em
+   * `docs/planning/SUBCATEGORIAS.md`.
+   */
+  newCategoryParentName: string | null;
   /** expense/income: conta citada na mensagem pra debitar/creditar, se identificável. */
   accountId: string | null;
   /** transfer: conta de origem citada na mensagem, se identificável. */
@@ -82,6 +89,8 @@ Retorne SOMENTE um JSON com este formato:
   "newCategoryName": nome de categoria pedido pelo usuario que NAO existe na lista, ou null,
   "newCategoryType": "income" | "expense" | "both" (junto com newCategoryName), ou null,
   "newCategoryIcon": uma destas chaves EXATAS — [${categoryIconKeys.join(', ')}] — ou null,
+  "newCategoryParentName": nome da categoria PAI, SO se a mensagem disser que a nova fica dentro de
+    outra ("dentro de X", "subcategoria de X", "em X"); null em qualquer outro caso,
   "accountId": id da conta EXISTENTE mencionada na mensagem pra expense/income (de onde sai ou entra o
     dinheiro), ou null se a mensagem nao citar conta nenhuma ou nenhuma bater com confianca,
   "sourceAccountId": id da conta EXISTENTE de origem, so pra intent transfer, ou null se nao identificavel,
@@ -196,6 +205,13 @@ pedido, capitalizado. newCategoryType = "income" se mencionar receita/renda, sen
 quando ambiguo). newCategoryIcon = chave mais adequada da lista, ou null. amountCents deve ser 0 e
 categoryId null — esse intent NUNCA cria uma transacao junto, mesmo que a mensagem tambem cite um valor.
 
+newCategoryParentName: preencha SO se a mensagem disser explicitamente que a categoria nova fica DENTRO
+de outra — "cria a categoria Energia dentro de Casa", "cria Agua como subcategoria de Casa", "adiciona
+Uber em Transporte". Ponha o nome da categoria PAI citado (so o nome, sem "dentro de"). Em QUALQUER outro
+caso deixe null: nao adivinhe pai por assunto ("Energia parece coisa de Casa" NAO basta) e nao use uma
+categoria citada em mensagem anterior — cada mensagem e isolada. Vale tambem quando a categoria nova vem
+junto de um lancamento (regra acima).
+
 Regras de conta (accountId / sourceAccountId / destinationAccountId): a mensagem do usuario traz uma lista
 de contas cadastradas (id: nome). Se a mensagem citar claramente o banco/conta de onde saiu ou pra onde foi
 o dinheiro (ex.: "no nubank", "pelo itau", "da carteira", "pra poupanca"), combine com a conta EXISTENTE
@@ -241,6 +257,7 @@ export async function interpretMessage(
       newCategoryName?: string | null;
       newCategoryType?: string | null;
       newCategoryIcon?: string | null;
+      newCategoryParentName?: string | null;
       accountId?: string | null;
       sourceAccountId?: string | null;
       destinationAccountId?: string | null;
@@ -281,6 +298,12 @@ export async function interpretMessage(
 
     const newCategoryIcon = typeof parsed.newCategoryIcon === 'string' && categoryIconKeys.includes(parsed.newCategoryIcon)
       ? parsed.newCategoryIcon
+      : null;
+
+    // Só um nome; quem resolve contra as categorias reais é o handler (o modelo não conhece a
+    // regra de quem PODE ser pai — hierarquia é travada em 1 nível).
+    const newCategoryParentName = typeof parsed.newCategoryParentName === 'string' && parsed.newCategoryParentName.trim()
+      ? parsed.newCategoryParentName.trim().slice(0, 80)
       : null;
 
     const validAccountId = (id: unknown): string | null =>
@@ -325,6 +348,7 @@ export async function interpretMessage(
       newCategoryName,
       newCategoryType,
       newCategoryIcon,
+      newCategoryParentName,
       accountId,
       sourceAccountId,
       destinationAccountId,

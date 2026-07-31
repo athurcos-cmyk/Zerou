@@ -168,10 +168,44 @@ ter pedido.
 - **Risco de drift**: é uma cópia manual da regra do app. Este é o **quinto** ponto de sincronia da
   Vic (junto de ícones, cores, `onboardingLabels` e `committedCutoff`) — mudar
   `selectableCategories` em `src/` sem mexer aqui volta a soltar a Vic no pai, em silêncio.
-- **Fora de escopo**: criar subcategoria por mensagem. A Vic continua criando só categoria
-  principal.
 - **Deploy**: feito em 2026-07-30 (`--only functions:billing:whatsappWebhook`), com o
   `--no-cpu-throttling` reaplicado depois.
+
+### Criar subcategoria por mensagem: entender, e só então oferecer (2026-07-30)
+
+Pergunta do dono: *"como que ela vai saber quando for pra criar uma subcategoria?"*. Ele levantou
+duas opções — perguntar antes (como faz com o cartão) ou guardar ~3 mensagens de memória. **Memória
+foi descartada**: ela faria a Vic *adivinhar* o pai a partir de uma mensagem anterior, e um palpite
+errado cria dado no lugar errado em silêncio. O padrão do cartão é melhor justamente porque
+pergunta em vez de inferir.
+
+O desenho escolhido tem **dois caminhos**, e nenhum deles adivinha:
+
+1. **Explícito na mensagem** → `newCategoryParentName` (campo novo em `interpretMessage`). "cria
+   Energia dentro de Casa" cria a subcategoria direto, sem passo extra. O prompt proíbe
+   explicitamente inferir pai por assunto ("Energia parece coisa de Casa" **não** basta) e usar
+   categoria citada em mensagem anterior.
+2. **Não citou** → cria como **principal** e *oferece* mover, com a lista numerada das principais
+   (`PendingCategoryParent`, TTL de 3 min como as outras pendências).
+
+**Por que oferecer depois em vez de perguntar antes**: a maioria das categorias é principal.
+Perguntar antes cobraria de toda criação o custo do caso raro. Aqui a categoria já existe e já
+funciona — **ignorar a oferta é uma resposta válida**, e é por isso que a mensagem termina em "se
+não, é só seguir".
+
+Essa é a única pendência que **não bloqueia nada**: as outras seguram um lançamento até a escolha;
+esta é uma oferta sobre um registro que já foi criado. Se a resposta não casar com nenhum
+candidato, ela cai e o fluxo normal segue com a mesma mensagem.
+
+Detalhes que valem lembrar:
+
+- Quem pode ser pai são as **raízes** (`parentCandidateRows`) — subcategoria virando pai criaria
+  neta (`[D2]`). É a segunda cópia da hierarquia do app neste arquivo; ambas com teste.
+- A filha **herda cor e tipo** do pai, igual ao app. Tipo divergente entre pai e filha já causou um
+  bug real (pai voltava a ser selecionável).
+- Nome de pai citado que **não existe** não vira silêncio: cria como principal e diz o motivo.
+- **Fora de escopo**: criar a hierarquia inteira por mensagem (ex.: "cria Casa com Energia e Água
+  dentro") e mover categoria já existente — isso é trabalho de tela.
 
 ### Comportamentos esperados (não são bugs)
 

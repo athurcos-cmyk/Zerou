@@ -20,6 +20,12 @@ export interface CreateCategoryFromMessageInput {
   name: string;
   type: 'income' | 'expense' | 'both';
   icon?: string | null;
+  /**
+   * Categoria principal que vai receber esta como subcategoria. Quando presente, a filha **herda
+   * a cor e o tipo** do pai — mesma regra do app (`CategoryForm`/`createCategory`), onde a filha
+   * de tipo divergente já causou um bug real (pai voltava a ser selecionável).
+   */
+  parent?: { id: string; color?: string | null; type: 'income' | 'expense' | 'both' } | null;
 }
 
 export async function createCategoryFromMessage(
@@ -42,7 +48,9 @@ export async function createCategoryFromMessage(
   }
 
   const icon = input.icon && categoryIconKeys.includes(input.icon) ? input.icon : 'sliders';
-  const color = categoryColors[activeSnap.size % categoryColors.length] ?? defaultCategoryColor;
+  const color = input.parent
+    ? (input.parent.color || defaultCategoryColor)
+    : (categoryColors[activeSnap.size % categoryColors.length] ?? defaultCategoryColor);
 
   const id = createId('cat');
   const now = FieldValue.serverTimestamp();
@@ -51,9 +59,12 @@ export async function createCategoryFromMessage(
     id,
     workspaceId: input.workspaceId,
     name,
-    type: input.type,
+    type: input.parent ? input.parent.type : input.type,
     icon,
     color,
+    // `parentCategoryId` só entra quando existe — categoria principal não grava o campo
+    // (é o que mantém "zero migração": documento sem o campo continua sendo o que sempre foi).
+    ...(input.parent ? { parentCategoryId: input.parent.id } : {}),
     isDefault: false,
     isActive: true,
     createdBy: input.userId,
@@ -62,4 +73,24 @@ export async function createCategoryFromMessage(
   });
 
   return { id, name, created: true };
+}
+
+/**
+ * Move uma categoria recém-criada pra dentro de uma principal — o "sim" da oferta que a Vic faz
+ * depois de criar ("quer ela dentro de alguma?"). Herda cor e tipo, igual à criação direta.
+ *
+ * Não valida a hierarquia: quem chama já escolheu o pai de uma lista montada por
+ * `parentCandidateRows`, que é onde a trava de 1 nível mora.
+ */
+export async function moveCategoryUnderParent(input: {
+  workspaceId: string;
+  categoryId: string;
+  parent: { id: string; color?: string | null; type: 'income' | 'expense' | 'both' };
+}): Promise<void> {
+  await getFirestore().doc(`workspaces/${input.workspaceId}/categories/${input.categoryId}`).update({
+    parentCategoryId: input.parent.id,
+    color: input.parent.color || defaultCategoryColor,
+    type: input.parent.type,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
 }

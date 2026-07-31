@@ -74,6 +74,31 @@ export function categoryAlreadyExistsMessage(name: string): string {
   return `🏷️ Você já tem uma categoria chamada *${name}*.`;
 }
 
+/** Subcategoria criada — a pessoa disse o pai na própria mensagem ("Energia dentro de Casa"). */
+export function subcategoryCreatedMessage(name: string, parentName: string): string {
+  return `🏷️ *${name}* criada dentro de *${parentName}*.\n\n_${parentName} vira agrupamento: os lançamentos passam a ir nas subcategorias._`;
+}
+
+/**
+ * Criou como principal e OFERECE mover — não pergunta antes de criar.
+ *
+ * A categoria já existe e já funciona; ignorar a oferta é uma resposta válida (ela expira em 3
+ * min). Por isso a frase termina em "se não, é só seguir": ninguém fica esperando confirmação.
+ */
+export function categoryCreatedWithParentOfferMessage(name: string, parentLabels: string[]): string {
+  return `🏷️ Categoria *${name}* criada!\n\nSe ela for parte de outra, responda o número:\n\n${numberedList(parentLabels)}\n\n_Se não, é só seguir — ela fica como categoria principal._`;
+}
+
+/** Resposta da oferta acima: a categoria virou subcategoria. */
+export function categoryMovedMessage(name: string, parentName: string): string {
+  return `🏷️ Pronto — *${name}* agora fica dentro de *${parentName}*, herdando a cor dela.\n\n_${parentName} vira agrupamento: os lançamentos passam a ir nas subcategorias._`;
+}
+
+/** O nome de pai citado na mensagem não bateu com categoria nenhuma que possa ser pai. */
+export function categoryParentNotFoundMessage(name: string, requestedParent: string): string {
+  return `🏷️ Criei *${name}* como categoria principal — não achei nenhuma categoria chamada *${requestedParent}* pra colocar ela dentro.\n\n_Dá pra organizar isso no app, em Menu > Categorias._`;
+}
+
 export function numberedList(labels: string[]): string {
   return labels.map((label, i) => `${i + 1}. ${label}`).join('\n');
 }

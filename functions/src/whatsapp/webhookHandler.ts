@@ -4,9 +4,9 @@ import { logger } from 'firebase-functions';
 import crypto from 'crypto';
 import { sendWhatsAppMessage, getVerifyToken, whatsappAppSecret } from './metaClient.js';
 import { interpretMessage, type AccountOption, type CategoryOption, type MessageInterpretation } from './interpretMessage.js';
-import { selectableCategoryOptions } from './categorySelection.js';
+import { selectableCategoryOptions, parentCandidateRows } from './categorySelection.js';
 import { createTransactionFromMessage } from './createTransactionFromMessage.js';
-import { createCategoryFromMessage } from './createCategoryFromMessage.js';
+import { createCategoryFromMessage, moveCategoryUnderParent } from './createCategoryFromMessage.js';
 import { createCardPurchaseFromMessage } from './createCardPurchaseFromMessage.js';
 import { processLinkCode } from './linkAccount.js';
 import {
@@ -15,6 +15,7 @@ import {
   clearPendingAction,
   resolveSingleSelection,
   resolveDualSelection,
+  type Candidate,
 } from './pendingAction.js';
 import { resolveDebitCreditAccount, resolveTransferSide, accountCandidates, type AccountRow } from './accountResolution.js';
 import { deepseekApiKey } from '../ai/deepseekClient.js';
@@ -26,6 +27,10 @@ import {
   confirmCardPurchase,
   categoryCreatedMessage,
   categoryAlreadyExistsMessage,
+  subcategoryCreatedMessage,
+  categoryCreatedWithParentOfferMessage,
+  categoryMovedMessage,
+  categoryParentNotFoundMessage,
   pendingChoicePrompt,
   outOfScopeMessage,
   questionRedirectMessage,
@@ -338,6 +343,30 @@ export const whatsappWebhook = onRequest(
             return;
           }
           // Nao resolveu -> descarta a pendencia e segue o fluxo normal com esta mesma mensagem.
+        } else if (pending.kind === 'category_parent') {
+          const resolvedParentId = resolveSingleSelection(cleanText, pending.candidates);
+          if (resolvedParentId) {
+            const parentSnap = await db.doc(`workspaces/${pending.workspaceId}/categories/${resolvedParentId}`).get();
+            const parentData = parentSnap.data();
+            if (parentData) {
+              await moveCategoryUnderParent({
+                workspaceId: pending.workspaceId,
+                categoryId: pending.categoryId,
+                parent: {
+                  id: resolvedParentId,
+                  color: parentData.color as string | undefined,
+                  type: (parentData.type as 'income' | 'expense' | 'both') ?? 'expense',
+                },
+              });
+              await sendWhatsAppMessage(
+                phone,
+                categoryMovedMessage(pending.categoryName, parentData.name as string),
+              );
+              return;
+            }
+          }
+          // Nao resolveu -> a oferta simplesmente cai e a categoria fica principal. Nada a
+          // desfazer: diferente das outras pendencias, aqui o registro JA foi criado.
         }
       }
 
@@ -347,17 +376,18 @@ export const whatsappWebhook = onRequest(
         .where('isActive', '==', true)
         .get();
 
+      const categoryRows = catsSnap.docs.map((d) => ({
+        id: d.id,
+        name: d.data().name as string,
+        type: d.data().type as 'income' | 'expense' | 'both',
+        color: d.data().color as string | undefined,
+        parentCategoryId: d.data().parentCategoryId as string | undefined,
+      }));
+
       // Categoria-pai fica de fora: agrupamento nao recebe lancamento (ver
       // `selectableCategoryOptions`). O snapshot ja vem filtrado por isActive, que e o que a
       // regra pede — filha excluida nao segura o pai.
-      const categories: CategoryOption[] = selectableCategoryOptions(
-        catsSnap.docs.map((d) => ({
-          id: d.id,
-          name: d.data().name as string,
-          type: d.data().type as 'income' | 'expense' | 'both',
-          parentCategoryId: d.data().parentCategoryId as string | undefined,
-        })),
-      );
+      const categories: CategoryOption[] = selectableCategoryOptions(categoryRows);
 
       // ── Load contas ativas (usadas pra casar nome na mensagem e como fallback) ──
       const acctsSnap = await db
@@ -405,18 +435,64 @@ export const whatsappWebhook = onRequest(
           return;
         }
 
+        // Quem pode ser pai: as raizes (trava de 1 nivel). A propria categoria nova ainda nao
+        // existe, entao nao precisa de exclusao aqui.
+        const parentRows = parentCandidateRows(categoryRows);
+        const parentCandidates: Candidate[] = parentRows.map((row) => ({ id: row.id, label: row.name }));
+
+        // Pai dito NA MENSAGEM ("cria Energia dentro de Casa") — `resolveSingleSelection` casa por
+        // nome ignorando acento/caixa, o mesmo criterio ja usado pra conta e cartao.
+        const requestedParentName = interpretation.newCategoryParentName;
+        const requestedParentId = requestedParentName
+          ? resolveSingleSelection(requestedParentName, parentCandidates)
+          : null;
+        const requestedParent = requestedParentId
+          ? parentRows.find((row) => row.id === requestedParentId) ?? null
+          : null;
+
         const result = await createCategoryFromMessage({
           workspaceId,
           userId: linkedByUid,
           name: interpretation.newCategoryName,
           type: interpretation.newCategoryType ?? 'expense',
           icon: interpretation.newCategoryIcon,
+          parent: requestedParent,
         });
 
-        await sendWhatsAppMessage(
-          phone,
-          result.created ? categoryCreatedMessage(result.name) : categoryAlreadyExistsMessage(result.name),
-        );
+        if (!result.created) {
+          await sendWhatsAppMessage(phone, categoryAlreadyExistsMessage(result.name));
+          return;
+        }
+
+        if (requestedParent) {
+          await sendWhatsAppMessage(phone, subcategoryCreatedMessage(result.name, requestedParent.name));
+          return;
+        }
+
+        // Pediu pai que nao existe: cria como principal e diz o motivo, em vez de calar.
+        if (requestedParentName) {
+          await sendWhatsAppMessage(phone, categoryParentNotFoundMessage(result.name, requestedParentName));
+          return;
+        }
+
+        // Nao citou pai: cria como principal e OFERECE mover (a oferta expira em 3 min e
+        // ignora-la e uma resposta valida — a categoria ja existe e ja funciona).
+        if (parentCandidates.length > 0) {
+          await setPendingAction(db, phone, {
+            kind: 'category_parent',
+            workspaceId,
+            categoryId: result.id,
+            categoryName: result.name,
+            candidates: parentCandidates,
+          });
+          await sendWhatsAppMessage(
+            phone,
+            categoryCreatedWithParentOfferMessage(result.name, parentCandidates.map((c) => c.label)),
+          );
+          return;
+        }
+
+        await sendWhatsAppMessage(phone, categoryCreatedMessage(result.name));
         return;
       }
 

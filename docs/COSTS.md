@@ -141,6 +141,51 @@ Registrado em `docs/planning/TODOS.md`.
 4. **DeepSeek/Vic**: custo externo por token, fora do Firebase. Pode virar o maior custo se a IA
    for muito usada.
 
+## 8. Por que a Vic do WhatsApp "demora" — e o preço de resolver (2026-07-30)
+
+Pergunta do dono: a Vic responde certo, mas às vezes demora, e ele suspeitou do prompt ter
+crescido. **Não é o prompt.** Medido nos logs reais do `whatsappWebhook`, cruzando
+`whatsapp_message_received` com a resposta pelo mesmo `execution_id`:
+
+| Situação | Tempo até a resposta |
+|---|---|
+| Instância **quente** (mensagens em sequência) | **2,2 – 3,2 s** |
+| Instância **fria** (primeira depois de uma pausa) | **4,8 – 6,2 s** |
+
+O que fecha o caso: **a amostra mais lenta de todas (6,2 s) é de 28/07**, um dia *antes* de a lista
+de ícones do prompt crescer; e a mais recente (5,1 s) tem um `Starting new instance` cinco segundos
+antes dela nos logs. A lista de ícones tem 964 caracteres (~240 tokens) — prefill, na casa de
+dezenas de milissegundos.
+
+A causa é **cold start**: sem `minInstances`, o Cloud Run desliga a instância quando não há
+tráfego, e cada mensagem depois de uma pausa paga 3,7–5,3 s de boot (visível como latência da
+primeira requisição). Deploy piora a primeira mensagem seguinte — revisão nova, contêiner novo.
+
+**Preço de matar o cold start** (`minInstances: 1`), com a config atual desta function
+(`cpu=1`, `memory=512Mi`, **`cpu-throttling=false`** — CPU cobrada o tempo todo em que a instância
+existe, não só durante a requisição), em `southamerica-east1` (região tier 2), ~730 h/mês:
+
+```
+CPU:      1 vCPU × 2.628.000 s × ~US$0,0000216/vCPU-s  ≈  US$ 57
+Memória:  0,5 GiB × 2.628.000 s × ~US$0,0000024/GiB-s  ≈  US$  3
+                                                    total ≈ US$ 60/mês (~R$ 330)
+```
+
+⚠️ **Confirme as tarifas em https://cloud.google.com/run/pricing antes de decidir** — preço muda e
+a região tier 2 tem tabela própria. A ordem de grandeza é o que importa aqui: **dezenas de dólares
+por mês**, num app gratuito com 9 usuários. O free tier do Cloud Run (180 mil vCPU-s/mês) cobre
+menos de 2 dias de uma instância sempre ligada.
+
+Não dá pra baratear tirando o `--no-cpu-throttling`: ele existe porque o webhook responde 200 à
+Meta e **processa depois**; com a CPU cortada, a confirmação demora dezenas de segundos
+(`docs/RUNBOOK.md`). Manter quente com ping do Cloud Scheduler também não ajuda no preço — instância
+viva com CPU sempre alocada é cobrada igual.
+
+**Alternativa gratuita, ainda não feita**: `functions/src/index.ts` re-exporta **17 functions**, e o
+contêiner do `whatsappWebhook` carrega esse índice inteiro no boot — Stripe, Resend, automações,
+tudo. Separar o WhatsApp num **codebase próprio** faria o contêiner carregar só o que ele usa.
+Não elimina o cold start, mas ataca a parte cara dele sem custo mensal nenhum.
+
 ## Fontes
 
 - Firestore — Usage and limits (quotas): https://firebase.google.com/docs/firestore/quotas
