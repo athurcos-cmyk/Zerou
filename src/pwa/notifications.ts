@@ -148,11 +148,11 @@ export async function requestAndRegisterPushToken(): Promise<void> {
   }
 }
 
-// Com o app ABERTO e visível, o SDK do FCM não mostra notificação nenhuma: ele
-// entrega a mensagem aqui, na página, e espera que o app decida o que fazer.
-// Sem este handler, todo push que chega com o app na frente some em silêncio.
-// Usa o mesmo `showNotification` do SW (mesma aparência) e a mesma `tag` que o
-// SW usa, então nunca dá pra ver a mesma mensagem duas vezes.
+// Documentação do SDK diz que, com o app ABERTO e visível, o FCM não mostra notificação
+// nenhuma sozinho: entrega a mensagem aqui, na página, e espera que o app decida o que
+// fazer. Sem este handler, push chegando com o app na frente some em silêncio.
+// ⚠️ Na prática essa separação não é garantida (ver comentário dentro da função) — por
+// isso o `document.visibilityState` como segunda trava, além do `tag`.
 export async function listenForForegroundPush(): Promise<void> {
   if (!VAPID_KEY) return;
   if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
@@ -166,6 +166,15 @@ export async function listenForForegroundPush(): Promise<void> {
     onMessage(messaging, (payload) => {
       const notification = payload.notification;
       if (!notification) return;
+
+      // Achado ao vivo em 2026-07-31: mesmo com `tag` igual (dedup do próprio navegador), o
+      // dono recebeu a notificação duas vezes num PWA Android — sinal de que o SW
+      // (`onBackgroundMessage`) e este handler (`onMessage`) dispararam os dois pro MESMO
+      // push, cada um chamando `showNotification` na hora que quis. O comentário original
+      // deste arquivo assumia que o SDK só entrega a UM dos dois, nunca aos dois — não é
+      // garantido na prática. `document.visibilityState` estreita a janela: só mostra por
+      // aqui quando a página está genuinamente na tela agora; fora disso, quem mostra é o SW.
+      if (document.visibilityState !== 'visible') return;
 
       const title = notification.title || 'Granativa';
       const body = notification.body || '';

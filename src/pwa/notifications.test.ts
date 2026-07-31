@@ -112,6 +112,10 @@ beforeEach(() => {
   // que verificam o gate sobrescrevem isso.
   vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: true }));
   Object.defineProperty(navigator, 'standalone', { configurable: true, value: undefined });
+
+  // Por padrão a página está visível — é o cenário em que listenForForegroundPush deve
+  // mostrar a notificação. O teste que prova a trava contra duplicação sobrescreve isso.
+  Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
 });
 
 afterEach(() => {
@@ -296,5 +300,27 @@ describe('listenForForegroundPush', () => {
     await listenForForegroundPush();
 
     expect(onMessageMock).not.toHaveBeenCalled();
+  });
+
+  // Achado ao vivo em 2026-07-31: o dono recebeu a MESMA notificação duas vezes num PWA
+  // Android, mesmo com `tag` igual — sinal de que o SW (onBackgroundMessage) e este handler
+  // dispararam os dois pro mesmo push. `document.visibilityState` estreita a janela: só
+  // mostra por aqui quando a página está genuinamente na tela agora.
+  it('não mostra a notificação quando a página não está visível — evita duplicar com o SW', async () => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+
+    const { listenForForegroundPush } = await loadModule();
+    await listenForForegroundPush();
+
+    const handler = onMessageMock.mock.calls[0][1];
+    handler({
+      notification: { title: 'Conta vence em breve', body: 'Luz: R$ 120,00 vence em 02/08' },
+      fcmOptions: { link: 'https://granativa.com.br/app/bills' },
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const fcmRegistration = await getRegistrationMock('/firebase-cloud-messaging-push-scope');
+    expect(fcmRegistration.showNotification).not.toHaveBeenCalled();
   });
 });
