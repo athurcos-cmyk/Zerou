@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, ArrowUpRight, RefreshCw, HelpCircle, ChevronDown, ChevronRight, Building2 } from 'lucide-react';
+import { Plus, ArrowUpRight, RefreshCw, HelpCircle, ChevronDown, ChevronRight, Building2, Landmark } from 'lucide-react';
 import { useFinanceContext } from '../finance/FinanceDataContext';
 import { useAuth } from '../auth/AuthContext';
 import { createInvestmentAccount, createInvestment, deleteInvestment } from '../finance/financeService';
@@ -103,12 +103,12 @@ export function InvestmentsPage() {
   const hasData = activeInvestments.length > 0 || investmentAccounts.length > 0;
 
   return (
-    <div className="page">
+    <div className="page" style={{ animation: 'fadeIn var(--duration-slow) ease both' }}>
       <header className="page-header">
         <div>
           <h1 className="page-title">Investimentos</h1>
-          <p className="text-muted" style={{ margin: '0.15rem 0 0', fontSize: '0.85rem' }}>
-            A Granativa não se conecta com nenhuma corretora ou banco — todo valor aqui é o que você mesmo informa.
+          <p className="text-muted" style={{ margin: '0.15rem 0 0', fontSize: '0.85rem', maxWidth: '42ch' }}>
+            Acompanhe seu portfólio. Nenhum valor é automático — você decide quando atualizar.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -123,23 +123,47 @@ export function InvestmentsPage() {
 
       {/* Dashboard — green gradient hero for investment/growth context */}
       {hasData && (
-        <div className="card-list-hero" style={{ marginBottom: '1rem', background: 'var(--gradient-income)' }}>
-          <div className="card-list-hero-inner" style={{ background: 'none', gridTemplateColumns: 'repeat(3, 1fr)' }}>
-            <div className="card-list-hero-stat" style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+        <div
+          className="card-list-hero"
+          style={{
+            marginBottom: '1.25rem',
+            background: 'var(--gradient-income)',
+            animation: 'fadeIn var(--duration-slow) 0.1s ease both'
+          }}
+        >
+          <div className="card-list-hero-inner" style={{
+            background: 'none',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: '0.75rem',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            {/* Decorative background dot pattern — subtle depth on the hero */}
+            <span aria-hidden="true" style={{
+              position: 'absolute', right: '-0.5rem', top: '-0.5rem',
+              width: 80, height: 80, borderRadius: '50%',
+              background: 'var(--on-accent-16)', pointerEvents: 'none'
+            }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
               <span className="card-list-hero-eyebrow">Total investido</span>
-              <strong className="card-list-hero-balance" style={{ fontSize: 'clamp(1.15rem, 3vw, 1.4rem)' }}>{formatMoney(totalContributed)}</strong>
+              <strong className="card-list-hero-balance" style={{ fontSize: 'clamp(1.1rem, 3vw, 1.35rem)' }}>
+                {formatMoney(totalContributed)}
+              </strong>
             </div>
-            <div className="card-list-hero-stat" style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
               <span className="card-list-hero-eyebrow">Valor atual</span>
-              <strong className="card-list-hero-balance" style={{ fontSize: 'clamp(1.15rem, 3vw, 1.4rem)' }}>{formatMoney(totalBalance)}</strong>
+              <strong className="card-list-hero-balance" style={{ fontSize: 'clamp(1.1rem, 3vw, 1.35rem)' }}>
+                {formatMoney(totalBalance)}
+              </strong>
             </div>
-            <div className="card-list-hero-stat" style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
               <span className="card-list-hero-eyebrow">Rendimento</span>
-              <strong className="card-list-hero-balance" style={{ fontSize: 'clamp(1.15rem, 3vw, 1.4rem)' }}>
+              <strong className="card-list-hero-balance" style={{ fontSize: 'clamp(1.1rem, 3vw, 1.35rem)' }}>
                 {totalReturn >= 0 ? '+' : ''}{formatMoney(totalReturn)}
               </strong>
               {totalContributed > 0 && (
-                <span style={{ fontSize: '0.75rem', color: 'var(--on-accent-82)' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--on-accent-82)', fontWeight: 500 }}>
                   {totalReturn >= 0 ? '+' : ''}{totalReturnPct.toFixed(1)}%
                 </span>
               )}
@@ -150,8 +174,22 @@ export function InvestmentsPage() {
 
       {/* Chart */}
       {valueUpdates.length >= 2 && (
-        <div className="surface surface-pad" style={{ marginBottom: '1rem' }}>
-          <p className="card-list-hero-label" style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Evolução do portfólio</p>
+        <div className="surface surface-pad" style={{
+          marginBottom: '1.25rem',
+          animation: 'fadeIn var(--duration-slow) 0.15s ease both'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem' }}>
+            <span style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 26, height: 26, borderRadius: 7,
+              background: 'var(--success-soft)', color: 'var(--success)'
+            }}>
+              <Landmark size={13} aria-hidden="true" />
+            </span>
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
+              Evolução do portfólio
+            </span>
+          </div>
           <InvestmentHistoryChart updates={valueUpdates} />
         </div>
       )}
@@ -161,122 +199,159 @@ export function InvestmentsPage() {
         <EmptyState illustration="wallet" title="Nenhum investimento ainda" description="Cadastre uma conta de investimento pra começar a acompanhar seu portfólio." />
       ) : (
         <div className="item-list">
-          {investmentAccounts.map((account) => {
+          {investmentAccounts.map((account, idx) => {
             const accountInvestments = investmentsByAccount.get(account.id) ?? [];
             const isExpanded = expandedAccounts.has(account.id);
             const accountCategory = finance.categories.find((c) => c.linkedInvestmentAccountId === account.id);
             const accountTotal = accountInvestments.reduce((sum, inv) => sum + (inv.currentBalanceCents ?? 0), 0);
 
             return (
-              <div key={account.id} className="day-group">
+              <div
+                key={account.id}
+                className="day-group"
+                style={{
+                  animation: `fadeIn var(--duration-slow) ${0.2 + idx * 0.06}s ease both`
+                }}
+              >
                 <button
                   type="button"
                   className="list-row--tap category-parent-row"
                   onClick={() => toggleAccount(account.id)}
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    gap: '0.75rem', cursor: 'pointer'
+                  }}
                 >
                   <span style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                     <span style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      width: 32, height: 32, borderRadius: 10,
+                      width: 34, height: 34, borderRadius: 10,
                       background: 'var(--success-soft)', color: 'var(--success)',
-                      transition: 'transform var(--duration-fast) ease',
-                      transform: isExpanded ? 'rotate(0deg)' : 'rotate(0deg)'
+                      transition: 'transform var(--duration-fast) ease, box-shadow var(--duration-fast) ease',
+                      boxShadow: isExpanded ? '0 2px 8px rgba(46, 174, 125, 0.15)' : 'none'
                     }}>
-                      <Building2 size={16} aria-hidden="true" />
+                      <Building2 size={17} aria-hidden="true" />
                     </span>
                     <span>
-                      <strong style={{ display: 'block', lineHeight: 1.25 }}>{account.name}</strong>
-                      <span className="text-muted" style={{ fontSize: '0.75rem' }}>
+                      <strong style={{ display: 'block', lineHeight: 1.2, fontSize: '0.95rem' }}>{account.name}</strong>
+                      <span className="text-muted" style={{ fontSize: '0.73rem' }}>
                         {accountInvestments.length} investimento{accountInvestments.length !== 1 ? 's' : ''}
                       </span>
                     </span>
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     {accountTotal > 0 && (
-                      <strong style={{ fontSize: '0.95rem', fontFamily: "'DM Sans', system-ui, sans-serif", fontWeight: 800 }}>
+                      <strong style={{
+                        fontSize: '0.95rem', fontFamily: "'DM Sans', system-ui, sans-serif",
+                        fontWeight: 800, fontVariantNumeric: 'tabular-nums'
+                      }}>
                         {formatMoney(accountTotal)}
                       </strong>
                     )}
-                    {isExpanded ? <ChevronDown size={16} className="text-muted" /> : <ChevronRight size={16} className="text-muted" />}
+                    <span style={{
+                      transition: 'transform var(--duration-fast) ease',
+                      transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)',
+                      display: 'flex', color: 'var(--text-muted)'
+                    }}>
+                      <ChevronDown size={16} />
+                    </span>
                   </span>
                 </button>
 
-                {isExpanded && (
-                  <>
-                    {accountInvestments.length > 0 ? (
-                      <div style={{ borderTop: '1px solid var(--border-subtle)' }}>
-                        {accountInvestments.map((inv) => {
-                          const invReturn = (inv.currentBalanceCents ?? 0) - (inv.contributedCents ?? 0);
-                          return (
-                            <div
-                              key={inv.id}
-                              className="list-row"
-                              style={{
-                                paddingLeft: '3.25rem', paddingRight: '0.75rem',
-                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                gap: '0.5rem', flexWrap: 'wrap'
-                              }}
-                            >
-                              <span style={{ flex: 1, minWidth: '120px' }}>
-                                <strong style={{ display: 'block', lineHeight: 1.3 }}>{inv.name}</strong>
-                                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', background: 'var(--bg-surface-subtle)', padding: '0.1rem 0.45rem', borderRadius: '4px' }}>
-                                  {investmentKindLabels[inv.kind]}
-                                </span>
+                {/* Expandable investment rows with CSS-only height animation */}
+                <div style={{
+                  overflow: 'hidden',
+                  transition: 'max-height var(--duration-slow) ease, opacity var(--duration-fast) ease',
+                  maxHeight: isExpanded ? `${accountInvestments.length * 56 + 48}px` : '0px',
+                  opacity: isExpanded ? 1 : 0
+                }}>
+                  {accountInvestments.length > 0 ? (
+                    <div style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                      {accountInvestments.map((inv) => {
+                        const invReturn = (inv.currentBalanceCents ?? 0) - (inv.contributedCents ?? 0);
+                        return (
+                          <div
+                            key={inv.id}
+                            className="list-row"
+                            style={{
+                              padding: '0.55rem 0.75rem 0.55rem 3.25rem',
+                              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                              gap: '0.5rem', flexWrap: 'wrap',
+                              animation: 'fadeIn var(--duration-fast) ease both'
+                            }}
+                          >
+                            <span style={{ flex: 1, minWidth: '110px' }}>
+                              <strong style={{ display: 'block', lineHeight: 1.3, fontSize: '0.9rem' }}>{inv.name}</strong>
+                              <span style={{
+                                fontSize: '0.68rem', color: 'var(--text-muted)',
+                                background: 'var(--bg-surface-muted)', padding: '0.08rem 0.4rem',
+                                borderRadius: '3px', fontWeight: 500, letterSpacing: '0.02em'
+                              }}>
+                                {investmentKindLabels[inv.kind]}
                               </span>
-                              <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                <span style={{ textAlign: 'right', lineHeight: 1.25 }}>
-                                  <strong style={{ fontFamily: "'DM Sans', system-ui, sans-serif", fontWeight: 800, fontSize: '0.92rem', display: 'block' }}>
-                                    {formatMoney(inv.currentBalanceCents ?? 0)}
-                                  </strong>
-                                  {invReturn !== 0 && (
-                                    <span style={{
-                                      fontSize: '0.72rem',
-                                      color: invReturn >= 0 ? 'var(--success)' : 'var(--danger)',
-                                      fontWeight: 600
-                                    }}>
-                                      {invReturn >= 0 ? '+' : ''}{formatMoney(invReturn)}
-                                    </span>
-                                  )}
-                                </span>
-                                <button
-                                  className="icon-button"
-                                  type="button"
-                                  style={{ width: '2.25rem', height: '2.25rem', color: 'var(--action-primary)' }}
-                                  onClick={() => { setContributeTarget(inv); setContributeCategoryId(accountCategory?.id ?? ''); }}
-                                  title="Aportar / Resgatar"
-                                >
-                                  <ArrowUpRight size={15} />
-                                </button>
-                                <button
-                                  className="icon-button"
-                                  type="button"
-                                  style={{ width: '2.25rem', height: '2.25rem', color: 'var(--info)' }}
-                                  onClick={() => setValueUpdateTarget(inv)}
-                                  title="Quanto rendeu desde a última vez?"
-                                >
-                                  <RefreshCw size={15} />
-                                </button>
+                            </span>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
+                              <span style={{ textAlign: 'right', lineHeight: 1.2 }}>
+                                <strong style={{
+                                  fontFamily: "'DM Sans', system-ui, sans-serif",
+                                  fontWeight: 800, fontSize: '0.9rem', display: 'block',
+                                  fontVariantNumeric: 'tabular-nums'
+                                }}>
+                                  {formatMoney(inv.currentBalanceCents ?? 0)}
+                                </strong>
+                                {invReturn !== 0 && (
+                                  <span style={{
+                                    fontSize: '0.7rem',
+                                    color: invReturn >= 0 ? 'var(--success)' : 'var(--danger)',
+                                    fontWeight: 600
+                                  }}>
+                                    {invReturn >= 0 ? '+' : ''}{formatMoney(invReturn)}
+                                  </span>
+                                )}
                               </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <p className="text-muted" style={{ padding: '0.6rem 0 0.6rem 3.25rem', fontSize: '0.85rem' }}>
-                        Nenhum investimento cadastrado nesta conta.
-                      </p>
-                    )}
-                    <button
-                      className="button button--subtle"
-                      type="button"
-                      style={{ margin: '0.25rem 0 0.5rem 2.75rem' }}
-                      onClick={() => { setSelectedAccountId(account.id); setInvestmentSheetOpen(true); }}
-                    >
-                      <Plus size={14} aria-hidden="true" /> Novo investimento
-                    </button>
-                  </>
-                )}
+                              <button
+                                className="icon-button"
+                                type="button"
+                                style={{
+                                  width: '2.25rem', height: '2.25rem', color: 'var(--action-primary)',
+                                  transition: 'background var(--duration-fast) ease'
+                                }}
+                                onClick={() => { setContributeTarget(inv); setContributeCategoryId(accountCategory?.id ?? ''); }}
+                                title="Aportar / Resgatar"
+                              >
+                                <ArrowUpRight size={15} />
+                              </button>
+                              <button
+                                className="icon-button"
+                                type="button"
+                                style={{
+                                  width: '2.25rem', height: '2.25rem', color: 'var(--info)',
+                                  transition: 'background var(--duration-fast) ease'
+                                }}
+                                onClick={() => setValueUpdateTarget(inv)}
+                                title="Quanto rendeu desde a última vez?"
+                              >
+                                <RefreshCw size={14} />
+                              </button>
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-muted" style={{ padding: '0.6rem 0 0.6rem 3.25rem', fontSize: '0.85rem' }}>
+                      Nenhum investimento cadastrado nesta conta.
+                    </p>
+                  )}
+                  <button
+                    className="button button--subtle"
+                    type="button"
+                    style={{ margin: '0.2rem 0 0.5rem 2.75rem' }}
+                    onClick={() => { setSelectedAccountId(account.id); setInvestmentSheetOpen(true); }}
+                  >
+                    <Plus size={14} aria-hidden="true" /> Novo investimento
+                  </button>
+                </div>
               </div>
             );
           })}
