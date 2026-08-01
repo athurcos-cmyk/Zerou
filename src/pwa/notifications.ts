@@ -148,11 +148,36 @@ export async function requestAndRegisterPushToken(): Promise<void> {
   }
 }
 
+// Dedup entre este handler e o service worker (public/firebase-messaging-sw.js, gerado por
+// vite.config.ts) — achado ao vivo em 2026-07-31, em duas rodadas: primeiro que `tag` igual
+// no `showNotification()` não bastava sozinho (o navegador às vezes mostra duas entradas
+// mesmo com tag idêntica); depois que `document.visibilityState` TAMBÉM não é confiável — a
+// página pode reportar 'visible' mesmo em segundo plano em algum Android/WebView, então essa
+// trava não impediu uma segunda duplicação real. Cache Storage é a única forma de estado que
+// os dois lados — este handler e o SW — realmente compartilham (`caches` existe nos dois
+// contextos, ao contrário de `localStorage`, que o SW não enxerga).
+const PUSH_DEDUP_CACHE = 'push-dedup-v1';
+const PUSH_DEDUP_WINDOW_MS = 8000;
+
+async function shouldDisplayPush(tag: string): Promise<boolean> {
+  try {
+    const cache = await caches.open(PUSH_DEDUP_CACHE);
+    const key = `https://push-dedup.internal/${encodeURIComponent(tag)}`;
+    const existing = await cache.match(key);
+    if (existing) {
+      const shownAt = Number(await existing.text());
+      if (Date.now() - shownAt < PUSH_DEDUP_WINDOW_MS) return false;
+    }
+    await cache.put(key, new Response(String(Date.now())));
+    return true;
+  } catch {
+    return true; // Cache Storage falhou: não bloqueia a notificação
+  }
+}
+
 // Documentação do SDK diz que, com o app ABERTO e visível, o FCM não mostra notificação
 // nenhuma sozinho: entrega a mensagem aqui, na página, e espera que o app decida o que
 // fazer. Sem este handler, push chegando com o app na frente some em silêncio.
-// ⚠️ Na prática essa separação não é garantida (ver comentário dentro da função) — por
-// isso o `document.visibilityState` como segunda trava, além do `tag`.
 export async function listenForForegroundPush(): Promise<void> {
   if (!VAPID_KEY) return;
   if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
@@ -167,27 +192,21 @@ export async function listenForForegroundPush(): Promise<void> {
       const notification = payload.notification;
       if (!notification) return;
 
-      // Achado ao vivo em 2026-07-31: mesmo com `tag` igual (dedup do próprio navegador), o
-      // dono recebeu a notificação duas vezes num PWA Android — sinal de que o SW
-      // (`onBackgroundMessage`) e este handler (`onMessage`) dispararam os dois pro MESMO
-      // push, cada um chamando `showNotification` na hora que quis. O comentário original
-      // deste arquivo assumia que o SDK só entrega a UM dos dois, nunca aos dois — não é
-      // garantido na prática. `document.visibilityState` estreita a janela: só mostra por
-      // aqui quando a página está genuinamente na tela agora; fora disso, quem mostra é o SW.
-      if (document.visibilityState !== 'visible') return;
-
       const title = notification.title || 'Granativa';
       const body = notification.body || '';
+      const tag = `${title}|${body}`;
 
-      navigator.serviceWorker
-        .getRegistration(FCM_SW_SCOPE)
-        .then((registration) => {
-          registration?.showNotification(title, {
-            body,
-            icon: '/brand/granativa-app-icon-192.png',
-            badge: '/brand/granativa-app-icon-192.png',
-            tag: `${title}|${body}`,
-            data: { link: payload.fcmOptions?.link || '/app' },
+      shouldDisplayPush(tag)
+        .then((should) => {
+          if (!should) return;
+          return navigator.serviceWorker.getRegistration(FCM_SW_SCOPE).then((registration) => {
+            registration?.showNotification(title, {
+              body,
+              icon: '/brand/granativa-app-icon-192.png',
+              badge: '/brand/granativa-app-icon-192.png',
+              tag,
+              data: { link: payload.fcmOptions?.link || '/app' },
+            });
           });
         })
         .catch(() => {});

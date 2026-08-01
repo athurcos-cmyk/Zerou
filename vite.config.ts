@@ -26,21 +26,42 @@ function generateFirebaseMessagingSW(env: Record<string, string>): Plugin {
 importScripts('https://www.gstatic.com/firebasejs/10.12.4/firebase-messaging-compat.js');
 firebase.initializeApp(${config});
 const messaging = firebase.messaging();
+// Dedup entre este SW e o handler de foreground (src/pwa/notifications.ts) — achado ao vivo
+// em 2026-07-31: 'tag' igual no showNotification() NÃO bastou (o navegador às vezes mostra
+// duas entradas mesmo com tag idêntica) nem document.visibilityState foi confiável (a página
+// pode reportar 'visible' mesmo em segundo plano em algum Android/WebView). O Cache Storage é
+// a única forma de estado que os dois lados — este SW e a página — realmente compartilham.
+var PUSH_DEDUP_CACHE = 'push-dedup-v1';
+var PUSH_DEDUP_WINDOW_MS = 8000;
+function shouldDisplayPush(tag) {
+  return caches.open(PUSH_DEDUP_CACHE).then(function(cache) {
+    var key = 'https://push-dedup.internal/' + encodeURIComponent(tag);
+    return cache.match(key).then(function(existing) {
+      if (existing) {
+        return existing.text().then(function(text) {
+          if (Date.now() - Number(text) < PUSH_DEDUP_WINDOW_MS) return false;
+          return cache.put(key, new Response(String(Date.now()))).then(function() { return true; });
+        });
+      }
+      return cache.put(key, new Response(String(Date.now()))).then(function() { return true; });
+    });
+  }).catch(function() { return true; }); // Cache Storage falhou: não bloqueia a notificação
+}
 // Notificações recebidas com o app fechado ou em background
 messaging.onBackgroundMessage(function(payload) {
   var n = payload.notification || {};
   var title = n.title || 'Granativa';
   var body = n.body || '';
-  self.registration.showNotification(title, {
-    body: body,
-    icon: '/brand/granativa-app-icon-192.png',
-    badge: '/brand/granativa-app-icon-192.png',
-    // Mesma 'tag' usada pelo handler de foreground (src/pwa/notifications.ts):
-    // a mesma mensagem nunca aparece duas vezes. Inclui o corpo de proposito —
-    // 'sendDueReminders' manda um push POR CONTA com o mesmo titulo, e agrupar
-    // so pelo titulo esconderia todas menos a ultima.
-    tag: title + '|' + body,
-    data: { link: (payload.fcmOptions || {}).link || '/app' }
+  var tag = title + '|' + body;
+  return shouldDisplayPush(tag).then(function(should) {
+    if (!should) return;
+    return self.registration.showNotification(title, {
+      body: body,
+      icon: '/brand/granativa-app-icon-192.png',
+      badge: '/brand/granativa-app-icon-192.png',
+      tag: tag,
+      data: { link: (payload.fcmOptions || {}).link || '/app' }
+    });
   });
 });
 // Abre o app (ou a aba existente) quando o usuário clica na notificação

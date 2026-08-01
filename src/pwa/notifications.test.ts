@@ -61,6 +61,36 @@ const registerMock =
   vi.fn<(script: string, options?: { scope?: string }) => Promise<SwRegistration>>();
 const getRegistrationMock = vi.fn<(clientUrl?: string) => Promise<SwRegistration>>();
 
+// Esvazia a fila de microtasks por completo (um `setTimeout` é macrotask, então só roda
+// depois de TODAS as promises pendentes resolverem) — mais robusto que contar quantos
+// `await Promise.resolve()` a cadeia de shouldDisplayPush precisa, que muda se a cadeia mudar.
+function flushAsync(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+// Cache Storage em memória — o mecanismo real de dedup entre o SW e o handler de foreground
+// (o único jeito de compartilhar estado entre os dois contextos). jsdom não implementa
+// `caches`, então precisa de um stand-in mínimo, mas funcional o bastante pra provar o
+// comportamento de verdade (não só que as funções certas foram chamadas).
+function createCacheStorageMock() {
+  const buckets = new Map<string, Map<string, string>>();
+  return {
+    open: async (name: string) => {
+      if (!buckets.has(name)) buckets.set(name, new Map());
+      const bucket = buckets.get(name)!;
+      return {
+        match: async (key: string) => {
+          const value = bucket.get(key);
+          return value === undefined ? undefined : { text: async () => value };
+        },
+        put: async (key: string, response: Response) => {
+          bucket.set(key, await response.text());
+        },
+      };
+    },
+  };
+}
+
 async function loadModule() {
   vi.resetModules();
   vi.stubEnv('VITE_FIREBASE_VAPID_KEY', 'vapid-de-teste');
@@ -113,9 +143,8 @@ beforeEach(() => {
   vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: true }));
   Object.defineProperty(navigator, 'standalone', { configurable: true, value: undefined });
 
-  // Por padrão a página está visível — é o cenário em que listenForForegroundPush deve
-  // mostrar a notificação. O teste que prova a trava contra duplicação sobrescreve isso.
-  Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+  // Cache Storage limpo a cada teste — bucket novo, sem histórico do teste anterior.
+  vi.stubGlobal('caches', createCacheStorageMock());
 });
 
 afterEach(() => {
@@ -279,8 +308,7 @@ describe('listenForForegroundPush', () => {
       notification: { title: 'Conta vence em breve', body: 'Luz: R$ 120,00 vence em 02/08' },
       fcmOptions: { link: 'https://granativa.com.br/app/bills' },
     });
-    await Promise.resolve();
-    await Promise.resolve();
+    await flushAsync();
 
     const fcmRegistration = await getRegistrationMock('/firebase-cloud-messaging-push-scope');
     expect(fcmRegistration.showNotification).toHaveBeenCalledWith(
@@ -302,12 +330,22 @@ describe('listenForForegroundPush', () => {
     expect(onMessageMock).not.toHaveBeenCalled();
   });
 
-  // Achado ao vivo em 2026-07-31: o dono recebeu a MESMA notificação duas vezes num PWA
-  // Android, mesmo com `tag` igual — sinal de que o SW (onBackgroundMessage) e este handler
-  // dispararam os dois pro mesmo push. `document.visibilityState` estreita a janela: só
-  // mostra por aqui quando a página está genuinamente na tela agora.
-  it('não mostra a notificação quando a página não está visível — evita duplicar com o SW', async () => {
-    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+  // Achado ao vivo em 2026-07-31, em DUAS rodadas: primeiro que `tag` igual sozinha não bastava
+  // (o Android às vezes mostra duas entradas mesmo com tag idêntica); depois que
+  // `document.visibilityState` TAMBÉM não é confiável (a página pode reportar 'visible' mesmo
+  // em segundo plano em algum Android/WebView) — um push disparado manualmente via Cloud
+  // Scheduler ainda chegou duas vezes com essa trava no ar. A correção final usa Cache Storage,
+  // que os dois lados (este handler e o SW) genuinamente compartilham — simula aqui o SW já
+  // tendo mostrado a mesma notificação (mesma tag) um instante antes.
+  it('não mostra de novo uma notificação que o SW (ou outra chamada) já mostrou há pouco — mesma tag', async () => {
+    // Mesma chave que o SW real usaria: o dedup roda por cima do Cache Storage do navegador,
+    // compartilhado entre os dois contextos.
+    const bucket = await (globalThis as unknown as { caches: ReturnType<typeof createCacheStorageMock> })
+      .caches.open('push-dedup-v1');
+    await bucket.put(
+      'https://push-dedup.internal/' + encodeURIComponent('Conta vence em breve|Luz: R$ 120,00 vence em 02/08'),
+      new Response(String(Date.now()))
+    );
 
     const { listenForForegroundPush } = await loadModule();
     await listenForForegroundPush();
@@ -317,10 +355,53 @@ describe('listenForForegroundPush', () => {
       notification: { title: 'Conta vence em breve', body: 'Luz: R$ 120,00 vence em 02/08' },
       fcmOptions: { link: 'https://granativa.com.br/app/bills' },
     });
-    await Promise.resolve();
-    await Promise.resolve();
+    await flushAsync();
 
     const fcmRegistration = await getRegistrationMock('/firebase-cloud-messaging-push-scope');
     expect(fcmRegistration.showNotification).not.toHaveBeenCalled();
+  });
+
+  it('mostra normalmente quando a mesma tag já foi vista, mas fora da janela de dedup', async () => {
+    const bucket = await (globalThis as unknown as { caches: ReturnType<typeof createCacheStorageMock> })
+      .caches.open('push-dedup-v1');
+    // 30s atrás — bem fora da janela de 8s.
+    await bucket.put(
+      'https://push-dedup.internal/' + encodeURIComponent('Conta vence em breve|Luz: R$ 120,00 vence em 02/08'),
+      new Response(String(Date.now() - 30_000))
+    );
+
+    const { listenForForegroundPush } = await loadModule();
+    await listenForForegroundPush();
+
+    const handler = onMessageMock.mock.calls[0][1];
+    handler({
+      notification: { title: 'Conta vence em breve', body: 'Luz: R$ 120,00 vence em 02/08' },
+      fcmOptions: { link: 'https://granativa.com.br/app/bills' },
+    });
+    await flushAsync();
+
+    const fcmRegistration = await getRegistrationMock('/firebase-cloud-messaging-push-scope');
+    expect(fcmRegistration.showNotification).toHaveBeenCalledTimes(1);
+  });
+
+  it('não bloqueia a notificação se o Cache Storage falhar (falha aberta)', async () => {
+    vi.stubGlobal('caches', {
+      open: async () => {
+        throw new Error('Cache Storage indisponível');
+      },
+    });
+
+    const { listenForForegroundPush } = await loadModule();
+    await listenForForegroundPush();
+
+    const handler = onMessageMock.mock.calls[0][1];
+    handler({
+      notification: { title: 'Conta vence em breve', body: 'Luz: R$ 120,00 vence em 02/08' },
+      fcmOptions: { link: 'https://granativa.com.br/app/bills' },
+    });
+    await flushAsync();
+
+    const fcmRegistration = await getRegistrationMock('/firebase-cloud-messaging-push-scope');
+    expect(fcmRegistration.showNotification).toHaveBeenCalledTimes(1);
   });
 });
