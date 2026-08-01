@@ -2,6 +2,19 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-01 — feat(investments): tracking de investimentos
+
+Feature nova: acompanhamento de investimentos em dois níveis (conta de investimento + investimentos individuais). Plano completo em `docs/planning/INVESTIMENTOS.md`, detalhes em `docs/history/2026-08.md`.
+
+- **Modelo**: `Investment` e `InvestmentValueUpdate` (coleções novas), `InvestmentKind` (9 tipos), `Category.linkedInvestmentAccountId` pra categoria sintética vinculada.
+- **Aporte/Resgate**: cria transação real (`expense`/`income`) com tag `'investimento'`, visível na Análise como categoria sintética por conta. Transação não pode ser excluída nem editada pelo fluxo comum.
+- **Dashboard + gráfico**: hero verde (`--gradient-income`), 3 stats (total investido, valor atual, rendimento), gráfico `stepAfter` com gradient fill.
+- **UI**: `InvestmentsPage.tsx` com lista agrupada por conta expansível, sheets de Aportar/Resgatar e "Quanto rendeu?", tutorial de 3 slides.
+- `firestore.rules`: `validInvestmentCreate/Update`, `validInvestmentValueUpdateCreate`, bloqueio de soft-delete pra transação com tag `investimento`. Regras deployadas.
+- **3 bugs críticos na própria entrega, achados via `/review`**: (1) `get()` em vez de `getAfter()` na regra — impedia criação de conta; (2) `contributeToInvestment` escrevia `balanceCents=0` no valueUpdate; (3) nome da categoria estourava 80 chars. Todos corrigidos e deployados.
+- WhatsApp filtra contas `type: 'investment'` da query de lançamento.
+- 90/90 testes de regras, 512/512 testes unitários, typecheck + build verdes.
+
 ## 2026-07-31 (parte 6) — fix(push): cache desatualizado corrigido; notificação em dobro CONTINUA
 
 Depois do fix de PWA-only (abaixo), mais problemas, achados só depois de resolver os anteriores.

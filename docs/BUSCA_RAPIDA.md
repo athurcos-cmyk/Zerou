@@ -43,6 +43,7 @@ Use este arquivo como mapa antes de abrir documentos grandes. Regra: leia o meno
 | Subcategorias — regras de hierarquia | `src/finance/categoryHierarchy.ts` (tudo função pura): `parentCategoryIds` (**exige a lista COMPLETA** — calcular sobre um recorte por tipo fez o pai voltar a ser selecionável, bug real 29/07), `selectableCategories`, `canBeParentOf` (3 travas de 1 nível), `parentCandidates`, `canDeleteCategory`, `dependentsOnCategory`. Plano e decisões: `docs/planning/SUBCATEGORIAS.md` |
 | Categoria — formulário, ações e tela | `src/components/CategoryForm.tsx` (formulário compartilhado pelos DOIS lugares que criam categoria), `src/finance/useCategoryActions.ts` (hook que substituiu 21 closures duplicadas), `src/settings/CategoriesSettingsPage.tsx` (`/app/settings/categories`), `src/components/CategoryField.tsx` (seletor dentro do lançamento — **não** foi removido de propósito) |
 | Serviço financeiro | `src/finance/financeService.ts` |
+| Investimentos | `src/pages/InvestmentsPage.tsx` (página principal), `src/finance/InvestmentContributeSheet.tsx` (aporte/resgate), `src/finance/InvestmentValueUpdateSheet.tsx` (atualizar valor), `src/finance/InvestmentHistoryChart.tsx` (gráfico), `src/finance/investmentAnalysis.ts` (`buildInvestmentValueHistory`). Plano: `docs/planning/INVESTIMENTOS.md`. Tutorial: `src/onboarding/InvestmentsTour.tsx` + `investmentsTour.store.ts` |
 | Saldo de conta (mantido incrementalmente) | `Account.currentBalanceCents`, `applyAccountEffectsToBatch` (`financeService.ts`), sinal por tipo de transação em `transactionAccountEffects` (`src/finance/financeCalculations.ts`, porta Admin SDK em `functions/src/shared/accountEffects.ts`) |
 | Acertar saldo com o banco (conciliação) | `AccountReconcileSheet` (`src/finance/`, sheet na tela de Contas, ícone balança) + `reconcileAccountBalance` (`financeService.ts`, cria 1 acerto pela diferença: `adjustment` se banco maior, `expense` se menor). Diagnóstico só-leitura da divergência: `scripts/reconcileAccountBalances.mjs` (bate `currentBalanceCents` vs histórico) e `scripts/dumpTransactionsForOwner.mjs`. Contexto (divergência fixa de 1,44 = rendimento externo, não bug): `docs/history/2026-07.md` |
 | Dashboard (resumo, Saldo total/Comprometido) | `src/pages/DashboardPage.tsx`, `src/finance/financeCalculations.ts` (`buildUpcomingCommitments` = recorrências + contas + faturas do ciclo atual; `selectCurrentCycleInvoices` conta só a fatura aberta mais próxima + as fechadas por cartão, não parcelas futuras; `recurringChargesByInvoice` desfaz a duplicidade de recorrência no cartão — sem corte por data desde 2026-07-27, Disponível/payday/availableMode removidos). Cache de exibição do boot em `src/finance/dashboardViewCache.ts` |
@@ -94,4 +95,13 @@ rg -n "EE5524|--action-primary|--gradient" src/styles/themes.css
 
 # Onde uma coleção Firestore é usada
 rg -n "goalContributions|collectionRef" src/finance
+
+# Investimentos
+rg -n "Investment|investments|investmentValueUpdate" src/finance/financeService.ts src/types/contracts.ts
+
+# Categoria sintética vinculada
+rg -n "linkedInvestmentAccountId" src/ src/finance/ firestore.rules
+
+# Regras de investimento no Firestore
+rg -n "validInvestment|validExistingInvestmentAccountRef" firestore.rules
 ```
