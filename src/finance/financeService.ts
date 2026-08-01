@@ -1050,7 +1050,7 @@ export function markReceivableReceived(
   const batch = writeBatch(getFirebaseDb());
   batch.update(documentRef(workspaceId, 'receivables', receivable.id), { status: 'received', updatedAt: serverTimestamp() });
   if (acctId) {
-    const id = createId('txn');
+    const id = receivablePaymentTransactionId(receivable.id, acctId);
     const now = new Date();
     batch.set(documentRef(workspaceId, 'transactions', id), omitUndefined({
       id, workspaceId, createdBy: userId, updatedBy: userId,
@@ -1105,6 +1105,22 @@ export function nextOccurrenceDate(
   );
 }
 
+// ─── IDs determinísticos de pagamento ──────────────────────────────────────────
+// Mesmo padrão de `recurringOccurrenceTransactionId`: clique duplo ou retry de rede
+// cai no mesmo documento, e a regra do Firestore rejeita a segunda escrita (version
+// não incrementa num payload de create), desfazendo o batch sem duplicar o débito.
+
+/** ID determinístico do débito de uma conta a pagar. `methodId` é a conta (branch de
+ * conta) ou o cartão (branch de cartão) resolvidos por `resolvePaymentMethod`. */
+export function billPaymentTransactionId(billId: string, methodId: string) {
+  return `${billId}_${methodId}`;
+}
+
+/** ID determinístico do crédito de um "a receber" marcado como recebido. */
+export function receivablePaymentTransactionId(receivableId: string, accountId: string) {
+  return `${receivableId}_${accountId}`;
+}
+
 // ─── payBill ──────────────────────────────────────────────────────────────────
 // Marca a conta como paga e cria uma transação de despesa na conta informada.
 // Se nenhuma conta for informada, apenas muda o status (sem débito).
@@ -1133,9 +1149,9 @@ export async function payBill(
       purchaseDate: new Date(),
       categoryId: catId,
       installments: opts.installments ?? bill.installments ?? 1
-    });
+    }, { transactionId: billPaymentTransactionId(bill.id, method.cardId) });
   } else if (method.accountId) {
-    const id = createId('txn');
+    const id = billPaymentTransactionId(bill.id, method.accountId);
     const now = new Date();
     batch.set(documentRef(workspaceId, 'transactions', id), omitUndefined({
       id, workspaceId, createdBy: userId, updatedBy: userId,

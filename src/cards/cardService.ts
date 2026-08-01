@@ -562,9 +562,20 @@ export function markClosedInvoices(
     .forEach((invoice) => closeInvoice(workspaceId, invoice.cardId, invoice.id));
 }
 
+/** ID determinístico de UM pagamento de fatura. Fatura pode ser paga em partes, então
+ * `paidAt` + `amountCents` separam pagamentos distintos; um retry/clique duplo repete
+ * o MESMO input e cai no mesmo documento — a regra rejeita a segunda escrita. */
+export function invoicePaymentTransactionId(
+  cardId: string, invoiceId: string, accountId: string, paidAt: Date, amountCents: number
+) {
+  return `${cardId}_${invoiceId}_${accountId}_${paidAt.getTime()}_${amountCents}`;
+}
+
 export async function recordInvoicePayment(workspaceId: string, userId: string, input: RecordInvoicePaymentInput) {
   const parsed = recordInvoicePaymentSchema.parse(input);
-  const transactionId = createId('txn');
+  const transactionId = invoicePaymentTransactionId(
+    parsed.cardId, parsed.invoiceId, parsed.accountId, parsed.paidAt, parsed.amountCents
+  );
   const idempotencyKey = `${transactionId}_payment`;
   const entryId = idempotentEntryId(idempotencyKey);
   const monthKey = monthKeyFromDate(parsed.paidAt);

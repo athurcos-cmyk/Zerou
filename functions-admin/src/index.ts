@@ -6,7 +6,6 @@ import { logger } from 'firebase-functions';
 
 initializeApp();
 
-const ADMIN_EMAIL = 'a.thurcos@gmail.com';
 const REGION = 'southamerica-east1';
 const BATCH_LIMIT = 450;
 
@@ -34,8 +33,8 @@ const WORKSPACE_COLLECTIONS = [
   'recurringNotifyState',
 ];
 
-function assertAdmin(email: string | undefined): void {
-  if (email !== ADMIN_EMAIL) {
+function assertAdmin(admin: boolean | undefined): void {
+  if (admin !== true) {
     throw new HttpsError('permission-denied', 'Acesso negado.');
   }
 }
@@ -119,7 +118,7 @@ async function collectWorkspaceTree(workspaceId: string): Promise<DocumentRefere
 export const adminDeleteUser = onCall(
   { region: REGION, maxInstances: 5 },
   async (request) => {
-    assertAdmin(request.auth?.token.email);
+    assertAdmin(request.auth?.token.admin);
 
     const userId = request.data?.userId;
     if (!userId || typeof userId !== 'string') {
@@ -260,7 +259,7 @@ export const adminDeleteUser = onCall(
 export const adminForceLogout = onCall(
   { region: REGION, maxInstances: 5 },
   async (request) => {
-    assertAdmin(request.auth?.token.email);
+    assertAdmin(request.auth?.token.admin);
 
     const userId = request.data?.userId;
     if (!userId || typeof userId !== 'string') {
@@ -292,7 +291,7 @@ export const adminForceLogout = onCall(
 export const adminUnlinkWhatsappNumber = onCall(
   { region: REGION, maxInstances: 5 },
   async (request) => {
-    assertAdmin(request.auth?.token.email);
+    assertAdmin(request.auth?.token.admin);
 
     const phone = request.data?.phone;
     if (!phone || typeof phone !== 'string') {

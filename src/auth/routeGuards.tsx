@@ -1,8 +1,6 @@
-﻿import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { useAccountDeletion } from '../settings/accountDeletion.store';
-
-const ADMIN_EMAIL = 'a.thurcos@gmail.com';
 
 export function RequireAuth() {
   const { user, loading } = useAuth();
@@ -14,6 +12,20 @@ export function RequireAuth() {
 
   if (!user) {
     return <Navigate to="/login" replace state={{ returnTo: location.pathname }} />;
+  }
+
+  return <Outlet />;
+}
+
+export function RequireVerifiedEmail() {
+  const { user, loading, authFromCache } = useAuth();
+  const location = useLocation();
+
+  if (loading || authFromCache) return <Outlet />;
+  // Sessão confirmada mas email ainda não verificado — barra acesso ao app.
+  // A /verify-email fica fora deste guard pra não causar loop.
+  if (user && !user.emailVerified && location.pathname !== '/verify-email') {
+    return <Navigate to="/verify-email" replace />;
   }
 
   return <Outlet />;
@@ -40,9 +52,9 @@ export function RequireOnboardingComplete() {
 }
 
 export function RequireAdmin() {
-  const { user, loading } = useAuth();
+  const { user, loading, isAdmin } = useAuth();
   if (loading) return null;
-  if (!user || user.email !== ADMIN_EMAIL) return <Navigate to="/app" replace />;
+  if (!user || !isAdmin) return <Navigate to="/app" replace />;
   return <Outlet />;
 }
 

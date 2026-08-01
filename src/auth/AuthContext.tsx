@@ -18,6 +18,10 @@ interface AuthContextValue {
   firebaseError: string | null;
   /** A conta desta sessão foi excluída (possivelmente em outro aparelho). */
   accountDeleted: boolean;
+  /** Email verificado? true durante cache boot (confia — o cache já provou posse da conta). */
+  emailVerified: boolean;
+  /** É admin? Resolvido do custom claim `admin: true` no token. Cache boot usa email como fallback. */
+  isAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -75,6 +79,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authFromCache, setAuthFromCache] = useState(() => isFirebaseConfigured && Boolean(readLastCachedProfile()));
   const [firebaseError, setFirebaseError] = useState<string | null>(null);
   const [accountDeleted, setAccountDeleted] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(() => {
+    const c = readLastCachedProfile();
+    return c?.email === 'a.thurcos@gmail.com';
+  });
+  const [emailVerified, setEmailVerified] = useState(true); // cache boot: confia
   // Evita disparar N renovações de token em paralelo (o listener pode reemitir várias vezes).
   const accountCheckInFlight = useRef(false);
   const hydrateFromProfile = useAppearanceStore((state) => state.hydrateFromProfile);
@@ -170,6 +179,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         setAuthFromCache(false);
         setUser(nextUser);
+        setEmailVerified(nextUser?.emailVerified ?? false);
+        // Resolve admin claim do token (fire-and-forget — não bloqueia o boot)
+        if (nextUser) {
+          nextUser.getIdTokenResult().then((r) => setIsAdmin(r.claims.admin === true)).catch(() => {});
+        } else {
+          setIsAdmin(false);
+        }
         const cachedProfile = readCachedProfile(nextUser?.uid);
         applyProfile(cachedProfile);
         setProfileLoading(Boolean(nextUser && !cachedProfile));
@@ -278,8 +294,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [applyProfile, firebaseError, user, resetLocalOverride, handleProfileUnavailable]);
 
   const value = useMemo(
-    () => ({ user, profile, loading, profileLoading, authFromCache, firebaseError, accountDeleted }),
-    [user, profile, loading, profileLoading, authFromCache, firebaseError, accountDeleted]
+    () => ({ user, profile, loading, profileLoading, authFromCache, firebaseError, accountDeleted, emailVerified, isAdmin }),
+    [user, profile, loading, profileLoading, authFromCache, firebaseError, accountDeleted, emailVerified, isAdmin]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

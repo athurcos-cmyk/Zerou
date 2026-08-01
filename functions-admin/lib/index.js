@@ -4,7 +4,6 @@ import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions';
 initializeApp();
-const ADMIN_EMAIL = 'a.thurcos@gmail.com';
 const REGION = 'southamerica-east1';
 const BATCH_LIMIT = 450;
 const WORKSPACE_COLLECTIONS = [
@@ -30,8 +29,8 @@ const WORKSPACE_COLLECTIONS = [
     // (Firestore não faz cascade delete). Mesmo molde do budgetAlertState, que já estava na lista.
     'recurringNotifyState',
 ];
-function assertAdmin(email) {
-    if (email !== ADMIN_EMAIL) {
+function assertAdmin(admin) {
+    if (admin !== true) {
         throw new HttpsError('permission-denied', 'Acesso negado.');
     }
 }
@@ -101,7 +100,7 @@ async function collectWorkspaceTree(workspaceId) {
     return refs;
 }
 export const adminDeleteUser = onCall({ region: REGION, maxInstances: 5 }, async (request) => {
-    assertAdmin(request.auth?.token.email);
+    assertAdmin(request.auth?.token.admin);
     const userId = request.data?.userId;
     if (!userId || typeof userId !== 'string') {
         throw new HttpsError('invalid-argument', 'userId obrigatório.');
@@ -231,7 +230,7 @@ export const adminDeleteUser = onCall({ region: REGION, maxInstances: 5 }, async
     return { success: true, docsDeleted: deletedCount, totalRefsCollected: refs.length };
 });
 export const adminForceLogout = onCall({ region: REGION, maxInstances: 5 }, async (request) => {
-    assertAdmin(request.auth?.token.email);
+    assertAdmin(request.auth?.token.admin);
     const userId = request.data?.userId;
     if (!userId || typeof userId !== 'string') {
         throw new HttpsError('invalid-argument', 'userId obrigatório.');
@@ -255,7 +254,7 @@ export const adminForceLogout = onCall({ region: REGION, maxInstances: 5 }, asyn
 // 2026-07-17 deixava o número preso pra sempre, sem forma de religar pelo app, já que
 // o client não pode escrever em whatsappPhoneIndex/whatsappLinks — allow write: if false).
 export const adminUnlinkWhatsappNumber = onCall({ region: REGION, maxInstances: 5 }, async (request) => {
-    assertAdmin(request.auth?.token.email);
+    assertAdmin(request.auth?.token.admin);
     const phone = request.data?.phone;
     if (!phone || typeof phone !== 'string') {
         throw new HttpsError('invalid-argument', 'phone obrigatório.');

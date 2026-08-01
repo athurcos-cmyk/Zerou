@@ -2331,7 +2331,7 @@ describe('firestore security rules', () => {
     });
 
     it('allows read by admin', async () => {
-      const adminDb = testEnv.authenticatedContext('admin-uid', { email: 'a.thurcos@gmail.com' }).firestore();
+      const adminDb = testEnv.authenticatedContext('admin-uid', { email: 'a.thurcos@gmail.com', admin: true }).firestore();
       await testEnv.withSecurityRulesDisabled(async (context) => {
         await setDoc(doc(context.firestore(), 'whatsappPhoneIndex/5511999999999'), {
           workspaceId: 'personal_alice',
@@ -2369,7 +2369,7 @@ describe('firestore security rules', () => {
     });
 
     it('allows read by admin', async () => {
-      const adminDb = testEnv.authenticatedContext('admin-uid', { email: 'a.thurcos@gmail.com' }).firestore();
+      const adminDb = testEnv.authenticatedContext('admin-uid', { email: 'a.thurcos@gmail.com', admin: true }).firestore();
       await testEnv.withSecurityRulesDisabled(async (context) => {
         await setDoc(doc(context.firestore(), 'adminMessages/msg1'), {
           type: 'broadcast',

@@ -140,7 +140,8 @@ describe('payBill', () => {
       firestoreMocks.batch,
       'workspace-1',
       'user-1',
-      expect.objectContaining({ cardId: 'card-1', installments: 3, amountCents: 150000 })
+      expect.objectContaining({ cardId: 'card-1', installments: 3, amountCents: 150000 }),
+      { transactionId: 'bill-1_card-1' }
     );
     expect(firestoreMocks.batch.set.mock.calls.some(([, payload]) => payload?.type === 'expense')).toBe(false);
   });

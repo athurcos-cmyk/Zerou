@@ -58,6 +58,7 @@ export function InvoicePage() {
   const [payAmount, setPayAmount] = useState('');
   const [payAccountId, setPayAccountId] = useState('');
   const [payDate, setPayDate] = useState(todayInputValue());
+  const [paySubmitting, setPaySubmitting] = useState(false);
 
   const [creditAmount, setCreditAmount] = useState('');
   const [creditType, setCreditType] = useState<'refund_credit' | 'chargeback_credit' | 'manual_credit'>('refund_credit');
@@ -98,13 +99,15 @@ export function InvoicePage() {
     setPayAmount('');
     setPayAccountId('');
     setPayDate(todayInputValue());
+    setPaySubmitting(false);
     setPaySheetOpen(true);
   }
 
   function handlePay() {
-    if (!workspaceId || !user || !cardId || !invoiceId || !payAccountId) return;
+    if (!workspaceId || !user || !cardId || !invoiceId || !payAccountId || paySubmitting) return;
     const amount = payAmount.trim() ? parseMoneyToCents(payAmount) : (invoice?.outstandingBalanceCents ?? 0);
     if (!amount) return;
+    setPaySubmitting(true);
     setPaySheetOpen(false);
     setMessage(null);
     recordInvoicePayment(workspaceId, user.uid, {
@@ -598,7 +601,7 @@ export function InvoicePage() {
             </p>
           )}
           <div className="sheet-actions">
-            <button className="button button--primary" type="button" disabled={!payAccountId} onClick={handlePay}>
+            <button className="button button--primary" type="button" disabled={!payAccountId || paySubmitting} onClick={handlePay}>
               Confirmar pagamento
             </button>
           </div>

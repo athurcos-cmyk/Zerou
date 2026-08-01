@@ -36,7 +36,7 @@ export function RegisterPage() {
 
     try {
       await registerWithEmail(values.name, values.email, values.password);
-      navigate('/app/onboarding', { replace: true });
+      navigate('/verify-email', { replace: true });
     } catch (error) {
       setMessage(getAuthErrorMessage(error));
     } finally {

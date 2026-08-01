@@ -2,6 +2,34 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-01 (parte 4) — fix(security): verificação de email + admin por custom claims
+
+- **AUTH-01 (verificação de email)**: `RequireVerifiedEmail` agora bloqueia acesso ao app para
+  contas com email não verificado, redirecionando para `/verify-email`. A página ganhou status ao
+  vivo, polling de verificação, e botão "Já verifiquei". Registro com email agora manda pra
+  verificação em vez de onboarding direto. Google login não muda (já chega verificado). Offline
+  (`authFromCache`) não é bloqueado — o cache prova posse da conta. `email_verified` nas regras
+  fica pra depois (requer base limpa).
+- **AUTH-02/ADMIN-5 (admin por custom claims)**: `isAdmin()` no Firestore, `assertAdmin()` nas
+  functions (admin + billing), e `RequireAdmin` no client agora usam custom claim
+  `admin: true` no token em vez de email hardcoded. Script `scripts/setAdminClaim.mjs` seta o
+  claim. **Deploy order**: rodar script PRIMEIRO, depois deploy de regras + functions.
+- **LACUNA-04**: resolvida automaticamente — `isAdmin()` não depende mais de email, e a claim
+  só é setada server-side via Admin SDK (confiável).
+
+## 2026-08-01 (parte 3) — fix(security): idempotência de pagamento + limpeza de cache no logout
+
+- **FIN-01/02/03 (idempotência de pagamento)**: `payBill`, `markReceivableReceived` e
+  `recordInvoicePayment` agora geram ID determinístico (derivado dos parâmetros de negócio) em vez
+  de `createId('txn')` aleatório — padrão que `recordRecurringPayment` já usava. Duplo clique ou
+  retry de rede cai no mesmo documento e a regra do Firestore rejeita a segunda escrita, impedindo
+  débito/crédito em dobro. Botões de confirmação também ganharam `disabled` durante o submit.
+- **CLIENT-7 (limpeza no logout)**: `logout({ clearLocalCache: true })` agora limpa também
+  `dashboardViewCache` (saldos/gastos), `pushTokenCache`, `budgetAlertCache`, `pendingInviteCode`
+  e `defaultCategoriesPrepared` do localStorage. Preferências de dispositivo (tema, tours, PWA,
+  cookie consent) permanecem intactas. Nenhum risco de loop de logout — as chaves removidas são
+  caches de exibição, não gate de auth.
+
 ## 2026-08-01 (parte 2) — fix(investments): QA ao vivo, cor por investimento, gráfico redesenhado
 
 Depois da entrega inicial (abaixo), o dono testou ao vivo e achou 5 problemas reais de

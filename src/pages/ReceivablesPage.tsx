@@ -45,6 +45,7 @@ export function ReceivablesPage() {
   const [receiveTarget, setReceiveTarget] = useState<Receivable | null>(null);
   const [receiveAccountId, setReceiveAccountId] = useState('');
   const [receiveAmount, setReceiveAmount] = useState('');
+  const [receiving, setReceiving] = useState(false);
 
   const [filter, setFilter] = useState<ReceivableFilterKey>('open');
 
@@ -86,13 +87,15 @@ export function ReceivablesPage() {
   }
 
   function handleOpenReceive(receivable: Receivable) {
+    setReceiving(false);
     setReceiveTarget(receivable);
     setReceiveAccountId(receivable.accountId ?? '');
     setReceiveAmount(centsToInputValue(receivable.amountCents));
   }
 
   function handleConfirmReceive() {
-    if (!workspaceId || !user || !receiveTarget) return;
+    if (!workspaceId || !user || !receiveTarget || receiving) return;
+    setReceiving(true);
     const amt = receiveAmount.trim() ? parseMoneyToCents(receiveAmount) : receiveTarget.amountCents;
     markReceivableReceived(workspaceId, user.uid, receiveTarget, {
       accountId: receiveAccountId || undefined,
@@ -273,7 +276,7 @@ export function ReceivablesPage() {
             className="button button--primary"
             type="button"
             onClick={handleConfirmReceive}
-            disabled={!receiveAccountId}
+            disabled={!receiveAccountId || receiving}
           >
             Confirmar recebimento
           </button>

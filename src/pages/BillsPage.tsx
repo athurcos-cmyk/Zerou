@@ -70,6 +70,7 @@ export function BillsPage() {
   const [payTarget, setPayTarget] = useState<PayTarget | null>(null);
   const [payAccountId, setPayAccountId] = useState('');
   const [payInstallments, setPayInstallments] = useState(1);
+  const [paySubmitting, setPaySubmitting] = useState(false);
   const [payAmount, setPayAmount] = useState('');
   const [payDescription, setPayDescription] = useState('');
   const [payCategoryId, setPayCategoryId] = useState('');
@@ -136,6 +137,7 @@ export function BillsPage() {
 
   // ── open pay sheet ──
   function handleOpenPay(target: PayTarget) {
+    setPaySubmitting(false);
     setPayTarget(target);
     const item = target.item;
     setPayAccountId(item.cardId ? `${CARD_PREFIX}${item.cardId}` : item.accountId ?? '');
@@ -152,7 +154,8 @@ export function BillsPage() {
   }
 
   function handleConfirmPay() {
-    if (!workspaceId || !user || !payTarget) return;
+    if (!workspaceId || !user || !payTarget || paySubmitting) return;
+    setPaySubmitting(true);
     const { accountId: payAcct, cardId: payCard } = parseAccountOrCard(payAccountId);
     if (payTarget.kind === 'bill') {
       const bill = payTarget.item as Bill;
@@ -638,7 +641,7 @@ export function BillsPage() {
             )}
           </div>
           <div className="sheet-actions">
-            <button className="button button--primary" type="button" disabled={payTarget?.kind === 'recurring' && !payAmount.trim() && !payTarget?.item.amountCents} onClick={handleConfirmPay}>
+            <button className="button button--primary" type="button" disabled={paySubmitting || (payTarget?.kind === 'recurring' && !payAmount.trim() && !payTarget?.item.amountCents)} onClick={handleConfirmPay}>
               Confirmar pagamento
             </button>
           </div>

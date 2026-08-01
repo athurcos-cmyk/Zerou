@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { CalendarClock, ChevronRight, Layers, Pencil, Trash2 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
@@ -42,6 +42,8 @@ export function CardDetailPage() {
   const [paySheetOpen, setPaySheetOpen] = useState(false);
   const [payAmount, setPayAmount] = useState('');
   const [payAccountId, setPayAccountId] = useState('');
+  const [paySubmitting, setPaySubmitting] = useState(false);
+  const paidAtRef = useRef(new Date());
   const [ongoingSheetOpen, setOngoingSheetOpen] = useState(false);
   const [editSheetOpen, setEditSheetOpen] = useState(false);
   const [editName, setEditName] = useState('');
@@ -55,6 +57,8 @@ export function CardDetailPage() {
   function handleOpenPaySheet() {
     setPayAmount('');
     setPayAccountId('');
+    setPaySubmitting(false);
+    paidAtRef.current = new Date();
     setPaySheetOpen(true);
   }
 
@@ -95,9 +99,10 @@ export function CardDetailPage() {
   }
 
   function handleQuickPay() {
-    if (!workspaceId || !user || !card || !openInvoice || !payAccountId) return;
+    if (!workspaceId || !user || !card || !openInvoice || !payAccountId || paySubmitting) return;
     const cents = payAmount.trim() ? parseMoneyToCents(payAmount) : openInvoice.outstandingBalanceCents;
     if (!cents) return;
+    setPaySubmitting(true);
     setPaySheetOpen(false);
     setPayAmount('');
     setPayAccountId('');
@@ -106,7 +111,7 @@ export function CardDetailPage() {
       invoiceId: openInvoice.id,
       accountId: payAccountId,
       amountCents: cents,
-      paidAt: new Date(),
+      paidAt: paidAtRef.current,
       advance: openInvoice.status === 'open'
     }).catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível registrar o pagamento.')));
   }
@@ -353,7 +358,7 @@ export function CardDetailPage() {
             <button
               className="button button--primary"
               type="button"
-              disabled={!payAccountId}
+              disabled={!payAccountId || paySubmitting}
               onClick={handleQuickPay}
             >
               Confirmar pagamento

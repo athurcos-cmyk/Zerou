@@ -6,7 +6,7 @@ import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { FinanceDataProvider } from './finance/FinanceDataContext';
 import { SharedDataProvider } from './shared/SharedDataContext';
 import { LandingCss } from './landing/LandingCss';
-import { PublicOnlyRoute, RequireAdmin, RequireAuth, RequireOnboardingComplete } from './auth/routeGuards';
+import { PublicOnlyRoute, RequireAdmin, RequireAuth, RequireOnboardingComplete, RequireVerifiedEmail } from './auth/routeGuards';
 import { useAuth } from './auth/AuthContext';
 import { AppearanceSyncBridge } from './settings/AppearanceSyncBridge';
 import { ThemeRuntime } from './theme/ThemeRuntime';
@@ -105,7 +105,8 @@ export function App() {
             <Route path="/admin" element={<Suspense fallback={<LazyFallback />}><AdminPage /></Suspense>} />
           </Route>
           <Route path="/verify-email" element={<VerifyEmailPage />} />
-          <Route path="/app" element={<AppShell />}>
+          <Route element={<RequireVerifiedEmail />}>
+            <Route path="/app" element={<AppShell />}>
             <Route path="onboarding" element={<Suspense fallback={<LazyFallback />}><OnboardingPage /></Suspense>} />
             <Route element={<RequireOnboardingComplete />}>
               <Route element={<FinanceDataProvider><SharedDataProvider><Outlet /></SharedDataProvider></FinanceDataProvider>}>
@@ -136,6 +137,7 @@ export function App() {
                 <Route path="settings/whatsapp" element={<Suspense fallback={<LazyFallback />}><WhatsAppLinkPage /></Suspense>} />
               </Route>
             </Route>
+          </Route>
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

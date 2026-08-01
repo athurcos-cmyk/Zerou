@@ -20,6 +20,7 @@ import { clearIndexedDbPersistence, terminate } from 'firebase/firestore';
 import { getFirebaseAuth, getFirebaseDb } from '../firebase/config';
 import { clearCachedProfiles } from './profileCache';
 import { beginIntentionalSignOut } from './authSession';
+import { clearAccountLocalCaches } from './logoutCleanup';
 
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
@@ -59,6 +60,7 @@ export async function logout(options?: { clearLocalCache?: boolean }) {
 
   if (options?.clearLocalCache) {
     clearCachedProfiles();
+    clearAccountLocalCaches();
     await terminate(db);
     await clearIndexedDbPersistence(db);
     window.location.reload();

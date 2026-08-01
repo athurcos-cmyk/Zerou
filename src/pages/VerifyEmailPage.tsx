@@ -1,5 +1,5 @@
-﻿import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { AuthLayout } from '../components/AuthLayout';
 import { FormMessage } from '../components/FormMessage';
 import { useAuth } from '../auth/AuthContext';
@@ -8,9 +8,30 @@ import { sendVerification } from '../auth/authService';
 
 export function VerifyEmailPage() {
   const { user, authFromCache } = useAuth();
+  const navigate = useNavigate();
   const [message, setMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [verified, setVerified] = useState(() => user?.emailVerified ?? false);
+
+  const checkVerified = useCallback(() => {
+    if (!user || authFromCache) return;
+    user.reload().then(() => setVerified(user.emailVerified)).catch(() => {});
+  }, [user, authFromCache]);
+
+  // Poll: se o usuário abre o link de verificação em outro app, detecta sem reload manual
+  useEffect(() => {
+    if (verified || authFromCache) return;
+    const interval = window.setInterval(checkVerified, 4000);
+    return () => window.clearInterval(interval);
+  }, [verified, authFromCache, checkVerified]);
+
+  // Se verificou, redireciona automaticamente
+  useEffect(() => {
+    if (verified) {
+      navigate('/app', { replace: true });
+    }
+  }, [verified, navigate]);
 
   async function onSend() {
     if (!user || authFromCache) {
@@ -24,7 +45,7 @@ export function VerifyEmailPage() {
 
     try {
       await sendVerification(user);
-      setSuccess('Email de verificação enviado.');
+      setSuccess('Email de verificação reenviado. Confira sua caixa de entrada.');
     } catch (error) {
       setMessage(getAuthErrorMessage(error));
     } finally {
@@ -32,21 +53,42 @@ export function VerifyEmailPage() {
     }
   }
 
+  if (!user || authFromCache) {
+    return (
+      <AuthLayout eyebrow="Verificação" title="Carregando..." description="Aguardando sua sessão Granativa.">
+        <div className="form-stack" />
+      </AuthLayout>
+    );
+  }
+
   return (
     <AuthLayout
       eyebrow="Verificação"
-      title="Confirme seu email."
-      description="A verificação ajuda a manter seu acesso Granativa recuperável e confiável."
+      title={verified ? 'Email verificado!' : 'Confirme seu email.'}
+      description={
+        verified
+          ? 'Sua conta está confirmada. Pronto para usar a Granativa.'
+          : `Enviamos um link para ${user.email ?? 'seu email'}. Clique nele para confirmar sua conta.`
+      }
     >
       <div className="form-stack">
         <FormMessage>{message}</FormMessage>
         <FormMessage type="success">{success}</FormMessage>
-        <button className="button button--primary" type="button" onClick={onSend} disabled={busy || !user || authFromCache}>
-          Reenviar verificação
-        </button>
-        <Link className="button button--secondary" to="/app">
-          Continuar
-        </Link>
+        {!verified && (
+          <>
+            <button className="button button--primary" type="button" onClick={onSend} disabled={busy}>
+              Reenviar email
+            </button>
+            <button className="button button--secondary" type="button" onClick={checkVerified} disabled={busy}>
+              Já verifiquei
+            </button>
+          </>
+        )}
+        {verified && (
+          <Link className="button button--primary" to="/app">
+            Ir para o app
+          </Link>
+        )}
       </div>
     </AuthLayout>
   );

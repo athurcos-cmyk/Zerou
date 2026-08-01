@@ -8,12 +8,8 @@ import { resendApiKey } from '../email/resendProvider.js';
 
 const REGION = 'southamerica-east1';
 
-// Mesmo valor de functions-admin/src/index.ts — não dá pra importar de lá, é
-// um codebase de deploy separado (ver firebase.json).
-const ADMIN_EMAIL = 'a.thurcos@gmail.com';
-
-function assertAdmin(email: string | undefined): void {
-  if (email !== ADMIN_EMAIL) {
+function assertAdmin(admin: boolean | undefined): void {
+  if (admin !== true) {
     throw new HttpsError('permission-denied', 'Acesso negado.');
   }
 }
@@ -56,7 +52,7 @@ async function recordHistory(entry: HistoryEntry): Promise<void> {
 export const adminSendMessage = onCall(
   { region: REGION, maxInstances: 5, secrets: [resendApiKey] },
   async (request) => {
-    assertAdmin(request.auth?.token.email);
+    assertAdmin(request.auth?.token.admin);
 
     const { userId, channel, subject, message } = request.data as {
       userId?: string;
@@ -137,7 +133,7 @@ export const adminSendMessage = onCall(
 export const adminBroadcastMessage = onCall(
   { region: REGION, maxInstances: 3, secrets: [resendApiKey] },
   async (request) => {
-    assertAdmin(request.auth?.token.email);
+    assertAdmin(request.auth?.token.admin);
 
     const { channel, subject, message } = request.data as {
       channel?: unknown;
