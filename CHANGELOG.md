@@ -2,6 +2,18 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-01 (parte 5) — fix(security): fechamento da auditoria (CSP + Zod webhook + lazy landing + DPO)
+
+- **CLIENT-2 (CSP)**: `'unsafe-inline'` removido do `script-src`. Substituído por SHA-256 do
+  script inline de tema. `frame-ancestors 'none'` adicionado. XSS injetado agora é bloqueado
+  pelo navegador.
+- **WHATSAPP-02 (Zod)**: payload do webhook validado com schema Zod em vez de type assertions
+  manuais. Payload malformado é rejeitado sem estourar em runtime.
+- **PERF-2/3 (bundle)**: `LandingCss` lazy-loaded. framer-motion (~48KB gzip) sai do bundle
+  principal. Bundle: 624KB → 472KB.
+- **LGPD-01 (DPO)**: DPO alterado para `contato@granativa.com.br`.
+- Relatório completo da auditoria em `~/Desktop/relatorio-auditoria-2026-08-01.md`.
+
 ## 2026-08-01 (parte 4) — fix(security): verificação de email + admin por custom claims
 
 - **AUTH-01 (verificação de email)**: `RequireVerifiedEmail` agora bloqueia acesso ao app para
