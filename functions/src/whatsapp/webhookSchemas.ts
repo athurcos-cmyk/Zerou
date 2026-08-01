@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 const textMessageSchema = z.object({
+  id: z.string().optional(),
   from: z.string().trim().min(1),
   text: z.object({
     body: z.string(),
