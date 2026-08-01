@@ -1717,14 +1717,6 @@ service cloud.firestore {
         allow delete: if canDeleteUserAccountData(uid);
       }
 
-      // ⚠️ TEMPORÁRIO (2026-07-31): diagnóstico do registro de push, sem dado sensível
-      // (só booleans/strings técnicas — ver writePushDebug em src/pwa/notifications.ts).
-      // Remover junto com o código que escreve aqui (docs/planning/TODOS.md).
-      match /pushDebug/{docId} {
-        allow read, write: if isSelf(uid);
-        allow delete: if canDeleteUserAccountData(uid);
-      }
-
       match /whatsappLinkCodes/{code} {
         allow read: if isSelf(uid);
         allow write: if false; // Admin SDK only

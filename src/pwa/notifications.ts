@@ -32,55 +32,26 @@ function isStandalonePwa(): boolean {
   return (navigator as Navigator & { standalone?: boolean }).standalone === true;
 }
 
-// ⚠️ TEMPORÁRIO (2026-07-31): grava um retrato do que aconteceu em cada etapa do registro
-// em `users/{uid}/pushDebug/latest` — só existe pra diagnosticar, sem acesso ao aparelho, por
-// que o dono não conseguia registrar um token mesmo confirmando que abre um PWA de verdade
-// (tela cheia, sem UI de navegador). Remover depois de confirmado (ver docs/planning/TODOS.md).
-function writePushDebug(info: Record<string, unknown>): void {
-  const user = getFirebaseAuth().currentUser;
-  if (!user) return;
-  setDoc(doc(getFirebaseDb(), 'users', user.uid, 'pushDebug', 'latest'), {
-    ...info,
-    updatedAt: serverTimestamp(),
-  }).catch(() => {});
-}
-
 // Pede permissão de notificação e salva o token FCM do dispositivo no Firestore.
 // É chamado uma vez após o usuário autenticar, em toda sessão. Falha
 // silenciosamente — nunca quebra o app se o usuário recusar ou o browser não
 // suportar.
 export async function requestAndRegisterPushToken(): Promise<void> {
-  const debug: Record<string, unknown> = {
-    vapidKeyPresent: Boolean(VAPID_KEY),
-    notificationSupported: 'Notification' in window,
-    serviceWorkerSupported: 'serviceWorker' in navigator,
-  };
-
   try {
     if (!VAPID_KEY) return;
     if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
-
-    debug.displayModeStandalone = window.matchMedia('(display-mode: standalone)').matches;
-    debug.navigatorStandalone = (navigator as Navigator & { standalone?: boolean }).standalone ?? null;
-    debug.isStandalone = isStandalonePwa();
     if (!isStandalonePwa()) return;
 
-    debug.permissionBefore = Notification.permission;
     const permission =
       Notification.permission === 'granted'
         ? 'granted'
         : await Notification.requestPermission();
-    debug.permissionAfter = permission;
     if (permission !== 'granted') return;
 
-    // `register` é idempotente: com o mesmo par (script, escopo) devolve a
-    // registration que já existe e só dispara uma checagem de atualização.
     const swRegistration = await navigator.serviceWorker.register(
       '/firebase-messaging-sw.js',
       { scope: FCM_SW_SCOPE }
     );
-    debug.swScope = swRegistration.scope;
-    debug.swActiveScript = swRegistration.active?.scriptURL ?? null;
 
     const { getMessaging, getToken } = await import('firebase/messaging');
     const messaging = getMessaging(getFirebaseServices().app);
@@ -88,33 +59,17 @@ export async function requestAndRegisterPushToken(): Promise<void> {
       vapidKey: VAPID_KEY,
       serviceWorkerRegistration: swRegistration,
     });
-    debug.tokenObtained = Boolean(token);
     if (!token) return;
 
     const user = getFirebaseAuth().currentUser;
-    debug.hasUser = Boolean(user);
     if (!user) return;
 
     const tokenDocRef = doc(getFirebaseDb(), 'users', user.uid, 'fcmTokens', token);
 
-    // O token FCM praticamente não muda entre sessões — sem esse cache local, toda
-    // abertura do app regravava o mesmo token no Firestore só pra atualizar updatedAt.
     const previousToken = readCachedPushToken(user.uid);
-    debug.previousToken = previousToken ? 'cached' : null;
-
     if (previousToken === token) {
-      // ⚠️ O cache local só reflete o que ESTE aparelho já escreveu antes — não o estado
-      // real do Firestore. Achado ao vivo em 2026-07-31: uma limpeza manual de tokens
-      // mortos apagou o doc direto no servidor, mas o cache do dono continuou dizendo
-      // "nada mudou" — o app pulava a escrita achando que já estava registrado, e o
-      // usuário ficava sem token nenhum até fechar o app (o que nunca limpa o
-      // localStorage sozinho). Confirma que o doc realmente existe antes de pular.
       const existing = await getDoc(tokenDocRef);
-      debug.tokenDocExistedInFirestore = existing.exists();
-      if (existing.exists()) {
-        debug.result = 'unchanged';
-        return;
-      }
+      if (existing.exists()) return;
     }
 
     await setDoc(tokenDocRef, {
@@ -123,28 +78,14 @@ export async function requestAndRegisterPushToken(): Promise<void> {
       updatedAt: serverTimestamp(),
     });
     saveCachedPushToken(user.uid, token);
-    debug.firestoreWriteSucceeded = true;
 
-    // O token anterior DESTE aparelho ficou órfão. Trocar de service worker gera uma
-    // inscrição nova, com endpoint novo — e `isTokenValid` (SDK do Messaging) compara
-    // endpoint/auth/p256dh, então o SDK descarta o token velho e emite outro.
-    // O `sendPushToUser` acabaria limpando o doc órfão sozinho (o SDK revoga o token
-    // antigo no FCM, então o envio pra ele passa a falhar e cai na limpeza de stale),
-    // mas só no próximo disparo — apagar aqui evita mandar push pra um token morto no
-    // meio tempo. DEPOIS de gravar o novo, pra que uma falha no meio nunca deixe o
-    // usuário sem token nenhum. `previousToken !== token` evita apagar o doc que
-    // acabamos de escrever no caso "cache desatualizado" acima.
     if (previousToken && previousToken !== token) {
       await deleteDoc(
         doc(getFirebaseDb(), 'users', user.uid, 'fcmTokens', previousToken)
       ).catch(() => {});
     }
-    debug.result = 'registered';
-  } catch (err) {
-    // Push é opcional — nunca impede o uso do app. Erro só entra no diagnóstico.
-    debug.error = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
-  } finally {
-    writePushDebug(debug);
+  } catch {
+    // Push é opcional — nunca impede o uso do app.
   }
 }
 
