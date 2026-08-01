@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
     <!-- Fontes carregam de forma não-bloqueante: o browser baixa em paralelo e aplica quando pronto.
          Sem isso, um CSS externo do Google Fonts trava o render inteiro em redes lentas. -->
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700;9..40,800&family=Instrument+Sans:wght@400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+    <link id="font-preload" rel="preload" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700;9..40,800&family=Instrument+Sans:wght@400;500;600;700&display=swap" as="style" />
     <noscript><link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700;9..40,800&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" /></noscript>
     <meta
       name="description"
@@ -46,6 +46,10 @@
 
         const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         if (prefersReducedMotion) document.documentElement.dataset.reduceMotion = 'true';
+
+        // Ativa fonte carregada de forma nao-bloqueante
+        var fontLink = document.getElementById('font-preload');
+        if (fontLink) fontLink.onload = function() { this.onload = null; this.rel = 'stylesheet'; };
       })();
     </script>
   </head>
