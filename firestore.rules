@@ -351,7 +351,7 @@ service cloud.firestore {
 
     function validExistingInvestmentAccountReference(workspaceId, accountId) {
       return accountId is string
-        && get(/databases/$(database)/documents/workspaces/$(workspaceId)/accounts/$(accountId)).data.type == 'investment';
+        && getAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/accounts/$(accountId)).data.type == 'investment';
     }
 
     function validAccountCreate(workspaceId, accountId) {

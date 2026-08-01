@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Area, ComposedChart } from 'recharts';
+import { Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Area, ComposedChart } from 'recharts';
 import { buildInvestmentValueHistory, type InvestmentValuePoint } from './investmentAnalysis';
 import { formatMoney } from './money';
 import type { InvestmentValueUpdate } from '../types/contracts';

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { TrendingUp, Plus, ArrowUpRight, RefreshCw, HelpCircle, Trash2, ChevronDown, ChevronRight, Building2 } from 'lucide-react';
+import { Plus, ArrowUpRight, RefreshCw, HelpCircle, ChevronDown, ChevronRight, Building2 } from 'lucide-react';
 import { useFinanceContext } from '../finance/FinanceDataContext';
 import { useAuth } from '../auth/AuthContext';
 import { createInvestmentAccount, createInvestment, deleteInvestment } from '../finance/financeService';
@@ -135,14 +135,11 @@ export function InvestmentsPage() {
             </div>
             <div className="card-list-hero-stat" style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
               <span className="card-list-hero-eyebrow">Rendimento</span>
-              <strong className="card-list-hero-balance" style={{
-                fontSize: 'clamp(1.15rem, 3vw, 1.4rem)',
-                color: totalReturn >= 0 ? 'var(--on-accent-95)' : 'rgba(255,220,180,0.95)'
-              }}>
+              <strong className="card-list-hero-balance" style={{ fontSize: 'clamp(1.15rem, 3vw, 1.4rem)' }}>
                 {totalReturn >= 0 ? '+' : ''}{formatMoney(totalReturn)}
               </strong>
               {totalContributed > 0 && (
-                <span style={{ fontSize: '0.75rem', color: totalReturn >= 0 ? 'var(--on-accent-82)' : 'rgba(255,200,160,0.85)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--on-accent-82)' }}>
                   {totalReturn >= 0 ? '+' : ''}{totalReturnPct.toFixed(1)}%
                 </span>
               )}

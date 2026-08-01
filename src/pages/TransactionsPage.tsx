@@ -486,17 +486,19 @@ export function TransactionsPage() {
                     Pra desfazer, resgate pela tela de Investimentos.
                   </p>
                 ) : (
-                  <button
-                    className="button button--ghost"
-                    type="button"
-                    onClick={() => void handleDelete(t)}
-                  >
-                    <Trash2 size={16} aria-hidden="true" /> Excluir
-                  </button>
+                  <>
+                    <button
+                      className="button button--ghost"
+                      type="button"
+                      onClick={() => void handleDelete(t)}
+                    >
+                      <Trash2 size={16} aria-hidden="true" /> Excluir
+                    </button>
+                    <Link className="button button--primary" to={`/app/transactions/${t.id}/edit`}>
+                      Editar
+                    </Link>
+                  </>
                 )}
-                <Link className="button button--primary" to={`/app/transactions/${t.id}/edit`}>
-                  Editar
-                </Link>
               </div>
             </div>
           </BottomSheet>

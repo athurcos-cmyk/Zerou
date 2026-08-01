@@ -1379,8 +1379,13 @@ export function createInvestmentAccount(workspaceId: string, userId: string, inp
     openingBalanceCents: 0, currentBalanceCents: 0, isActive: true,
     createdBy: userId, createdAt: now, updatedAt: now
   });
+  const prefix = 'Investimento: ';
+  const categoryName = (prefix + parsed.name).length > 80
+    ? prefix + parsed.name.slice(0, 80 - prefix.length)
+    : prefix + parsed.name;
+
   batch.set(documentRef(workspaceId, 'categories', categoryId), {
-    id: categoryId, workspaceId, name: `Investimento: ${parsed.name}`, type: 'both' as const,
+    id: categoryId, workspaceId, name: categoryName, type: 'both' as const,
     icon: 'investment', isDefault: false, isActive: true,
     linkedInvestmentAccountId: accountId, createdBy: userId, createdAt: now, updatedAt: now
   });
@@ -1420,7 +1425,9 @@ export function contributeToInvestment(
   investment: Pick<Investment, 'id' | 'name'>,
   categoryId: string,
   bankAccountId: string,
-  amountCents: number
+  amountCents: number,
+  currentContributedCents: number,
+  currentBalanceCents: number
 ) {
   const isContribution = amountCents >= 0;
   const magnitudeCents = Math.abs(amountCents);
@@ -1429,6 +1436,8 @@ export function contributeToInvestment(
   const txnId = createId('txn');
   const updateId = createId('invupd');
   const type = isContribution ? ('expense' as const) : ('income' as const);
+  const newContributedCents = currentContributedCents + amountCents;
+  const newBalanceCents = currentBalanceCents + amountCents;
   const batch = writeBatch(getFirebaseDb());
 
   batch.set(documentRef(workspaceId, 'transactions', txnId), omitUndefined({
@@ -1450,8 +1459,8 @@ export function contributeToInvestment(
   });
   batch.set(documentRef(workspaceId, 'investmentValueUpdates', updateId), {
     id: updateId, workspaceId, investmentId: investment.id,
-    balanceCents: 0 /* caller preenche via overrides abaixo — ver abaixo */,
-    contributedCentsAtTime: 0,
+    balanceCents: newBalanceCents,
+    contributedCentsAtTime: newContributedCents,
     recordedAt: serverTimestamp(), createdBy: userId, createdAt: serverTimestamp()
   });
 

@@ -38,7 +38,7 @@ export function InvestmentContributeSheet({ open, workspaceId, userId, investmen
   function handleSubmit() {
     if (!workspaceId || !userId || !investment || !canSubmit) return;
     const delta = sign * magnitudeCents;
-    contributeToInvestment(workspaceId, userId, investment, categoryId, accountId, delta);
+    contributeToInvestment(workspaceId, userId, investment, categoryId, accountId, delta, investment.contributedCents, investment.currentBalanceCents);
     reset();
     onClose();
   }
