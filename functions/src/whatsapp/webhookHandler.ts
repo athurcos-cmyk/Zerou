@@ -3,6 +3,7 @@ import { onRequest } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions';
 import crypto from 'crypto';
 import { sendWhatsAppMessage, getVerifyToken, whatsappAppSecret } from './metaClient.js';
+import { webhookPayloadSchema } from './webhookSchemas.js';
 import { interpretMessage, type AccountOption, type CategoryOption, type MessageInterpretation } from './interpretMessage.js';
 import { selectableCategoryOptions, parentCandidateRows } from './categorySelection.js';
 import { createTransactionFromMessage } from './createTransactionFromMessage.js';
@@ -153,23 +154,13 @@ export const whatsappWebhook = onRequest(
     res.status(200).json({ ok: true });
 
     try {
-      const body = req.body as Record<string, unknown>;
-      if (!body || body.object !== 'whatsapp_business_account') return;
+      const parsed = webhookPayloadSchema.safeParse(req.body);
+      if (!parsed.success) return;
 
-      const entries = body.entry as Array<Record<string, unknown>> | undefined;
-      if (!entries?.[0]) return;
-
-      const changes = entries[0].changes as Array<Record<string, unknown>> | undefined;
-      if (!changes?.[0]) return;
-
-      const value = changes[0].value as Record<string, unknown> | undefined;
-      const messages = value?.messages as Array<Record<string, unknown>> | undefined;
-      if (!messages?.[0]) return;
-
-      const msg = messages[0];
-      const phone = (msg.from as string)?.trim();
-      const text = (msg.text as Record<string, unknown>)?.body as string | undefined;
-      if (!phone || !text) return;
+      const msg = parsed.data.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
+      if (!msg) return;
+      const phone = msg.from;
+      const text = msg.text.body;
 
       const cleanText = text.trim();
       if (!cleanText) return;

@@ -5,7 +5,6 @@ import { AccountDeletedScreen } from './auth/AccountDeletedScreen';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { FinanceDataProvider } from './finance/FinanceDataContext';
 import { SharedDataProvider } from './shared/SharedDataContext';
-import { LandingCss } from './landing/LandingCss';
 import { PublicOnlyRoute, RequireAdmin, RequireAuth, RequireOnboardingComplete, RequireVerifiedEmail } from './auth/routeGuards';
 import { useAuth } from './auth/AuthContext';
 import { AppearanceSyncBridge } from './settings/AppearanceSyncBridge';
@@ -49,12 +48,13 @@ const InvestmentsPage = lazy(() => import('./pages/InvestmentsPage').then((m) =>
 const TermsPage = lazy(() => import('./pages/LegalPages').then((m) => ({ default: m.TermsPage })));
 const PrivacyPolicyPage = lazy(() => import('./pages/LegalPages').then((m) => ({ default: m.PrivacyPolicyPage })));
 const DataDeletionPage = lazy(() => import('./pages/LegalPages').then((m) => ({ default: m.DataDeletionPage })));
+const LandingCss = lazy(() => import('./landing/LandingCss').then((m) => ({ default: m.LandingCss })));
 
 function RootRoute() {
   const { user, profile, loading } = useAuth();
   if (loading) return <div className="public-page">Carregando Granativa...</div>;
   if (user) return <Navigate to={profile?.defaultWorkspaceId ? '/app' : '/app/onboarding'} replace />;
-  return <LandingCss />;
+  return <Suspense fallback={<div className="public-page">Carregando Granativa...</div>}><LandingCss /></Suspense>;
 }
 
 function LazyFallback() {
