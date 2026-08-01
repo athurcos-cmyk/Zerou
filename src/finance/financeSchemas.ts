@@ -11,7 +11,7 @@ export const receivableStatuses = ['pending', 'received', 'overdue', 'cancelled'
 
 export const recurringFrequencies = ['weekly', 'biweekly', 'monthly', 'yearly'] as const;
 
-const moneyCentsSchema = z
+export const moneyCentsSchema = z
   .number()
   .int('Valores monetários precisam ser inteiros em centavos.')
   .min(0, 'Informe um valor maior ou igual a zero.')
@@ -88,6 +88,21 @@ export const createRecurringRuleSchema = z.object({
   accountId: z.string().trim().max(120).optional(),
   cardId: z.string().trim().max(120).optional(),
   categoryId: z.string().trim().max(120).optional()
+});
+
+export const investmentKinds = [
+  'treasury', 'cdb', 'lci_lca', 'funds', 'stocks', 'reits', 'pension', 'crypto', 'other'
+] as const;
+
+export const createInvestmentAccountSchema = z.object({
+  name: z.string().trim().min(2, 'Informe um nome com pelo menos 2 caracteres.').max(80)
+});
+
+export const createInvestmentSchema = z.object({
+  investmentAccountId: z.string().trim().min(1),
+  name: z.string().trim().min(2, 'Informe um nome com pelo menos 2 caracteres.').max(80),
+  kind: z.enum(investmentKinds),
+  openingBalanceCents: moneyCentsSchema
 });
 
 export type CreateAccountInput = z.infer<typeof createAccountSchema>;

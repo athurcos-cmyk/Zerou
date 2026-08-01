@@ -18,7 +18,7 @@ import {
   MessageCircle,
   Users,
   WalletCards,
-  X, FolderTree } from 'lucide-react';
+  X, FolderTree, TrendingUp } from 'lucide-react';
 import { UserAvatar } from '../profile/UserAvatar';
 import { BottomSheet } from '../components/BottomSheet';
 import { BrandLockup } from '../components/BrandLogo';
@@ -105,6 +105,9 @@ export function AppShell() {
           <NavLink className={getNavClass} to="/app/goals">
             <Target size={19} aria-hidden="true" /> Metas
           </NavLink>
+          <NavLink className={getNavClass} to="/app/investments">
+            <TrendingUp size={19} aria-hidden="true" /> Investimentos
+          </NavLink>
           <NavLink className={getNavClass} to="/app/search">
             <BarChart2 size={19} aria-hidden="true" /> Análise
           </NavLink>
@@ -174,6 +177,9 @@ export function AppShell() {
             </NavLink>
             <NavLink className={getTileClass} to="/app/goals" onClick={() => setMobileMenuOpen(false)}>
               <Target size={20} aria-hidden="true" /> <span>Metas</span>
+            </NavLink>
+            <NavLink className={getTileClass} to="/app/investments" onClick={() => setMobileMenuOpen(false)}>
+              <TrendingUp size={20} aria-hidden="true" /> <span>Investimentos</span>
             </NavLink>
             <NavLink className={getTileClass} to="/app/search" onClick={() => setMobileMenuOpen(false)}>
               <BarChart2 size={20} aria-hidden="true" /> <span>Análise</span>

@@ -601,6 +601,41 @@ function privacyRequestPayload(requestId: string, uid: string, overrides: Record
   };
 }
 
+function investmentPayload(workspaceId: string, investmentId: string, uid: string, investmentAccountId: string, overrides: Record<string, unknown> = {}) {
+  const now = serverTimestamp();
+
+  return {
+    id: investmentId,
+    workspaceId,
+    investmentAccountId,
+    name: 'CDB Banco X 110% CDI',
+    kind: 'cdb',
+    contributedCents: 500000,
+    currentBalanceCents: 500000,
+    isActive: true,
+    createdBy: uid,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides
+  };
+}
+
+function investmentValueUpdatePayload(workspaceId: string, updateId: string, investmentId: string, uid: string, overrides: Record<string, unknown> = {}) {
+  const now = serverTimestamp();
+
+  return {
+    id: updateId,
+    workspaceId,
+    investmentId,
+    balanceCents: 500000,
+    contributedCentsAtTime: 500000,
+    recordedAt: now,
+    createdBy: uid,
+    createdAt: now,
+    ...overrides
+  };
+}
+
 function createCoupleWorkspaceBatch(db: TestFirestore, workspaceId = 'couple_a', uid = 'alice') {
   const modularDb = db as unknown as Parameters<typeof writeBatch>[0];
   const batch = writeBatch(modularDb);
@@ -664,6 +699,9 @@ describe('firestore security rules', () => {
         locale: 'pt-BR',
         timezone: 'America/Sao_Paulo'
       });
+      // Conta de investimento (pros testes de investment). NÃO semear `accountA` aqui —
+      // vários testes existentes criam `accountA` via setDoc e colidiriam (setDoc vira update).
+      await setDoc(doc(adminDb, 'workspaces/workspaceA/accounts/accountInvest'), accountPayload('workspaceA', 'accountInvest', 'alice', { type: 'investment' }));
       await setDoc(doc(adminDb, 'workspaces/workspaceA/members/alice'), {
         userId: 'alice',
         workspaceId: 'workspaceA',
@@ -2352,6 +2390,142 @@ describe('firestore security rules', () => {
           message: 'oi',
           createdAt: serverTimestamp()
         })
+      );
+    });
+  });
+
+  describe('investments', () => {
+    it('allows create investment inside an investment account', async () => {
+      const aliceDb = testEnv.authenticatedContext('alice').firestore();
+      await assertSucceeds(
+        setDoc(doc(aliceDb, 'workspaces/workspaceA/investments/inv1'), investmentPayload('workspaceA', 'inv1', 'alice', 'accountInvest'))
+      );
+    });
+
+    it('rejects investment pointing to a non-investment account', async () => {
+      const aliceDb = testEnv.authenticatedContext('alice').firestore();
+      await assertFails(
+        setDoc(doc(aliceDb, 'workspaces/workspaceA/investments/inv1'), investmentPayload('workspaceA', 'inv1', 'alice', 'accountA'))
+      );
+    });
+
+    it('rejects investment update changing investmentAccountId', async () => {
+      const aliceDb = testEnv.authenticatedContext('alice').firestore();
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await setDoc(
+          doc(context.firestore(), 'workspaces/workspaceA/investments/inv1'),
+          investmentPayload('workspaceA', 'inv1', 'alice', 'accountInvest')
+        );
+      });
+      await assertFails(
+        updateDoc(doc(aliceDb, 'workspaces/workspaceA/investments/inv1'), { investmentAccountId: 'other', updatedAt: serverTimestamp() })
+      );
+    });
+
+    it('allows update of name and currentBalanceCents', async () => {
+      const aliceDb = testEnv.authenticatedContext('alice').firestore();
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await setDoc(
+          doc(context.firestore(), 'workspaces/workspaceA/investments/inv1'),
+          investmentPayload('workspaceA', 'inv1', 'alice', 'accountInvest')
+        );
+      });
+      await assertSucceeds(
+        updateDoc(doc(aliceDb, 'workspaces/workspaceA/investments/inv1'), { name: 'Novo nome', currentBalanceCents: 550000, updatedAt: serverTimestamp() })
+      );
+    });
+
+    it('blocks cross-workspace investment read', async () => {
+      const bobDb = testEnv.authenticatedContext('bob').firestore();
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await setDoc(
+          doc(context.firestore(), 'workspaces/workspaceA/investments/inv1'),
+          investmentPayload('workspaceA', 'inv1', 'alice', 'accountInvest')
+        );
+      });
+      await assertFails(getDoc(doc(bobDb, 'workspaces/workspaceA/investments/inv1')));
+    });
+  });
+
+  describe('investmentValueUpdates', () => {
+    it('allows create value update', async () => {
+      const aliceDb = testEnv.authenticatedContext('alice').firestore();
+      await assertSucceeds(
+        setDoc(doc(aliceDb, 'workspaces/workspaceA/investmentValueUpdates/upd1'), investmentValueUpdatePayload('workspaceA', 'upd1', 'inv1', 'alice'))
+      );
+    });
+
+    it('rejects update of value update (immutable)', async () => {
+      const aliceDb = testEnv.authenticatedContext('alice').firestore();
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await setDoc(
+          doc(context.firestore(), 'workspaces/workspaceA/investmentValueUpdates/upd1'),
+          investmentValueUpdatePayload('workspaceA', 'upd1', 'inv1', 'alice')
+        );
+      });
+      await assertFails(
+        updateDoc(doc(aliceDb, 'workspaces/workspaceA/investmentValueUpdates/upd1'), { balanceCents: 999, updatedAt: serverTimestamp() })
+      );
+    });
+
+    it('rejects delete of value update (immutable)', async () => {
+      const aliceDb = testEnv.authenticatedContext('alice').firestore();
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await setDoc(
+          doc(context.firestore(), 'workspaces/workspaceA/investmentValueUpdates/upd1'),
+          investmentValueUpdatePayload('workspaceA', 'upd1', 'inv1', 'alice')
+        );
+      });
+      await assertFails(deleteDoc(doc(aliceDb, 'workspaces/workspaceA/investmentValueUpdates/upd1')));
+    });
+  });
+
+  describe('category with linkedInvestmentAccountId', () => {
+    it('allows category create with valid linkedInvestmentAccountId', async () => {
+      const aliceDb = testEnv.authenticatedContext('alice').firestore();
+      await assertSucceeds(
+        setDoc(doc(aliceDb, 'workspaces/workspaceA/categories/catInv'), categoryPayload('workspaceA', 'catInv', 'alice', { linkedInvestmentAccountId: 'accountInvest' }))
+      );
+    });
+
+    it('rejects category create with linkedInvestmentAccountId pointing to non-investment account', async () => {
+      const aliceDb = testEnv.authenticatedContext('alice').firestore();
+      await assertFails(
+        setDoc(doc(aliceDb, 'workspaces/workspaceA/categories/catInv'), categoryPayload('workspaceA', 'catInv', 'alice', { linkedInvestmentAccountId: 'accountA' }))
+      );
+    });
+  });
+
+  describe('transaction with investment tag cannot be soft-deleted', () => {
+    it('rejects soft-delete of transaction tagged investimento', async () => {
+      const aliceDb = testEnv.authenticatedContext('alice').firestore();
+      const txnId = 'txn_investment_01';
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        const db = context.firestore();
+        await setDoc(doc(db, 'workspaces/workspaceA/accounts/accountA'), accountPayload('workspaceA', 'accountA', 'alice'));
+        await setDoc(
+          doc(db, 'workspaces/workspaceA/transactions', txnId),
+          transactionPayload('workspaceA', txnId, 'alice', 'accountA', { tags: ['investimento'] })
+        );
+      });
+      await assertFails(
+        updateDoc(doc(aliceDb, 'workspaces/workspaceA/transactions', txnId), { deletedAt: serverTimestamp(), version: 2, updatedBy: 'alice', updatedAt: serverTimestamp() })
+      );
+    });
+
+    it('allows soft-delete of regular transaction (untagged)', async () => {
+      const aliceDb = testEnv.authenticatedContext('alice').firestore();
+      const txnId = 'txn_regular_01';
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        const db = context.firestore();
+        await setDoc(doc(db, 'workspaces/workspaceA/accounts/accountA'), accountPayload('workspaceA', 'accountA', 'alice'));
+        await setDoc(
+          doc(db, 'workspaces/workspaceA/transactions', txnId),
+          transactionPayload('workspaceA', txnId, 'alice', 'accountA', { tags: [] })
+        );
+      });
+      await assertSucceeds(
+        updateDoc(doc(aliceDb, 'workspaces/workspaceA/transactions', txnId), { deletedAt: serverTimestamp(), version: 2, updatedBy: 'alice', updatedAt: serverTimestamp() })
       );
     });
   });

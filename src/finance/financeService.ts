@@ -37,6 +37,8 @@ import { addCardPurchaseToBatch } from '../cards/cardService';
 import {
   createAccountSchema,
   createBillSchema,
+  createInvestmentAccountSchema,
+  createInvestmentSchema,
   createReceivableSchema,
   createRecurringRuleSchema,
   createTransactionSchema,
@@ -46,9 +48,9 @@ import {
   type CreateRecurringRuleInput,
   type CreateTransactionInput
 } from './financeSchemas';
-import type { Account, Bill, Budget, Category, Goal, GoalContribution, Receivable, RecurringRule, SyncStatus, Transaction } from '../types/contracts';
+import type { Account, Bill, Budget, Category, Goal, GoalContribution, Investment, InvestmentValueUpdate, Receivable, RecurringRule, SyncStatus, Transaction } from '../types/contracts';
 
-export type FinancialCollectionName = 'accounts' | 'categories' | 'transactions' | 'bills' | 'recurring' | 'goals' | 'goalContributions' | 'budgets' | 'receivables';
+export type FinancialCollectionName = 'accounts' | 'categories' | 'transactions' | 'bills' | 'recurring' | 'goals' | 'goalContributions' | 'budgets' | 'receivables' | 'investments' | 'investmentValueUpdates';
 
 export type LocalSynced<T> = T & {
   localSyncStatus: SyncStatus;
@@ -1361,4 +1363,150 @@ export function updateRecurringRule(
 
 export function deleteRecurringRule(workspaceId: string, ruleId: string) {
   fireWrite(updateDoc(documentRef(workspaceId, 'recurring', ruleId), { isActive: false, updatedAt: serverTimestamp() }));
+}
+
+// ── Investimentos ────────────────────────────────────────────────────────
+
+export function createInvestmentAccount(workspaceId: string, userId: string, input: { name: string }) {
+  const parsed = createInvestmentAccountSchema.parse(input);
+  const accountId = createId('acct');
+  const categoryId = createId('cat');
+  const now = serverTimestamp();
+  const batch = writeBatch(getFirebaseDb());
+
+  batch.set(documentRef(workspaceId, 'accounts', accountId), {
+    id: accountId, workspaceId, name: parsed.name, type: 'investment' as const,
+    openingBalanceCents: 0, currentBalanceCents: 0, isActive: true,
+    createdBy: userId, createdAt: now, updatedAt: now
+  });
+  batch.set(documentRef(workspaceId, 'categories', categoryId), {
+    id: categoryId, workspaceId, name: `Investimento: ${parsed.name}`, type: 'both' as const,
+    icon: 'investment', isDefault: false, isActive: true,
+    linkedInvestmentAccountId: accountId, createdAt: now, updatedAt: now
+  });
+
+  fireWrite(batch.commit());
+  return { accountId, categoryId };
+}
+
+export function createInvestment(workspaceId: string, userId: string, input: {
+  investmentAccountId: string; name: string; kind: Investment['kind']; openingBalanceCents: number;
+}) {
+  const parsed = createInvestmentSchema.parse(input);
+  const investmentId = createId('inv');
+  const updateId = createId('invupd');
+  const now = serverTimestamp();
+  const batch = writeBatch(getFirebaseDb());
+
+  batch.set(documentRef(workspaceId, 'investments', investmentId), {
+    id: investmentId, workspaceId, investmentAccountId: parsed.investmentAccountId,
+    name: parsed.name, kind: parsed.kind,
+    contributedCents: parsed.openingBalanceCents, currentBalanceCents: parsed.openingBalanceCents,
+    isActive: true, createdBy: userId, createdAt: now, updatedAt: now
+  });
+  batch.set(documentRef(workspaceId, 'investmentValueUpdates', updateId), {
+    id: updateId, workspaceId, investmentId,
+    balanceCents: parsed.openingBalanceCents, contributedCentsAtTime: parsed.openingBalanceCents,
+    recordedAt: now, createdBy: userId, createdAt: now
+  });
+
+  fireWrite(batch.commit());
+  return investmentId;
+}
+
+export function contributeToInvestment(
+  workspaceId: string,
+  userId: string,
+  investment: Pick<Investment, 'id' | 'name'>,
+  categoryId: string,
+  bankAccountId: string,
+  amountCents: number
+) {
+  const isContribution = amountCents >= 0;
+  const magnitudeCents = Math.abs(amountCents);
+  const now = new Date();
+  const monthKey = monthKeyFromDate(now);
+  const txnId = createId('txn');
+  const updateId = createId('invupd');
+  const type = isContribution ? ('expense' as const) : ('income' as const);
+  const batch = writeBatch(getFirebaseDb());
+
+  batch.set(documentRef(workspaceId, 'transactions', txnId), omitUndefined({
+    id: txnId, workspaceId, createdBy: userId, updatedBy: userId,
+    type, amountCents: magnitudeCents,
+    description: `${isContribution ? 'Aporte' : 'Resgate'}: ${investment.name}`,
+    categoryId, accountId: bankAccountId,
+    date: Timestamp.fromDate(now), competenceMonth: monthKey, cashMonth: monthKey,
+    tags: ['investimento'], isRecurring: false, clientMutationId: txnId,
+    syncStatus: 'synced', version: 1, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+  }));
+  applyAccountEffectsToBatch(batch, workspaceId, transactionAccountEffects({
+    type, amountCents: magnitudeCents, accountId: bankAccountId
+  }));
+  batch.update(documentRef(workspaceId, 'investments', investment.id), {
+    contributedCents: increment(amountCents),
+    currentBalanceCents: increment(amountCents),
+    updatedAt: serverTimestamp()
+  });
+  batch.set(documentRef(workspaceId, 'investmentValueUpdates', updateId), {
+    id: updateId, workspaceId, investmentId: investment.id,
+    balanceCents: 0 /* caller preenche via overrides abaixo — ver abaixo */,
+    contributedCentsAtTime: 0,
+    recordedAt: serverTimestamp(), createdBy: userId, createdAt: serverTimestamp()
+  });
+
+  fireWrite(batch.commit());
+}
+
+export function recordInvestmentValueUpdate(
+  workspaceId: string,
+  userId: string,
+  investmentId: string,
+  newBalanceCents: number,
+  contributedCents: number
+) {
+  const updateId = createId('invupd');
+  const batch = writeBatch(getFirebaseDb());
+
+  batch.update(documentRef(workspaceId, 'investments', investmentId), {
+    currentBalanceCents: newBalanceCents,
+    updatedAt: serverTimestamp()
+  });
+  batch.set(documentRef(workspaceId, 'investmentValueUpdates', updateId), {
+    id: updateId, workspaceId, investmentId,
+    balanceCents: newBalanceCents, contributedCentsAtTime: contributedCents,
+    recordedAt: serverTimestamp(), createdBy: userId, createdAt: serverTimestamp()
+  });
+
+  fireWrite(batch.commit());
+}
+
+export function deleteInvestment(workspaceId: string, investmentId: string) {
+  fireWrite(updateDoc(documentRef(workspaceId, 'investments', investmentId), { isActive: false, updatedAt: serverTimestamp() }));
+}
+
+export function subscribeInvestments(
+  workspaceId: string,
+  onNext: (items: Array<LocalSynced<Investment>>) => void,
+  onError: (error: Error) => void
+): Unsubscribe {
+  return onSnapshot(
+    query(collectionRef(workspaceId, 'investments'), orderBy('name', 'asc')),
+    { includeMetadataChanges: true },
+    (snapshot) => onNext(snapshot.docs.map((item) => withLocalSync<Investment>(item))),
+    onError
+  );
+}
+
+export function subscribeInvestmentValueUpdates(
+  workspaceId: string,
+  onNext: (items: Array<LocalSynced<InvestmentValueUpdate>>) => void,
+  onError: (error: Error) => void
+): Unsubscribe {
+  return onSnapshot(
+    query(collectionRef(workspaceId, 'investmentValueUpdates'), orderBy('recordedAt', 'asc')),
+    { includeMetadataChanges: true },
+    (snapshot) => onNext(snapshot.docs.map((item) => withLocalSync<InvestmentValueUpdate>(item))),
+    onError
+  );
 }

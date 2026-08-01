@@ -12,7 +12,9 @@ const financeMocks = vi.hoisted(() => ({
   subscribeBudgets: vi.fn(),
   subscribeCategories: vi.fn(),
   subscribeRecurringRules: vi.fn(),
-  subscribeTransactions: vi.fn()
+  subscribeTransactions: vi.fn(),
+  subscribeInvestments: vi.fn(),
+  subscribeInvestmentValueUpdates: vi.fn()
 }));
 
 vi.mock('./financeService', () => financeMocks);
@@ -41,7 +43,9 @@ describe('useFinanceData', () => {
       financeMocks.subscribeBudgets,
       financeMocks.subscribeCategories,
       financeMocks.subscribeRecurringRules,
-      financeMocks.subscribeTransactions
+      financeMocks.subscribeTransactions,
+      financeMocks.subscribeInvestments,
+      financeMocks.subscribeInvestmentValueUpdates
     ]) {
       subscribe.mockImplementation((_workspaceId, onNext) => {
         onNext([]);

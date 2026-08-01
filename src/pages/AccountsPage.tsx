@@ -266,7 +266,7 @@ export function AccountsPage() {
               label="Tipo"
               value={type}
               onChange={(v) => setType(v as AccountType)}
-              options={accountTypes.map((t) => ({ value: t, label: accountTypeLabels[t] }))}
+              options={accountTypes.filter((t) => t !== 'investment').map((t) => ({ value: t, label: accountTypeLabels[t] }))}
             />
             <label className="field">
               <span>Saldo inicial</span>

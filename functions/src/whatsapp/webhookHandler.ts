@@ -403,11 +403,13 @@ export const whatsappWebhook = onRequest(
         .where('isActive', '==', true)
         .get();
 
-      const accounts: AccountRow[] = acctsSnap.docs.map((d) => ({
-        id: d.id,
-        name: d.data().name as string,
-        isPrimary: d.data().isPrimary === true,
-      }));
+      const accounts: AccountRow[] = acctsSnap.docs
+        .filter((d) => d.data().type !== 'investment')
+        .map((d) => ({
+          id: d.id,
+          name: d.data().name as string,
+          isPrimary: d.data().isPrimary === true,
+        }));
 
       const accountOptions: AccountOption[] = accounts.map((a) => ({ id: a.id, name: a.name }));
 

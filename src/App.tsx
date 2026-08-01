@@ -45,6 +45,7 @@ const SecurityPage = lazy(() => import('./pages/PublicPages').then((m) => ({ def
 const HelpPage = lazy(() => import('./pages/PublicPages').then((m) => ({ default: m.HelpPage })));
 const ContactPage = lazy(() => import('./pages/PublicPages').then((m) => ({ default: m.ContactPage })));
 const PrivacyCenterPage = lazy(() => import('./pages/PrivacyCenterPage').then((m) => ({ default: m.PrivacyCenterPage })));
+const InvestmentsPage = lazy(() => import('./pages/InvestmentsPage').then((m) => ({ default: m.InvestmentsPage })));
 const TermsPage = lazy(() => import('./pages/LegalPages').then((m) => ({ default: m.TermsPage })));
 const PrivacyPolicyPage = lazy(() => import('./pages/LegalPages').then((m) => ({ default: m.PrivacyPolicyPage })));
 const DataDeletionPage = lazy(() => import('./pages/LegalPages').then((m) => ({ default: m.DataDeletionPage })));
@@ -121,6 +122,7 @@ export function App() {
                 <Route path="receivables" element={<Suspense fallback={<LazyFallback />}><ReceivablesPage /></Suspense>} />
                 <Route path="goals" element={<Suspense fallback={<LazyFallback />}><GoalsPage /></Suspense>} />
                 <Route path="goals/:goalId" element={<Suspense fallback={<LazyFallback />}><GoalDetailPage /></Suspense>} />
+                <Route path="investments" element={<Suspense fallback={<LazyFallback />}><InvestmentsPage /></Suspense>} />
                 {/* Patrimônio Líquido descontinuado (2026-07-24) — código removido; redirect fica pra não deixar link morto se alguém tiver a URL salva/favoritada. */}
                 <Route path="net-worth" element={<Navigate to="/app/dashboard" replace />} />
                 <Route path="search" element={<Suspense fallback={<LazyFallback />}><SearchPage /></Suspense>} />

@@ -17,7 +17,7 @@ import type { Category } from '../types/contracts';
  * As travas são client-side: `firestore.rules` não consegue contar filhas sem uma query.
  */
 
-type CategoryLike = Pick<Category, 'id' | 'parentCategoryId'> & Partial<Pick<Category, 'isActive'>>;
+type CategoryLike = Pick<Category, 'id' | 'parentCategoryId'> & Partial<Pick<Category, 'isActive' | 'linkedInvestmentAccountId'>>;
 
 /** Só categorias que ainda existem contam como filha — excluída não segura o pai. */
 function activeChildren<T extends CategoryLike>(categoryId: string, all: readonly T[]): T[] {
@@ -66,7 +66,7 @@ export function parentCategoryIds(all: readonly CategoryLike[]): Set<string> {
  */
 export function selectableCategories<T extends CategoryLike>(all: readonly T[]): T[] {
   const paiIds = parentCategoryIds(all);
-  return all.filter((cat) => cat.isActive !== false && !paiIds.has(cat.id));
+  return all.filter((cat) => cat.isActive !== false && !paiIds.has(cat.id) && !cat.linkedInvestmentAccountId);
 }
 
 /**

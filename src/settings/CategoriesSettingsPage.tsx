@@ -43,7 +43,7 @@ export function CategoriesSettingsPage() {
   const openTour = useCategoriesTour((state) => state.openTour);
 
   const active = useMemo(
-    () => finance.categories.filter((cat) => cat.isActive !== false),
+    () => finance.categories.filter((cat) => cat.isActive !== false && !cat.linkedInvestmentAccountId),
     [finance.categories]
   );
 

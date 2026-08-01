@@ -9,12 +9,14 @@ import {
   subscribeBills,
   subscribeBudgets,
   subscribeCategories,
+  subscribeInvestments,
+  subscribeInvestmentValueUpdates,
   subscribeReceivables,
   subscribeRecurringRules,
   subscribeTransactions,
   type LocalSynced
 } from './financeService';
-import type { Account, Bill, Budget, Category, Receivable, RecurringRule, Transaction } from '../types/contracts';
+import type { Account, Bill, Budget, Category, Investment, InvestmentValueUpdate, Receivable, RecurringRule, Transaction } from '../types/contracts';
 
 const FINANCE_BOOT_RETRY_DELAYS_MS = [600, 1200, 2400, 4000];
 // Depois de esgotar o backoff acima, continua tentando neste intervalo pra sempre em vez
@@ -65,6 +67,8 @@ interface FinanceDataState {
   receivables: Array<LocalSynced<Receivable>>;
   recurringRules: Array<LocalSynced<RecurringRule>>;
   budgets: Array<LocalSynced<Budget>>;
+  investments: Array<LocalSynced<Investment>>;
+  investmentValueUpdates: Array<LocalSynced<InvestmentValueUpdate>>;
   loading: boolean;
   error: string | null;
 }
@@ -77,6 +81,8 @@ const initialState: FinanceDataState = {
   receivables: [],
   recurringRules: [],
   budgets: [],
+  investments: [],
+  investmentValueUpdates: [],
   loading: true,
   error: null
 };
@@ -253,7 +259,10 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
         setState(setSlice('receivables', items, markSliceLoaded('receivables')));
       }),
       subscribeWithBootRetry(subscribeRecurringRules, (items) => setState(setSlice('recurringRules', items, markSliceLoaded('recurringRules')))),
-      subscribeWithBootRetry(subscribeBudgets, (items) => setState(setSlice('budgets', items, markSliceLoaded('budgets'))))
+      subscribeWithBootRetry(subscribeBudgets, (items) => setState(setSlice('budgets', items, markSliceLoaded('budgets')))),
+      // Investimentos não entram em REQUIRED_SLICES — o app funciona normalmente sem eles.
+      subscribeWithBootRetry(subscribeInvestments, (items) => setState((state) => ({ ...state, investments: items }))),
+      subscribeWithBootRetry(subscribeInvestmentValueUpdates, (items) => setState((state) => ({ ...state, investmentValueUpdates: items })))
     ];
 
     return () => {
@@ -282,7 +291,15 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
     return [...state.categories, ...missingDefaults].sort((left, right) => left.name.localeCompare(right.name, 'pt-BR'));
   }, [state.categories, workspaceId]);
 
-  const activeAccounts = useMemo(() => state.accounts.filter((account) => account.isActive), [state.accounts]);
+  const activeAccounts = useMemo(
+    () => state.accounts.filter((a) => a.isActive && a.type !== 'investment'),
+    [state.accounts]
+  );
+
+  const investmentAccounts = useMemo(
+    () => state.accounts.filter((a) => a.isActive && a.type === 'investment'),
+    [state.accounts]
+  );
 
   const accountBalances = useMemo(
     () => currentAccountBalances(activeAccounts),
@@ -312,6 +329,7 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
   return {
     ...state,
     accounts: activeAccounts,
+    investmentAccounts,
     categories: categoriesWithDefaults,
     accountBalances,
     transactionIndex,

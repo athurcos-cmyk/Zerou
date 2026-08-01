@@ -349,6 +349,11 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/workspaces/$(workspaceId)/accounts/$(accountId));
     }
 
+    function validExistingInvestmentAccountReference(workspaceId, accountId) {
+      return accountId is string
+        && get(/databases/$(database)/documents/workspaces/$(workspaceId)/accounts/$(accountId)).data.type == 'investment';
+    }
+
     function validAccountCreate(workspaceId, accountId) {
       return isActiveMember(workspaceId)
         && request.resource.data.keys().hasOnly([
@@ -401,6 +406,7 @@ service cloud.firestore {
           'name',
           'type',
           'parentCategoryId',
+          'linkedInvestmentAccountId',
           'icon',
           'color',
           'isDefault',
@@ -423,7 +429,9 @@ service cloud.firestore {
           || (request.resource.data.isDefault == false && request.resource.data.createdBy == request.auth.uid)
         )
         && request.resource.data.createdAt == request.time
-        && request.resource.data.updatedAt == request.time;
+        && request.resource.data.updatedAt == request.time
+        && (!request.resource.data.keys().hasAny(['linkedInvestmentAccountId'])
+            || validExistingInvestmentAccountReference(workspaceId, request.resource.data.linkedInvestmentAccountId));
     }
 
     function validCategoryUpdate(workspaceId) {
@@ -447,6 +455,77 @@ service cloud.firestore {
         && validOptionalString('color', 40)
         && request.resource.data.isActive is bool
         && request.resource.data.updatedAt == request.time;
+    }
+
+    function validInvestmentCreate(workspaceId, investmentId) {
+      return isActiveMember(workspaceId)
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'workspaceId',
+          'investmentAccountId',
+          'name',
+          'kind',
+          'contributedCents',
+          'currentBalanceCents',
+          'isActive',
+          'createdBy',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.id == investmentId
+        && request.resource.data.workspaceId == workspaceId
+        && validExistingInvestmentAccountReference(workspaceId, request.resource.data.investmentAccountId)
+        && validShortText(request.resource.data.name, 2, 80)
+        && request.resource.data.kind in ['treasury', 'cdb', 'lci_lca', 'funds', 'stocks', 'reits', 'pension', 'crypto', 'other']
+        && validSignedMoneyCents(request.resource.data.contributedCents)
+        && validSignedMoneyCents(request.resource.data.currentBalanceCents)
+        && request.resource.data.isActive is bool
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validInvestmentUpdate(workspaceId) {
+      return isActiveMember(workspaceId)
+        && request.resource.data.workspaceId == resource.data.workspaceId
+        && request.resource.data.investmentAccountId == resource.data.investmentAccountId
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name',
+          'kind',
+          'contributedCents',
+          'currentBalanceCents',
+          'isActive',
+          'updatedAt'
+        ])
+        && validShortText(request.resource.data.name, 2, 80)
+        && request.resource.data.kind in ['treasury', 'cdb', 'lci_lca', 'funds', 'stocks', 'reits', 'pension', 'crypto', 'other']
+        && validSignedMoneyCents(request.resource.data.contributedCents)
+        && validSignedMoneyCents(request.resource.data.currentBalanceCents)
+        && request.resource.data.isActive is bool
+        && request.resource.data.updatedAt == request.time;
+    }
+
+    function validInvestmentValueUpdateCreate(workspaceId) {
+      return isActiveMember(workspaceId)
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'workspaceId',
+          'investmentId',
+          'balanceCents',
+          'contributedCentsAtTime',
+          'recordedAt',
+          'createdBy',
+          'createdAt'
+        ])
+        && request.resource.data.workspaceId == workspaceId
+        && request.resource.data.investmentId is string
+        && validSignedMoneyCents(request.resource.data.balanceCents)
+        && validSignedMoneyCents(request.resource.data.contributedCentsAtTime)
+        && request.resource.data.recordedAt is timestamp
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time;
     }
 
     function validPhase2TransactionType() {
@@ -598,6 +677,13 @@ service cloud.firestore {
         && (!request.resource.data.keys().hasAny(['deletedAt']) || request.resource.data.deletedAt == request.time)
         && request.resource.data.updatedAt == request.time
         && validTransactionAccounts(workspaceId);
+    }
+
+    function validTransactionUpdateWithInvestmentTagBlock(workspaceId) {
+      return validTransactionUpdate(workspaceId)
+        // Transação de investimento (aporte/resgate) não pode ser excluída pelo fluxo comum.
+        && !(request.resource.data.keys().hasAny(['deletedAt'])
+             && 'investimento' in resource.data.tags);
     }
 
     // Compra no cartão ao pagar: `installments` só é válido junto de `cardId` (parcelas não
@@ -1692,7 +1778,7 @@ service cloud.firestore {
       match /transactions/{transactionId} {
         allow read: if isActiveMember(workspaceId);
         allow create: if validTransactionCreate(workspaceId, transactionId);
-        allow update: if validTransactionUpdate(workspaceId);
+        allow update: if validTransactionUpdateWithInvestmentTagBlock(workspaceId);
         allow delete: if canDeleteWorkspaceTree(workspaceId);
       }
 
@@ -1722,6 +1808,19 @@ service cloud.firestore {
         allow create: if validBudgetCreate(workspaceId, budgetId);
         allow update: if validBudgetUpdate(workspaceId);
         allow delete: if isActiveMember(workspaceId);
+      }
+
+      match /investments/{investmentId} {
+        allow read: if isActiveMember(workspaceId);
+        allow create: if validInvestmentCreate(workspaceId, investmentId);
+        allow update: if validInvestmentUpdate(workspaceId);
+        allow delete: if isActiveMember(workspaceId);
+      }
+
+      match /investmentValueUpdates/{updateId} {
+        allow read: if isActiveMember(workspaceId);
+        allow create: if validInvestmentValueUpdateCreate(workspaceId);
+        allow update, delete: if false;
       }
 
       match /goals/{goalId} {

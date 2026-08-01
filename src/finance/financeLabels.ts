@@ -1,4 +1,4 @@
-import type { AccountType, SyncStatus, TransactionType } from '../types/contracts';
+import type { AccountType, InvestmentKind, SyncStatus, TransactionType } from '../types/contracts';
 
 export const accountTypeLabels: Record<AccountType, string> = {
   checking: 'Conta corrente',
@@ -46,4 +46,16 @@ export const syncStatusLabels: Record<SyncStatus, string> = {
   pending: 'Pendente',
   synced: 'Sincronizado',
   failed: 'Falhou'
+};
+
+export const investmentKindLabels: Record<InvestmentKind, string> = {
+  treasury: 'Tesouro Direto',
+  cdb: 'CDB',
+  lci_lca: 'LCI/LCA',
+  funds: 'Fundos de investimento',
+  stocks: 'Ações',
+  reits: 'FIIs',
+  pension: 'Previdência Privada',
+  crypto: 'Criptomoedas',
+  other: 'Outro'
 };

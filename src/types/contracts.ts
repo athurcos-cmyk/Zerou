@@ -167,12 +167,51 @@ export interface Account {
   updatedAt?: Timestamp;
 }
 
+export type InvestmentKind =
+  | 'treasury'
+  | 'cdb'
+  | 'lci_lca'
+  | 'funds'
+  | 'stocks'
+  | 'reits'
+  | 'pension'
+  | 'crypto'
+  | 'other';
+
+export interface Investment {
+  id: string;
+  workspaceId: string;
+  investmentAccountId: string;
+  name: string;
+  kind: InvestmentKind;
+  contributedCents: MoneyCents;
+  currentBalanceCents: MoneyCents;
+  isActive: boolean;
+  createdBy: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+export interface InvestmentValueUpdate {
+  id: string;
+  workspaceId: string;
+  investmentId: string;
+  balanceCents: MoneyCents;
+  contributedCentsAtTime: MoneyCents;
+  recordedAt: Timestamp;
+  createdBy: string;
+  createdAt?: Timestamp;
+}
+
 export interface Category {
   id: string;
   workspaceId: string;
   name: string;
   type: 'income' | 'expense' | 'both';
   parentCategoryId?: string;
+  /** Presente só em categorias auto-criadas junto com uma conta de investimento.
+   * Marca a categoria como gerenciada pelo sistema — nunca aparece em seletor. */
+  linkedInvestmentAccountId?: string;
   icon?: string;
   color?: string;
   isDefault: boolean;
