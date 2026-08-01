@@ -2,6 +2,28 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-07-31 (parte 5) — fix(push): cache desatualizado + notificação em dobro — capítulo final
+
+Depois do fix de PWA-only (abaixo), dois problemas novos, achados só depois de resolver os
+anteriores. **Já deployado e confirmado ao vivo**: reinstalação limpa, 1 notificação recebida,
+navegador não pede mais permissão. Detalhe completo em `docs/history/2026-07.md`.
+
+- **Cache local escondia token apagado do Firestore**: depois da limpeza manual dos 5 tokens
+  residuais, o dono reabriu o PWA três vezes e continuava sem token nenhum registrado. Causa: o
+  `getToken()` devolvia o mesmo token de sempre (a inscrição de push não mudou), o código
+  comparava com o cache do `localStorage` deste aparelho, via "igual" e pulava a escrita — sem
+  saber que o Firestore tinha sido esvaziado por fora. Corrigido com um `getDoc` confirmando que
+  o doc realmente existe antes de pular; se não existir, regrava.
+- **Diagnóstico temporário** (`writePushDebug`, `users/{uid}/pushDebug/latest`) foi o que achou
+  isso sem acesso ao aparelho do dono — pronto pra ser removido agora que cumpriu o papel
+  (`docs/planning/TODOS.md`).
+- **Mesma notificação chegava duas vezes**, mesmo com um único token confirmado (`successCount:
+  1/1` no envio). Causa: dois pontos do código podem mostrar notificação —
+  `onBackgroundMessage` no service worker e `onMessage` na página — e os dois dispararam pro
+  mesmo push no Android real, apesar da `tag` igual. Corrigido com `document.visibilityState !==
+  'visible'` como segunda trava no handler de foreground.
+- 12/12 testes de `notifications.test.ts` (4 novos desde a manhã). 510 testes de cliente verdes.
+
 ## 2026-07-31 (parte 4) — fix(push): notificação só registra no PWA instalado, nunca numa aba
 
 Achado pelo dono testando: mandar um push chegou **duas vezes** no celular. Causa: ele tinha

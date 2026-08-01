@@ -106,6 +106,22 @@ Teste isolado o mais rápido pra confirmar: `node scripts/with-java.mjs firebase
 
 ---
 
+## ⚠️ Limpeza manual no Firestore (script/console) pode deixar cache local do cliente mentindo (2026-07-31)
+
+Apaguei tokens FCM residuais direto no Firestore via script (fora do fluxo do app, pra corrigir um bug de notificação duplicada). Esperado: o app detecta "sem token salvo" e registra um novo sozinho. Na prática, o aparelho ficou **3 reaberturas completas** sem registrar nada.
+
+**Causa**: `src/pwa/notifications.ts` comparava o token obtido contra um cache em `localStorage` (`pushTokenCache.ts`) só pra evitar escrita redundante no Firestore a cada boot — uma otimização legítima, mas que **assume que o Firestore sempre reflete o que o cache diz**. Como o token FCM raramente muda (mesma inscrição de push = mesmo token), `getToken()` devolveu o valor de sempre, o cache disse "igual, nada a fazer", e o código nunca soube que o documento correspondente tinha sido apagado por fora.
+
+**Regra**: qualquer cache local (`localStorage`, `sessionStorage`, cache em memória) que existe só pra **evitar reescrever algo que já está certo no servidor** precisa, cedo ou tarde, verificar a suposição — não confiar cegamente que "já escrevi isso antes" ainda vale. Se uma limpeza manual no banco (script, console do Firebase, correção ad-hoc) é sequer remotamente possível no ciclo de vida de um dado, o código que lê o cache precisa de uma forma de perceber que o servidor mudou por fora, ou vai se autoconvencer de que está tudo certo enquanto o servidor está vazio. No caso do push, a correção foi um `getDoc` extra (1 leitura, só no caminho "cache diz que não mudou") confirmando que o documento existe antes de pular a escrita — barato, e fecha essa classe de bug pra sempre, não só pra este incidente.
+
+## ⚠️ `onBackgroundMessage` (service worker) e `onMessage` (página) podem disparar os DOIS pro mesmo push (2026-07-31)
+
+A documentação do Firebase Messaging dá a entender que os dois caminhos são mutuamente exclusivos: com o app em foco, `onMessage` recebe a mensagem e o SDK não mostra notificação sozinho; sem foco, quem recebe é `onBackgroundMessage` no service worker. Na prática, num Android real (PWA instalado), os dois dispararam pro mesmo push — mesmo com a mesma `tag` nos dois `showNotification()`, que deveria fazer o segundo *substituir* o primeiro, não empilhar.
+
+**Regra**: não confiar só na separação foreground/background do SDK nem só no `tag` pra evitar notificação duplicada quando dois pontos do código podem chamar `showNotification`. Em `src/pwa/notifications.ts`, `listenForForegroundPush` agora também confere `document.visibilityState === 'visible'` antes de mostrar — uma segunda trava, mais direta, que não depende de o navegador respeitar a semântica esperada.
+
+---
+
 ## Regras de código
 
 - **Dinheiro sempre em centavos inteiros** (`amountCents`); exibir via `formatMoney()`.
