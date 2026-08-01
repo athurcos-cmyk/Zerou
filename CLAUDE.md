@@ -114,11 +114,15 @@ Apaguei tokens FCM residuais direto no Firestore via script (fora do fluxo do ap
 
 **Regra**: qualquer cache local (`localStorage`, `sessionStorage`, cache em memória) que existe só pra **evitar reescrever algo que já está certo no servidor** precisa, cedo ou tarde, verificar a suposição — não confiar cegamente que "já escrevi isso antes" ainda vale. Se uma limpeza manual no banco (script, console do Firebase, correção ad-hoc) é sequer remotamente possível no ciclo de vida de um dado, o código que lê o cache precisa de uma forma de perceber que o servidor mudou por fora, ou vai se autoconvencer de que está tudo certo enquanto o servidor está vazio. No caso do push, a correção foi um `getDoc` extra (1 leitura, só no caminho "cache diz que não mudou") confirmando que o documento existe antes de pular a escrita — barato, e fecha essa classe de bug pra sempre, não só pra este incidente.
 
-## ⚠️ `onBackgroundMessage` (service worker) e `onMessage` (página) podem disparar os DOIS pro mesmo push (2026-07-31)
+## ⚠️ Notificação push chegando em dobro — NÃO RESOLVIDO apesar de 3 tentativas (2026-07-31)
 
-A documentação do Firebase Messaging dá a entender que os dois caminhos são mutuamente exclusivos: com o app em foco, `onMessage` recebe a mensagem e o SDK não mostra notificação sozinho; sem foco, quem recebe é `onBackgroundMessage` no service worker. Na prática, num Android real (PWA instalado), os dois dispararam pro mesmo push — mesmo com a mesma `tag` nos dois `showNotification()`, que deveria fazer o segundo *substituir* o primeiro, não empilhar.
+A documentação do Firebase Messaging dá a entender que `onBackgroundMessage` (service worker) e `onMessage` (página) são mutuamente exclusivos: com o app em foco, quem recebe é `onMessage`, e o SDK não mostra notificação sozinho; sem foco, quem recebe é o SW. Num Android real (PWA instalado) isso não se sustentou, e **nenhuma das 3 correções tentadas na mesma sessão eliminou a duplicação**, cada uma descartada só depois de testada ao vivo contra a function real de produção (`gcloud scheduler jobs run`, não um script à parte):
 
-**Regra**: não confiar só na separação foreground/background do SDK nem só no `tag` pra evitar notificação duplicada quando dois pontos do código podem chamar `showNotification`. Em `src/pwa/notifications.ts`, `listenForForegroundPush` agora também confere `document.visibilityState === 'visible'` antes de mostrar — uma segunda trava, mais direta, que não depende de o navegador respeitar a semântica esperada.
+1. `tag` igual (`título|corpo`) nos dois `showNotification()` — já existia, insuficiente sozinha.
+2. `document.visibilityState === 'visible'` como trava no handler de foreground — pareceu funcionar num primeiro teste, depois voltou a duplicar. `visibilityState` não é confiável em todo Android/WebView (pode reportar `'visible'` em segundo plano).
+3. Cache Storage (`caches`) como dedup real entre os dois contextos — a `shouldDisplayPush()` em `src/pwa/notifications.ts`/`vite.config.ts` ainda está no código (é uma melhoria real, testada com 14 casos), mas **a duplicação persistiu mesmo assim**, testada ao vivo depois do deploy.
+
+**O que isso ensina**: o fato de a tentativa 3 (que fecha especificamente a corrida SW-vs-página) não ter resolvido é evidência de que a causa pode não ser essa corrida — hipóteses não confirmadas em `docs/planning/TODOS.md` (check-then-write não-atômico no dedup; redelivery na camada de transporte do Web Push, que nenhuma dedup client-side resolveria sozinha). **Regra pra quem retomar**: não assumir que a próxima ideia "óbvia" vai resolver sem testar contra a function real de produção — as 3 tentativas anteriores pareciam corretas no código e nos testes automatizados, e nenhuma bateu na prática.
 
 ---
 

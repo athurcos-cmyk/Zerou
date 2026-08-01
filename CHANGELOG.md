@@ -2,27 +2,33 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
-## 2026-07-31 (parte 5) — fix(push): cache desatualizado + notificação em dobro — capítulo final
+## 2026-07-31 (parte 6) — fix(push): cache desatualizado corrigido; notificação em dobro CONTINUA
 
-Depois do fix de PWA-only (abaixo), dois problemas novos, achados só depois de resolver os
-anteriores. **Já deployado e confirmado ao vivo**: reinstalação limpa, 1 notificação recebida,
-navegador não pede mais permissão. Detalhe completo em `docs/history/2026-07.md`.
+Depois do fix de PWA-only (abaixo), mais problemas, achados só depois de resolver os anteriores.
+**Deployado.** O cache local está corrigido e confirmado. A notificação em dobro **não foi
+resolvida** apesar de três tentativas — decisão do dono foi parar por aqui nesta sessão. Detalhe
+completo e honesto em `docs/history/2026-07.md`.
 
-- **Cache local escondia token apagado do Firestore**: depois da limpeza manual dos 5 tokens
-  residuais, o dono reabriu o PWA três vezes e continuava sem token nenhum registrado. Causa: o
-  `getToken()` devolvia o mesmo token de sempre (a inscrição de push não mudou), o código
-  comparava com o cache do `localStorage` deste aparelho, via "igual" e pulava a escrita — sem
-  saber que o Firestore tinha sido esvaziado por fora. Corrigido com um `getDoc` confirmando que
-  o doc realmente existe antes de pular; se não existir, regrava.
-- **Diagnóstico temporário** (`writePushDebug`, `users/{uid}/pushDebug/latest`) foi o que achou
-  isso sem acesso ao aparelho do dono — pronto pra ser removido agora que cumpriu o papel
-  (`docs/planning/TODOS.md`).
-- **Mesma notificação chegava duas vezes**, mesmo com um único token confirmado (`successCount:
-  1/1` no envio). Causa: dois pontos do código podem mostrar notificação —
-  `onBackgroundMessage` no service worker e `onMessage` na página — e os dois dispararam pro
-  mesmo push no Android real, apesar da `tag` igual. Corrigido com `document.visibilityState !==
-  'visible'` como segunda trava no handler de foreground.
-- 12/12 testes de `notifications.test.ts` (4 novos desde a manhã). 510 testes de cliente verdes.
+- **Cache local escondia token apagado do Firestore** (resolvido, confirmado): depois da limpeza
+  manual dos 5 tokens residuais, o dono reabriu o PWA três vezes e continuava sem token nenhum
+  registrado. Causa: `getToken()` devolvia o mesmo token de sempre, o código comparava com o
+  cache do `localStorage` deste aparelho, via "igual" e pulava a escrita — sem saber que o
+  Firestore tinha sido esvaziado por fora. Corrigido com um `getDoc` confirmando que o doc
+  realmente existe antes de pular; se não existir, regrava. Token novo confirmado no Firestore.
+- **Mesma notificação chegava duas vezes — três tentativas, nenhuma eliminou de vez**:
+  1) `tag` igual no `showNotification()` já existia e não bastava sozinha.
+  2) `document.visibilityState !== 'visible'` no handler de foreground — pareceu funcionar num
+     primeiro teste (reinstalação limpa, 1 notificação), mas um teste posterior via
+     `gcloud scheduler jobs run` (a function real de produção, não um script à parte) voltou a
+     duplicar. Hipótese: `visibilityState` não é confiável em todo Android/WebView.
+  3) Cache Storage (`caches`) como dedup real entre SW e página — mecanismo mais robusto
+     (14 testes provando o comportamento), mas **testado ao vivo de novo e a duplicação
+     persistiu**. Causa raiz segue desconhecida — hipóteses (corrida não-atômica no
+     check-then-write, ou redelivery na camada de transporte do Web Push) anotadas em
+     `docs/planning/TODOS.md` pra quem retomar.
+- **Diagnóstico temporário** (`writePushDebug`) cumpriu o papel (achou o bug do cache) e está
+  pronto pra remoção.
+- 14/14 testes de `notifications.test.ts`. 512 testes de cliente verdes.
 
 ## 2026-07-31 (parte 4) — fix(push): notificação só registra no PWA instalado, nunca numa aba
 
