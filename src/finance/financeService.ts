@@ -1382,7 +1382,7 @@ export function createInvestmentAccount(workspaceId: string, userId: string, inp
   batch.set(documentRef(workspaceId, 'categories', categoryId), {
     id: categoryId, workspaceId, name: `Investimento: ${parsed.name}`, type: 'both' as const,
     icon: 'investment', isDefault: false, isActive: true,
-    linkedInvestmentAccountId: accountId, createdAt: now, updatedAt: now
+    linkedInvestmentAccountId: accountId, createdBy: userId, createdAt: now, updatedAt: now
   });
 
   fireWrite(batch.commit());
