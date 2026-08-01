@@ -69,7 +69,8 @@ const cachedView: CachedDashboardView = {
   ],
   recentTransactions: [
     { id: 'tx-1', type: 'expense', description: 'Mercado da esquina', dateISO: '2026-07-18T12:00:00.000Z', amountCents: 5000, mark: null }
-  ]
+  ],
+  nextMonthProjection: null
 };
 
 function renderDashboard() {

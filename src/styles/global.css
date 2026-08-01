@@ -872,6 +872,20 @@ html[data-reduce-motion='true'] *::after {
 
 .dash-shortcut-row .button {
   justify-content: center;
+  /* min-width: 0 no item de grid (relato real: ícone de "Compromissos" sumindo em iPhone
+     16/12 e alguns Android, não reproduzido no Chromium desktop/emulado). Item de grid herda
+     min-width: auto por padrão — sem isso, o texto mais longo da fileira ("Compromissos", sem
+     ponto de quebra) pode forçar o WebKit a espremer o SVG do ícone (primeiro filho do flex
+     interno do botão) até sumir antes de deixar o texto quebrar, mesmo com min-width: 0 no
+     TRACK do grid (que só libera a coluna, não o item). Mesma classe de bug do input gigante
+     em flex/grid documentada no DESIGN.md. */
+  min-width: 0;
+}
+
+.dash-shortcut-row .button svg {
+  /* Nunca deixa o SVG (que já tem width/height fixos via atributo do lucide-react) ser
+     comprimido pelo flex interno do botão — reforça a intenção do min-width acima. */
+  flex-shrink: 0;
 }
 
 .start-guide,
@@ -3737,6 +3751,181 @@ span.service-mark--brand {
 
 .reconcile-diff--match strong {
   font-size: 0.98rem;
+}
+
+/* --- Hero + legenda de categorias (Análise) --- */
+.analysis-hero {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  border-color: transparent;
+  border-radius: 1rem;
+  background: var(--gradient-brand);
+  padding: 1.25rem 1.5rem;
+  box-shadow: var(--shadow-brand-26);
+}
+
+.analysis-hero .eyebrow {
+  color: var(--on-accent-85);
+}
+
+.analysis-hero-amount {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--on-accent-95);
+}
+
+.analysis-hero-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--on-accent-82);
+  font-size: 0.86rem;
+}
+
+.category-legend-row {
+  display: flex;
+  flex-direction: column;
+}
+
+.category-legend-head {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+
+.category-legend-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.3rem;
+}
+
+.category-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: block;
+}
+
+.category-legend-name {
+  flex: 1;
+  font-size: 0.82rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category-legend-name--selected {
+  font-weight: 700;
+}
+
+.category-legend-pct {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.category-legend-value {
+  font-size: 0.82rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  min-width: 4.5rem;
+  text-align: right;
+}
+
+.category-legend-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.category-legend-bar-track {
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border-subtle);
+  overflow: hidden;
+  position: relative;
+}
+
+.category-legend-bar-fill {
+  height: 4px;
+  border-radius: 999px;
+  transition: width var(--duration-slow) ease;
+}
+
+.category-legend-bar-marker {
+  position: absolute;
+  top: 0;
+  height: 4px;
+  width: 2px;
+  background: var(--text-secondary);
+  border-radius: 1px;
+}
+
+.category-legend-budget-pct {
+  font-size: 0.72rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.category-legend-budget-pct span {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.category-legend-expand {
+  margin: 0.55rem 0 0.1rem 0.25rem;
+  padding-left: 0.8rem;
+  border-left: 2px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.category-legend-expand-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.category-legend-expand-name {
+  flex: 1;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category-legend-expand-pct {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.category-legend-expand-value {
+  font-size: 0.78rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  min-width: 4.5rem;
+  text-align: right;
+}
+
+.category-legend-budget-note {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
 }
 
 /* --- Donut de categorias (SVG puro na Análise) --- */

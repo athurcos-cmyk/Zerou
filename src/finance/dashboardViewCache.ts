@@ -42,6 +42,11 @@ export interface CachedRecentTransaction {
   mark: CachedCategoryMark | null;
 }
 
+export interface CachedNextMonthProjection {
+  committedCents: number;
+  leftoverCents: number;
+}
+
 export interface CachedDashboardView {
   totalBalanceCents: number;
   committedCents: number;
@@ -52,6 +57,12 @@ export interface CachedDashboardView {
   spending: CachedSpendingRow[];
   commitments: CachedCommitment[];
   recentTransactions: CachedRecentTransaction[];
+  /** `null` = sem salário previsto configurado (card mostra o convite, não um valor). Ao
+   * contrário do Comprometido/Saldo, esse número nunca tinha cache — reabrir o app sempre
+   * recalculava do zero com `bills`/`recurringRules`/`invoices` ainda vazios (boot), mostrando
+   * por um instante "sobra = salário inteiro" antes de cair pro valor real quando os
+   * compromissos chegavam. */
+  nextMonthProjection: CachedNextMonthProjection | null;
 }
 
 function canUseStorage() {
@@ -141,6 +152,18 @@ function parseRecentTransaction(value: unknown): CachedRecentTransaction | null 
   };
 }
 
+/** `undefined` = valor inválido (invalida o cache inteiro); `null` é um valor válido (sem
+ * salário previsto configurado). */
+function parseProjection(value: unknown): CachedNextMonthProjection | null | undefined {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'object') return undefined;
+  const projection = value as Record<string, unknown>;
+  if (!isFiniteNumber(projection.committedCents) || !isFiniteNumber(projection.leftoverCents)) {
+    return undefined;
+  }
+  return { committedCents: projection.committedCents, leftoverCents: projection.leftoverCents };
+}
+
 function parseList<T>(value: unknown, parseItem: (item: unknown) => T | null): T[] | null {
   if (!Array.isArray(value)) return null;
   const parsed: T[] = [];
@@ -165,6 +188,8 @@ function readMiniCache(workspaceId: string): CachedDashboardView | null {
     ) {
       return null;
     }
+    const nextMonthProjection = parseProjection(parsed.nextMonthProjection);
+    if (nextMonthProjection === undefined) return null;
     return {
       totalBalanceCents: parsed.totalBalanceCents,
       committedCents: parsed.committedCents,
@@ -172,7 +197,8 @@ function readMiniCache(workspaceId: string): CachedDashboardView | null {
       spendingVariationPct: parsed.spendingVariationPct as number | null,
       spending: [],
       commitments: [],
-      recentTransactions: []
+      recentTransactions: [],
+      nextMonthProjection
     };
   } catch {
     return null;
@@ -203,7 +229,8 @@ export function readCachedDashboardView(workspaceId?: string | null): CachedDash
     const spending = parseList(parsed.spending, parseSpendingRow);
     const commitments = parseList(parsed.commitments, parseCommitment);
     const recentTransactions = parseList(parsed.recentTransactions, parseRecentTransaction);
-    if (!spending || !commitments || !recentTransactions) {
+    const nextMonthProjection = parseProjection(parsed.nextMonthProjection);
+    if (!spending || !commitments || !recentTransactions || nextMonthProjection === undefined) {
       return readMiniCache(workspaceId);
     }
 
@@ -214,7 +241,8 @@ export function readCachedDashboardView(workspaceId?: string | null): CachedDash
       spendingVariationPct: parsed.spendingVariationPct as number | null,
       spending,
       commitments,
-      recentTransactions
+      recentTransactions,
+      nextMonthProjection
     };
   } catch {
     return null;
@@ -237,7 +265,8 @@ export function saveCachedDashboardView(workspaceId: string | undefined | null, 
         totalBalanceCents: view.totalBalanceCents,
         committedCents: view.committedCents,
         committedCaption: view.committedCaption,
-        spendingVariationPct: view.spendingVariationPct
+        spendingVariationPct: view.spendingVariationPct,
+        nextMonthProjection: view.nextMonthProjection
       };
       window.localStorage.setItem(CACHE_KEY_PREFIX + workspaceId + '.mini', JSON.stringify(mini));
     } catch { /* sem recuperação possível */ }

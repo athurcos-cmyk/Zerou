@@ -56,7 +56,7 @@ service cloud.firestore {
 
     function validThemeFields() {
       return request.resource.data.themeMode in ['manual', 'system']
-        && request.resource.data.themeId in ['paper', 'sakura', 'obsidian', 'midnight', 'aurora', 'rose-gold']
+        && request.resource.data.themeId in ['paper', 'perola', 'floresta', 'lavanda', 'rosa', 'areia', 'noturno', 'carbono', 'cobalto', 'ametista', 'grafite', 'vinho']
         && request.resource.data.density in ['comfortable', 'compact']
         && request.resource.data.fontScale in ['sm', 'md', 'lg']
         && request.resource.data.reduceMotion is bool;

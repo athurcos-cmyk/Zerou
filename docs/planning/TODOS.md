@@ -44,7 +44,7 @@ Não implementado (decisão consciente):
 - [ ] **Contas `investment` legacy** — tipo existe em contracts.ts. `useFinanceData.ts:294` já filtra `type !== 'investment'` do saldo. Nenhuma migração pra contas antigas do tipo.
 - [ ] **`--chart-4` tema escuro** — valor real é `#FFD54F` (não `#F9A825` como anotado antes). `#F9A825` é dos temas claros. Fora de escopo (token global).
 - [ ] **Categoria nome duplicado** — `createCategory` não valida (financeService.ts:272). Subcategorias tornam duplicata legítima em ramos diferentes. Validação futura = única dentro do mesmo pai.
-- [ ] **Redesenho da Análise (SearchPage.tsx)** — 65 inline `style={{ }}`, ~35 no bloco donut. Sem herói visual, sem hierarquia visual entre seções.
+- [x] ~~**Redesenho da Análise (SearchPage.tsx)**~~ — hero full-width pro "Gasto/Previsto no mês" (`.analysis-hero`, mesmo padrão de `.dash-hero`/`.invoice-hero`), legenda do donut migrada de inline style pra classes (`.category-legend-*`), toggles "Ver todas" reaproveitando `.list-toggle`. "Compras parceladas em andamento" também compactada (3 por padrão, `showAllOngoing`). 523 testes verdes, verificado ao vivo (mobile, tema escuro, mês futuro).
 - [ ] **Revisar demais telas** — sem lista fechada, avaliar conforme abrir.
 - [ ] **Contas a Receber recorrente (Fase 2)** — `RecurringRule` não tem campo `direction`. Nenhum código de receita recorrente. Plano: `direction: 'payable' | 'receivable'` + botão Registrar espelhado + Cloud Function + deploy manual.
 - [ ] **QA manual real no celular** — 10 fluxos.
@@ -76,6 +76,79 @@ Feature entregue 2026-07-30 (plano: `docs/planning/SUBCATEGORIAS.md`).
 - [x] Paleta daltonismo — decisão explícita do dono.
 
 ## Concluído (recente)
+
+### 2026-08-01 — Ícone de "Compromissos" sumindo em iPhone 16/12 e alguns Android — CONFIRMADO CORRIGIDO
+
+- [x] `.dash-shortcut-row .button` (grid 2x2 de atalhos do Dashboard mobile) ganhou
+      `min-width: 0` (item de grid herda `min-width: auto`, e "Compromissos" — a palavra mais
+      longa da fileira, sem ponto de quebra — pode forçar o WebKit a espremer o ícone SVG até
+      sumir em vez de deixar o texto quebrar) + `flex-shrink: 0` no SVG do ícone, reforçando que
+      ele nunca deve ser comprimido. Mesma classe de bug já documentada no DESIGN.md
+      ("input gigante em flex/grid precisa de min-width: 0"). Não reproduzível no Chromium
+      (testado 393×852/390×844/320×700 — engine Blink não tem o bug de sizing do WebKit,
+      independente do viewport). **Confirmado corrigido pelo dono em iPhone real.**
+
+### 2026-08-01 — Bug real: "Projeção do próximo mês" recalculava do zero no boot (achado pelo dono)
+
+- [x] Ao contrário de Saldo total/Comprometido (que já usam `dashboardViewCache` pra mostrar o
+      último valor conhecido enquanto Firestore ainda não respondeu), a "Sobra prevista" era
+      100% recalculada a cada abertura do app com `bills`/`recurringRules`/`invoices` ainda
+      vazios no boot — mostrava por um instante "sobra = salário inteiro" (sem descontar nada)
+      antes de cair pro valor real quando os compromissos chegavam. `CachedDashboardView` ganhou
+      `nextMonthProjection` (`dashboardViewCache.ts`, com fallback `null` pra cache de formato
+      antigo sem essa chave — não invalida o resto); `DashboardPage.tsx` usa o mesmo gate `cache`/
+      `isCommittedLoading` que o Comprometido já usa (mesma dependência de invoices/cards). A
+      sheet de edição (`NextMonthProjectionSheet`) continua com o valor AO VIVO, não o cacheado —
+      é onde a pessoa ajusta o número, precisa refletir o estado atual. 2 testes de regressão
+      novos em `dashboardViewCache.test.ts`. Verificado ao vivo (localStorage confirma
+      `nextMonthProjection` persistido, valor idêntico ao exibido após reload).
+
+### 2026-08-01 — Busca em recorrências + filtro de categoria descobrível em Transações
+
+- [x] **Recorrências**: campo de busca por nome acima da lista (`BillsPage.tsx`) — buscar
+      mostra todos os resultados (ignora o cap de 3), toggle "Ver todas" some durante a busca.
+- [x] **Transações**: filtro por categoria já existia (via texto digitado na busca), mas
+      invisível — ninguém descobria sozinho. Novo `SelectField` "Categoria" (searchable) na
+      sheet de Filtros, junto de Tag/Cartão, contabilizado no badge "Filtros · N".
+
+### 2026-08-01 — Contas a Pagar compactada (3 por padrão)
+
+- [x] "Recorrentes" e "Compromissos" (contas avulsas) mostravam a lista inteira sem limite —
+      agora só as 3 primeiras, com `.list-toggle` ("Ver todas as N" / "Ver menos"), mesmo padrão
+      já usado na Análise (compras parceladas) e na Fatura. Trocar de filtro em Compromissos
+      (Em aberto/Vencidas/Pagas/Todas) reseta o "Ver todas". Verificado ao vivo com 12
+      recorrentes reais.
+
+### 2026-08-01 — Bug real: sync de tema em loop infinito de permission-denied — CORRIGIDO E DEPLOYADO
+
+- [x] `firestore.rules` (`validThemeFields`) só aceitava os 6 nomes antigos de tema
+      (`paper, sakura, obsidian, midnight, aurora, rose-gold`) — o client já usa 12 nomes novos
+      desde o rebrand (`src/theme/theme.types.ts`: `paper, perola, floresta, lavanda, rosa, areia,
+      noturno, carbono, cobalto, ametista, grafite, vinho`). Escolher qualquer tema que não seja
+      "Paper" nunca persistia no servidor — o `AppearanceSyncBridge` ficava retentando pra sempre
+      (write rejeitado → SDK reverte cache local → snapshot dispara de novo → retenta), inundando
+      o console com `permission-denied` em TODA página (Dashboard, Análise, etc.), achado
+      investigando um relato não relacionado ("orçamento de subcategoria não mostrou"/tela preta).
+      Regra corrigida pra aceitar os 12 nomes atuais + teste de regressão novo em
+      `tests/firestore.rules.test.ts` (rejeita nome antigo tipo `sakura`). 93/93 testes de regras
+      verdes no emulador. **Deployado em produção** (`npx firebase deploy --only firestore:rules
+      --project zerou-26757`, autorizado pelo dono) e verificado ao vivo: mutações antigas
+      presas na fila do IndexedDB do cliente ainda geravam ruído por alguns reloads, mas
+      confirmado com instrumentação que o loop parou de vez após o deploy.
+
+### 2026-08-01 — Bug real: orçamento de subcategoria nunca aparecia na Análise
+
+- [x] O orçamento de uma subcategoria (ex.: "Guloseimas" dentro de "Alimentação") sempre foi
+      gravado certo no Firestore — o bug era só de EXIBIÇÃO: a lista/donut da Análise soma
+      subcategoria no pai (`rollUpByParent`), então só o PAI vira uma linha; a expansão de
+      subcategorias (`SearchPage.tsx`, dentro de `cat.children.map`) nunca olhava
+      `budgetByCategoryId` pra elas — só a linha do pai tinha barra/%/limite. Corrigido: cada
+      subcategoria na expansão agora mostra o mesmo `X% lim.` que a linha principal, verificado
+      ao vivo com "Guloseimas" (orçamento pré-existente de R$100, 6% usado).
+
+### 2026-08-01 — Redesenho da Análise
+
+- [x] Hero visual (`.analysis-hero`), legenda do donut em classes CSS, "Compras parceladas em andamento" compactada (3 padrão)
 
 ### 2026-08-01 — Limpeza pós-auditoria
 

@@ -2,6 +2,25 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-01 (parte 6) — feat(analise): redesenho + fix(rules): tema em loop + fix(dashboard): projeção sem cache + UX de listas
+
+- **Análise redesenhada**: hero visual (`.analysis-hero`), legenda de categorias em classes CSS,
+  "Compras parceladas" compactada (3 padrão). Item do TODOS fechado.
+- **fix(rules) — DEPLOYADO**: `firestore.rules` só aceitava 6 nomes de tema antigos contra os 12
+  atuais do client — qualquer tema não-Paper nunca sincronizava (loop infinito de
+  `permission-denied` em toda página). Corrigido, testado (93/93) e deployado em produção.
+- **fix**: orçamento de subcategoria gravava certo mas nunca aparecia na tela (bug de exibição,
+  não de escrita) — corrigido.
+- **fix**: card "Projeção do próximo mês" recalculava do zero a cada abertura do app (sem cache,
+  ao contrário de Saldo/Comprometido) — corrigido com o mesmo `dashboardViewCache`.
+- **fix**: ícone de "Compromissos" sumindo em iPhone 16/12 e alguns Android — confirmado corrigido
+  pelo dono (`min-width: 0` + `flex-shrink: 0`, bug de WebKit não reproduzível no Chromium).
+- **UX**: Contas a Pagar compactada (3 por padrão) + busca em recorrências; filtro de categoria
+  descobrível em Transações (antes só funcionava digitando o nome, sem indício visual).
+- `WelcomeTour.tsx` atualizado de 6 para 9 slides (Investimentos, Vic, Projeção, Contas a Receber,
+  subcategorias).
+- Detalhe completo: `docs/history/2026-08.md`.
+
 ## 2026-08-01 (parte 5) — fix(security): fechamento da auditoria (CSP + Zod webhook + lazy landing + DPO)
 
 - **CLIENT-2 (CSP)**: `'unsafe-inline'` removido do `script-src`. Substituído por SHA-256 do

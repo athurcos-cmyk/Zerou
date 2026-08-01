@@ -1,5 +1,5 @@
 import {
-  CalendarClock, PieChart, ReceiptText, Sparkles, WalletCards, Wallet
+  Bot, CalendarClock, FolderTree, PieChart, ReceiptText, Sparkles, Telescope, TrendingUp, WalletCards
 } from 'lucide-react';
 import { useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
@@ -24,18 +24,33 @@ const slides: TourSlide[] = [
   },
   {
     icon: <CalendarClock size={26} aria-hidden="true" />,
-    title: 'Nunca perca um vencimento',
-    text: 'Contas a Pagar reune o que voce deve: contas avulsas (IPTU, uma conta pontual) e recorrentes (aluguel, Netflix) — tudo na mesma tela.'
+    title: 'O que você deve e o que vão te pagar',
+    text: 'Contas a Pagar reúne o que você deve — avulsas (IPTU) e recorrentes (aluguel, Netflix). Contas a Receber anota o que ainda não é seu: só entra no saldo quando você marcar como recebido.'
   },
   {
-    icon: <Wallet size={26} aria-hidden="true" />,
-    title: 'Saldo e Comprometido',
-    text: 'Dois números que importam: quanto você tem nas contas, e o quanto já está prometido — suas contas fixas e recorrentes mais a fatura do cartão.'
+    icon: <Telescope size={26} aria-hidden="true" />,
+    title: 'Saldo, Comprometido e Projeção',
+    text: 'Três números que importam: quanto você tem agora, o quanto já está prometido (contas fixas, recorrentes e fatura do cartão) — e, se quiser simular, quanto sobraria mês que vem com o salário que você prevê.'
+  },
+  {
+    icon: <FolderTree size={26} aria-hidden="true" />,
+    title: 'Categorias que se organizam',
+    text: 'Cada categoria pode virar um grupo com subcategorias — Água e Energia dentro de Casa, por exemplo. Veja como funciona em Configurações > Categorias.'
+  },
+  {
+    icon: <TrendingUp size={26} aria-hidden="true" />,
+    title: 'Seus investimentos, no mesmo lugar',
+    text: 'Acompanhe o quanto sua reserva rendeu — por conta e por investimento individual, com aporte e resgate registrados como transação de verdade.'
   },
   {
     icon: <PieChart size={26} aria-hidden="true" />,
     title: 'Metas, a dois e Análise',
     text: 'Guarde com objetivo no cofrinho, organize as contas do casal, e veja pra onde seu dinheiro vai — por categoria e por mês — na Análise.'
+  },
+  {
+    icon: <Bot size={26} aria-hidden="true" />,
+    title: 'Vic, sua assistente',
+    text: 'Converse com a Vic no app pra tirar dúvidas com seus dados reais, ou lance um gasto direto pelo WhatsApp, sem nem abrir o app.'
   }
 ];
 

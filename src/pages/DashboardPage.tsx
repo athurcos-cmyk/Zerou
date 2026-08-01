@@ -13,6 +13,7 @@ import {
   readCachedDashboardView,
   saveCachedDashboardView,
   type CachedCategoryMark,
+  type CachedNextMonthProjection,
   type CachedSpendingRow
 } from '../finance/dashboardViewCache';
 import { formatFriendlyDate, toDate, type DateLike } from '../finance/financeDates';
@@ -154,6 +155,12 @@ export function DashboardPage() {
     : isCommittedLoading
       ? '—'
       : formatMoney(dashboard.committedCents);
+  // Mesmo acelerador do Comprometido (depende de invoices/cards, mesmo gate `cache`): sem
+  // isso, reabrir o app recalculava do zero com `bills`/`invoices` ainda vazios no boot,
+  // mostrando por um instante "sobra = salário inteiro" antes de cair pro valor real.
+  const effectiveNextMonthProjection: CachedNextMonthProjection | null = cache
+    ? cache.nextMonthProjection
+    : nextMonthProjection;
   const syncStatus = finance.pendingWrites || cardsData.pendingWrites ? 'pending' : 'synced';
   const currentMonth = new Date().toISOString().slice(0, 7);
   const now = new Date();
@@ -261,7 +268,8 @@ export function DashboardPage() {
         dateISO: toDate(transaction.date).toISOString(),
         amountCents: transaction.amountCents,
         mark: markForTransaction(transaction, categoryMap)
-      }))
+      })),
+      nextMonthProjection
     });
     // Deps = as fontes estáveis do dashboard (os arrays do contexto só trocam de referência
     // quando chega snapshot novo), não os objetos recomputados a cada render — senão isto
@@ -277,7 +285,9 @@ export function DashboardPage() {
     finance.recurringRules,
     finance.categories,
     cardsData.invoices,
-    cardsData.cards
+    cardsData.cards,
+    profile?.projectedSalaryCents,
+    profile?.projectionIncludesBalance
   ]);
   // Se existe cache de exibição, o app NÃO está vazio — a pessoa já usou antes.
   // Só decide "conta nova" depois que finanças E cartões resolveram E não há cache
@@ -337,14 +347,14 @@ export function DashboardPage() {
 
       <article className="projection-card">
         <div className="projection-card-header">
-          <span className={`projection-icon${nextMonthProjection && nextMonthProjection.leftoverCents < 0 ? ' projection-icon--negative' : ''}`}>
+          <span className={`projection-icon${effectiveNextMonthProjection && effectiveNextMonthProjection.leftoverCents < 0 ? ' projection-icon--negative' : ''}`}>
             <Telescope size={19} aria-hidden="true" />
           </span>
           <div className="projection-card-title">
             <p className="eyebrow">Projeção do próximo mês</p>
-            <h2>{nextMonthProjection ? (nextMonthProjection.leftoverCents >= 0 ? 'Sobra prevista' : 'Rombo previsto') : 'Quanto sobraria mês que vem?'}</h2>
+            <h2>{effectiveNextMonthProjection ? (effectiveNextMonthProjection.leftoverCents >= 0 ? 'Sobra prevista' : 'Rombo previsto') : 'Quanto sobraria mês que vem?'}</h2>
           </div>
-          {nextMonthProjection ? (
+          {effectiveNextMonthProjection ? (
             <button
               className="icon-button"
               type="button"
@@ -356,10 +366,10 @@ export function DashboardPage() {
           ) : null}
         </div>
 
-        {nextMonthProjection ? (
+        {effectiveNextMonthProjection ? (
           <>
-            <strong className={`projection-amount ${nextMonthProjection.leftoverCents >= 0 ? 'projection-amount--positive' : 'projection-amount--negative'}`}>
-              {formatMoney(nextMonthProjection.leftoverCents)}
+            <strong className={`projection-amount ${effectiveNextMonthProjection.leftoverCents >= 0 ? 'projection-amount--positive' : 'projection-amount--negative'}`}>
+              {formatMoney(effectiveNextMonthProjection.leftoverCents)}
             </strong>
             <div className="projection-formula">
               <span className="projection-formula-term">
@@ -375,7 +385,7 @@ export function DashboardPage() {
               ) : null}
               <span className="projection-formula-operator" aria-hidden="true">−</span>
               <span className="projection-formula-term">
-                <Scale size={13} aria-hidden="true" /> {formatMoney(nextMonthProjection.committedCents)}
+                <Scale size={13} aria-hidden="true" /> {formatMoney(effectiveNextMonthProjection.committedCents)}
               </span>
             </div>
             <p className="projection-disclaimer">Simulação com o que você informou — não é saldo garantido.</p>

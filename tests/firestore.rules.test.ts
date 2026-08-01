@@ -827,7 +827,7 @@ describe('firestore security rules', () => {
     await assertSucceeds(
       updateDoc(doc(aliceDb, 'users/alice'), {
         themeMode: 'manual',
-        themeId: 'sakura',
+        themeId: 'noturno',
         density: 'compact',
         fontScale: 'lg',
         reduceMotion: true,
@@ -836,6 +836,20 @@ describe('firestore security rules', () => {
     );
 
     await assertFails(updateDoc(doc(aliceDb, 'users/alice'), { defaultWorkspaceId: 'workspaceB' }));
+
+    // Regressão: nomes de tema antigos (pré-rebrand dos 12 temas) não podem voltar a validar —
+    // foi exatamente esse desalinhamento entre cliente e regra que travava a sincronização de
+    // aparência em loop (ver CLAUDE.md).
+    await assertFails(
+      updateDoc(doc(aliceDb, 'users/alice'), {
+        themeMode: 'manual',
+        themeId: 'sakura',
+        density: 'compact',
+        fontScale: 'lg',
+        reduceMotion: true,
+        updatedAt: serverTimestamp()
+      })
+    );
   });
 
   it('allows a user to set and clear their own avatarStyle, rejects an unknown id', async () => {

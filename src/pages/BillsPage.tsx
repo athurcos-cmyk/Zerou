@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { CalendarClock, ChevronDown, Pencil, Repeat, X } from 'lucide-react';
+import { CalendarClock, ChevronDown, Pencil, Repeat, Search, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { CategoryField } from '../components/CategoryField';
@@ -99,6 +99,14 @@ export function BillsPage() {
   // ── filtro de compromissos ──
   const [billFilter, setBillFilter] = useState<BillFilterKey>('open');
 
+  // ── colapso das listas (3 por padrão, "Ver todas" expande) ──
+  const [showAllRecurring, setShowAllRecurring] = useState(false);
+  const [showAllBills, setShowAllBills] = useState(false);
+  const BILLS_PAGE_SIZE = 3;
+
+  // ── busca nas recorrências (lista cresce rápido — assinatura, conta fixa, etc.) ──
+  const [recurringQuery, setRecurringQuery] = useState('');
+
   // ── opções mescladas conta+cartão (reaproveitadas nos 3 selects + chip-row de pagamento) ──
   const { accountOptions, cardOptions } = buildAccountOrCardOptions(finance.accounts, cardsData.cards);
   const accountOrCardOptions = [...accountOptions, ...cardOptions];
@@ -111,6 +119,22 @@ export function BillsPage() {
         .sort((a, b) => a.nextOccurrenceAt.toMillis() - b.nextOccurrenceAt.toMillis()),
     [finance.recurringRules]
   );
+
+  const normalizedRecurringQuery = recurringQuery.trim().toLocaleLowerCase('pt-BR');
+  const filteredRecurringItems = useMemo(
+    () =>
+      normalizedRecurringQuery
+        ? recurringItems.filter((r) => r.description.toLocaleLowerCase('pt-BR').includes(normalizedRecurringQuery))
+        : recurringItems,
+    [recurringItems, normalizedRecurringQuery]
+  );
+  // Buscando, mostra todos os resultados (sem cap de 3) — senão a pessoa digita e o item que
+  // procura pode nem estar entre as 3 primeiras exibidas.
+  const displayedRecurringItems = normalizedRecurringQuery
+    ? filteredRecurringItems
+    : showAllRecurring
+    ? recurringItems
+    : recurringItems.slice(0, BILLS_PAGE_SIZE);
 
   const recurringTotalCents = useMemo(
     () => recurringItems.reduce((sum, r) => sum + (r.amountCents ?? 0), 0),
@@ -453,11 +477,25 @@ export function BillsPage() {
             <Repeat size={22} aria-hidden="true" style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
           </div>
 
+          {hasRecurring && (
+            <div className="input-with-icon" style={{ marginBottom: '0.85rem' }}>
+              <Search size={17} aria-hidden="true" />
+              <input
+                className="input"
+                value={recurringQuery}
+                onChange={(e) => setRecurringQuery(e.target.value)}
+                placeholder="Buscar recorrência"
+                aria-label="Buscar recorrência por nome"
+              />
+            </div>
+          )}
+
           {finance.loading ? (
             <LoadingState compact />
           ) : hasRecurring ? (
+            displayedRecurringItems.length > 0 ? (
             <div className="item-list">
-              {recurringItems.map((rule) => {
+              {displayedRecurringItems.map((rule) => {
                 const due = isRecurrenceDue(rule.nextOccurrenceAt.toDate());
                 const canPayEarly = canRegisterRecurrence(rule.nextOccurrenceAt.toDate());
                 const actionLabel = due ? 'Pago' : canPayEarly ? 'Pagar adiantado' : null;
@@ -498,6 +536,14 @@ export function BillsPage() {
                 );
               })}
             </div>
+            ) : (
+              <EmptyState
+                illustration="bills"
+                compact
+                title="Nenhum resultado"
+                description={`Nada encontrado para "${recurringQuery.trim()}".`}
+              />
+            )
           ) : (
             <EmptyState
               illustration="bills"
@@ -505,6 +551,15 @@ export function BillsPage() {
               title="Nenhuma assinatura ou conta fixa"
               description="Aluguel, internet, streaming — cadastre como recorrente e o Granativa lembra sozinho todo ciclo."
             />
+          )}
+          {!normalizedRecurringQuery && recurringItems.length > BILLS_PAGE_SIZE && (
+            <button type="button" className="list-toggle" onClick={() => setShowAllRecurring((v) => !v)}>
+              {showAllRecurring ? (
+                <>Ver menos <ChevronDown size={14} aria-hidden="true" style={{ transform: 'rotate(180deg)' }} /></>
+              ) : (
+                <>Ver todas as {recurringItems.length} recorrentes <ChevronDown size={14} aria-hidden="true" /></>
+              )}
+            </button>
           )}
         </article>
 
@@ -521,7 +576,7 @@ export function BillsPage() {
           {hasBills && (
             <div className="chip-row">
               {billFilterChips.map((chip) => (
-                <button key={chip.key} type="button" className={`chip${billFilter === chip.key ? ' chip--active' : ''}`} onClick={() => setBillFilter(chip.key)}>
+                <button key={chip.key} type="button" className={`chip${billFilter === chip.key ? ' chip--active' : ''}`} onClick={() => { setBillFilter(chip.key); setShowAllBills(false); }}>
                   {chip.label}
                 </button>
               ))}
@@ -533,7 +588,7 @@ export function BillsPage() {
           ) : hasBills ? (
             visibleBills.length > 0 ? (
               <div className="item-list">
-                {visibleBills.map((bill) => {
+                {(showAllBills ? visibleBills : visibleBills.slice(0, BILLS_PAGE_SIZE)).map((bill) => {
                   const isPending = bill.status === 'pending' || bill.status === 'overdue';
                   const dateClassName = bill.status === 'overdue' ? 'amount--expense' : bill.status === 'paid' ? 'text-muted' : 'text-secondary';
 
@@ -572,6 +627,15 @@ export function BillsPage() {
               title="Nenhuma conta avulsa ainda"
               description="Cadastre uma conta pontual — sem repetição — e seja lembrado antes do vencimento."
             />
+          )}
+          {visibleBills.length > BILLS_PAGE_SIZE && (
+            <button type="button" className="list-toggle" onClick={() => setShowAllBills((v) => !v)}>
+              {showAllBills ? (
+                <>Ver menos <ChevronDown size={14} aria-hidden="true" style={{ transform: 'rotate(180deg)' }} /></>
+              ) : (
+                <>Ver todas as {visibleBills.length} contas <ChevronDown size={14} aria-hidden="true" /></>
+              )}
+            </button>
           )}
         </article>
       </div>

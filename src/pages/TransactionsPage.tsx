@@ -52,6 +52,7 @@ export function TransactionsPage() {
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense' | 'transfer'>('all');
   const [cardFilter, setCardFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [tagFilter, setTagFilter] = useState<Set<string>>(new Set());
   const [filtersOpen, setFiltersOpen] = useState(false);
   // Sheet de detalhe: a linha inteira é o alvo de toque; Editar/Excluir vivem aqui dentro.
@@ -66,6 +67,19 @@ export function TransactionsPage() {
       ...cardsData.cards.map((card) => ({ value: card.id, label: card.name }))
     ],
     [cardsData.cards]
+  );
+  // Filtro de categoria descobrível: antes só dava pra achar digitando o nome na busca de
+  // texto, sem nenhum indício visual de que isso funcionava. `searchable` no SelectField
+  // porque a lista cresce rápido com subcategorias.
+  const categoryOptions = useMemo(
+    () => [
+      { value: '', label: 'Todas as categorias' },
+      ...finance.categories
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+        .map((c) => ({ value: c.id, label: c.name }))
+    ],
+    [finance.categories]
   );
   // ── paginação "Carregar mais" (Fase 2) ──────────────────────────────────────
   // As 300 do boot continuam ao vivo (onSnapshot); páginas mais antigas entram aqui sob
@@ -136,6 +150,7 @@ export function TransactionsPage() {
     return activeTransactions.filter((t) => {
       // Filtro por cartão: só as compras daquele cartão.
       if (cardFilter && (t.type !== 'card_purchase' || t.cardId !== cardFilter)) return false;
+      if (categoryFilter && t.categoryId !== categoryFilter) return false;
       if (typeFilter === 'income' && t.type !== 'income') return false;
       if (typeFilter === 'expense' && t.type !== 'expense' && t.type !== 'card_purchase') return false;
       if (typeFilter === 'transfer' && t.type !== 'transfer') return false;
@@ -151,7 +166,7 @@ export function TransactionsPage() {
         .toLocaleLowerCase('pt-BR');
       return haystack.includes(normalizedQuery);
     });
-  }, [activeTransactions, cardFilter, typeFilter, tagFilter, normalizedQuery, categoryMap]);
+  }, [activeTransactions, cardFilter, categoryFilter, typeFilter, tagFilter, normalizedQuery, categoryMap]);
 
   // Extrato agrupado por dia (padrão de app financeiro nativo): cabeçalho "Hoje/Ontem/12 jul"
   // com o saldo no fim daquele dia. A lista já vem ordenada por data; agrupar preserva a ordem.
@@ -191,11 +206,12 @@ export function TransactionsPage() {
   // Filtros secundários (tag, cartão) ficam escondidos atrás de um botão "Filtros" —
   // mostrar os grupos soltos na tela, além do tipo, virava uma parede de chips no
   // celular (7+ chips empilhados, achado real testando em 375px).
-  const activeSecondaryFilterCount = (tagFilter.size > 0 ? 1 : 0) + (cardFilter ? 1 : 0);
+  const activeSecondaryFilterCount = (tagFilter.size > 0 ? 1 : 0) + (cardFilter ? 1 : 0) + (categoryFilter ? 1 : 0);
 
   function clearSecondaryFilters() {
     setTagFilter(new Set());
     setCardFilter('');
+    setCategoryFilter('');
   }
 
   async function handleDelete(transaction: Transaction) {
@@ -280,9 +296,20 @@ export function TransactionsPage() {
         open={filtersOpen}
         onClose={() => setFiltersOpen(false)}
         title="Filtros"
-        subtitle="Tag e cartão"
+        subtitle="Categoria, tag e cartão"
       >
         <div className="form-stack">
+          {finance.categories.length > 0 && (
+            <SelectField
+              label="Categoria"
+              value={categoryFilter}
+              onChange={setCategoryFilter}
+              options={categoryOptions}
+              sheetTitle="Filtrar por categoria"
+              searchable
+            />
+          )}
+
           {availableTags.length > 0 && (
             <div className="field">
               <span className="field-label">Tags</span>

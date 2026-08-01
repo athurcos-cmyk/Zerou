@@ -23,7 +23,8 @@ const sampleView: CachedDashboardView = {
   recentTransactions: [
     { id: 'tx-1', type: 'expense', description: 'Mercado', dateISO: '2026-07-18T12:00:00.000Z', amountCents: 5000, mark: { id: 'food', icon: 'utensils', color: defaultCategoryColors.expense_food } },
     { id: 'tx-2', type: 'income', description: 'Salário', dateISO: '2026-07-05T12:00:00.000Z', amountCents: 300000, mark: { id: '', icon: 'money', color: defaultCategoryColors.income_salary } }
-  ]
+  ],
+  nextMonthProjection: { committedCents: 60000, leftoverCents: 440000 }
 };
 
 afterEach(() => {
@@ -43,6 +44,23 @@ describe('dashboardViewCache', () => {
 
   it('devolve null quando não há nada salvo', () => {
     expect(readCachedDashboardView(workspaceId)).toBeNull();
+  });
+
+  it('nextMonthProjection: aceita null (sem salário previsto configurado)', () => {
+    saveCachedDashboardView(workspaceId, { ...sampleView, nextMonthProjection: null });
+    expect(readCachedDashboardView(workspaceId)?.nextMonthProjection).toBeNull();
+  });
+
+  it('nextMonthProjection: cache de formato antigo (sem a chave) lê como null, não invalida o resto', () => {
+    // Simula uma entrada gravada antes desse campo existir — regressão pro bug real de
+    // 2026-08-01: a Projeção do próximo mês nunca tinha cache e recalculava do zero no boot
+    // (ver DashboardPage.tsx). Chave nova ausente não pode derrubar o cache inteiro.
+    const { nextMonthProjection: _omit, ...oldFormat } = sampleView;
+    window.localStorage.setItem('zerou.dashboardView.v2.' + workspaceId, JSON.stringify(oldFormat));
+    const view = readCachedDashboardView(workspaceId);
+    expect(view).not.toBeNull();
+    expect(view!.nextMonthProjection).toBeNull();
+    expect(view!.totalBalanceCents).toBe(sampleView.totalBalanceCents);
   });
 
   it('rejeita o cache inteiro (não renderiza lixo) se qualquer item de lista estiver corrompido', () => {

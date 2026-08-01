@@ -139,6 +139,7 @@ export function SearchPage() {
   const [expandedCatId, setExpandedCatId] = useState<string | null>(null);
   const [showAllCategories, setShowAllCategories] = useState(false);
   const [showAllRecurring, setShowAllRecurring] = useState(false);
+  const [showAllOngoing, setShowAllOngoing] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [annualOpen, setAnnualOpen] = useState(false);
@@ -451,6 +452,7 @@ export function SearchPage() {
     setSelectedCatIndex(null);
     setExpandedCatId(null);
     setShowAllCategories(false);
+    setShowAllOngoing(false);
     setSelectedMonth((m) => shiftMonth(m, delta));
   }
 
@@ -491,7 +493,7 @@ export function SearchPage() {
       </div>
 
       {chartDataError && (
-        <div className="notice notice--danger" role="alert" style={{ marginBottom: '0.75rem' }}>{chartDataError}</div>
+        <div className="notice notice--danger" role="alert">{chartDataError}</div>
       )}
 
       {!isOnline && (
@@ -520,13 +522,20 @@ export function SearchPage() {
         </div>
       )}
 
+      {/* ── Hero: número principal do mês ───────────────────────────────────── */}
+      <div className="analysis-hero">
+        <p className="eyebrow">{isFutureMonth ? 'Previsto no mês' : 'Gasto no mês'}</p>
+        <span className="analysis-hero-amount">{totalSpent > 0 ? formatMoney(totalSpent) : 'R$ 0'}</span>
+        {!isFutureMonth && variation !== null && (
+          <span className="analysis-hero-meta">
+            {variation > 0 ? <TrendingUp size={14} aria-hidden="true" /> : variation < 0 ? <TrendingDown size={14} aria-hidden="true" /> : <Minus size={14} aria-hidden="true" />}
+            {variation > 0 ? '+' : ''}{variation}% {comparisonMode === 'last_year' ? 'vs. mesmo mês ano passado' : 'vs. mês anterior'}
+          </span>
+        )}
+      </div>
+
       {/* ── KPI strip ──────────────────────────────────────────────────────── */}
       <div className="metric-strip">
-        <MetricCard
-          accent
-          label={isFutureMonth ? 'Previsto no mês' : 'Gasto no mês'}
-          value={totalSpent > 0 ? formatMoney(totalSpent) : 'R$ 0'}
-        />
         <MetricCard
           long
           label="Maior categoria"
@@ -586,8 +595,7 @@ export function SearchPage() {
 
         {totalSpent > 0 ? (
           <>
-            <p className="text-secondary" style={{ margin: '0.1rem 0 1rem' }}>{formatMoney(totalSpent)} no total</p>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem', marginTop: '0.6rem' }}>
 
               {/* donut — SVG puro (sem Recharts): render instantâneo, sem ResizeObserver, animação
                   de entrada em CSS (GPU) em vez do "forming" em JS que engasgava no celular. */}
@@ -686,10 +694,12 @@ export function SearchPage() {
                   return (
                     <div
                       key={cat.categoryId ?? NO_CATEGORY}
+                      className="category-legend-row"
                       style={{ opacity: isDimmed ? 0.35 : 1, transition: 'opacity var(--duration-normal) ease' }}
                     >
                     <button
                       type="button"
+                      className="category-legend-head"
                       aria-expanded={isParent ? isExpanded : undefined}
                       onClick={() => {
                         setSelectedCatIndex(i === selectedCatIndex ? null : i);
@@ -697,15 +707,11 @@ export function SearchPage() {
                         // destacar a fatia (decisão do dono).
                         if (isParent) setExpandedCatId(isExpanded ? null : cat.categoryId);
                       }}
-                      style={{
-                        background: 'none', border: 'none', padding: 0,
-                        cursor: 'pointer', textAlign: 'left', width: '100%',
-                      }}
                     >
                       {/* nome + valor */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.3rem' }}>
-                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: cat.color, flexShrink: 0, display: 'block' }} />
-                        <span style={{ flex: 1, fontSize: '0.82rem', fontWeight: isSelected ? 700 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div className="category-legend-name-row">
+                        <span className="category-legend-dot" style={{ background: cat.color }} />
+                        <span className={`category-legend-name${isSelected ? ' category-legend-name--selected' : ''}`}>
                           {cat.name}
                         </span>
                         {/* A seta é o único aviso de que a linha abre — sem ela, ninguém descobre. */}
@@ -715,36 +721,33 @@ export function SearchPage() {
                             : <ChevronDown size={13} className="text-secondary" style={{ flexShrink: 0 }} aria-hidden="true" />
                         )}
                         {/* Fatia do total (contexto do donut). O % do LIMITE fica ao lado da barra, abaixo. */}
-                        <span title="do total gasto" style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', flexShrink: 0 }}>{pct}%</span>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 700, flexShrink: 0, minWidth: '4.5rem', textAlign: 'right' }}>
+                        <span title="do total gasto" className="category-legend-pct">{pct}%</span>
+                        <span className="category-legend-value">
                           {formatMoney(cat.amountCents)}
                           {leafBudget ? ` / ${formatMoney(leafBudget.limitCents)}` : ''}
                         </span>
                       </div>
                       {/* barra de progresso + % do LIMITE (quando há orçamento) */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <div style={{ flex: 1, height: 4, borderRadius: 999, background: 'var(--border-subtle)', overflow: 'hidden', position: 'relative' }}>
-                          <div style={{
-                            height: 4, borderRadius: 999,
-                            background: barColor,
-                            width: budgetBarWidthPct !== null ? `${budgetBarWidthPct}%` : `${pct}%`,
-                            transition: 'width var(--duration-slow) ease',
-                          }} />
+                      <div className="category-legend-bar-row">
+                        <div className="category-legend-bar-track">
+                          <div
+                            className="category-legend-bar-fill"
+                            style={{
+                              background: barColor,
+                              width: budgetBarWidthPct !== null ? `${budgetBarWidthPct}%` : `${pct}%`,
+                            }}
+                          />
                           {leafBudget && (
                             <div
                               title={`Limite: ${formatMoney(leafBudget.limitCents)}`}
-                              style={{
-                                position: 'absolute', top: 0, height: 4,
-                                left: `${budgetMarkerLeftPct}%`, width: 2,
-                                background: 'var(--text-secondary)',
-                                borderRadius: 1,
-                              }}
+                              className="category-legend-bar-marker"
+                              style={{ left: `${budgetMarkerLeftPct}%` }}
                             />
                           )}
                         </div>
                         {budgetPct !== null && (
-                          <span title="do limite usado" style={{ fontSize: '0.72rem', fontWeight: 700, color: barColor, flexShrink: 0, whiteSpace: 'nowrap' }}>
-                            {budgetPct}% <span style={{ fontWeight: 500, color: 'var(--text-secondary)' }}>lim.</span>
+                          <span title="do limite usado" className="category-legend-budget-pct" style={{ color: barColor }}>
+                            {budgetPct}% <span>lim.</span>
                           </span>
                         )}
                       </div>
@@ -752,14 +755,7 @@ export function SearchPage() {
 
                     {/* expansão: as subcategorias, com % relativo ao PAI (não ao total do mês) */}
                     {isExpanded && (
-                      <div
-                        style={{
-                          margin: '0.55rem 0 0.1rem 0.25rem',
-                          paddingLeft: '0.8rem',
-                          borderLeft: `2px solid ${cat.color}`,
-                          display: 'flex', flexDirection: 'column', gap: '0.45rem',
-                        }}
-                      >
+                      <div className="category-legend-expand" style={{ borderLeftColor: cat.color }}>
                         {cat.children.map((child) => {
                           const isGeral = child.id === cat.categoryId;
                           // Guarda de NaN `[D8]`: o total do pai é o divisor e pode ser zero num
@@ -768,27 +764,43 @@ export function SearchPage() {
                           const childPct = cat.amountCents > 0
                             ? Math.round((child.amountCents / cat.amountCents) * 100)
                             : null;
+                          // Orçamento por SUBCATEGORIA: existe (bug real corrigido em 2026-08-01) —
+                          // antes o orçamento era gravado normalmente mas nunca aparecia em lugar
+                          // nenhum aqui, porque só a linha do PAI olhava `budgetByCategoryId`.
+                          const childBudget = !isGeral ? budgetByCategoryId.get(child.id) : undefined;
+                          const childBudgetPct = childBudget
+                            ? Math.round((child.amountCents / childBudget.limitCents) * 100)
+                            : null;
+                          const childBudgetColor = childBudgetPct !== null
+                            ? childBudgetPct >= 100 ? 'var(--danger)' : childBudgetPct >= 80 ? 'var(--warning)' : 'var(--success)'
+                            : undefined;
                           return (
-                            <div key={child.id} style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                            <div key={child.id} className="category-legend-expand-row">
                               <span
                                 title={isGeral ? `Lançado direto em ${cat.name}, sem subcategoria` : undefined}
-                                style={{ flex: 1, fontSize: '0.78rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                className="category-legend-expand-name"
                               >
                                 {child.name}
                               </span>
                               {childPct !== null && (
-                                <span title={`de ${cat.name}`} style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', flexShrink: 0 }}>
+                                <span title={`de ${cat.name}`} className="category-legend-expand-pct">
                                   {childPct}%
                                 </span>
                               )}
-                              <span style={{ fontSize: '0.78rem', fontWeight: 600, flexShrink: 0, minWidth: '4.5rem', textAlign: 'right' }}>
+                              <span className="category-legend-expand-value">
                                 {formatMoney(child.amountCents)}
+                                {childBudget ? ` / ${formatMoney(childBudget.limitCents)}` : ''}
                               </span>
+                              {childBudgetPct !== null && (
+                                <span title="do limite usado" className="category-legend-budget-pct" style={{ color: childBudgetColor }}>
+                                  {childBudgetPct}% <span>lim.</span>
+                                </span>
+                              )}
                             </div>
                           );
                         })}
                         {groupBudget && (
-                          <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                          <p className="category-legend-budget-note">
                             Orçamento de {formatMoney(groupBudget.limitCents)} — conta só o que for lançado direto em {cat.name}, não as subcategorias.
                           </p>
                         )}
@@ -801,12 +813,8 @@ export function SearchPage() {
                 {spendingByCategory.length > 6 && (
                   <button
                     type="button"
+                    className="list-toggle"
                     onClick={() => setShowAllCategories((v) => !v)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '0.3rem',
-                      fontSize: '0.78rem', fontWeight: 600, color: 'var(--action-primary)',
-                      background: 'none', border: 'none', padding: '0.15rem 0 0', cursor: 'pointer',
-                    }}
                   >
                     {showAllCategories ? (
                       <>Ver menos <ChevronUp size={14} aria-hidden="true" /></>
@@ -869,12 +877,8 @@ export function SearchPage() {
           {recurringProjected.length > 5 && (
             <button
               type="button"
+              className="list-toggle"
               onClick={() => setShowAllRecurring((v) => !v)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '0.3rem',
-                fontSize: '0.78rem', fontWeight: 600, color: 'var(--action-primary)',
-                background: 'none', border: 'none', padding: '0.7rem 0 0', cursor: 'pointer',
-              }}
             >
               {showAllRecurring ? (
                 <>Ver menos <ChevronUp size={14} aria-hidden="true" /></>
@@ -899,7 +903,7 @@ export function SearchPage() {
             O valor cheio de cada compra. Na visão por categoria acima ele aparece diluído — só a parcela do mês pesa lá.
           </p>
           <div className="item-list">
-            {ongoing.map((purchase) => {
+            {(showAllOngoing ? ongoing : ongoing.slice(0, 3)).map((purchase) => {
               const catId = txnCategoryById.get(purchase.sourceTransactionId);
               return (
                 <div className="list-row list-row--with-icon" key={purchase.sourceTransactionId}>
@@ -917,6 +921,19 @@ export function SearchPage() {
               );
             })}
           </div>
+          {ongoing.length > 3 && (
+            <button
+              type="button"
+              className="list-toggle"
+              onClick={() => setShowAllOngoing((v) => !v)}
+            >
+              {showAllOngoing ? (
+                <>Ver menos <ChevronUp size={14} aria-hidden="true" /></>
+              ) : (
+                <>Ver todas as {ongoing.length} compras parceladas <ChevronDown size={14} aria-hidden="true" /></>
+              )}
+            </button>
+          )}
         </article>
       )}
 
