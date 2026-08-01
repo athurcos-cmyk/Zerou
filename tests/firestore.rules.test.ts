@@ -2402,6 +2402,29 @@ describe('firestore security rules', () => {
       );
     });
 
+    it('allows create investment with a color', async () => {
+      const aliceDb = testEnv.authenticatedContext('alice').firestore();
+      await assertSucceeds(
+        setDoc(
+          doc(aliceDb, 'workspaces/workspaceA/investments/inv1'),
+          investmentPayload('workspaceA', 'inv1', 'alice', 'accountInvest', { color: '#2EAE7D' })
+        )
+      );
+    });
+
+    it('allows updating color', async () => {
+      const aliceDb = testEnv.authenticatedContext('alice').firestore();
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await setDoc(
+          doc(context.firestore(), 'workspaces/workspaceA/investments/inv1'),
+          investmentPayload('workspaceA', 'inv1', 'alice', 'accountInvest')
+        );
+      });
+      await assertSucceeds(
+        updateDoc(doc(aliceDb, 'workspaces/workspaceA/investments/inv1'), { color: '#E4572E', updatedAt: serverTimestamp() })
+      );
+    });
+
     it('rejects investment pointing to a non-investment account', async () => {
       const aliceDb = testEnv.authenticatedContext('alice').firestore();
       await assertFails(

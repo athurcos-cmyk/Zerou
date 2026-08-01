@@ -34,7 +34,11 @@ export function InvestmentValueUpdateSheet({ open, workspaceId, userId, investme
     if (!workspaceId || !userId || !investment || !canSubmit) return;
     const newBalance = magnitudeCents;
     const diffCents = newBalance - investment.currentBalanceCents;
-    const pct = investment.contributedCents > 0 ? ((diffCents / investment.contributedCents) * 100) : 0;
+    // % acumulado DESDE O INÍCIO (novo valor vs. total aportado) — não o % desta atualização
+    // isolada. Rótulo diz "desde o início"; usar diffCents/contributedCents aqui mostraria só o
+    // incremento desta vez (ex.: 0,67% na 2ª atualização quando o rendimento acumulado real já é
+    // 1%) — o mesmo cálculo que o cabeçalho da aba já usa pro rendimento total do portfólio.
+    const pct = investment.contributedCents > 0 ? (((newBalance - investment.contributedCents) / investment.contributedCents) * 100) : 0;
     recordInvestmentValueUpdate(workspaceId, userId, investment.id, newBalance, investment.contributedCents);
     setFeedback({ rendeu: diffCents >= 0, diffCents, pct });
     setAmount('');

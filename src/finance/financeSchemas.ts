@@ -102,7 +102,8 @@ export const createInvestmentSchema = z.object({
   investmentAccountId: z.string().trim().min(1),
   name: z.string().trim().min(2, 'Informe um nome com pelo menos 2 caracteres.').max(80),
   kind: z.enum(investmentKinds),
-  openingBalanceCents: moneyCentsSchema
+  openingBalanceCents: moneyCentsSchema,
+  color: z.string().trim().max(40).optional()
 });
 
 export type CreateAccountInput = z.infer<typeof createAccountSchema>;

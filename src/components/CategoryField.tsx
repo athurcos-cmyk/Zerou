@@ -7,7 +7,7 @@ import { useConfirm } from './ConfirmDialog';
 import { CategoryForm, type CategoryFormValues } from './CategoryForm';
 import { CategoryIcon, resolveCategoryColor } from './categoryIcons';
 import {
-  canDeleteCategory, childrenOf, parentCandidates, parentCategoryIds
+  canDeleteCategory, childrenOf, parentCandidates, parentCategoryIds, selectableCategories
 } from '../finance/categoryHierarchy';
 
 export interface CategoryPatch {
@@ -59,12 +59,18 @@ export const CategoryField = memo(function CategoryField({
   // escondia a filha (quando o tipo dela diferia do pai) e fazia o pai voltar a ser
   // selecionável — bug real de 29/07/2026, contra a regra [D10].
   const parentIds = parentCategoryIds(allActive);
+  // `selectableCategories` é a fonte única de verdade pra "essa categoria pode receber um
+  // lançamento" (exclui pai-de-grupo e categoria gerenciada pelo sistema, ex.: a categoria
+  // sintética de uma conta de investimento). Delegar em vez de reimplementar evita o bug real de
+  // 01/08/2026: esta função tinha sua própria cópia da exclusão de pai e nunca ganhou a exclusão
+  // de `linkedInvestmentAccountId` quando ela foi adicionada em `selectableCategories`.
+  const selectableIds = new Set(selectableCategories(allActive).map((cat) => cat.id));
 
   const filtered = allActive.filter((cat) => {
     if (filterType === 'all') return true;
     return cat.type === filterType || cat.type === 'both';
   });
-  const selectable = filtered.filter((cat) => !parentIds.has(cat.id));
+  const selectable = filtered.filter((cat) => selectableIds.has(cat.id));
   const parents = filtered.filter((cat) => parentIds.has(cat.id));
   const rootLeaves = selectable.filter((cat) => !cat.parentCategoryId);
 

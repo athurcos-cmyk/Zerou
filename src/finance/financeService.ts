@@ -1395,7 +1395,7 @@ export function createInvestmentAccount(workspaceId: string, userId: string, inp
 }
 
 export function createInvestment(workspaceId: string, userId: string, input: {
-  investmentAccountId: string; name: string; kind: Investment['kind']; openingBalanceCents: number;
+  investmentAccountId: string; name: string; kind: Investment['kind']; openingBalanceCents: number; color?: string;
 }) {
   const parsed = createInvestmentSchema.parse(input);
   const investmentId = createId('inv');
@@ -1403,12 +1403,12 @@ export function createInvestment(workspaceId: string, userId: string, input: {
   const now = serverTimestamp();
   const batch = writeBatch(getFirebaseDb());
 
-  batch.set(documentRef(workspaceId, 'investments', investmentId), {
+  batch.set(documentRef(workspaceId, 'investments', investmentId), omitUndefined({
     id: investmentId, workspaceId, investmentAccountId: parsed.investmentAccountId,
-    name: parsed.name, kind: parsed.kind,
+    name: parsed.name, kind: parsed.kind, color: parsed.color,
     contributedCents: parsed.openingBalanceCents, currentBalanceCents: parsed.openingBalanceCents,
     isActive: true, createdBy: userId, createdAt: now, updatedAt: now
-  });
+  }));
   batch.set(documentRef(workspaceId, 'investmentValueUpdates', updateId), {
     id: updateId, workspaceId, investmentId,
     balanceCents: parsed.openingBalanceCents, contributedCentsAtTime: parsed.openingBalanceCents,
@@ -1417,6 +1417,20 @@ export function createInvestment(workspaceId: string, userId: string, input: {
 
   fireWrite(batch.commit());
   return investmentId;
+}
+
+/** Edita nome/tipo/cor de um investimento já existente — não mexe em saldo/aportado (isso é só
+ * pelo fluxo de Aportar/Resgatar/"Quanto rendeu", nunca por aqui). */
+export function updateInvestment(
+  workspaceId: string,
+  investmentId: string,
+  patch: { name?: string; kind?: Investment['kind']; color?: string }
+) {
+  const updates: Record<string, unknown> = { updatedAt: serverTimestamp() };
+  if (patch.name !== undefined) updates.name = patch.name;
+  if (patch.kind !== undefined) updates.kind = patch.kind;
+  if (patch.color !== undefined) updates.color = patch.color;
+  fireWrite(updateDoc(documentRef(workspaceId, 'investments', investmentId), updates));
 }
 
 export function contributeToInvestment(

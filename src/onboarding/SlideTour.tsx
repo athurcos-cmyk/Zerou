@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useFocusTrap } from '../utils/useFocusTrap';
 
@@ -38,7 +39,13 @@ export function SlideTour({ open, slides, ariaLabel, onClose, lastLabel = 'Enten
   const slide = slides[index];
   const isLast = index === slides.length - 1;
 
-  return (
+  // Portal pro document.body: `position: fixed` só cobre a viewport inteira se nenhum ancestral
+  // tiver `transform`/`filter` diferente de `none` (isso cria um containing block novo). Uma
+  // página com `animation: ... both` cujo keyframe final anima `transform` (ex.: `fadeIn` em
+  // `global.css`) deixa esse transform "grudado" mesmo depois da animação acabar — sem portal, o
+  // tour ficava confinado ao retângulo da página em vez da tela inteira (achado na aba
+  // Investimentos). Mesmo padrão que `BottomSheet.tsx` já usa.
+  return createPortal(
     <div className="welcome-tour" role="dialog" aria-modal="true" aria-label={ariaLabel} ref={tourRef}>
       <div className="welcome-tour-card">
         <button className="welcome-tour-skip" type="button" onClick={onClose}>
@@ -74,6 +81,7 @@ export function SlideTour({ open, slides, ariaLabel, onClose, lastLabel = 'Enten
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

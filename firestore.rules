@@ -467,6 +467,7 @@ service cloud.firestore {
           'kind',
           'contributedCents',
           'currentBalanceCents',
+          'color',
           'isActive',
           'createdBy',
           'createdAt',
@@ -479,6 +480,7 @@ service cloud.firestore {
         && request.resource.data.kind in ['treasury', 'cdb', 'lci_lca', 'funds', 'stocks', 'reits', 'pension', 'crypto', 'other']
         && validSignedMoneyCents(request.resource.data.contributedCents)
         && validSignedMoneyCents(request.resource.data.currentBalanceCents)
+        && validOptionalString('color', 40)
         && request.resource.data.isActive is bool
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.createdAt == request.time
@@ -496,6 +498,7 @@ service cloud.firestore {
           'kind',
           'contributedCents',
           'currentBalanceCents',
+          'color',
           'isActive',
           'updatedAt'
         ])
@@ -503,6 +506,7 @@ service cloud.firestore {
         && request.resource.data.kind in ['treasury', 'cdb', 'lci_lca', 'funds', 'stocks', 'reits', 'pension', 'crypto', 'other']
         && validSignedMoneyCents(request.resource.data.contributedCents)
         && validSignedMoneyCents(request.resource.data.currentBalanceCents)
+        && validOptionalString('color', 40)
         && request.resource.data.isActive is bool
         && request.resource.data.updatedAt == request.time;
     }

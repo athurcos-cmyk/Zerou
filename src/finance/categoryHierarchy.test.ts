@@ -74,6 +74,19 @@ describe('selectableCategories', () => {
 
     expect(selectableCategories(planas)).toHaveLength(3);
   });
+
+  // Categoria sintética de uma conta de investimento (`linkedInvestmentAccountId` setado) nunca
+  // pode ser oferecida como opção de lançamento comum — bug real de 01/08/2026: `CategoryField`
+  // reimplementava esta exclusão na mão e nunca ganhou este campo, deixando "Investimento: XP"
+  // selecionável em Nova Transação.
+  it('exclui categoria vinculada a uma conta de investimento', () => {
+    const comInvestimento = [
+      cat('transporte'),
+      { id: 'inv-xp', isActive: true, linkedInvestmentAccountId: 'acct-xp' }
+    ];
+
+    expect(selectableCategories(comInvestimento).map((c) => c.id)).toEqual(['transporte']);
+  });
 });
 
 describe('canBeParentOf — trava de 1 nível', () => {

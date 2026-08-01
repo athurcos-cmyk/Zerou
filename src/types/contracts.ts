@@ -186,6 +186,9 @@ export interface Investment {
   kind: InvestmentKind;
   contributedCents: MoneyCents;
   currentBalanceCents: MoneyCents;
+  /** Cor escolhida pra esse investimento no gráfico da aba. Ausente = cor padrão atribuída na
+   * criação (rotaciona pela paleta compartilhada, mesma lista que Categorias usa). */
+  color?: string;
   isActive: boolean;
   createdBy: string;
   createdAt?: Timestamp;

@@ -2,6 +2,36 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-01 (parte 2) — fix(investments): QA ao vivo, cor por investimento, gráfico redesenhado
+
+Depois da entrega inicial (abaixo), o dono testou ao vivo e achou 5 problemas reais de
+UX/layout — nenhum pego pelo `/review` anterior por serem de comportamento em runtime, não de
+regra. Detalhe completo em `docs/history/2026-08.md`.
+
+- **Tutorial com layout quebrado**: `SlideTour.tsx` ganhou `createPortal` (mesmo padrão do
+  `BottomSheet`) — corrige os 4 tours do app, não só o de Investimentos.
+- **Categoria sintética vazava no seletor de Nova Transação**: `CategoryField.tsx` duplicava a
+  lógica de exclusão em vez de usar `selectableCategories()`; agora delega, com teste de
+  regressão novo.
+- **Aportar/Resgatar difícil de achar**: contas nascem expandidas por padrão, investimento sem
+  saldo inicial abre o sheet de Aportar sozinho, botões ganharam texto visível, botão Excluir
+  investimento adicionado.
+- **Só 1 de N investimentos aparecia na lista**: animação de expandir usava `maxHeight` estimado
+  em px, desatualizado pro design novo; trocado por `grid-template-rows` (nunca mais depende de
+  estimar altura).
+- **Cor por investimento** (`Investment.color`, grid reaproveitando `CategoryForm`) + **gráfico
+  reescrito**: uma linha por investimento (não mais uma soma agregada — corrigia uma subcontagem
+  silenciosa real), eixo em **%** em vez de R$ (investimentos de tamanhos diferentes ficavam
+  "retos" no mesmo eixo em reais), paleta dedicada `--chart-1..5` validada com a skill `dataviz`.
+- `firestore.rules` do campo `color` não estava implantada — achada e corrigida (deploy
+  autorizado) antes de virar um incidente silencioso de verdade.
+- **Excluir conta de investimento** (faltava — só dava pra excluir o investimento individual):
+  reaproveita `deleteAccount`/`deleteCategory` já existentes, exige a conta vazia primeiro.
+- **Espaçamento "colado"** (`/frontend-design`): `InvestmentsPage.tsx` usava classes CSS
+  (`page`, `page-header`) que não existem em `global.css` — trocado pras classes que toda tela
+  irmã já usa (`page-content`, `page-heading-row page-heading-row--tight`), zero CSS novo.
+- Dados de teste limpos ao final; typecheck/testes/build verdes a cada etapa.
+
 ## 2026-08-01 — feat(investments): tracking de investimentos
 
 Feature nova: acompanhamento de investimentos em dois níveis (conta de investimento + investimentos individuais). Plano completo em `docs/planning/INVESTIMENTOS.md`, detalhes em `docs/history/2026-08.md`.
