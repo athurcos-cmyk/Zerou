@@ -21,6 +21,10 @@ Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/histor
 - **Cloud Functions**: `buildFinancialContext` (Vic) lista a conta rotulada mas não soma no total;
   `budgetAlerts` (que calcula gasto direto no servidor, sem passar por `spendingAnalysis.ts`)
   ignora as transações dela.
+- ⚠️ **Deploy das functions incompleto**: `sendBudgetAlerts` subiu; `financialAssistantChat` (Vic do
+  app) **não** — `Quota exceeded for total allowable CPU per project per region` no Cloud Run
+  (27 serviços × 1 CPU em `southamerica-east1`, no teto da quota). Até subir, a Vic responde pela
+  revisão antiga e ainda soma o vale. Ver `docs/history/2026-08.md` pros caminhos de solução.
 - **fix(test)**: o mock de Firestore de `buildFinancialContext.test.ts` tratava `where()` como
   no-op **para tudo** — a consulta nova devolvia todas as contas como excluídas e derrubou 3
   testes. Mock corrigido pra filtrar `==` de verdade, o que expôs um cartão de teste sem
