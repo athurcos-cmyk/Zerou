@@ -32,6 +32,9 @@ interface Props {
   invoices: InvoiceForSpending[];
   categories: { id: string; name: string; color?: string }[];
   categoryOf: (transactionId: string | undefined) => string | undefined;
+  /** Contas "fora do saldo" (`Account.excludeFromTotals`) — a tendência tem que bater com o
+   * donut da Análise, então o gasto delas fica de fora aqui também. */
+  excludedAccountIds: ReadonlySet<string>;
   /** Categoria pra abrir focada (a destacada no donut, ou a maior). */
   initialCategoryId?: string;
 }
@@ -56,13 +59,14 @@ function TrendTooltip({ active, payload }: { active?: boolean; payload?: { paylo
 }
 
 export function CategoryTrendSheet({
-  open, onClose, months, currentMonth, transactions, invoices, categories, categoryOf, initialCategoryId,
+  open, onClose, months, currentMonth, transactions, invoices, categories, categoryOf,
+  excludedAccountIds, initialCategoryId,
 }: Props) {
   const reducedMotion = useReducedMotion();
 
   const byCategory = useMemo(
-    () => spendingByCategoryAcrossMonths(months, transactions, invoices, categoryOf),
-    [months, transactions, invoices, categoryOf],
+    () => spendingByCategoryAcrossMonths(months, transactions, invoices, categoryOf, excludedAccountIds),
+    [months, transactions, invoices, categoryOf, excludedAccountIds],
   );
 
   const categoryMeta = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);

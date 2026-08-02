@@ -2,6 +2,31 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-02 — feat(contas): conta "fora do saldo" (vale-refeição) + fix(test): mock de Firestore que não filtrava
+
+- **Feature nova**: campo opcional `excludeFromTotals` em `Account` marca uma conta como "não é
+  dinheiro de verdade" (vale-refeição, vale-alimentação, cartão presente). Ela **some** do Saldo
+  total, da Análise (donut/histórico/tendência), do Resumo Anual, dos alertas de orçamento, do
+  Comprometido e da Projeção — mas **continua** na tela Contas com o próprio saldo, no Extrato e
+  em todo seletor de lançamento. Opcional ⇒ zero migração.
+- **`firestore.rules` DEPLOYADO**: `validAccountCreate` e `validAccountUpdate` aceitam o campo. Sem
+  o `affectedKeys` do update, o toggle seria rejeitado em silêncio (padrão dos 3 incidentes do
+  `CLAUDE.md`). 2 testes novos travam isso — **95/95**.
+- **Trava anti-drift**: `excludedAccountIds` virou parâmetro **obrigatório** em
+  `spendingByCategoryForMonth`, `monthlyTotals`, `spendingByCategoryAcrossMonths`,
+  `calculateDashboardSummary` e `calculateNextMonthProjection`. Já pagou: o compilador apontou
+  `CategoryTrendSheet`, que não estava no plano.
+- **UI**: toggle 👁 por conta, selo "Fora do saldo", saldo em tom mais baixo, badge do topo só com
+  o que conta + linha dizendo quanto ficou de fora, checkbox no formulário de nova conta.
+- **Cloud Functions**: `buildFinancialContext` (Vic) lista a conta rotulada mas não soma no total;
+  `budgetAlerts` (que calcula gasto direto no servidor, sem passar por `spendingAnalysis.ts`)
+  ignora as transações dela.
+- **fix(test)**: o mock de Firestore de `buildFinancialContext.test.ts` tratava `where()` como
+  no-op **para tudo** — a consulta nova devolvia todas as contas como excluídas e derrubou 3
+  testes. Mock corrigido pra filtrar `==` de verdade, o que expôs um cartão de teste sem
+  `isActive` que só passava porque o filtro não existia.
+- Detalhe completo: `docs/history/2026-08.md`.
+
 ## 2026-08-01 (parte 6) — feat(analise): redesenho + fix(rules): tema em loop + fix(dashboard): projeção sem cache + UX de listas
 
 - **Análise redesenhada**: hero visual (`.analysis-hero`), legenda de categorias em classes CSS,

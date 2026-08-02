@@ -64,6 +64,28 @@ export const sendBudgetAlerts = onSchedule(
 
     logger.info(`budgetAlerts: checking ${budgetsSnap.size} active budgets`);
 
+    // Contas "fora do saldo" (vale-refeição etc., `Account.excludeFromTotals`) por workspace.
+    // Esta function calcula o gasto do mês DIRETO no servidor, sem passar por
+    // `src/finance/spendingAnalysis.ts` — sem esta exclusão ela alertaria por um estouro que a
+    // Análise e o banner do app não mostram, e o app estaria certo. Cache por workspace: o
+    // mesmo espaço costuma ter vários orçamentos, e a consulta quase sempre volta vazia.
+    const excludedAccountsByWorkspace = new Map<string, Set<string>>();
+    const excludedAccountIdsFor = async (workspaceId: string): Promise<Set<string>> => {
+      const cached = excludedAccountsByWorkspace.get(workspaceId);
+      if (cached) return cached;
+
+      const snap = await db
+        .collection('workspaces')
+        .doc(workspaceId)
+        .collection('accounts')
+        .where('excludeFromTotals', '==', true)
+        .get();
+
+      const ids = new Set(snap.docs.map((accountDoc) => accountDoc.id));
+      excludedAccountsByWorkspace.set(workspaceId, ids);
+      return ids;
+    };
+
     for (const budgetDoc of budgetsSnap.docs) {
       try {
       const budget = budgetDoc.data();
@@ -109,9 +131,15 @@ export const sendBudgetAlerts = onSchedule(
         .where('date', '<', startOfNextMonth)
         .get();
 
+      const excludedAccountIds = await excludedAccountIdsFor(workspaceId);
+
       let spentCents = 0;
       for (const txnDoc of txnsSnap.docs) {
         const txn = txnDoc.data();
+        // `card_purchase` não grava `accountId` (ver src/cards/cardService.ts), então compra no
+        // cartão nunca cai aqui por acidente.
+        const accountId = txn.accountId as string | undefined;
+        if (accountId && excludedAccountIds.has(accountId)) continue;
         if (!txn.deletedAt) {
           spentCents += (txn.amountCents as number) ?? 0;
         }

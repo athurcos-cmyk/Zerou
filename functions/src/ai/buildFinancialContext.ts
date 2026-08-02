@@ -145,6 +145,20 @@ export async function buildFinancialContext(
     categoryMap.set(doc.id, sanitize(cat.name ?? '') || doc.id);
   }
 
+  // ── Contas "fora do saldo" ────────────────────────────────────────────────
+  // Vale-refeicao e afins (Account.excludeFromTotals): o app os tira do Saldo total, da
+  // Analise e do Comprometido. A Vic tem que enxergar o MESMO recorte, senao responde numero
+  // que nao existe em tela nenhuma. Consulta barata: quase sempre volta vazia.
+  const excludedAccountsSnap = await db
+    .collection(`workspaces/${workspaceId}/accounts`)
+    .where('excludeFromTotals', '==', true)
+    .get();
+  const excludedAccountIds = new Set(excludedAccountsSnap.docs.map((doc) => doc.id));
+  // `card_purchase` nao grava `accountId` (ver src/cards/cardService.ts) — gasto de cartao
+  // nunca cai aqui por acidente.
+  const isOnExcludedAccount = (accountId: unknown): boolean =>
+    excludedAccountIds.size > 0 && typeof accountId === 'string' && excludedAccountIds.has(accountId);
+
   // ── Transactions ───────────────────────────────────────────────────────────
   const txnSnap = await db
     .collection(`workspaces/${workspaceId}/transactions`)
@@ -164,6 +178,7 @@ export async function buildFinancialContext(
   for (const doc of txnSnap.docs) {
     const txn = doc.data();
     if (txn.deletedAt) continue;
+    if (isOnExcludedAccount(txn.accountId)) continue;
 
     const amount = (txn.amountCents as number) ?? 0;
     const txnDate = (txn.date as Timestamp).toDate();
@@ -232,6 +247,7 @@ export async function buildFinancialContext(
 
   for (const doc of billsSnap.docs) {
     const bill = doc.data();
+    if (isOnExcludedAccount(bill.accountId)) continue;
     const dueDateTs = bill.dueDate as Timestamp | null | undefined;
     if (!dueDateTs || !dueDateTs.toDate) continue;
 
@@ -268,6 +284,7 @@ export async function buildFinancialContext(
   for (const doc of recurringSnap.docs) {
     const rule = doc.data() as RecurringRuleData;
 
+    if (isOnExcludedAccount((rule as { accountId?: unknown }).accountId)) continue;
     if (typeof rule.amountCents !== 'number' || rule.amountCents <= 0) continue;
 
     const nextDate = rule.nextOccurrenceAt.toDate();
@@ -356,6 +373,14 @@ export async function buildFinancialContext(
     // currentBalanceCents e mantido incrementalmente a cada transacao (ver
     // src/finance/financeService.ts). Cai pro saldo de abertura em conta anterior ao backfill.
     const balance = (acct.currentBalanceCents as number | undefined) ?? (acct.openingBalanceCents as number) ?? 0;
+
+    // Conta "fora do saldo" (vale-refeicao etc., Account.excludeFromTotals): o app nao a soma
+    // no Saldo total, entao a Vic tambem nao pode — senao ela responde um numero que a pessoa
+    // nao ve em tela nenhuma. Continua listada, rotulada, pra ela saber que o dinheiro existe.
+    if (acct.excludeFromTotals === true) {
+      accountLines.push(`${name}: ${formatBRL(balance)} (fora do saldo total, nao conta como dinheiro)`);
+      continue;
+    }
 
     totalBalance += balance;
     accountLines.push(`${name}: ${formatBRL(balance)}`);

@@ -26,6 +26,8 @@ interface Props {
   transactions: Transaction[];
   invoices: InvoiceForSpending[];
   categories: { id: string; name: string; color?: string }[];
+  /** Contas "fora do saldo" (`Account.excludeFromTotals`) — o ano tem que bater com a Análise. */
+  excludedAccountIds: ReadonlySet<string>;
   currentYear: number;
 }
 
@@ -44,7 +46,7 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
   );
 }
 
-export function AnnualSummarySheet({ open, onClose, workspaceId, transactions, invoices, categories, currentYear }: Props) {
+export function AnnualSummarySheet({ open, onClose, workspaceId, transactions, invoices, categories, excludedAccountIds, currentYear }: Props) {
   const [year, setYear] = useState(currentYear);
 
   const categoryNames = useMemo(
@@ -66,8 +68,8 @@ export function AnnualSummarySheet({ open, onClose, workspaceId, transactions, i
   );
 
   const summary = useMemo(
-    () => computeAnnualSummary(year, completeTransactions, invoices, categoryNames),
-    [year, completeTransactions, invoices, categoryNames],
+    () => computeAnnualSummary(year, completeTransactions, invoices, categoryNames, excludedAccountIds),
+    [year, completeTransactions, invoices, categoryNames, excludedAccountIds],
   );
 
   const chartData = useMemo(

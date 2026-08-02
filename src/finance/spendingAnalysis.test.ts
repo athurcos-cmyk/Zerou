@@ -6,13 +6,13 @@ import {
   billsByCategoryForMonth,
   committedByCategoryForMonth,
   lastCommittedMonth,
-  monthlyTotals,
   ongoingInstallmentPurchases,
   projectedRecurringForMonth,
   recurringByCategoryForMonth,
   signedCharge,
-  spendingByCategoryForMonth,
-  spendingByCategoryAcrossMonths,
+  spendingByCategoryForMonth as spendingByCategoryForMonthRaw,
+  spendingByCategoryAcrossMonths as spendingByCategoryAcrossMonthsRaw,
+  monthlyTotals as monthlyTotalsRaw,
   computeCategoryTrend,
   rollUpByParent,
   NO_CATEGORY,
@@ -20,6 +20,34 @@ import {
   type InvoiceForSpending,
   type RecurringForProjection
 } from './spendingAnalysis';
+
+// `excludedAccountIds` é obrigatório na função real de propósito (ver o comentário lá), pra que
+// uma tela nova não esqueça de passá-lo. Aqui a maioria dos casos não tem conta "fora do saldo",
+// então estes wrappers deixam o argumento implícito — os testes que exercitam a exclusão passam
+// o Set explicitamente.
+type CategoryOf = (transactionId: string | undefined) => string | undefined;
+const spendingByCategoryForMonth = (
+  month: string,
+  transactions: Transaction[],
+  invoices: InvoiceForSpending[],
+  categoryOf: CategoryOf,
+  excludedAccountIds: ReadonlySet<string> = new Set()
+) => spendingByCategoryForMonthRaw(month, transactions, invoices, categoryOf, excludedAccountIds);
+
+const spendingByCategoryAcrossMonths = (
+  months: string[],
+  transactions: Transaction[],
+  invoices: InvoiceForSpending[],
+  categoryOf: CategoryOf,
+  excludedAccountIds: ReadonlySet<string> = new Set()
+) => spendingByCategoryAcrossMonthsRaw(months, transactions, invoices, categoryOf, excludedAccountIds);
+
+const monthlyTotals = (
+  months: string[],
+  transactions: Transaction[],
+  invoices: InvoiceForSpending[],
+  excludedAccountIds: ReadonlySet<string> = new Set()
+) => monthlyTotalsRaw(months, transactions, invoices, excludedAccountIds);
 
 // Stepper espelhando `nextOccurrenceDate` de financeService (evita importar firebase no teste).
 function step(date: Date, frequency: 'weekly' | 'biweekly' | 'monthly' | 'yearly', anchorDay?: number): Date {
@@ -780,5 +808,62 @@ describe('spendingByCategoryForMonth NÃO agrupa subcategoria no pai [D9]', () =
     const result = spendingByCategoryForMonth('2026-07', [energia], [], () => undefined);
 
     expect(result.has('casa')).toBe(false);
+  });
+});
+
+// Conta "fora do saldo" (`Account.excludeFromTotals`): vale-refeição, vale-alimentação, cartão
+// presente. O gasto existe e aparece no Extrato, mas não pode entrar em agregado nenhum da
+// Análise — foi exatamente pra isso que `excludedAccountIds` virou parâmetro obrigatório.
+describe('contas fora do saldo (excludeFromTotals)', () => {
+  const VR = new Set(['acc-vr']);
+
+  it('despesa em conta excluída não entra no gasto por categoria', () => {
+    const banco = txn({ id: 'a', amountCents: 5000, categoryId: 'alimentacao', accountId: 'acc-banco' });
+    const vale = txn({ id: 'b', amountCents: 3000, categoryId: 'alimentacao', accountId: 'acc-vr' });
+
+    expect(spendingByCategoryForMonth('2026-07', [banco, vale], [], () => undefined).get('alimentacao')).toBe(8000);
+    expect(spendingByCategoryForMonth('2026-07', [banco, vale], [], () => undefined, VR).get('alimentacao')).toBe(5000);
+  });
+
+  it('receita em conta excluída não infla as entradas do mês', () => {
+    const salario = txn({ id: 's', type: 'income', amountCents: 500000, accountId: 'acc-banco' });
+    const creditoDoVale = txn({ id: 'v', type: 'income', amountCents: 80000, accountId: 'acc-vr' });
+
+    const [semFiltro] = monthlyTotals(['2026-07'], [salario, creditoDoVale], []);
+    expect(semFiltro.incomeCents).toBe(580000);
+
+    const [comFiltro] = monthlyTotals(['2026-07'], [salario, creditoDoVale], [], VR);
+    expect(comFiltro.incomeCents).toBe(500000);
+  });
+
+  it('despesa em conta excluída sai também das saídas do mês', () => {
+    const mercado = txn({ id: 'm', amountCents: 12000, accountId: 'acc-banco' });
+    const almoco = txn({ id: 'a', amountCents: 4000, accountId: 'acc-vr' });
+
+    expect(monthlyTotals(['2026-07'], [mercado, almoco], [], VR)[0].expenseCents).toBe(12000);
+  });
+
+  it('compra no cartão NÃO é afetada pela exclusão de conta (card_purchase não tem accountId)', () => {
+    // Regressão: `card_purchase` grava `cardId`, nunca `accountId` (ver src/cards/cardService.ts).
+    // Se a exclusão olhasse outro campo, ter um vale-refeição no workspace apagaria gasto de
+    // cartão da Análise inteira.
+    const compra = txn({ id: 'c', type: 'card_purchase', amountCents: 20000, categoryId: 'compras', cardId: 'card' });
+
+    expect(spendingByCategoryForMonth('2026-07', [compra], [], () => undefined, VR).get('compras')).toBe(20000);
+  });
+
+  it('a tendência por categoria enxerga o mesmo recorte do donut', () => {
+    const meses = ['2026-05', '2026-06', '2026-07'];
+    const banco = txn({ id: 'a', amountCents: 5000, categoryId: 'alimentacao', accountId: 'acc-banco', cashMonth: '2026-06', competenceMonth: '2026-06' });
+    const vale = txn({ id: 'b', amountCents: 9000, categoryId: 'alimentacao', accountId: 'acc-vr', cashMonth: '2026-06', competenceMonth: '2026-06' });
+
+    const byCat = spendingByCategoryAcrossMonths(meses, [banco, vale], [], () => undefined, VR);
+    expect(byCat.get('alimentacao')?.get('2026-06')).toBe(5000);
+  });
+
+  it('Set vazio deixa tudo como sempre foi (nenhuma conta marcada)', () => {
+    const vale = txn({ id: 'b', amountCents: 3000, categoryId: 'alimentacao', accountId: 'acc-vr' });
+
+    expect(spendingByCategoryForMonth('2026-07', [vale], [], () => undefined, new Set()).get('alimentacao')).toBe(3000);
   });
 });

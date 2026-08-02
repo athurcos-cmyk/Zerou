@@ -20,13 +20,16 @@ export function computeAnnualSummary(
   transactions: Transaction[],
   invoices: InvoiceForSpending[],
   categoryNames: Map<string, string>,
+  /** Contas "fora do saldo" (`Account.excludeFromTotals`): fora das entradas, das saídas e da
+   * taxa de poupança do ano — senão o crédito mensal do vale entraria como receita. */
+  excludedAccountIds: ReadonlySet<string>,
 ): AnnualSummary {
   const months: string[] = [];
   for (let m = 0; m < 12; m++) {
     months.push(`${year}-${String(m + 1).padStart(2, '0')}`);
   }
 
-  const monthly = monthlyTotals(months, transactions, invoices);
+  const monthly = monthlyTotals(months, transactions, invoices, excludedAccountIds);
   const monthlyBreakdown = monthly.map((m) => ({
     month: m.month,
     monthLabel: MONTH_LABELS[parseInt(m.month.split('-')[1], 10) - 1] ?? m.month,
@@ -54,7 +57,7 @@ export function computeAnnualSummary(
   // Aggregate spending by category across all 12 months
   const categoryTotals = new Map<string, number>();
   for (const month of months) {
-    const byCat = spendingByCategoryForMonth(month, transactions, invoices, (id) => (id ? categoryByTransactionId.get(id) : undefined));
+    const byCat = spendingByCategoryForMonth(month, transactions, invoices, (id) => (id ? categoryByTransactionId.get(id) : undefined), excludedAccountIds);
     for (const [catId, cents] of byCat) {
       if (cents <= 0) continue;
       categoryTotals.set(catId, (categoryTotals.get(catId) ?? 0) + cents);

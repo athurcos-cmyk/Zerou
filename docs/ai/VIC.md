@@ -62,7 +62,7 @@ O contexto é dividido em até 10 seções (algumas só aparecem quando há dado
 - Mês atual e anterior (`yyyy-MM`)
 - Gasto total no mês atual vs. anterior (com variação %)
 - Receitas no mês atual
-- Saldo total em contas (lido de `account.currentBalanceCents`, mantido incrementalmente — nunca mais recalculado só com os últimos 90 dias, ver "Bugs corrigidos")
+- Saldo total em contas (lido de `account.currentBalanceCents`, mantido incrementalmente — nunca mais recalculado só com os últimos 90 dias, ver "Bugs corrigidos"). **Não soma conta marcada como "fora do saldo"** (`excludeFromTotals`, ver abaixo).
 - Total comprometido (contas + faturas)
 - *("Livre para gastar" foi REMOVIDO em 2026-07-28 junto com o Disponível do app — a Vic não fala mais nisso; quem cobre "quanto sobra" é a Projeção do próximo mês, abaixo.)*
 
@@ -80,7 +80,15 @@ O contexto é dividido em até 10 seções (algumas só aparecem quando há dado
 - Só aparece se a pessoa configurou um **salário previsto** (`users/{uid}.projectedSalaryCents`, declarado por ela, nunca 0/estimado). Lida no mesmo `userDoc` que o onboarding.
 - Mostra: salário previsto declarado, se conta o saldo atual na sobra (`projectionIncludesBalance`), e a **sobra/rombo prevista** = `salário previsto + (saldo atual se ligado) − comprometido`. O prompt instrui a tratar como **simulação declarada**, não saldo garantido nem o saldo real de hoje — isolada, igual no app.
 
-**Coleções consultadas**: `categories`, `transactions`, `bills`, `recurring`, `cards` + `cards/*/invoices`, `accounts`. `users/{uid}` pra onboarding + salário previsto.
+**Contas "fora do saldo"** (2026-08-02, `Account.excludeFromTotals`): vale-refeição, vale-alimentação, cartão presente — contas que o dono marcou como "não é dinheiro de verdade". Uma consulta a mais no começo (`accounts.where('excludeFromTotals','==',true)`, quase sempre vazia) monta o `Set`, e ele descarta:
+
+- a transação daquela conta do gasto por categoria, da tendência e das receitas do mês;
+- a conta a pagar e a recorrência debitadas dela do Comprometido;
+- o saldo dela do "Saldo total em contas".
+
+A conta **continua listada** em "Saldos:", rotulada `(fora do saldo total, nao conta como dinheiro)` — a Vic precisa saber que o dinheiro existe, só não pode somá-lo. Sem essa exclusão a Vic responderia um saldo e um gasto que **não aparecem em tela nenhuma do app**, que aplica o mesmo recorte desde `useFinanceData.ts` (`countedAccounts`/`excludedAccountIds`). `card_purchase` não grava `accountId`, então gasto de cartão nunca é descartado por acidente.
+
+**Coleções consultadas**: `categories`, `transactions`, `bills`, `recurring`, `cards` + `cards/*/invoices`, `accounts` (duas vezes: saldos + o recorte de `excludeFromTotals`). `users/{uid}` pra onboarding + salário previsto.
 
 **Cuidados de timezone**: todas as datas usam `nowInBRT()` (mesmo padrão de `automation.ts`). Sem isso, entre 21h e 00h BRT no último dia do mês o mês "atual" ficava errado (UTC já virou).
 
@@ -269,6 +277,8 @@ npm --prefix functions run test
 - Conta que vence daqui a meses entra no Comprometido, sem corte por data (2026-07-27)
 - Conta só o ciclo atual do cartão (fechada + aberta mais próxima); exclui parcelas futuras (2026-07-28)
 - Desconta a cobrança de recorrência da fatura — não duplica a assinatura no cartão (2026-07-27)
+
+⚠️ **O mock de Firestore desse arquivo (`fakeQuery`) filtra `==` de verdade desde 2026-08-02** — antes `where()` era no-op **para tudo**. Quando o contexto ganhou `accounts.where('excludeFromTotals','==',true)`, o mock devolveu TODAS as contas como excluídas e 3 testes caíram de uma vez. Corrigir o mock expôs na hora um segundo problema: um cartão de teste sem `isActive`, que só passava porque `.where('isActive','==',true)` não filtrava. **Ao escrever fixture nova aqui, preencha os campos que a consulta real filtra** (`isActive`, `status`, etc.) — senão o doc some e o teste falha por um motivo que não é o que se quer testar. Operadores fora do `==` (`in`, `>=`) seguem no-op.
 
 4 testes em `verifyWorkspaceMembership.test.ts`:
 - Membro ativo → resolve

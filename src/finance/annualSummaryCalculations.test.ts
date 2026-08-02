@@ -1,8 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { computeAnnualSummary } from './annualSummaryCalculations';
+import { computeAnnualSummary as computeAnnualSummaryRaw } from './annualSummaryCalculations';
 import type { InvoiceForSpending } from './spendingAnalysis';
 import type { InvoiceLedgerEntry, Transaction } from '../types/contracts';
 import { Timestamp } from 'firebase/firestore';
+
+// `excludedAccountIds` é obrigatório na função real (ver o comentário lá). A maioria dos casos
+// não tem conta "fora do saldo"; quem exercita a exclusão passa o Set explicitamente.
+const computeAnnualSummary = (
+  year: number,
+  transactions: Transaction[],
+  invoices: InvoiceForSpending[],
+  categoryNames: Map<string, string>,
+  excludedAccountIds: ReadonlySet<string> = new Set()
+) => computeAnnualSummaryRaw(year, transactions, invoices, categoryNames, excludedAccountIds);
 
 function makeTxn(overrides: Partial<Transaction> = {}): Transaction {
   return {

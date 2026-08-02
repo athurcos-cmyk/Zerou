@@ -217,9 +217,13 @@ export function SearchPage() {
     [knownTransactions]
   );
   // Contas a pagar reduzidas ao que a projeção futura precisa (mês do vencimento resolvido aqui).
+  // Conta debitada de uma conta "fora do saldo" (vale-refeição) não entra: o mês futuro mostraria
+  // um comprometido que o mês passado, já realizado, não mostra.
   const billsForCommitment = useMemo<BillForCommitment[]>(
     () =>
-      finance.bills.map((b) => {
+      finance.bills
+        .filter((b) => !(b.accountId && finance.excludedAccountIds.has(b.accountId)))
+        .map((b) => {
         const due = toDate(b.dueDate);
         return {
           categoryId: b.categoryId,
@@ -228,22 +232,24 @@ export function SearchPage() {
           dueMonth: `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, '0')}`
         };
       }),
-    [finance.bills]
+    [finance.bills, finance.excludedAccountIds]
   );
-  // Recorrências (sempre despesa) reduzidas ao que a projeção precisa.
+  // Recorrências (sempre despesa) reduzidas ao que a projeção precisa. Mesma exclusão das contas.
   const rulesForProjection = useMemo<RecurringForProjection[]>(
     () =>
-      finance.recurringRules.map((r) => ({
-        id: r.id,
-        description: r.description,
-        categoryId: r.categoryId,
-        amountCents: r.amountCents ?? 0,
-        frequency: r.frequency,
-        nextOccurrenceAt: toDate(r.nextOccurrenceAt),
-        anchorDay: r.anchorDay,
-        isActive: r.isActive
-      })),
-    [finance.recurringRules]
+      finance.recurringRules
+        .filter((r) => !(r.accountId && finance.excludedAccountIds.has(r.accountId)))
+        .map((r) => ({
+          id: r.id,
+          description: r.description,
+          categoryId: r.categoryId,
+          amountCents: r.amountCents ?? 0,
+          frequency: r.frequency,
+          nextOccurrenceAt: toDate(r.nextOccurrenceAt),
+          anchorDay: r.anchorDay,
+          isActive: r.isActive
+        })),
+    [finance.recurringRules, finance.excludedAccountIds]
   );
   const hasProjectableRecurring = useMemo(
     () => rulesForProjection.some((r) => r.isActive && r.amountCents > 0),
@@ -283,7 +289,7 @@ export function SearchPage() {
         totals.set(cat, (totals.get(cat) ?? 0) + cents);
       }
     } else {
-      totals = spendingByCategoryForMonth(selectedMonth, knownTransactions, invoicesForSpending, catOf);
+      totals = spendingByCategoryForMonth(selectedMonth, knownTransactions, invoicesForSpending, catOf, finance.excludedAccountIds);
     }
     // Subcategoria soma no pai — SÓ aqui. Orçamento e Resumo Anual continuam lendo o cru
     // (ver o aviso em `rollUpByParent`).
@@ -362,12 +368,12 @@ export function SearchPage() {
   // ── histórico mensal (últimos 6 meses reais — não acompanha selectedMonth) ─
   const monthlyData = useMemo(
     () =>
-      monthlyTotals(last6Months, knownTransactions, invoicesForSpending).map((m) => ({
+      monthlyTotals(last6Months, knownTransactions, invoicesForSpending, finance.excludedAccountIds).map((m) => ({
         month: monthLabel(m.month),
         incomeCents: m.incomeCents,
         expenseCents: m.expenseCents
       })),
-    [knownTransactions, invoicesForSpending, last6Months]
+    [knownTransactions, invoicesForSpending, last6Months, finance.excludedAccountIds]
   );
 
   const hasMonthlyData = monthlyData.some((m) => m.incomeCents > 0 || m.expenseCents > 0);
@@ -380,10 +386,11 @@ export function SearchPage() {
     () =>
       sumPositive(
         spendingByCategoryForMonth(comparisonMonth, knownTransactions, invoicesForSpending, (id) =>
-          id ? txnCategoryById.get(id) : undefined
+          id ? txnCategoryById.get(id) : undefined,
+          finance.excludedAccountIds
         )
       ),
-    [knownTransactions, invoicesForSpending, txnCategoryById, comparisonMonth]
+    [knownTransactions, invoicesForSpending, txnCategoryById, comparisonMonth, finance.excludedAccountIds]
   );
   // Comparação só faz sentido entre meses realizados; mês futuro é comprometido, não gasto.
   const variation = !isFutureMonth && comparisonExpense > 0
@@ -1172,6 +1179,7 @@ export function SearchPage() {
         transactions={finance.transactions}
         invoices={invoicesForSpending}
         categories={expenseCategories}
+        excludedAccountIds={finance.excludedAccountIds}
         currentYear={new Date().getFullYear()}
       />
 
@@ -1184,6 +1192,7 @@ export function SearchPage() {
         invoices={invoicesForSpending}
         categories={expenseCategories}
         categoryOf={(id) => (id ? txnCategoryById.get(id) : undefined)}
+        excludedAccountIds={finance.excludedAccountIds}
         initialCategoryId={selectedCat?.categoryId ?? topCat?.categoryId ?? undefined}
       />
     </section>

@@ -188,8 +188,11 @@ export function TransactionsPage() {
   // tinha naquele dia é um fato do dia, não do filtro — escolher "Despesas" não pode mudar o
   // saldo. Ver `balanceByDayEnd`.
   const balanceByDay = useMemo(
-    () => balanceByDayEnd(finance.accounts, activeTransactions),
-    [finance.accounts, activeTransactions]
+    // `countedAccounts`: o saldo do dia é o mesmo número do "Saldo total" do Dashboard, então
+    // conta "fora do saldo" fica de fora dos dois. O lançamento dela continua na lista (o
+    // passeio pra trás já ignora efeito em conta fora do conjunto) — só não move o saldo.
+    () => balanceByDayEnd(finance.countedAccounts, activeTransactions),
+    [finance.countedAccounts, activeTransactions]
   );
 
   // Nota: o saldo do dia aparece mesmo com busca/filtro ativo. Isso era proibido enquanto o

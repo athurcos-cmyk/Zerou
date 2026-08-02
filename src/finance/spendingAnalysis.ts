@@ -121,8 +121,29 @@ function isSinglePurchaseLedgerEntry(
     && !parceledIds.has(entry.sourceTransactionId);
 }
 
-function isCountableExpense(t: Transaction, month: string, parceledIds: Set<string>): boolean {
+/**
+ * A transação saiu de uma conta marcada como "fora do saldo" (`Account.excludeFromTotals` —
+ * vale-refeição e afins)? Se sim, ela não entra em agregado NENHUM da Análise.
+ *
+ * Só olha `accountId`, e isso basta: `card_purchase` sequer grava esse campo (ver
+ * `cardService.ts` — compra no cartão tem `cardId`, não conta), então gasto de cartão nunca é
+ * descartado por acidente por causa de um vale-refeição existir no workspace.
+ *
+ * `destinationAccountId` (transferência) fica de fora de propósito: transferência já não conta
+ * como gasto nem como receita em nenhuma dessas funções.
+ */
+function isOnExcludedAccount(t: Pick<Transaction, 'accountId'>, excludedAccountIds: ReadonlySet<string>): boolean {
+  return excludedAccountIds.size > 0 && !!t.accountId && excludedAccountIds.has(t.accountId);
+}
+
+function isCountableExpense(
+  t: Transaction,
+  month: string,
+  parceledIds: Set<string>,
+  excludedAccountIds: ReadonlySet<string>
+): boolean {
   if (t.deletedAt) return false;
+  if (isOnExcludedAccount(t, excludedAccountIds)) return false;
   // Cartão à vista entra pela transação, no mês da COMPRA (competência). Parcela de cartão
   // continua pelo ledger (por fatura), nunca pela transação (valor cheio no mês da compra).
   // Estorno/reembolso/ajuste entram como crédito negativo na própria categoria (não gasto +).
@@ -138,12 +159,18 @@ function isCountableExpense(t: Transaction, month: string, parceledIds: Set<stri
  * parcelas de cartão que caem na fatura desse mês (pelo ledger). Retorna centavos por
  * `categoryId` (`NO_CATEGORY` quando sem categoria). Categorias podem vir negativas em mês
  * só de estorno — cabe a quem exibe filtrar.
+ *
+ * `excludedAccountIds` é **obrigatório de propósito** (passe `new Set()` quando não houver):
+ * esta função tem quatro consumidores, e um parâmetro opcional aqui significaria que esquecer
+ * de passá-lo numa tela nova faria o gasto do vale-refeição voltar a contar, sem erro nenhum e
+ * sem ninguém perceber. Obrigatório, o TypeScript força cada call site a decidir.
  */
 export function spendingByCategoryForMonth(
   month: string,
   transactions: Transaction[],
   invoices: InvoiceForSpending[],
-  categoryOfTransaction: (transactionId: string | undefined) => string | undefined
+  categoryOfTransaction: (transactionId: string | undefined) => string | undefined,
+  excludedAccountIds: ReadonlySet<string>
 ): Map<string, number> {
   const totals = new Map<string, number>();
   const parceledIds = installmentPurchaseIds(invoices);
@@ -154,7 +181,7 @@ export function spendingByCategoryForMonth(
   };
 
   for (const t of transactions) {
-    if (!isCountableExpense(t, month, parceledIds)) continue;
+    if (!isCountableExpense(t, month, parceledIds, excludedAccountIds)) continue;
     add(t.categoryId, refundLikeTypes.has(t.type) ? -t.amountCents : t.amountCents);
   }
 
@@ -255,11 +282,12 @@ export function spendingByCategoryAcrossMonths(
   months: string[],
   transactions: Transaction[],
   invoices: InvoiceForSpending[],
-  categoryOfTransaction: (transactionId: string | undefined) => string | undefined
+  categoryOfTransaction: (transactionId: string | undefined) => string | undefined,
+  excludedAccountIds: ReadonlySet<string>
 ): Map<string, Map<string, number>> {
   const byCategory = new Map<string, Map<string, number>>();
   for (const month of months) {
-    const perCategory = spendingByCategoryForMonth(month, transactions, invoices, categoryOfTransaction);
+    const perCategory = spendingByCategoryForMonth(month, transactions, invoices, categoryOfTransaction, excludedAccountIds);
     for (const [categoryId, cents] of perCategory) {
       if (cents <= 0) continue;
       let byMonth = byCategory.get(categoryId);
@@ -362,11 +390,16 @@ export interface MonthlyTotals {
 /**
  * Entradas e saídas por mês (barras dos últimos meses). Saída = despesas fora do cartão +
  * gasto reconhecido das faturas daquele mês. Entrada = receitas do mês.
+ *
+ * `excludedAccountIds` obrigatório pelo mesmo motivo de `spendingByCategoryForMonth`. Vale tanto
+ * pra saída quanto pra ENTRADA: o crédito mensal do vale-refeição, lançado como receita naquela
+ * conta, inflaria a barra de entradas e a taxa de poupança do Resumo Anual.
  */
 export function monthlyTotals(
   months: string[],
   transactions: Transaction[],
-  invoices: InvoiceForSpending[]
+  invoices: InvoiceForSpending[],
+  excludedAccountIds: ReadonlySet<string>
 ): MonthlyTotals[] {
   const parceledIds = installmentPurchaseIds(invoices);
   const cardExpenseByMonth = new Map<string, number>();
@@ -381,6 +414,7 @@ export function monthlyTotals(
     let expenseCents = cardExpenseByMonth.get(month) ?? 0;
     for (const t of transactions) {
       if (t.deletedAt) continue;
+      if (isOnExcludedAccount(t, excludedAccountIds)) continue;
       const m = t.cashMonth ?? t.competenceMonth;
       if (m !== month) continue;
       if (t.tags?.includes('meta') || t.tags?.includes('cofrinho')) continue;
@@ -553,8 +587,11 @@ export function committedByCategoryForMonth(
   bills: BillForCommitment[],
   categoryOfTransaction: (transactionId: string | undefined) => string | undefined
 ): Map<string, number> {
-  // Sem transações: num mês futuro não há gasto realizado, só o comprometido.
-  const totals = spendingByCategoryForMonth(month, [], invoices, categoryOfTransaction);
+  // Sem transações: num mês futuro não há gasto realizado, só o comprometido. Por isso o
+  // conjunto de contas excluídas é provavelmente irrelevante aqui (não há transação pra
+  // filtrar) — quem cuida de tirar conta a pagar/recorrência de conta excluída é o caller,
+  // filtrando `bills`/`rules` antes de montar essas listas.
+  const totals = spendingByCategoryForMonth(month, [], invoices, categoryOfTransaction, new Set<string>());
   for (const [categoryId, cents] of billsByCategoryForMonth(month, bills)) {
     totals.set(categoryId, (totals.get(categoryId) ?? 0) + cents);
   }

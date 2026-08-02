@@ -40,6 +40,9 @@ export function BudgetAlertBanner() {
         const txn = spendingSource.find((t) => t.id === txnId);
         return txn?.categoryId;
       },
+      // Gasto no vale-refeição não pode estourar o orçamento de "Alimentação" — ele não é
+      // dinheiro do orçamento. Mesma exclusão que a Análise aplica.
+      finance.excludedAccountIds
     );
 
     return activeBudgets

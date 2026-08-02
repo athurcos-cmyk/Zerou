@@ -1244,6 +1244,35 @@ span.category-mark {
   color: var(--on-accent-55);
 }
 
+/* Linha do tipo da conta + o selo "Fora do saldo" (conta que não conta como dinheiro). */
+.account-card-hero-eyebrow-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.account-card-hero-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--on-accent-16);
+  color: var(--on-accent-85);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Saldo que não entra no total fica visualmente um degrau abaixo — continua legível, mas para
+   de competir com o das contas que somam. */
+.account-card-hero-balance--muted {
+  color: var(--on-accent-55);
+}
+
 .account-card-hero-name {
   font-size: 1.05rem;
   font-weight: 700;
@@ -2128,6 +2157,14 @@ span.service-mark--brand {
 .icon-button--star.is-active {
   background: var(--warning-soft);
   color: var(--warning);
+}
+
+/* Toggle "não contar no saldo/análises". Sai do vermelho do hover padrão (que existe porque a
+   maioria dos icon-buttons é de excluir) — aqui não se apaga nada, só se muda o que soma. */
+.icon-button--excluded:hover,
+.icon-button--excluded.is-active {
+  background: var(--info-soft);
+  color: var(--info);
 }
 
 .empty-copy {

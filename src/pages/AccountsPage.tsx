@@ -1,5 +1,5 @@
 ﻿import { useState, type FormEvent } from 'react';
-import { Building2, ChevronDown, Scale, Star, Trash2 } from 'lucide-react';
+import { Building2, ChevronDown, Eye, EyeOff, Scale, Star, Trash2 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useFinanceContext } from '../finance/FinanceDataContext';
 import { SelectField } from '../components/SelectField';
@@ -11,7 +11,7 @@ import { AccountReconcileSheet } from '../finance/AccountReconcileSheet';
 import { findBankInstitution, searchBankInstitutions, type BankInstitution } from '../finance/bankInstitutions';
 import type { AccountBalance } from '../finance/financeCalculations';
 import { accountTypeLabels } from '../finance/financeLabels';
-import { accountHasLiveTransactions, createAccount, deleteAccount, setPrimaryAccount, unsetPrimaryAccount } from '../finance/financeService';
+import { accountHasLiveTransactions, createAccount, deleteAccount, setAccountExcludeFromTotals, setPrimaryAccount, unsetPrimaryAccount } from '../finance/financeService';
 import { accountTypes } from '../finance/financeSchemas';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
@@ -25,6 +25,7 @@ export function AccountsPage() {
   const [name, setName] = useState('');
   const [type, setType] = useState<AccountType>('checking');
   const [openingBalance, setOpeningBalance] = useState('');
+  const [excludeFromTotals, setExcludeFromTotals] = useState(false);
   // Mensagem com tom: erros em vermelho (padrão), sucesso (ex.: acerto de saldo) em verde.
   const [message, setMessage] = useState<{ text: string; tone: 'success' | 'danger' } | null>(null);
   const showError = (text: string) => setMessage({ text, tone: 'danger' });
@@ -36,7 +37,15 @@ export function AccountsPage() {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const suggestions = searchBankInstitutions(name, name.trim() ? 6 : 8);
   const syncStatusByAccountId = new Map(finance.accounts.map((account) => [account.id, account.localSyncStatus]));
-  const totalBalance = finance.accountBalances.reduce((sum, a) => sum + a.balanceCents, 0);
+  // O badge do topo é o mesmo número do "Saldo total" do Dashboard: só conta que conta como
+  // dinheiro. As contas "fora do saldo" continuam na lista abaixo, com o próprio saldo.
+  const totalBalance = finance.accountBalances
+    .filter((a) => !a.excludeFromTotals)
+    .reduce((sum, a) => sum + a.balanceCents, 0);
+  const excludedBalance = finance.accountBalances
+    .filter((a) => a.excludeFromTotals)
+    .reduce((sum, a) => sum + a.balanceCents, 0);
+  const hasExcludedAccount = finance.accountBalances.some((a) => a.excludeFromTotals);
 
   function selectInstitution(institution: BankInstitution) {
     setName(institution.name);
@@ -61,6 +70,16 @@ export function AccountsPage() {
     );
   }
 
+  function handleToggleExcludeFromTotals(accountId: string, isExcluded: boolean) {
+    if (!workspaceId) {
+      return;
+    }
+
+    setAccountExcludeFromTotals(workspaceId, accountId, !isExcluded).catch((error) =>
+      showError(getUserFacingErrorMessage(error, 'Não foi possível atualizar a conta agora.'))
+    );
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage(null);
@@ -73,11 +92,13 @@ export function AccountsPage() {
     createAccount(workspaceId, user.uid, {
       name,
       type,
-      openingBalanceCents: parseMoneyToCents(openingBalance)
+      openingBalanceCents: parseMoneyToCents(openingBalance),
+      excludeFromTotals
     }).catch((error) => showError(getUserFacingErrorMessage(error, 'Não foi possível criar a conta agora.')));
     setName('');
     setType('checking');
     setOpeningBalance('');
+    setExcludeFromTotals(false);
     setFormOpen(false);
   }
 
@@ -155,6 +176,14 @@ export function AccountsPage() {
         </p>
       )}
 
+      {hasExcludedAccount && (
+        <p className="settings-hint">
+          O total acima não inclui {formatMoney(excludedBalance)} em contas fora do saldo
+          (<EyeOff size={13} aria-hidden="true" style={{ verticalAlign: '-2px' }} />) — elas também
+          não entram na Análise nem no Comprometido.
+        </p>
+      )}
+
       {finance.loading ? (
         <LoadingState compact />
       ) : finance.accountBalances.length > 0 ? (
@@ -166,12 +195,19 @@ export function AccountsPage() {
                 <div className="account-card-hero-inner">
                   <div className="account-card-hero-header">
                     <div>
-                      <span className="account-card-hero-eyebrow">{accountTypeLabels[account.type]}</span>
+                      <span className="account-card-hero-eyebrow-row">
+                        <span className="account-card-hero-eyebrow">{accountTypeLabels[account.type]}</span>
+                        {account.excludeFromTotals && (
+                          <span className="account-card-hero-flag">Fora do saldo</span>
+                        )}
+                      </span>
                       <strong className="account-card-hero-name">{account.name}</strong>
                     </div>
                     <BankMark institution={institution} />
                   </div>
-                  <strong className="account-card-hero-balance">{formatMoney(account.balanceCents)}</strong>
+                  <strong className={`account-card-hero-balance${account.excludeFromTotals ? ' account-card-hero-balance--muted' : ''}`}>
+                    {formatMoney(account.balanceCents)}
+                  </strong>
                 </div>
                 <div className="account-card-hero-footer">
                   <SyncStatusBadge status={syncStatusByAccountId.get(account.id) ?? 'synced'} />
@@ -184,6 +220,20 @@ export function AccountsPage() {
                       onClick={() => setReconcileAccount(account)}
                     >
                       <Scale size={17} aria-hidden="true" />
+                    </button>
+                    <button
+                      className={`icon-button icon-button--excluded${account.excludeFromTotals ? ' is-active' : ''}`}
+                      type="button"
+                      aria-pressed={account.excludeFromTotals === true}
+                      aria-label={
+                        account.excludeFromTotals
+                          ? `${account.name} está fora do saldo total. Clique para voltar a contar.`
+                          : `Deixar ${account.name} fora do saldo total e das análises`
+                      }
+                      title={account.excludeFromTotals ? 'Fora do saldo e das análises' : 'Não contar no saldo nem nas análises'}
+                      onClick={() => handleToggleExcludeFromTotals(account.id, account.excludeFromTotals === true)}
+                    >
+                      {account.excludeFromTotals ? <EyeOff size={17} aria-hidden="true" /> : <Eye size={17} aria-hidden="true" />}
                     </button>
                     <button
                       className={`icon-button icon-button--star${account.isPrimary ? ' is-active' : ''}`}
@@ -271,6 +321,21 @@ export function AccountsPage() {
             <label className="field">
               <span>Saldo inicial</span>
               <input className="input" inputMode="decimal" value={openingBalance} onChange={(event) => setOpeningBalance(event.target.value)} placeholder="0,00" />
+            </label>
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={excludeFromTotals}
+                onChange={(event) => setExcludeFromTotals(event.target.checked)}
+              />
+              <span>
+                Não contar no saldo nem nas análises
+                <br />
+                <span className="text-muted">
+                  Para vale-refeição, vale-alimentação ou cartão presente — dinheiro que existe, mas
+                  não se mistura com o resto. Você continua lançando gastos nela normalmente.
+                </span>
+              </span>
             </label>
             <button className="button button--primary" type="submit">
               Criar conta

@@ -26,7 +26,9 @@ export const signedMoneyCentsSchema = z
 export const createAccountSchema = z.object({
   name: z.string().trim().min(2, 'Informe um nome com pelo menos 2 caracteres.').max(80),
   type: z.enum(accountTypes),
-  openingBalanceCents: signedMoneyCentsSchema
+  openingBalanceCents: signedMoneyCentsSchema,
+  /** Ver `Account.excludeFromTotals`. Ausente = conta normal. */
+  excludeFromTotals: z.boolean().optional()
 });
 
 export const createTransactionSchema = z

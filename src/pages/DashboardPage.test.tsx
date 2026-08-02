@@ -46,6 +46,10 @@ function financeCtx(overrides: Record<string, unknown> = {}) {
     categories: [],
     budgets: [],
     accountBalances: [],
+    // Recortes de `useFinanceData`: contas que somam no Saldo total e as marcadas como
+    // "fora do saldo" (`Account.excludeFromTotals`).
+    countedAccounts: [],
+    excludedAccountIds: new Set<string>(),
     transactionIndex: { knownIds: new Set(), deletedIds: new Set() },
     pendingWrites: false,
     ...overrides

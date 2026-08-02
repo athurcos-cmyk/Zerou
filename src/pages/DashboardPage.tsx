@@ -84,13 +84,17 @@ export function DashboardPage() {
   // O Comprometido soma o total da fatura que só a Cloud Function atualiza — ela não roda
   // offline. Ver comentário completo em hasPendingCardLedgerActivity.
   const hasPendingCardActivity = hasPendingCardLedgerActivity(finance.transactions);
+  // `countedAccounts`, não `accounts`: conta marcada como "fora do saldo" (vale-refeição etc.)
+  // não entra no Saldo total. As transações dela seguem vindo inteiras — "Transações recentes"
+  // mostra o histórico todo; quem as tira dos agregados é `excludedAccountIds`.
   const dashboard = calculateDashboardSummary({
-    accounts: finance.accounts,
+    accounts: finance.countedAccounts,
     transactions: finance.transactions,
     bills: finance.bills,
     recurringRules: finance.recurringRules,
     invoices: cardsData.invoices,
-    cards: cardsData.cards
+    cards: cardsData.cards,
+    excludedAccountIds: finance.excludedAccountIds
   });
   // Card "Projeção do próximo mês" — isolado do saldo real de propósito (ver comentário em
   // calculateNextMonthProjection). `null` quando ainda não configurado. `totalBalanceCents`
@@ -103,7 +107,8 @@ export function DashboardPage() {
     bills: finance.bills,
     recurringRules: finance.recurringRules,
     invoices: cardsData.invoices,
-    cards: cardsData.cards
+    cards: cardsData.cards,
+    excludedAccountIds: finance.excludedAccountIds
   });
   function handleSaveProjectedSalary(cents: number) {
     if (user) updateProjectedSalary(user.uid, cents);
@@ -170,8 +175,12 @@ export function DashboardPage() {
   // anterior completos sob demanda — senão, custo ZERO (as 300 já cobrem). Bate com a Análise.
   const spendingSource = useCompleteCurrentMonth(workspaceId, finance.transactions, [currentMonth, previousMonth]);
   const categoryMap = new Map(finance.categories.map((c) => [c.id, c]));
+  // Espelha `isCountableExpense` da Análise (`spendingAnalysis.ts`) numa versão simplificada —
+  // incluindo descartar gasto de conta "fora do saldo", senão o vale-refeição apareceria aqui
+  // depois de sumir da Análise, e os dois números do mesmo mês não bateriam.
   const isCountableSpend = (transaction: (typeof finance.transactions)[number], month: string) =>
     !transaction.deletedAt &&
+    !(transaction.accountId && finance.excludedAccountIds.has(transaction.accountId)) &&
     (transaction.type === 'expense' || transaction.type === 'card_purchase') &&
     (transaction.cashMonth === month || transaction.competenceMonth === month) &&
     !transaction.tags?.includes('meta') &&

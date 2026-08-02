@@ -1316,6 +1316,32 @@ describe('firestore security rules', () => {
     await assertFails(updateDoc(accountReference, { isPrimary: 'sim', updatedAt: serverTimestamp() }));
   });
 
+  // Conta "fora do saldo" (vale-refeição): o toggle é fire-and-forget, então uma regra
+  // desatualizada rejeitaria a escrita EM SILÊNCIO — a UI mostraria sucesso e o estado voltaria
+  // ao recarregar. Exatamente o incidente do `createdBy` (17/06). Este teste é a trava.
+  it('allows creating an account excluded from totals and toggling it via update', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    const accountReference = doc(aliceDb, 'workspaces/workspaceA/accounts/accountVR');
+
+    await assertSucceeds(
+      setDoc(accountReference, accountPayload('workspaceA', 'accountVR', 'alice', { excludeFromTotals: true }))
+    );
+    await assertSucceeds(updateDoc(accountReference, { excludeFromTotals: false, updatedAt: serverTimestamp() }));
+    await assertSucceeds(updateDoc(accountReference, { excludeFromTotals: true, updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(accountReference, { excludeFromTotals: 'sim', updatedAt: serverTimestamp() }));
+  });
+
+  it('rejects a non-boolean excludeFromTotals on create', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertFails(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/accounts/accountBadFlag'),
+        accountPayload('workspaceA', 'accountBadFlag', 'alice', { excludeFromTotals: 'sim' })
+      )
+    );
+  });
+
   it('allows a member to create a transaction only for an account in the same workspace', async () => {
     const aliceDb = testEnv.authenticatedContext('alice').firestore();
 

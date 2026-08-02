@@ -161,6 +161,19 @@ export interface Account {
    * mensagem. No máximo uma por workspace — exclusividade garantida pelo client (batch em
    * `setPrimaryAccount`), não pela regra do Firestore. */
   isPrimary?: boolean;
+  /**
+   * Conta que não é "dinheiro de verdade" — vale-refeição, vale-alimentação, cartão presente,
+   * conta de terceiro. Fica FORA do Saldo total, das Análises (donut/histórico/orçamento/Resumo
+   * Anual) e do Comprometido/Projeção, mas continua aparecendo na tela Contas com o próprio
+   * saldo e continua selecionável em qualquer lançamento.
+   *
+   * Diferente de `type: 'investment'`, que some de `finance.accounts` inteira (some também dos
+   * seletores). Aqui é o oposto: some dos AGREGADOS, nunca do histórico nem dos seletores —
+   * você lança gasto no vale todo dia e precisa vê-lo no Extrato.
+   *
+   * Opcional de propósito: ausente = conta normal (zero migração).
+   */
+  excludeFromTotals?: boolean;
   isActive: boolean;
   createdBy: string;
   createdAt?: Timestamp;

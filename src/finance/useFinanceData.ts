@@ -306,6 +306,20 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
     [activeAccounts]
   );
 
+  // Conta "fora do saldo" (vale-refeição etc., `Account.excludeFromTotals`) continua em
+  // `accounts`/`accountBalances` — aparece na tela Contas e em todo seletor de lançamento.
+  // O que muda é só quem entra nos AGREGADOS: estes dois recortes são o que Saldo total,
+  // Análise, orçamento e Comprometido consomem.
+  const countedAccounts = useMemo(
+    () => activeAccounts.filter((account) => !account.excludeFromTotals),
+    [activeAccounts]
+  );
+
+  const excludedAccountIds = useMemo(
+    () => new Set(activeAccounts.filter((account) => account.excludeFromTotals).map((account) => account.id)),
+    [activeAccounts]
+  );
+
   const pendingWrites = useMemo(
     () =>
       [...state.accounts, ...state.categories, ...state.transactions, ...state.bills, ...state.receivables, ...state.recurringRules, ...state.budgets].some(
@@ -330,6 +344,8 @@ export function useFinanceData(workspaceId?: string, userId?: string) {
     ...state,
     accounts: activeAccounts,
     investmentAccounts,
+    countedAccounts,
+    excludedAccountIds,
     categories: categoriesWithDefaults,
     accountBalances,
     transactionIndex,

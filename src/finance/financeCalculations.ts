@@ -318,19 +318,30 @@ function selectCurrentCycleInvoices(invoices: Invoice[]): Invoice[] {
  * conta só o que NÃO é recorrência (compra avulsa, parcelado) — `recurringChargesByInvoice`
  * desconta as cobranças de recorrência já lançadas, senão a mesma assinatura contaria duas
  * vezes ao ser registrada no cartão. `transactions` é passado só pra esse desconto.
+ *
+ * `excludedAccountIds` (contas "fora do saldo", ver `Account.excludeFromTotals`) descarta a
+ * conta a pagar e a recorrência debitadas de uma conta que não conta como dinheiro. Sem isso o
+ * Comprometido descontaria uma obrigação que o Saldo total nunca somou, e a sobra da Projeção
+ * do próximo mês sairia menor do que a realidade. Fatura de cartão não é afetada: cartão não é
+ * conta, e `card_purchase` nem grava `accountId`. Tem default vazio só porque vem depois de
+ * outros parâmetros já opcionais — a disciplina de "cada caller decide" é cobrada um nível
+ * acima, onde `calculateDashboardSummary`/`calculateNextMonthProjection` o exigem.
  */
 export function buildUpcomingCommitments(
   bills: Bill[],
   recurringRules: RecurringRule[],
   invoices: Invoice[] = [],
   cards: CreditCard[] = [],
-  transactions: Transaction[] = []
+  transactions: Transaction[] = [],
+  excludedAccountIds: ReadonlySet<string> = new Set()
 ): UpcomingCommitment[] {
   const cardById = new Map(cards.map((card) => [card.id, card]));
   const recurringInInvoice = recurringChargesByInvoice(transactions);
+  const isExcluded = (accountId: string | undefined) =>
+    excludedAccountIds.size > 0 && !!accountId && excludedAccountIds.has(accountId);
 
   const billCommitments = bills
-    .filter((bill) => bill.status === 'pending' || bill.status === 'overdue')
+    .filter((bill) => (bill.status === 'pending' || bill.status === 'overdue') && !isExcluded(bill.accountId))
     .map(
       (bill) =>
         ({
@@ -346,7 +357,7 @@ export function buildUpcomingCommitments(
   // Cartão e conta contam igual — a duplicidade da de cartão é desfeita descontando a
   // cobrança dela da fatura (abaixo), não excluindo a recorrência.
   const recurringCommitments = recurringRules
-    .filter((rule) => rule.isActive && typeof rule.amountCents === 'number')
+    .filter((rule) => rule.isActive && typeof rule.amountCents === 'number' && !isExcluded(rule.accountId))
     .map(
       (rule) =>
         ({
@@ -420,6 +431,12 @@ export function hasPendingCardLedgerActivity(transactions: Array<LocalSynced<Tra
   );
 }
 
+/**
+ * `accounts` aqui é `finance.countedAccounts` (sem as contas marcadas como "fora do saldo") —
+ * o Saldo total só soma dinheiro de verdade. As transações do vale-refeição continuam vindo em
+ * `transactions` porque "Transações recentes" mostra o histórico inteiro; quem as descarta dos
+ * agregados é `excludedAccountIds`.
+ */
 export function calculateDashboardSummary(input: {
   accounts: Account[];
   transactions: Transaction[];
@@ -427,6 +444,7 @@ export function calculateDashboardSummary(input: {
   recurringRules: RecurringRule[];
   invoices?: Invoice[];
   cards?: CreditCard[];
+  excludedAccountIds: ReadonlySet<string>;
 }): DashboardSummary {
   const totalBalanceCents = currentTotalBalance(input.accounts);
   const commitments = buildUpcomingCommitments(
@@ -434,7 +452,8 @@ export function calculateDashboardSummary(input: {
     input.recurringRules,
     input.invoices ?? [],
     input.cards ?? [],
-    input.transactions
+    input.transactions,
+    input.excludedAccountIds
   );
   const committedCents = commitments.reduce((total, commitment) => total + commitment.amountCents, 0);
   const recentTransactions = input.transactions
@@ -474,6 +493,7 @@ export function calculateNextMonthProjection(input: {
   cards?: CreditCard[];
   includeCurrentBalance?: boolean;
   totalBalanceCents?: number;
+  excludedAccountIds: ReadonlySet<string>;
 }): { committedCents: number; leftoverCents: number } | null {
   if (!input.projectedSalaryCents) return null;
 
@@ -482,7 +502,8 @@ export function calculateNextMonthProjection(input: {
     input.recurringRules,
     input.invoices ?? [],
     input.cards ?? [],
-    input.transactions
+    input.transactions,
+    input.excludedAccountIds
   ).reduce((total, commitment) => total + commitment.amountCents, 0);
 
   const balanceCents = input.includeCurrentBalance ? input.totalBalanceCents ?? 0 : 0;

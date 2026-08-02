@@ -4,8 +4,8 @@ import {
   buildUpcomingCommitments,
   buildUpcomingReceivables,
   calculateAccountBalances,
-  calculateDashboardSummary,
-  calculateNextMonthProjection,
+  calculateDashboardSummary as calculateDashboardSummaryRaw,
+  calculateNextMonthProjection as calculateNextMonthProjectionRaw,
   calculateTotalBalance,
   currentAccountBalances,
   balanceByDayEnd,
@@ -16,6 +16,16 @@ import {
   transactionAccountEffects
 } from './financeCalculations';
 import type { Account, Bill, CreditCard, Invoice, Receivable, RecurringRule, Transaction } from '../types/contracts';
+
+// `excludedAccountIds` é obrigatório nas duas funções reais de propósito (ver o comentário em
+// `buildUpcomingCommitments`). A maioria dos casos não tem conta "fora do saldo"; quem exercita
+// a exclusão passa o Set explicitamente.
+type DashboardInput = Parameters<typeof calculateDashboardSummaryRaw>[0];
+type ProjectionInput = Parameters<typeof calculateNextMonthProjectionRaw>[0];
+const calculateDashboardSummary = (input: Omit<DashboardInput, 'excludedAccountIds'> & Partial<Pick<DashboardInput, 'excludedAccountIds'>>) =>
+  calculateDashboardSummaryRaw({ excludedAccountIds: new Set<string>(), ...input });
+const calculateNextMonthProjection = (input: Omit<ProjectionInput, 'excludedAccountIds'> & Partial<Pick<ProjectionInput, 'excludedAccountIds'>>) =>
+  calculateNextMonthProjectionRaw({ excludedAccountIds: new Set<string>(), ...input });
 
 function account(id: string, openingBalanceCents = 0, overrides: Partial<Account> = {}): Account {
   return {
@@ -1000,5 +1010,91 @@ describe('balanceByDayEnd', () => {
     );
 
     expect(balances.get('2026-06-13')).toBe(10500);
+  });
+});
+
+// Conta "fora do saldo" (`Account.excludeFromTotals`): vale-refeição e afins. O saldo dela
+// existe e aparece na tela Contas, mas não soma no Saldo total nem gera Comprometido.
+describe('contas fora do saldo (excludeFromTotals)', () => {
+  const VR = new Set(['vale']);
+
+  it('Saldo total ignora a conta excluída', () => {
+    const accounts = [
+      account('banco', 0, { currentBalanceCents: 250000 }),
+      account('vale', 0, { currentBalanceCents: 80000, excludeFromTotals: true })
+    ];
+
+    // `currentTotalBalance` continua puro: quem filtra é o caller (finance.countedAccounts).
+    expect(currentTotalBalance(accounts)).toBe(330000);
+    expect(currentTotalBalance(accounts.filter((a) => !a.excludeFromTotals))).toBe(250000);
+  });
+
+  it('conta a pagar debitada da conta excluída não vira Comprometido', () => {
+    const bills = [
+      bill({ id: 'b1', amountCents: 20000, accountId: 'banco' }),
+      bill({ id: 'b2', amountCents: 15000, accountId: 'vale' })
+    ];
+
+    expect(buildUpcomingCommitments(bills, [], [], [], [])).toHaveLength(2);
+
+    const filtrado = buildUpcomingCommitments(bills, [], [], [], [], VR);
+    expect(filtrado).toHaveLength(1);
+    expect(filtrado[0].id).toBe('b1');
+  });
+
+  it('recorrência debitada da conta excluída não vira Comprometido', () => {
+    const rules = [
+      recurring({ id: 'r1', amountCents: 5000, accountId: 'banco' }),
+      recurring({ id: 'r2', amountCents: 7000, accountId: 'vale' })
+    ];
+
+    const filtrado = buildUpcomingCommitments([], rules, [], [], [], VR);
+    expect(filtrado).toHaveLength(1);
+    expect(filtrado[0].id).toBe('r1');
+  });
+
+  it('o Comprometido do Dashboard reflete a exclusão', () => {
+    const accounts = [account('banco', 0, { currentBalanceCents: 250000 })];
+    const bills = [bill({ id: 'b1', amountCents: 20000, accountId: 'banco' }), bill({ id: 'b2', amountCents: 15000, accountId: 'vale' })];
+
+    const summary = calculateDashboardSummary({
+      accounts,
+      transactions: [],
+      bills,
+      recurringRules: [],
+      excludedAccountIds: VR
+    });
+
+    expect(summary.committedCents).toBe(20000);
+    expect(summary.totalBalanceCents).toBe(250000);
+  });
+
+  it('a sobra da Projeção do próximo mês cresce ao excluir a conta', () => {
+    const bills = [bill({ id: 'b1', amountCents: 20000, accountId: 'banco' }), bill({ id: 'b2', amountCents: 15000, accountId: 'vale' })];
+
+    const semExclusao = calculateNextMonthProjection({
+      projectedSalaryCents: 300000, transactions: [], bills, recurringRules: []
+    });
+    const comExclusao = calculateNextMonthProjection({
+      projectedSalaryCents: 300000, transactions: [], bills, recurringRules: [], excludedAccountIds: VR
+    });
+
+    expect(semExclusao?.leftoverCents).toBe(265000);
+    expect(comExclusao?.leftoverCents).toBe(280000);
+  });
+
+  it('saldo por dia do Extrato bate com o Saldo total (conta excluída fora dos dois)', () => {
+    // A transação do vale continua na lista — só não move o saldo, porque a conta dela não
+    // está no conjunto que o passeio pra trás conhece.
+    const counted = [account('banco', 0, { currentBalanceCents: 100000 })];
+    const transactions = [
+      transaction({ id: 't1', type: 'expense', amountCents: 3000, accountId: 'vale', date: Timestamp.fromDate(new Date('2026-06-20T10:00:00')) }),
+      transaction({ id: 't2', type: 'expense', amountCents: 5000, accountId: 'banco', date: Timestamp.fromDate(new Date('2026-06-19T10:00:00')) })
+    ];
+
+    const byDay = balanceByDayEnd(counted, transactions);
+    expect(byDay.get('2026-06-20')).toBe(100000);
+    // Só a despesa do banco desfaz saldo — a do vale passa batido.
+    expect(byDay.get('2026-06-19')).toBe(100000);
   });
 });

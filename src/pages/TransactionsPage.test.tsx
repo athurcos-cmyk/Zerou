@@ -43,7 +43,10 @@ function tx(id: string, dateISO: string, description: string) {
 }
 
 function financeCtx(transactions: unknown[]) {
-  return { transactions, categories: [], accounts: [{ id: 'acc1', name: 'Carteira' }], budgets: [] };
+  const accounts = [{ id: 'acc1', name: 'Carteira' }];
+  // `countedAccounts` é o que alimenta o saldo por dia (conta "fora do saldo" fica de fora);
+  // aqui nenhuma conta está marcada, então é a mesma lista.
+  return { transactions, categories: [], accounts, countedAccounts: accounts, excludedAccountIds: new Set<string>(), budgets: [] };
 }
 
 function renderPage() {

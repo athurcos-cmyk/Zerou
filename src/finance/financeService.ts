@@ -108,20 +108,34 @@ export async function createAccount(workspaceId: string, userId: string, input: 
   const id = createId('acct');
   const now = serverTimestamp();
 
-  fireWrite(setDoc(documentRef(workspaceId, 'accounts', id), {
+  // `omitUndefined`: conta normal não grava a chave `excludeFromTotals` (ausente = false),
+  // mantendo o documento idêntico ao que sempre foi gravado.
+  fireWrite(setDoc(documentRef(workspaceId, 'accounts', id), omitUndefined({
     id,
     workspaceId,
     name: parsed.name,
     type: parsed.type,
     openingBalanceCents: parsed.openingBalanceCents,
     currentBalanceCents: parsed.openingBalanceCents,
+    excludeFromTotals: parsed.excludeFromTotals ? true : undefined,
     isActive: true,
     createdBy: userId,
     createdAt: now,
     updatedAt: now
-  }));
+  })));
 
   return id;
+}
+
+/**
+ * Liga/desliga "não contar no saldo total nem nas análises" numa conta (ver
+ * `Account.excludeFromTotals`). Fire-and-forget, igual a `setPrimaryAccount`.
+ */
+export async function setAccountExcludeFromTotals(workspaceId: string, accountId: string, exclude: boolean) {
+  fireWrite(updateDoc(documentRef(workspaceId, 'accounts', accountId), {
+    excludeFromTotals: exclude,
+    updatedAt: serverTimestamp()
+  }));
 }
 
 /** Quantas transações da conta são inspecionadas no servidor antes de decidir. Ver `accountHasLiveTransactions`. */

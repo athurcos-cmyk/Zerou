@@ -25,7 +25,7 @@ interface FakeDoc {
 
 interface FakeCollection {
   docs: FakeDoc[];
-  where?: () => FakeCollection;
+  where?: (field: string, op: string, value: unknown) => FakeCollection;
   limit?: () => FakeCollection;
   get: () => Promise<{ docs: FakeDoc[]; empty: boolean }>;
 }
@@ -39,15 +39,21 @@ function fakeQuery(docs: FakeDoc[]): FakeCollection {
     docs,
     get: async () => ({ docs, empty: docs.length === 0 }),
   };
-  self.where = () => self;
+  // `==` filtra de verdade; os outros operadores seguem no-op (basta pros casos aqui).
+  //
+  // Já foi no-op pra TUDO, e isso deixou passar um falso verde: quando o contexto ganhou a
+  // consulta `accounts.where('excludeFromTotals','==',true)` (contas fora do saldo), o mock
+  // devolveu TODAS as contas como excluidas — todo lançamento sumiu do contexto e três testes
+  // caíram de uma vez. Um `where('==')` que filtra vale mais que a simplicidade aqui.
+  self.where = (field, op, value) =>
+    op === '==' ? fakeQuery(docs.filter((doc) => doc.data()[field] === value)) : self;
   self.limit = () => self;
   return self;
 }
 
-// Mock DB: maps collection path -> docs. Since where() is a no-op in the mock,
-// all queries to the same path return the same docs. For account balance sub-queries
-// (which query transactions with accountId filter), we share the same transactions array.
-// Set up test data with matching accountId so balance calculation is coherent.
+// Mock DB: maps collection path -> docs. Para as sub-consultas de saldo por conta (que filtram
+// transactions por accountId) o mesmo array de transações é compartilhado — monte os dados de
+// teste com accountId coerente pro cálculo de saldo fechar.
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mockDb(docs: Record<string, Record<string, unknown>>, collections: Record<string, FakeDoc[]>): any {
@@ -466,7 +472,7 @@ describe('buildFinancialContext', () => {
       'workspaces/ws1/transactions': [],
       'workspaces/ws1/bills': [],
       'workspaces/ws1/accounts': [],
-      'workspaces/ws1/cards': [fakeDoc('card1', { name: 'Nubank' })],
+      'workspaces/ws1/cards': [fakeDoc('card1', { name: 'Nubank', isActive: true })],
       'workspaces/ws1/cards/card1/invoices': [
         fakeDoc('inv_closed', { cardId: 'card1', referenceMonth: '2026-07', status: 'closed', outstandingBalanceCents: 50000, dueDate: Timestamp.fromDate(makeDateFuture(5)) }),
         fakeDoc('inv_open_now', { cardId: 'card1', referenceMonth: '2026-08', status: 'open', outstandingBalanceCents: 30000, dueDate: Timestamp.fromDate(makeDateFuture(35)) }),
@@ -495,7 +501,7 @@ describe('buildFinancialContext', () => {
       'workspaces/ws1/recurring': [
         fakeDoc('rec_claude', { description: 'Claude', amountCents: 12000, isActive: true, cardId: 'card1', nextOccurrenceAt: Timestamp.fromDate(makeDateFuture(20)) }),
       ],
-      'workspaces/ws1/cards': [fakeDoc('card1', { name: 'Nubank' })],
+      'workspaces/ws1/cards': [fakeDoc('card1', { name: 'Nubank', isActive: true })],
       'workspaces/ws1/cards/card1/invoices': [
         fakeDoc('inv1', {
           cardId: 'card1', referenceMonth: '2026-07', status: 'open',
