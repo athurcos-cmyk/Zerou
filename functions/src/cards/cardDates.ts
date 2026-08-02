@@ -28,8 +28,14 @@ export function resolveInstallmentCycle(
   installmentIndex = 0,
 ): { referenceMonth: string; dueDate: Date } {
   const purchaseDay = purchaseDate.getDate();
-  // Compra depois do fechamento entra na fatura do mes seguinte.
-  const firstMonthOffset = purchaseDay > closingDay ? 1 : 0;
+  // Compra NO dia do fechamento ou depois entra na fatura do mes seguinte — `>=`, nao `>`.
+  //
+  // ⚠️ Este arquivo e uma PORTA MANUAL de `src/cards/cardDates.ts` (o cliente). As duas copias
+  // precisam mudar no MESMO commit: lancar pelo app e lancar pela Vic no WhatsApp tem que cair
+  // na mesma fatura. Corrigido em 2026-08-02 junto com a copia do cliente — ver o comentario
+  // longo la para o bug real que motivou (compra no dia do fechamento caindo dentro da fatura
+  // que fechava naquele mesmo dia).
+  const firstMonthOffset = purchaseDay >= closingDay ? 1 : 0;
   const referenceDate = new Date(
     purchaseDate.getFullYear(),
     purchaseDate.getMonth() + firstMonthOffset + installmentIndex,

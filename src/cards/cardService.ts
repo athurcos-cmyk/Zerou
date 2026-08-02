@@ -539,13 +539,19 @@ export async function closeInvoice(workspaceId: string, cardId: string, invoiceI
 }
 
 /**
- * Marca como `closed` toda fatura `open` cujo dia de fechamento já passou. Chamado a cada
+ * Marca como `closed` toda fatura `open` cujo dia de fechamento já chegou. Chamado a cada
  * snapshot de `subscribeInvoices` — silencioso, sem feedback de UI (mesmo padrão de
  * `markOverdueBills` pra contas a pagar). Sem isso, o único jeito de uma fatura fechar é o
  * Cloud Scheduler `closeInvoicesDue`, que roda uma vez por dia e só pega faturas do dia exato
  * do fechamento — uma compra lançada com data retroativa (ou o scheduler falhando um dia)
  * deixava a fatura "Aberta" por até um mês, com o botão errado ("Antecipar fatura" em vez de
  * "Pagar fatura").
+ *
+ * `<=`, não `<`: a fatura fecha NO dia do fechamento, não no dia seguinte. Com `<`, o cliente
+ * dizia "ainda aberta" no dia 2 enquanto o `closeInvoicesDue` do servidor (que fecha
+ * `referenceMonth <= currentMonth` rodando nesse mesmo dia) já a tinha fechado — quem visse a
+ * tela via um estado e quem lançasse caía noutro. Agora os dois lados usam a mesma fronteira
+ * de `resolveInstallmentCycle`, e o estado não depende mais de o scheduler ter rodado.
  */
 export function markClosedInvoices(
   workspaceId: string,
@@ -557,7 +563,7 @@ export function markClosedInvoices(
   invoices
     .filter(
       (invoice) =>
-        invoice.status === 'open' && invoiceClosingDateForReferenceMonth(invoice.referenceMonth, closingDay) < todayStart
+        invoice.status === 'open' && invoiceClosingDateForReferenceMonth(invoice.referenceMonth, closingDay) <= todayStart
     )
     .forEach((invoice) => closeInvoice(workspaceId, invoice.cardId, invoice.id));
 }

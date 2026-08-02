@@ -1,6 +1,27 @@
-﻿# Changelog
+# Changelog
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
+
+## 2026-08-02 (parte 2) — fix(cartao): compra no dia do fechamento caia na fatura que fechava naquele dia
+
+- **Bug real, achado pelo dono em producao**: cartao fechando dia 2, compra feita no dia 2. A
+  fatura de agosto ja aparecia FECHADA (no app do banco e aqui), mas a compra do dia caia dentro
+  dela — uma compra de hoje numa fatura fechada vencendo em 8 dias.
+- **Causa**: tres regras discordavam da mesma fronteira. Roteamento (`cardDates.ts`) dizia que o
+  dia do fechamento ainda era do ciclo atual (`>`); `closeInvoicesDue` (servidor) fechava a fatura
+  nesse mesmo dia; `markClosedInvoices` (cliente) dizia que ainda nao tinha fechado (`<`).
+- **Correcao**: `>` virou `>=` no roteamento e `<` virou `<=` no fechamento do cliente. O dia do
+  fechamento pertence ao ciclo SEGUINTE, e a fatura fecha nesse dia — as tres regras passam a
+  dizer a mesma coisa, e o estado nao depende mais de o scheduler ter rodado.
+- **Copia no servidor corrigida junto**: `functions/src/cards/cardDates.ts` (porta manual usada
+  pela Vic no WhatsApp) tinha o mesmo `>`. Sem isso, lancar pelo app e pelo WhatsApp cairia em
+  faturas diferentes. Referencia cruzada adicionada nos dois arquivos.
+- **Lancamento retroativo preservado** (requisito explicito do dono): o roteamento usa sempre a
+  DATA DA COMPRA, nunca "hoje", e nem `firestore.rules` nem o client bloqueiam escrita em fatura
+  fechada. Travado por teste.
+- **Por que passou despercebido**: os 9 testes de ciclo usavam sempre dias estritamente antes ou
+  depois do fechamento. `purchaseDay === closingDay` era a unica fronteira sem cobertura.
+- Detalhe: `docs/history/2026-08.md`.
 
 ## 2026-08-02 — feat(contas): conta "fora do saldo" (vale-refeição) + fix(test): mock de Firestore que não filtrava
 

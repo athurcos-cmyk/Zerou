@@ -30,6 +30,37 @@ describe('resolveInvoiceCycle', () => {
     expect(cycle.referenceMonth).toBe('2026-08');
     expect(cycle.dueDate.toISOString().slice(0, 10)).toBe('2026-09-05');
   });
+
+  // ⚠️ Regressão real, achada pelo dono em produção (2026-08-02): cartão fechando dia 2, compra
+  // feita NO dia 2. A fatura de agosto já estava fechada (o app do banco mostrava fechada, e o
+  // `closeInvoicesDue` do servidor fecha `referenceMonth <= currentMonth` rodando nesse mesmo
+  // dia) — mas a compra caía DENTRO dela, porque a regra de roteamento usava `>` em vez de `>=`.
+  // Resultado: compra de hoje numa fatura fechada que vencia em 8 dias.
+  //
+  // Era a única fronteira que nenhum dos testes existentes cobria — todos usavam dias
+  // estritamente antes ou estritamente depois do fechamento.
+  it('manda a compra feita NO dia do fechamento pra fatura seguinte', () => {
+    const cycle = resolveInvoiceCycle(new Date('2026-08-02T12:00:00'), 2, 10);
+
+    expect(cycle.referenceMonth).toBe('2026-09');
+    expect(cycle.dueDate.toISOString().slice(0, 10)).toBe('2026-09-10');
+  });
+
+  it('mantém na fatura do mês a compra da véspera do fechamento', () => {
+    const cycle = resolveInvoiceCycle(new Date('2026-08-01T12:00:00'), 2, 10);
+
+    expect(cycle.referenceMonth).toBe('2026-08');
+    expect(cycle.dueDate.toISOString().slice(0, 10)).toBe('2026-08-10');
+  });
+
+  // Lançar retroativo continua funcionando e caindo na fatura certa — o roteamento é sempre
+  // pela DATA DA COMPRA, nunca por "hoje". Uma compra de 15/jul num cartão que fecha dia 2 é
+  // posterior ao fechamento de julho, então pertence à fatura de agosto (que hoje já fechou).
+  it('roteia lançamento retroativo pela data da compra, mesmo em fatura já fechada', () => {
+    expect(resolveInvoiceCycle(new Date('2026-07-15T12:00:00'), 2, 10).referenceMonth).toBe('2026-08');
+    expect(resolveInvoiceCycle(new Date('2026-07-02T12:00:00'), 2, 10).referenceMonth).toBe('2026-08');
+    expect(resolveInvoiceCycle(new Date('2026-07-01T12:00:00'), 2, 10).referenceMonth).toBe('2026-07');
+  });
 });
 
 describe('resolveInstallmentCycle', () => {

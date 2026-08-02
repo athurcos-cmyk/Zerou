@@ -23,6 +23,11 @@ export function invoiceDueDateForReferenceMonth(referenceMonth: string, closingD
 /**
  * Ciclo (fatura + vencimento) da parcela `installmentIndex` de uma compra.
  *
+ * ⚠️ **Esta função tem uma cópia manual no servidor**, `functions/src/cards/cardDates.ts`, usada
+ * quando a Vic lança compra pelo WhatsApp (`createCardPurchaseFromMessage.ts`). Mudança aqui
+ * **precisa ir junto lá, no mesmo commit** — senão lançar pelo app e lançar pelo WhatsApp caem
+ * em faturas diferentes, e `git push` nem reimplanta a de lá (ver `docs/RUNBOOK.md`).
+ *
  * O mês da parcela é contado a partir do mês da PRIMEIRA fatura, ancorado no dia 1 —
  * nunca somando meses à data da compra. Somar à data da compra clampa em fevereiro
  * (31/jan + 1 mês = 28/fev) e, num cartão que fecha dia 28, o dia clampado deixa de
@@ -36,8 +41,22 @@ export function resolveInstallmentCycle(
   installmentIndex = 0
 ) {
   const purchaseDay = purchaseDate.getDate();
-  // Compra depois do fechamento entra na fatura do mês seguinte.
-  const firstMonthOffset = purchaseDay > closingDay ? 1 : 0;
+  // Compra NO dia do fechamento ou depois entra na fatura do mês seguinte — `>=`, não `>`.
+  //
+  // Era `>` e isso contradizia o fechamento (bug real, achado pelo dono em 2026-08-02): num
+  // cartão que fecha dia 2, a fatura de agosto já aparecia FECHADA no dia 2 — tanto no app do
+  // banco quanto aqui, porque `closeInvoicesDue` (`functions/src/automation.ts`) roda no dia do
+  // fechamento e fecha `referenceMonth <= currentMonth`. Só que a compra feita nesse mesmo dia
+  // era roteada com offset 0, ou seja, PRA DENTRO da fatura que acabara de fechar. Uma compra
+  // de hoje entrava numa fatura fechada que vence em 8 dias.
+  //
+  // Com `>=`, a fatura de um mês cobre do dia seguinte ao fechamento anterior até a véspera do
+  // próprio fechamento, e o dia do fechamento já pertence ao ciclo seguinte — que é como o
+  // cartão brasileiro funciona e o que o app do banco mostra.
+  //
+  // Nenhum dos 9 testes que já existiam mudou de resultado: a fronteira `purchaseDay ===
+  // closingDay` era justamente o único caso que nenhum deles cobria.
+  const firstMonthOffset = purchaseDay >= closingDay ? 1 : 0;
   const referenceDate = new Date(
     purchaseDate.getFullYear(),
     purchaseDate.getMonth() + firstMonthOffset + installmentIndex,
@@ -71,13 +90,16 @@ export function invoiceIdFor(cardId: string, referenceMonth: string) {
 
 /**
  * Início (00:00) do dia de fechamento da fatura de um `referenceMonth`, dado o cartão —
- * sempre o `closingDay` clampado no próprio mês de referência (é a definição de
- * referenceMonth: uma compra até o dia de fechamento cai na fatura DESSE mês; ver
- * `resolveInstallmentCycle`). Meia-noite de propósito, não meio-dia: quem usa isso pra
- * decidir "essa fatura já fechou?" precisa comparar por DIA inteiro — `resolveInstallmentCycle`
- * trata o dia de fechamento inteiro como parte do ciclo atual, então fechar a fatura a
- * partir do meio-dia desse mesmo dia fecharia horas antes de uma compra da tarde ainda
- * poder cair nela.
+ * sempre o `closingDay` clampado no próprio mês de referência.
+ *
+ * **A fatura está fechada A PARTIR desse instante, inclusive** (comparar com `<=`, não `<`).
+ * O dia do fechamento pertence ao ciclo SEGUINTE: `resolveInstallmentCycle` roteia a compra
+ * desse dia pra próxima fatura (`purchaseDay >= closingDay`). As duas regras são a mesma
+ * fronteira vista dos dois lados e **precisam andar juntas** — enquanto discordavam, a compra
+ * do dia do fechamento caía dentro da fatura que fechava naquele mesmo dia (bug de 2026-08-02).
+ *
+ * Meia-noite de propósito, não meio-dia: a decisão é por DIA inteiro, sem depender da hora em
+ * que o lançamento aconteceu nem da hora em que o scheduler rodou.
  */
 export function invoiceClosingDateForReferenceMonth(referenceMonth: string, closingDay: number) {
   const [year, month] = referenceMonth.split('-').map(Number);
