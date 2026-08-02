@@ -155,9 +155,9 @@ export function outOfScopeMessage(screen: OutOfScopeScreen): string {
     case 'contas':
       return '🏦 Criar, editar ou excluir uma conta (banco, carteira, dinheiro) é melhor fazer direto pelo app, na aba *Contas*.';
     case 'contas_a_pagar':
-      return '📋 Criar, editar ou excluir conta a pagar ou recorrência é melhor fazer direto pelo app, na aba *Contas a Pagar* — lá dá pra definir vencimento, frequência e até pagar no cartão.\n\nPor aqui eu só registro lançamentos que já aconteceram (gasto, receita, compra no cartão).';
+      return '📋 Criar, editar ou excluir conta a pagar ou recorrência é melhor fazer direto pelo app, na aba *Contas e assinaturas* — lá dá pra definir vencimento, frequência e até pagar no cartão.\n\nPor aqui eu só registro lançamentos que já aconteceram (gasto, receita, compra no cartão).';
     case 'contas_a_receber':
-      return '📋 Criar, editar ou excluir uma conta a receber é melhor fazer direto pelo app, na aba *Contas a Receber*.';
+      return '📋 Criar, editar ou excluir uma conta a receber é melhor fazer direto pelo app, na aba *Dinheiro a receber*.';
     case 'cartoes':
       return '🧭 Isso aqui é mais avançado — dá uma olhada em *Cartões* no app pra fazer isso (parcela que já estava em andamento, antecipar parcela/fatura, renegociar, editar ou excluir um cartão).';
     case 'metas':

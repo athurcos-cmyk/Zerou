@@ -545,7 +545,7 @@ export async function buildFinancialContext(
     lines.push('');
   }
 
-  // COMPROMETIDO — Contas a Pagar (avulsas + recorrentes) + Faturas
+  // COMPROMETIDO — Contas e assinaturas (avulsas + recorrentes) + Faturas
   const totalBills = upcomingBills.length + upcomingRecurring.length;
   lines.push('=== COMPROMETIDO (contas fixas + faturas em aberto) ===');
 

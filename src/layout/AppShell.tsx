@@ -97,10 +97,10 @@ export function AppShell() {
             <ReceiptText size={19} aria-hidden="true" /> Transações
           </NavLink>
           <NavLink className={getNavClass} to="/app/bills">
-            <CalendarClock size={19} aria-hidden="true" /> Contas a Pagar
+            <CalendarClock size={19} aria-hidden="true" /> Contas e assinaturas
           </NavLink>
           <NavLink className={getNavClass} to="/app/receivables">
-            <HandCoins size={19} aria-hidden="true" /> Contas a Receber
+            <HandCoins size={19} aria-hidden="true" /> Dinheiro a receber
           </NavLink>
           <NavLink className={getNavClass} to="/app/goals">
             <Target size={19} aria-hidden="true" /> Metas
@@ -170,10 +170,10 @@ export function AppShell() {
               <WalletCards size={20} aria-hidden="true" /> <span>Contas</span>
             </NavLink>
             <NavLink className={getTileClass} to="/app/bills" onClick={() => setMobileMenuOpen(false)}>
-              <CalendarClock size={20} aria-hidden="true" /> <span>Contas a Pagar</span>
+              <CalendarClock size={20} aria-hidden="true" /> <span>Contas e assinaturas</span>
             </NavLink>
             <NavLink className={getTileClass} to="/app/receivables" onClick={() => setMobileMenuOpen(false)}>
-              <HandCoins size={20} aria-hidden="true" /> <span>Contas a Receber</span>
+              <HandCoins size={20} aria-hidden="true" /> <span>Dinheiro a receber</span>
             </NavLink>
             <NavLink className={getTileClass} to="/app/goals" onClick={() => setMobileMenuOpen(false)}>
               <Target size={20} aria-hidden="true" /> <span>Metas</span>

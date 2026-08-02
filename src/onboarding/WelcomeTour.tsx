@@ -25,7 +25,7 @@ const slides: TourSlide[] = [
   {
     icon: <CalendarClock size={26} aria-hidden="true" />,
     title: 'O que você deve e o que vão te pagar',
-    text: 'Contas a Pagar reúne o que você deve — avulsas (IPTU) e recorrentes (aluguel, Netflix). Contas a Receber anota o que ainda não é seu: só entra no saldo quando você marcar como recebido.'
+    text: 'Contas e assinaturas reúne o que você já sabe que vai pagar — avulsas (IPTU) e recorrentes (aluguel, Netflix). O app não paga nada por você: quando a cobrança acontecer, é só confirmar que já foi. Dinheiro a receber anota o que ainda não é seu: só entra no saldo quando você marcar como recebido.'
   },
   {
     icon: <Telescope size={26} aria-hidden="true" />,

@@ -350,6 +350,18 @@ html[data-reduce-motion='true'] *::after {
   color: var(--text-muted);
 }
 
+/* Prévia do que vai acontecer, no topo da sheet de confirmar conta paga (BillsPage). Fundo de
+   informação, não de alerta: é orientação, nada deu errado. */
+.pay-preview {
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  border-radius: 0.7rem;
+  background: var(--info-soft);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
 .checkbox-row {
   display: flex;
   align-items: flex-start;

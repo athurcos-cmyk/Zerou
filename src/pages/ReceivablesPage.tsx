@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, HelpCircle } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useFinanceContext } from '../finance/FinanceDataContext';
 import { SelectField } from '../components/SelectField';
@@ -17,6 +17,8 @@ import { centsToInputValue, formatMoney, parseMoneyToCents } from '../finance/mo
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
 import type { Receivable } from '../types/contracts';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
+import { ReceivablesTour } from '../onboarding/ReceivablesTour';
+import { useReceivablesTour } from '../onboarding/receivablesTour.store';
 
 type ReceivableFilterKey = 'open' | 'received' | 'all';
 
@@ -31,6 +33,7 @@ export function ReceivablesPage() {
   const workspaceId = profile?.defaultWorkspaceId;
   const finance = useFinanceContext();
   const { confirm, dialog: confirmDialog } = useConfirm();
+  const openReceivablesTour = useReceivablesTour((state) => state.openTour);
 
   // ── form (novo a receber) ──
   const [formOpen, setFormOpen] = useState(false);
@@ -127,12 +130,23 @@ export function ReceivablesPage() {
       <div className="page-heading-row page-heading-row--tight">
         <div>
           <p className="eyebrow">O que você tem pra receber</p>
-          <h1 className="page-title page-title--compact">Contas a Receber</h1>
+          <h1 className="page-title page-title--compact">Dinheiro a receber</h1>
           <p className="text-secondary" style={{ margin: '0.35rem 0 0', maxWidth: '34rem' }}>
             Anote quem te deve. Só entra no seu saldo quando você marcar como recebido.
           </p>
         </div>
-        <SyncStatusBadge status={finance.pendingWrites ? 'pending' : 'synced'} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <button
+            className="icon-button"
+            type="button"
+            aria-label="Como funciona Dinheiro a receber"
+            title="Como funciona"
+            onClick={openReceivablesTour}
+          >
+            <HelpCircle size={17} aria-hidden="true" />
+          </button>
+          <SyncStatusBadge status={finance.pendingWrites ? 'pending' : 'synced'} />
+        </div>
       </div>
 
       <div className="finance-grid">
@@ -285,6 +299,8 @@ export function ReceivablesPage() {
           ) : null}
         </div>
       </BottomSheet>
+
+      <ReceivablesTour />
 
       {confirmDialog}
     </section>

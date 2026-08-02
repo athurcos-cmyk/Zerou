@@ -99,7 +99,7 @@ export function CategoriesSettingsPage() {
 
     return confirm({
       title: `${parent?.name ?? 'Esta categoria'} tem ${partes.join(' e ')}`,
-      message: `Elas continuam lançando em "${parent?.name}" até você reapontar cada uma pra uma subcategoria, em Contas a Pagar. Criar a subcategoria agora?`,
+      message: `Elas continuam lançando em "${parent?.name}" até você reapontar cada uma pra uma subcategoria, em Contas e assinaturas. Criar a subcategoria agora?`,
       confirmLabel: 'Criar',
       cancelLabel: 'Deixa pra depois'
     });

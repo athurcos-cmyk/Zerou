@@ -987,8 +987,8 @@ export function subscribeBills(
   );
 }
 
-// ─── Contas a Receber (Fase 1: avulso) ────────────────────────────────────────
-// Espelho do Contas a Pagar numa coleção SEPARADA (`receivables`) de propósito: o cálculo de
+// ─── Dinheiro a receber (Fase 1: avulso) ────────────────────────────────────────
+// Espelho do Contas e assinaturas numa coleção SEPARADA (`receivables`) de propósito: o cálculo de
 // saldo/comprometido NUNCA lê isto, então um "a receber" nunca infla o Disponível. Só vira
 // dinheiro em `markReceivableReceived`. Ver `docs/planning/CONTAS_A_RECEBER.md`.
 
@@ -1228,9 +1228,24 @@ export function canRegisterRecurrence(
   earlyDays = RECURRENCE_EARLY_PAY_DAYS
 ) {
   const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  return releaseDateForRecurrence(nextOccurrenceAt, earlyDays).getTime() <= endOfToday.getTime();
+}
+
+/**
+ * Primeiro dia em que `canRegisterRecurrence` passa a devolver `true` — o que a tela mostra
+ * enquanto a recorrência ainda está fora da janela ("confirme a partir de 3 ago").
+ *
+ * Deriva da MESMA constante que a regra de propósito: se um dia a janela mudar de 7 dias, o
+ * texto muda junto. Duplicar o cálculo aqui faria a tela prometer uma data e o botão aparecer
+ * noutra — o tipo de divergência que ninguém percebe até um usuário reclamar.
+ */
+export function releaseDateForRecurrence(
+  nextOccurrenceAt: Date,
+  earlyDays = RECURRENCE_EARLY_PAY_DAYS
+) {
   const earliest = new Date(nextOccurrenceAt);
   earliest.setDate(earliest.getDate() - earlyDays);
-  return earliest.getTime() <= endOfToday.getTime();
+  return earliest;
 }
 
 // Cria transação de despesa (ou compra no cartão) e avança nextOccurrenceAt para a próxima data.

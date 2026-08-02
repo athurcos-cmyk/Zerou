@@ -2,6 +2,35 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-02 (parte 3) — ux(contas): vocabulário de registro, prévia do efeito, tutoriais e rename das duas telas
+
+- **Relato do dono**: usuários não entendiam a tela de Contas a Pagar — parte achava que servia só
+  pra registrar o pagamento da fatura do cartão, e "Pago"/"Pagar adiantado" davam a entender que o
+  app pagaria a conta por eles.
+- **Diagnóstico**: a tela usava vocabulário de *executar* pagamento, mas o que ela faz é *registrar*
+  um fato passado. E usava 4 palavras pra mesma ação ("Pago", "Pagar adiantado", "Confirmar
+  pagamento", "Registrar pagamento") + um 5º nome no atalho do Dashboard ("Compromissos", que
+  também é o nome de uma **seção** dentro da tela).
+- **Vocabulário**: um rótulo só, **"Já foi paga"** — voz passiva, cobre a conta que você pagou e a
+  assinatura que o cartão foi cobrado. "Como foi pago?" → "De onde saiu o dinheiro?"; "Sem débito"
+  → "Não descontar"; "Confirmar pagamento" → "Confirmar".
+- **Prévia do efeito** (classe `.pay-preview`): a sheet passa a dizer o que vai acontecer, com
+  valores reais — *"Vamos lançar R$ 100,00 na fatura do Cartão Nubank. Seu saldo em conta não muda
+  agora — muda quando você pagar a fatura."*
+- **Estado morto resolvido**: recorrência fora da janela de 7 dias mostrava só "Em dia", sem botão
+  — a tela parecia inerte. Agora diz "Você confirma a partir de 3 ago"
+  (`releaseDateForRecurrence`, derivado da MESMA constante da regra, pros dois nunca divergirem).
+- **Dois tutoriais novos** (padrão `AnalysisTour`): `BillsTour` e `ReceivablesTour`, 4 slides cada,
+  abrindo na 1ª visita e reabríveis pelo `?` no topo.
+- **Rename**: "Contas a Pagar" → **"Contas e assinaturas"**; "Contas a Receber" → **"Dinheiro a
+  receber"**; atalho do Dashboard "Compromissos" → **"A pagar"**. Motivo: o menu tinha **três**
+  itens começando com "Contas", e em português "conta" significa tanto conta bancária quanto
+  boleto. **Rotas inalteradas** (`/app/bills`, `/app/receivables`).
+- **Achado**: a tela de Contas a Receber **já estava certa** — botão "Recebi" (1ª pessoa, passado),
+  linha explicativa e prévia na sheet já existiam. O padrão já morava no app, só não tinha sido
+  aplicado do outro lado.
+- Detalhe: `docs/history/2026-08.md`.
+
 ## 2026-08-02 (parte 2) — fix(cartao): compra no dia do fechamento caia na fatura que fechava naquele dia
 
 - **Bug real, achado pelo dono em producao**: cartao fechando dia 2, compra feita no dia 2. A

@@ -103,7 +103,7 @@ export const closeInvoicesDue = onSchedule(
 // venceu. Decisão de produto (2026-07-21): dinheiro só se move quando a pessoa confirma
 // — o débito automático podia tirar dinheiro de uma assinatura já cancelada que a pessoa
 // esqueceu de desativar aqui. Quem registra é a pessoa, pelo botão "Registrar" da tela
-// Contas a Pagar (`recordRecurringPayment`), que é quem avança `nextOccurrenceAt`.
+// Contas e assinaturas (`recordRecurringPayment`), que é quem avança `nextOccurrenceAt`.
 //
 // Por isso a data NUNCA é tocada aqui: enquanto a ocorrência não for registrada ela
 // segue vencida e o botão segue liberado. Como a regra continuaria "vencida" todo dia, o

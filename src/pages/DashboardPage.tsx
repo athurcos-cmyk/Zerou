@@ -437,7 +437,7 @@ export function DashboardPage() {
           <CreditCard size={17} aria-hidden="true" /> Cartões
         </Link>
         <Link className="button button--subtle" to="/app/bills">
-          <CalendarClock size={17} aria-hidden="true" /> Compromissos
+          <CalendarClock size={17} aria-hidden="true" /> A pagar
         </Link>
         <Link className="button button--subtle" to="/app/goals">
           <Target size={17} aria-hidden="true" /> Metas
@@ -445,7 +445,7 @@ export function DashboardPage() {
       </div>
 
       {/* Mobile: o grid acima some ("Lançar agora" some pois o FAB já cobre), mas
-          Contas/Cartões/Compromissos/Metas continuam com atalho aqui. Visibilidade
+          Contas/Cartões/A pagar/Metas continuam com atalho aqui. Visibilidade
           controlada em global.css. */}
       <div className="dash-shortcut-row">
         <Link className="button button--subtle" to="/app/accounts">
@@ -455,7 +455,7 @@ export function DashboardPage() {
           <CreditCard size={17} aria-hidden="true" /> Cartões
         </Link>
         <Link className="button button--subtle" to="/app/bills">
-          <CalendarClock size={17} aria-hidden="true" /> Compromissos
+          <CalendarClock size={17} aria-hidden="true" /> A pagar
         </Link>
         <Link className="button button--subtle" to="/app/goals">
           <Target size={17} aria-hidden="true" /> Metas
@@ -546,7 +546,7 @@ export function DashboardPage() {
           {effectiveCommitments.length > 0 ? (
             <div className="item-list">
               {effectiveCommitments.map((commitment) => {
-                // Fatura leva pra fatura do cartao; conta (avulsa ou recorrente) vai pra Contas a Pagar.
+                // Fatura leva pra fatura do cartao; conta (avulsa ou recorrente) vai pra Contas e assinaturas.
                 const href =
                   commitment.kind === 'invoice' && commitment.cardId
                     ? `/app/cards/${commitment.cardId}/invoices/${commitment.id}`

@@ -306,7 +306,7 @@ export interface Bill {
 }
 
 /**
- * Contas a Receber (Fase 1: avulso) — espelho do `Bill`, mas semântica de ENTRADA. Vive numa
+ * Dinheiro a receber (Fase 1: avulso) — espelho do `Bill`, mas semântica de ENTRADA. Vive numa
  * coleção separada (`receivables`) de propósito: o cálculo de saldo/comprometido nunca lê isto,
  * então um "a receber" nunca infla o Disponível. Só vira dinheiro ao marcar `received` (cria uma
  * transação `income` de verdade). Ver `docs/planning/CONTAS_A_RECEBER.md`.

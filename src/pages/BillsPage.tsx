@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { CalendarClock, ChevronDown, Pencil, Repeat, Search, X } from 'lucide-react';
+import { CalendarClock, ChevronDown, HelpCircle, Pencil, Repeat, Search, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { CategoryField } from '../components/CategoryField';
@@ -23,11 +23,14 @@ import {
   nextOccurrenceDate,
   payBill,
   recordRecurringPayment,
+  releaseDateForRecurrence,
   updateBill,
   updateBillStatus,
   updateRecurringRule,
 } from '../finance/financeService';
 import { useCategoryActions } from '../finance/useCategoryActions';
+import { BillsTour } from '../onboarding/BillsTour';
+import { useBillsTour } from '../onboarding/billsTour.store';
 import { recurringFrequencies, type CreateRecurringRuleInput } from '../finance/financeSchemas';
 import { centsToInputValue, formatMoney, parseMoneyToCents } from '../finance/money';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
@@ -51,6 +54,7 @@ export function BillsPage() {
   const finance = useFinanceContext();
   const cardsData = useCardsContext();
   const { confirm, dialog: confirmDialog } = useConfirm();
+  const openBillsTour = useBillsTour((state) => state.openTour);
 
   // ── form state (nova conta) ──
   const [description, setDescription] = useState('');
@@ -110,6 +114,34 @@ export function BillsPage() {
   // ── opções mescladas conta+cartão (reaproveitadas nos 3 selects + chip-row de pagamento) ──
   const { accountOptions, cardOptions } = buildAccountOrCardOptions(finance.accounts, cardsData.cards);
   const accountOrCardOptions = [...accountOptions, ...cardOptions];
+
+  /**
+   * Frase que aparece no topo da sheet de confirmação, descrevendo exatamente o que o app vai
+   * fazer — valor real, destino real. Nasceu do relato de usuários que liam "Pagar" como se o
+   * Granativa fosse pagar a conta por eles (2026-08-02); dizer o efeito antes de confirmar é o
+   * que desfaz isso no momento exato da dúvida.
+   *
+   * Reflete o que `handleConfirmPay` realmente faz: valor digitado ou o cadastrado; cartão vira
+   * lançamento na fatura, conta desconta do saldo, e nenhum dos dois só registra a despesa.
+   */
+  const payPreview = useMemo(() => {
+    if (!payTarget) return '';
+
+    const fallbackCents = payTarget.kind === 'bill'
+      ? (payTarget.item as Bill).amountCents
+      : (payTarget.item as RecurringRule).amountCents ?? 0;
+    const cents = payAmount.trim() ? parseMoneyToCents(payAmount) : fallbackCents;
+    const valueLabel = cents ? formatMoney(cents) : 'o valor informado';
+    const destination = accountOrCardOptions.find((option) => option.value === payAccountId);
+
+    if (!payAccountId) {
+      return `Vamos criar a despesa de ${valueLabel} no seu Extrato, sem descontar de nenhuma conta.`;
+    }
+    if (payAccountId.startsWith(CARD_PREFIX)) {
+      return `Vamos lançar ${valueLabel} na fatura do ${destination?.label ?? 'cartão'}. Seu saldo em conta não muda agora — muda quando você pagar a fatura.`;
+    }
+    return `Vamos criar a despesa de ${valueLabel} e descontar do saldo de ${destination?.label ?? 'sua conta'}.`;
+  }, [payTarget, payAmount, payAccountId, accountOrCardOptions]);
 
   const recurringItems = useMemo(
     () =>
@@ -364,11 +396,31 @@ export function BillsPage() {
     <section className="page-content">
       <div className="page-heading-row page-heading-row--tight">
         <div>
-          <p className="eyebrow">O que você tem pra pagar</p>
-          <h1 className="page-title page-title--compact">Contas a Pagar</h1>
+          <p className="eyebrow">O que você já sabe que vai pagar</p>
+          <h1 className="page-title page-title--compact">Contas e assinaturas</h1>
         </div>
-        <SyncStatusBadge status={finance.pendingWrites ? 'pending' : 'synced'} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <button
+            className="icon-button"
+            type="button"
+            aria-label="Como funciona Contas e assinaturas"
+            title="Como funciona"
+            onClick={openBillsTour}
+          >
+            <HelpCircle size={17} aria-hidden="true" />
+          </button>
+          <SyncStatusBadge status={finance.pendingWrites ? 'pending' : 'synced'} />
+        </div>
       </div>
+
+      {/* Linha fixa: a tela era lida como "onde eu pago minhas contas", e várias pessoas
+          concluíram que só servia pra registrar a fatura do cartão. Dizer o que ela faz — e o
+          que ela NÃO faz — logo no topo é a defesa mais barata contra isso. */}
+      <p className="settings-hint">
+        Cadastre aqui suas assinaturas e contas fixas. O Granativa lembra você antes de vencer e
+        já conta esses valores no seu Comprometido — <strong>ele não paga nada por você</strong>.
+        Quando a cobrança acontecer, é só confirmar que já foi.
+      </p>
 
       <div className="finance-grid">
         {/* ── Form ── */}
@@ -498,8 +550,15 @@ export function BillsPage() {
               {displayedRecurringItems.map((rule) => {
                 const due = isRecurrenceDue(rule.nextOccurrenceAt.toDate());
                 const canPayEarly = canRegisterRecurrence(rule.nextOccurrenceAt.toDate());
-                const actionLabel = due ? 'Pago' : canPayEarly ? 'Pagar adiantado' : null;
+                // Um rótulo só pros dois estados. "Pagar adiantado" sugeria uma AÇÃO diferente
+                // (quitar antes do vencimento) quando é a mesma confirmação de sempre — a linha
+                // da data logo acima já diz se venceu ou não. Voz passiva porque cobre os dois
+                // casos reais: a conta que VOCÊ pagou e a assinatura que o cartão foi cobrado.
+                const canRegister = due || canPayEarly;
                 const dateClassName = due ? 'amount--expense' : 'text-secondary';
+                // Fora da janela de 7 dias não há ação — antes isso virava um "Em dia" mudo, e a
+                // tela inteira parecia inerte pra quem abria longe do vencimento.
+                const opensAt = releaseDateForRecurrence(rule.nextOccurrenceAt.toDate());
 
                 return (
                   <div className="list-row list-row--with-icon" key={rule.id}>
@@ -512,17 +571,24 @@ export function BillsPage() {
                       <span className={dateClassName}>
                         {due ? 'Vence' : 'Próximo vencimento'}: {formatFriendlyDate(rule.nextOccurrenceAt)}
                       </span>
+                      {/* Fora da janela não há botão nenhum, e antes isso virava um "Em dia"
+                          mudo — a tela parecia inerte pra quem abria longe do vencimento. Vive
+                          no corpo da linha, não no slot da direita: lá o texto quebrava em duas
+                          linhas no mobile e colidia com os ícones de editar/desativar. */}
+                      {!canRegister && (
+                        <span className="text-muted" style={{ fontSize: '0.76rem' }}>
+                          Você confirma a partir de {formatFriendlyDate(opensAt)}
+                        </span>
+                      )}
                     </div>
                     <div className="list-row-end">
                       <strong>{rule.amountCents ? formatMoney(rule.amountCents) : 'valor variável'}</strong>
                       <SyncStatusBadge status={rule.localSyncStatus} />
                       <div style={{ display: 'flex', gap: '0.35rem' }}>
-                        {actionLabel ? (
+                        {canRegister && (
                           <button className="button button--subtle button--compact" type="button" onClick={() => handleOpenPay({ kind: 'recurring', item: rule })}>
-                            {actionLabel}
+                            Já foi paga
                           </button>
-                        ) : (
-                          <span className="text-muted" style={{ fontSize: '0.78rem', alignSelf: 'center' }}>Em dia</span>
                         )}
                         <button className="icon-button" type="button" aria-label={`Editar ${rule.description}`} onClick={() => handleOpenEditRule(rule)}>
                           <Pencil size={16} aria-hidden="true" />
@@ -606,7 +672,7 @@ export function BillsPage() {
                         <SyncStatusBadge status={bill.localSyncStatus} />
                         {isPending ? (
                           <>
-                            <button className="button button--subtle button--compact" type="button" onClick={() => handleOpenPay({ kind: 'bill', item: bill })}>Pago</button>
+                            <button className="button button--subtle button--compact" type="button" onClick={() => handleOpenPay({ kind: 'bill', item: bill })}>Já foi paga</button>
                             <button className="button button--ghost button--compact" type="button" onClick={() => handleCancelBill(bill.id)}>Cancelar</button>
                             <button className="icon-button" type="button" aria-label={`Editar ${bill.description}`} onClick={() => handleOpenEditBill(bill)}>
                               <Pencil size={16} aria-hidden="true" />
@@ -644,10 +710,14 @@ export function BillsPage() {
       <BottomSheet
         open={Boolean(payTarget)}
         onClose={() => { setPayTarget(null); setPayDescription(''); setPayCategoryId(''); }}
-        title={payTarget?.kind === 'bill' ? 'Confirmar pagamento' : 'Registrar pagamento'}
+        title="Confirmar que já foi paga"
         subtitle={payTarget?.item.description}
       >
         <div className="form-stack">
+          {/* A frase que desfaz o mal-entendido, no exato momento da dúvida: dizer o que o app
+              vai fazer, com o valor e o destino reais, ANTES de a pessoa confirmar. Sem isso ela
+              só descobre o efeito depois, no Extrato. */}
+          <p className="pay-preview">{payPreview}</p>
           <label className="field">
             <span>Valor pago</span>
             <input
@@ -678,9 +748,11 @@ export function BillsPage() {
           )}
 
           <div className="field">
-            <span className="field-label">Como foi pago?</span>
+            <span className="field-label">De onde saiu o dinheiro?</span>
             <div className="chip-row">
-              <button type="button" className={`chip${!payAccountId ? ' chip--active' : ''}`} onClick={() => setPayAccountId('')}>Sem débito</button>
+              {/* "Sem débito" era jargão — ninguém sabia se aquilo significava "não paguei" ou
+                  "não registra". O rótulo agora diz o efeito. */}
+              <button type="button" className={`chip${!payAccountId ? ' chip--active' : ''}`} onClick={() => setPayAccountId('')}>Não descontar</button>
               {accountOptions.map((option) => (
                 <button key={option.value} type="button" className={`chip${payAccountId === option.value ? ' chip--active' : ''}`} onClick={() => setPayAccountId(option.value)}>{option.label}</button>
               ))}
@@ -706,7 +778,7 @@ export function BillsPage() {
           </div>
           <div className="sheet-actions">
             <button className="button button--primary" type="button" disabled={paySubmitting || (payTarget?.kind === 'recurring' && !payAmount.trim() && !payTarget?.item.amountCents)} onClick={handleConfirmPay}>
-              Confirmar pagamento
+              Confirmar
             </button>
           </div>
         </div>
@@ -812,6 +884,8 @@ export function BillsPage() {
           </div>
         </div>
       </BottomSheet>
+
+      <BillsTour />
 
       {confirmDialog}
     </section>
