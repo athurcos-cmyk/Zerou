@@ -62,8 +62,9 @@ relatados por ele, dois achados na leitura do código — os dois achados eram m
   confirmar, sinal de conexão ruim), com aviso **antes** de a pessoa tentar — não depois de falhar.
   Leitura do cache continua livre. Motivo: offline-first pressupõe uma pessoa por dado; duas filas
   locais sincronizando em momentos diferentes divergem em silêncio.
-- Regras novas em `firestore.rules` (5 mudanças) **ainda não deployadas** — precisa de autorização.
-  103 testes de regras, 555 de cliente, typecheck e build ok. Detalhe: `docs/history/2026-08.md`.
+- Regras novas em `firestore.rules` (6 mudanças) **deployadas** com autorização do dono, e o
+  cliente publicado. 103 testes de regras (107 depois da parte 7), 555 de cliente, typecheck e
+  build ok. Detalhe: `docs/history/2026-08.md`.
 
 ## 2026-08-03 (parte 5) — fix(dashboard): varredura achou mais 3 casos de "fonte misturada"
 

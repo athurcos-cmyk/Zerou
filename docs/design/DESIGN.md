@@ -174,6 +174,12 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
 - **Pull-to-refresh bloqueado via JS cirúrgico** (`src/pwa/preventPullToRefresh.ts`, 2026-07-19): cancela o gesto só quando a página está no topo E o dedo vai pra baixo (o único caso que dispara o refresh), sem tocar no scroll normal. O PWA instalado no Android **tem** pull-to-refresh (confirmado com print do dono) — não some só por estar instalado. **NÃO usar `overscroll-behavior-y: contain`** pra isso: tentado antes e **travou todo o scroll no mobile** (interação com o `overflow-x: hidden` do body).
 - **Navegação por mês/período** (`.month-switcher`, `global.css`): `‹ Mês de Ano › ` com `.icon-button`, introduzido em `SearchPage.tsx` (2026-07-08) — padrão a reaproveitar se outra tela precisar filtrar por mês, em vez de inventar um novo controle.
 - Ação em cartão do casal/despesa que muda estado do servidor (gerar/regenerar/revogar convite): sempre com `confirm()` explicando a consequência antes de agir, principalmente se for destrutiva ou invalidar algo que já foi compartilhado com outra pessoa.
+- **`<button>` estilizado como card precisa de `:disabled` explícito no CSS** (achado ao vivo na
+  trava de conexão do casal, 2026-08-03): `.button` já tem estado desabilitado, mas
+  `.couple-upgrade-card` e `.couple-mode-badge` são botões com aparência de card/badge — `:disabled`
+  não muda nada visualmente neles. O resultado é pior que não travar: o card continua com cara de
+  tocável e só recusa **depois** do toque. Sempre `opacity` + `cursor: not-allowed` + neutralizar o
+  `:hover`.
 - **Ação bloqueada por condição temporária avisa ANTES, em `.notice--warning`** (aprendido na trava
   de conexão do casal, 2026-08-03): quando algo impede a ação agora e vai passar, o aviso vem no
   topo da tela **antes** de a pessoa tentar — não como erro depois de falhar. Variante própria de
