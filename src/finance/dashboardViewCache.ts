@@ -65,6 +65,24 @@ export interface CachedDashboardView {
   nextMonthProjection: CachedNextMonthProjection | null;
 }
 
+/** O que a carta "Projeção do próximo mês" exibe: a projeção e o saldo que entra na fórmula.
+ *
+ * Existe como função separada por causa de um bug real (03/08/2026): a carta pegava a projeção do
+ * cache mas lia o saldo AO VIVO, e offline isso não era um piscar — era permanente. Com o Firestore
+ * em `unavailable` o listener fica vivo e `loading` nunca vira false (ver `useFinanceData.ts`), o
+ * app mostra o cache indefinidamente, e aquela linha mostrava R$ 0,00 indefinidamente junto. Pior:
+ * a "Sobra prevista" (do cache) já tinha somado o saldo, então a fórmula exibida não fechava.
+ *
+ * **A regra é "tudo do mesmo lado do `if`"** — nunca metade do cache e metade ao vivo. Manter isso
+ * numa função com teste é o que impede a mistura de voltar despercebida no meio de um JSX grande. */
+export function resolveProjectionView(
+  cache: Pick<CachedDashboardView, 'totalBalanceCents' | 'nextMonthProjection'> | null,
+  live: { projection: CachedNextMonthProjection | null; totalBalanceCents: number }
+): { projection: CachedNextMonthProjection | null; balanceCents: number } {
+  if (cache) return { projection: cache.nextMonthProjection, balanceCents: cache.totalBalanceCents };
+  return { projection: live.projection, balanceCents: live.totalBalanceCents };
+}
+
 function canUseStorage() {
   return typeof window !== 'undefined' && Boolean(window.localStorage);
 }

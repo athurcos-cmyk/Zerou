@@ -2,6 +2,27 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-03 (parte 4) — fix(dashboard): Projeção mostrava saldo R$ 0,00 offline
+
+- **Relato do dono**: *"ao abrir o app sem internet ela fica com valor 0"* — o termo do saldo (🐷)
+  na fórmula da carta "Projeção do próximo mês".
+- **Causa**: todos os números da carta vinham do `dashboardViewCache`, **menos esse**, que lia o
+  valor ao vivo. No boot normal seria um flash; **offline vira permanente**, porque com o Firestore
+  em `unavailable` o listener continua vivo e `loading` nunca vira false (decisão de 24/07), então o
+  app mostra o cache indefinidamente — e essa linha, zero indefinidamente.
+- **Também quebrava a conta exibida**: a "Sobra prevista" (do cache) já tinha somado o saldo, mas a
+  fórmula mostrava esse saldo como R$ 0,00 — `5.500 + 0 − 3.800` não dá `2.031`.
+- **Correção**: os dois valores passam a sair do **mesmo lado do `if`**, via `resolveProjectionView`
+  (função pura em `dashboardViewCache.ts`, **4 testes novos**, incluindo o estado exato relatado e
+  um que verifica que a fórmula fecha). Mesma troca na `NextMonthProjectionSheet`, que offline
+  prometeria somar R$ 0,00 e faria a pessoa desligar o toggle achando que não funciona.
+- **Regra que fica**: tela com modo cache mostra **tudo** do mesmo lado do `if` — um valor ao vivo
+  no meio de valores cacheados é contradição visível, e offline não passa sozinha.
+- ⚠️ **Procedimento**: `npx tsc --noEmit` avulso passou limpo num erro de sintaxe JSX que só o
+  `npm run build` (`tsc -b`) pegou. Validar sempre com `npm run build`.
+- 544/544 testes, build ok, conferido ao vivo (fórmula fecha e o saldo dela bate com o card "Saldo
+  total").
+
 ## 2026-08-03 (parte 3) — ux(contas): tirar conta do saldo agora avisa quanto o Comprometido cai
 
 - **Relato do dono**: marcou o Nubank como "fora do saldo" e o **Comprometido despencou** sem

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   readCachedDashboardView,
+  resolveProjectionView,
   saveCachedDashboardView,
   type CachedDashboardView
 } from './dashboardViewCache';
@@ -142,5 +143,41 @@ describe('dashboardViewCache', () => {
     expect(view!.committedCents).toBe(sampleView.committedCents);
     expect(view!.spending).toEqual([]);
     setItem.mockRestore();
+  });
+});
+
+/** Regressão do bug de 03/08/2026 (achado pelo dono abrindo o app sem internet): a carta
+ * "Projeção do próximo mês" pegava a projeção do cache mas lia o saldo AO VIVO. Offline isso não
+ * era um piscar — o Firestore devolve `unavailable`, `loading` nunca vira false, o app mostra o
+ * cache indefinidamente, e a linha do saldo mostrava R$ 0,00 indefinidamente junto. */
+describe('resolveProjectionView — nunca mistura cache com ao vivo', () => {
+  const cache = { totalBalanceCents: 33221, nextMonthProjection: { committedCents: 380043, leftoverCents: 203178 } };
+  const live = { totalBalanceCents: 99999, projection: { committedCents: 111, leftoverCents: 222 } };
+
+  it('com cache: os DOIS valores saem do cache (o saldo junto, não só a projeção)', () => {
+    const view = resolveProjectionView(cache, live);
+    expect(view.projection).toEqual(cache.nextMonthProjection);
+    expect(view.balanceCents).toBe(cache.totalBalanceCents);
+  });
+
+  it('offline no boot (cache existe, dados ao vivo ainda zerados) não mostra saldo R$ 0,00', () => {
+    // Exatamente o estado reportado: `loading` preso em true, live tudo zerado.
+    const view = resolveProjectionView(cache, { totalBalanceCents: 0, projection: null });
+    expect(view.balanceCents).toBe(cache.totalBalanceCents);
+    expect(view.projection).toEqual(cache.nextMonthProjection);
+  });
+
+  it('sem cache: os dois valores saem do ao vivo', () => {
+    const view = resolveProjectionView(null, live);
+    expect(view.projection).toEqual(live.projection);
+    expect(view.balanceCents).toBe(live.totalBalanceCents);
+  });
+
+  it('a fórmula fecha: salário + saldo − comprometido == sobra prevista', () => {
+    // O que o descasamento quebrava na tela: a sobra vinha do cache tendo somado o saldo, mas a
+    // fórmula logo abaixo exibia esse saldo como zero, e a conta não batia à vista.
+    const salarioCents = 550000;
+    const view = resolveProjectionView(cache, live);
+    expect(salarioCents + view.balanceCents - view.projection!.committedCents).toBe(view.projection!.leftoverCents);
   });
 });

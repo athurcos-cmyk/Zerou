@@ -11,6 +11,7 @@ import { calculateDashboardSummary, calculateNextMonthProjection, buildUpcomingR
 import { useCompleteCurrentMonth } from '../finance/useMonthlyTransactions';
 import {
   readCachedDashboardView,
+  resolveProjectionView,
   saveCachedDashboardView,
   type CachedCategoryMark,
   type CachedNextMonthProjection,
@@ -163,9 +164,22 @@ export function DashboardPage() {
   // Mesmo acelerador do Comprometido (depende de invoices/cards, mesmo gate `cache`): sem
   // isso, reabrir o app recalculava do zero com `bills`/`invoices` ainda vazios no boot,
   // mostrando por um instante "sobra = salário inteiro" antes de cair pro valor real.
-  const effectiveNextMonthProjection: CachedNextMonthProjection | null = cache
-    ? cache.nextMonthProjection
-    : nextMonthProjection;
+  //
+  // ⚠️ Os DOIS números da carta saem daqui, do MESMO lado do `if`, de propósito. Antes só a
+  // projeção vinha do cache e o saldo da fórmula era lido ao vivo (`dashboard.totalBalanceCents`)
+  // — a única linha da carta que ignorava o cache. **Offline isso não era um piscar, era
+  // permanente**: com o Firestore devolvendo `unavailable`, o listener fica vivo e `loading`
+  // permanece `true` indefinidamente (decisão de 24/07, ver `useFinanceData.ts`), então o app
+  // mostra o cache pra sempre — e essa linha mostrava R$ 0,00 pra sempre junto. Achado pelo dono
+  // abrindo o app sem internet (03/08/2026). Além de errado, quebrava a conta: a "Sobra prevista"
+  // vinha do cache tendo somado o saldo, e a fórmula logo abaixo exibia esse saldo como zero.
+  // Manter os dois no mesmo objeto torna esse descasamento impossível de reintroduzir sem
+  // desmontar a estrutura de propósito.
+  const projectionView = resolveProjectionView(cache, {
+    projection: nextMonthProjection,
+    totalBalanceCents: dashboard.totalBalanceCents
+  });
+  const effectiveNextMonthProjection = projectionView.projection;
   const syncStatus = finance.pendingWrites || cardsData.pendingWrites ? 'pending' : 'synced';
   const currentMonth = new Date().toISOString().slice(0, 7);
   const now = new Date();
@@ -388,7 +402,7 @@ export function DashboardPage() {
                 <>
                   <span className="projection-formula-operator" aria-hidden="true">+</span>
                   <span className="projection-formula-term">
-                    <PiggyBank size={13} aria-hidden="true" /> {formatMoney(dashboard.totalBalanceCents)}
+                    <PiggyBank size={13} aria-hidden="true" /> {formatMoney(projectionView.balanceCents)}
                   </span>
                 </>
               ) : null}
@@ -414,11 +428,14 @@ export function DashboardPage() {
         )}
       </article>
 
+      {/* Mesma fonte da carta (ver `projectionView`): a sheet mostra a prévia ao vivo do efeito de
+          ligar "contar meu saldo atual" — offline, lendo o valor cru, ela prometeria somar
+          R$ 0,00 e a pessoa desligaria o toggle achando que a opção não funciona. */}
       <NextMonthProjectionSheet
         open={projectionSheetOpen}
         currentProjectedSalaryCents={profile?.projectedSalaryCents}
-        committedCents={nextMonthProjection?.committedCents}
-        totalBalanceCents={dashboard.totalBalanceCents}
+        committedCents={effectiveNextMonthProjection?.committedCents}
+        totalBalanceCents={projectionView.balanceCents}
         includeCurrentBalance={profile?.projectionIncludesBalance ?? false}
         onSave={handleSaveProjectedSalary}
         onRemove={handleRemoveProjectedSalary}
