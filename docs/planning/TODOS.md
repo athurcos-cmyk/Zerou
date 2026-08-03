@@ -49,6 +49,9 @@ com tela, trava de conexão. Detalhe em `docs/history/2026-08.md`. O que ficou:
 - [ ] **`subscribeActiveInvites` continua assinando depois do casal formado** — a seção de convite não renderiza mais nesse estado. Custo perto de zero (query sem resultado), mas é listener sem uso.
 - [ ] **Despesa dividida não aparece no Extrato como "do casal"** — a transação pessoal leva a tag `casal`, mas nada na linha do Extrato indica que ela tem uma contraparte compartilhada.
 - [ ] **Contestar não avisa o outro** — muda o status e sai do acerto, sem push nem email. A pessoa só descobre abrindo a tela.
+- [ ] **⚠️ Decisão do dono pendente: resgate do cofrinho deixa gasto fantasma na Análise.** Depositar é `expense` (conta como gasto do mês em "Cofrinho"); resgatar é `income`, que `spendingAnalysis.ts:150` **descarta**. Depositar R$ 100 e resgatar R$ 100 no mesmo mês deixa R$ 100 de gasto em Cofrinho pra sempre, com o dinheiro já de volta na conta. Trocar o resgate pra `reimbursement` (em `coupleGoalWithdraw`, `financeService.ts`) fez a linha 185 subtrair e o par se anular — mas cria gasto **negativo** em Cofrinho quando depósito e resgate caem em meses diferentes. Vale pras Metas pessoais também (`deleteGoalWithRefund` usa `income`). Não mexer sem decidir qual dos dois efeitos é preferível.
+- [ ] **Despesa dividida: chip default é "Só anotar"** — ou seja, o comportamento padrão continua não lançando na conta, que era a queixa original. Mantido por consistência com o cofrinho (que também default "Só registrar") e por não debitar conta sem a pessoa pedir. Se o uso mostrar que as pessoas erram isso, o default vira a conta principal.
+- [ ] **Cofrinho: exclusão bloqueada e `byUser` no card não foram testados ao vivo** — exigiria depositar dinheiro real. Código e regra deployados; validados só por teste automatizado (104 de regras).
 
 ### Produto / UX
 
