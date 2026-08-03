@@ -2,6 +2,32 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-03 (parte 5) — fix(dashboard): varredura achou mais 3 casos de "fonte misturada"
+
+Varredura do Dashboard inteiro pedida pelo dono depois do bug do saldo zerado. Auditados os 14
+valores que o render consome: 10 corretos, 3 defeitos.
+
+- **"Próximos a receber" não tinha cache nenhum** (o mais grave): lido ao vivo, e a seção só
+  renderiza com `length > 0` — então ela **sumia inteira** durante o boot, em vez de mostrar número
+  errado. Pior de perceber: some sem deixar rastro, e é o lembrete de que alguém te deve. Agora vai
+  pro cache; chave ausente lê como `[]` sem invalidar o resto (senão o 1º boot pós-deploy jogaria
+  fora o cache de todo mundo).
+- **Estado vazio de "Resumo de gastos" com o gate trocado**: a lista usa o gate de finanças, o
+  estado vazio esperava o cartão também — quem não tem gasto no mês ficava com o card **em branco**
+  até as faturas resolverem.
+- **`profile!.projectedSalaryCents!` podia render "R$ NaN"**: a fórmula aceita projeção do cache,
+  que sobrevive à remoção do salário por um render. Fechado com `?? 0`.
+- **3 testes novos em `DashboardPage.test.tsx`** (que eu não sabia que existia — é o lugar certo,
+  renderiza a tela no estado do bug) + 2 no cache. **Verificados revertendo as correções**: os de
+  regressão falham sem elas.
+- ⚠️ **Correção de uma afirmação minha na parte 4**: eu disse que offline `loading` fica `true`
+  indefinidamente, como se fosse o único caminho. São **dois** — o comum é `loading` só virar
+  `false` quando as **7 coleções** entregam o primeiro snapshot (offline eles chegam do cache, mas
+  a janela é a da mais lenta, segundos num celular); o indefinido só acontece se alguma coleção
+  nunca entregar. A conclusão não muda: enquanto a tela mostra o cache, valor fora do cache mostra
+  zero.
+- 549/549 testes, build ok, conferido ao vivo.
+
 ## 2026-08-03 (parte 4) — fix(dashboard): Projeção mostrava saldo R$ 0,00 offline
 
 - **Relato do dono**: *"ao abrir o app sem internet ela fica com valor 0"* — o termo do saldo (🐷)

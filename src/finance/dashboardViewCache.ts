@@ -47,6 +47,21 @@ export interface CachedNextMonthProjection {
   leftoverCents: number;
 }
 
+/** "Próximos a receber" (o que vence em ≤5 dias). Entrou no cache em 03/08/2026, na varredura
+ * que o dono pediu depois do bug do saldo zerado: era a última seção do Dashboard que lia dado
+ * ao vivo sem cobertura de cache nenhuma. Diferente dos outros achados, ela não mostrava número
+ * errado — **sumia da tela inteira** durante o boot (a seção só renderiza com `length > 0`), o
+ * que é pior de perceber: some sem deixar rastro, e é justamente um lembrete de dinheiro que
+ * alguém te deve. */
+export interface CachedUpcomingReceivable {
+  id: string;
+  description: string;
+  fromWho?: string;
+  /** Serializado (localStorage não guarda Date/Timestamp) — vira Date de novo no read. */
+  dueAtISO: string;
+  amountCents: number;
+}
+
 export interface CachedDashboardView {
   totalBalanceCents: number;
   committedCents: number;
@@ -63,6 +78,9 @@ export interface CachedDashboardView {
    * por um instante "sobra = salário inteiro" antes de cair pro valor real quando os
    * compromissos chegavam. */
   nextMonthProjection: CachedNextMonthProjection | null;
+  /** Chave ausente (cache gravado antes de 03/08/2026) lê como `[]`, não invalida o resto —
+   * mesmo tratamento tolerante de `nextMonthProjection`. */
+  upcomingReceivables: CachedUpcomingReceivable[];
 }
 
 /** O que a carta "Projeção do próximo mês" exibe: a projeção e o saldo que entra na fórmula.
@@ -182,6 +200,27 @@ function parseProjection(value: unknown): CachedNextMonthProjection | null | und
   return { committedCents: projection.committedCents, leftoverCents: projection.leftoverCents };
 }
 
+function parseReceivable(value: unknown): CachedUpcomingReceivable | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const receivable = value as Record<string, unknown>;
+  if (
+    typeof receivable.id !== 'string' ||
+    typeof receivable.description !== 'string' ||
+    !isOptionalString(receivable.fromWho) ||
+    typeof receivable.dueAtISO !== 'string' ||
+    !isFiniteNumber(receivable.amountCents)
+  ) {
+    return null;
+  }
+  return {
+    id: receivable.id,
+    description: receivable.description,
+    fromWho: receivable.fromWho,
+    dueAtISO: receivable.dueAtISO,
+    amountCents: receivable.amountCents
+  };
+}
+
 function parseList<T>(value: unknown, parseItem: (item: unknown) => T | null): T[] | null {
   if (!Array.isArray(value)) return null;
   const parsed: T[] = [];
@@ -216,7 +255,8 @@ function readMiniCache(workspaceId: string): CachedDashboardView | null {
       spending: [],
       commitments: [],
       recentTransactions: [],
-      nextMonthProjection
+      nextMonthProjection,
+      upcomingReceivables: []
     };
   } catch {
     return null;
@@ -248,7 +288,11 @@ export function readCachedDashboardView(workspaceId?: string | null): CachedDash
     const commitments = parseList(parsed.commitments, parseCommitment);
     const recentTransactions = parseList(parsed.recentTransactions, parseRecentTransaction);
     const nextMonthProjection = parseProjection(parsed.nextMonthProjection);
-    if (!spending || !commitments || !recentTransactions || nextMonthProjection === undefined) {
+    // Chave ausente = cache anterior a 03/08/2026 → `[]`, sem derrubar o resto (mesma tolerância
+    // de `nextMonthProjection`). Presente mas corrompida ainda invalida, como as outras listas.
+    const upcomingReceivables =
+      parsed.upcomingReceivables === undefined ? [] : parseList(parsed.upcomingReceivables, parseReceivable);
+    if (!spending || !commitments || !recentTransactions || !upcomingReceivables || nextMonthProjection === undefined) {
       return readMiniCache(workspaceId);
     }
 
@@ -260,7 +304,8 @@ export function readCachedDashboardView(workspaceId?: string | null): CachedDash
       spending,
       commitments,
       recentTransactions,
-      nextMonthProjection
+      nextMonthProjection,
+      upcomingReceivables
     };
   } catch {
     return null;

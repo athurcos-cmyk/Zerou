@@ -25,7 +25,10 @@ const sampleView: CachedDashboardView = {
     { id: 'tx-1', type: 'expense', description: 'Mercado', dateISO: '2026-07-18T12:00:00.000Z', amountCents: 5000, mark: { id: 'food', icon: 'utensils', color: defaultCategoryColors.expense_food } },
     { id: 'tx-2', type: 'income', description: 'Salário', dateISO: '2026-07-05T12:00:00.000Z', amountCents: 300000, mark: { id: '', icon: 'money', color: defaultCategoryColors.income_salary } }
   ],
-  nextMonthProjection: { committedCents: 60000, leftoverCents: 440000 }
+  nextMonthProjection: { committedCents: 60000, leftoverCents: 440000 },
+  upcomingReceivables: [
+    { id: 'rec-1', description: 'Freela', fromWho: 'Cliente X', dueAtISO: '2026-07-22T12:00:00.000Z', amountCents: 90000 }
+  ]
 };
 
 afterEach(() => {
@@ -62,6 +65,27 @@ describe('dashboardViewCache', () => {
     expect(view).not.toBeNull();
     expect(view!.nextMonthProjection).toBeNull();
     expect(view!.totalBalanceCents).toBe(sampleView.totalBalanceCents);
+  });
+
+  it('upcomingReceivables: cache de formato antigo (sem a chave) lê como [], não invalida o resto', () => {
+    // Regressão da varredura de 03/08/2026: "Próximos a receber" era a última seção sem cache.
+    // Adicionar a chave não pode derrubar o cache já gravado na máquina de quem atualizar o app —
+    // senão o primeiro boot depois do deploy volta a piscar a tela inteira.
+    const { upcomingReceivables: _omit, ...oldFormat } = sampleView;
+    window.localStorage.setItem('zerou.dashboardView.v2.' + workspaceId, JSON.stringify(oldFormat));
+    const view = readCachedDashboardView(workspaceId);
+    expect(view).not.toBeNull();
+    expect(view!.upcomingReceivables).toEqual([]);
+    expect(view!.totalBalanceCents).toBe(sampleView.totalBalanceCents);
+    expect(view!.spending).toEqual(sampleView.spending);
+  });
+
+  it('upcomingReceivables: presente mas corrompido invalida (não renderiza lixo)', () => {
+    window.localStorage.setItem(
+      'zerou.dashboardView.v2.' + workspaceId,
+      JSON.stringify({ ...sampleView, upcomingReceivables: [{ id: 'rec-1', description: 'Freela' }] })
+    );
+    expect(readCachedDashboardView(workspaceId)).toBeNull();
   });
 
   it('rejeita o cache inteiro (não renderiza lixo) se qualquer item de lista estiver corrompido', () => {

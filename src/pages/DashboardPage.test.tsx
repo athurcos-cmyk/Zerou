@@ -74,7 +74,10 @@ const cachedView: CachedDashboardView = {
   recentTransactions: [
     { id: 'tx-1', type: 'expense', description: 'Mercado da esquina', dateISO: '2026-07-18T12:00:00.000Z', amountCents: 5000, mark: null }
   ],
-  nextMonthProjection: null
+  nextMonthProjection: null,
+  upcomingReceivables: [
+    { id: 'rec-1', description: 'Freela do site', fromWho: 'Cliente X', dueAtISO: '2026-07-20T12:00:00.000Z', amountCents: 90000 }
+  ]
 };
 
 function renderDashboard() {
@@ -129,6 +132,66 @@ describe('DashboardPage — listas do cache no boot', () => {
     expect(screen.getByText('Nenhuma transação ainda')).toBeInTheDocument();
     // Conta genuinamente nova/vazia, já carregada, É o único caso que mostra o guia inicial.
     expect(screen.getByText('Comece em poucos minutos')).toBeInTheDocument();
+  });
+
+  // ── Regressões de 03/08/2026: valor ao vivo no meio de valores cacheados ──
+
+  it('offline/boot: o saldo DENTRO da fórmula da projeção vem do cache, não R$ 0,00', () => {
+    // O bug que o dono viu abrindo o app sem internet. Todos os números da carta vinham do cache
+    // menos este, que lia `dashboard.totalBalanceCents` ao vivo — zerado enquanto o boot não
+    // termina. `loading: true` + arrays vazios + cache = exatamente esse estado.
+    saveCachedDashboardView(WORKSPACE_ID, {
+      ...cachedView,
+      totalBalanceCents: 33221,
+      nextMonthProjection: { committedCents: 380043, leftoverCents: 203178 }
+    });
+    state.auth = {
+      user: { uid: 'u1' },
+      profile: {
+        defaultWorkspaceId: WORKSPACE_ID,
+        name: 'Ana',
+        projectedSalaryCents: 550000,
+        projectionIncludesBalance: true
+      }
+    };
+    state.finance = financeCtx({ loading: true });
+    state.cards = cardsCtx({ loading: true });
+
+    const { container } = renderDashboard();
+
+    const termos = [...container.querySelectorAll('.projection-formula-term')].map((t) => t.textContent?.trim());
+    // Salário + saldo (do cache!) − comprometido. O saldo NÃO pode ser R$ 0,00.
+    expect(termos).toHaveLength(3);
+    expect(termos[1]).toContain('332,21');
+    // Nenhum termo pode ser o valor zerado. (Comparação exata, não `includes`: "R$ 5.500,00"
+    // contém "0,00" como substring — foi o que fez esta asserção falhar na primeira escrita.)
+    expect(termos.map((t) => t?.replace(/\s+/g, ' ').trim())).not.toContain('R$ 0,00');
+    // E a conta exibida tem que fechar com a sobra mostrada acima.
+    expect(container.querySelector('.projection-amount')?.textContent).toContain('2.031,78');
+  });
+
+  it('offline/boot: "Próximos a receber" vem do cache em vez de sumir da tela', () => {
+    // Essa seção só renderiza com `length > 0` — lendo ao vivo, ela desaparecia inteira durante
+    // o boot, sem deixar rastro de que existia.
+    saveCachedDashboardView(WORKSPACE_ID, cachedView);
+    state.finance = financeCtx({ loading: true, receivables: [] });
+    state.cards = cardsCtx({ loading: true });
+
+    renderDashboard();
+
+    expect(screen.getByText('Freela do site')).toBeInTheDocument();
+    expect(screen.getByText('Chega nos próximos dias')).toBeInTheDocument();
+  });
+
+  it('sem cache, com finanças prontas e cartão ainda carregando, o estado vazio de gastos aparece', () => {
+    // O card ficava com o corpo em branco (nem lista nem estado vazio) porque a lista usava o
+    // gate de finanças e o estado vazio esperava o cartão também.
+    state.finance = financeCtx({ loading: false });
+    state.cards = cardsCtx({ loading: true });
+
+    renderDashboard();
+
+    expect(screen.getByText('Sem gastos este mês')).toBeInTheDocument();
   });
 
   it('não mostra o guia "Comece em poucos minutos" enquanto uma conta já usada recarrega', () => {

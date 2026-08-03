@@ -49,6 +49,14 @@ interface CommitmentView {
   amountCents: number;
 }
 
+interface UpcomingReceivableView {
+  id: string;
+  description: string;
+  fromWho?: string;
+  dueAt: DateLike;
+  amountCents: number;
+}
+
 type CategoryLike = { id: string; name?: string; icon?: string; color?: string };
 
 /** Guarda só o que o `CategoryMark` precisa (id/ícone/cor). Props opcionais de propósito:
@@ -241,6 +249,23 @@ export function DashboardPage() {
   const effectiveCommitments: CommitmentView[] = cache
     ? cache.commitments.map((commitment) => ({ ...commitment, dueAt: new Date(commitment.dueAtISO) }))
     : dashboard.upcomingCommitments;
+  // "Próximos a receber": só o que vence em ≤5 dias, no fim da tela e SEM entrar em nenhum total —
+  // dinheiro a receber não é dinheiro que se tem (ver docs/planning/CONTAS_A_RECEBER.md).
+  //
+  // Passou pelo cache em 03/08/2026 (varredura pedida pelo dono): era a última seção que lia dado
+  // ao vivo sem cobertura nenhuma. Não mostrava número errado — **sumia inteira** durante o boot,
+  // porque só renderiza com `length > 0`. Some sem deixar rastro, e é justamente o lembrete de que
+  // alguém te deve. Gate `financeCache` (só finanças): recebível não depende de cartão.
+  const liveUpcomingReceivables = buildUpcomingReceivables(finance.receivables);
+  const effectiveUpcomingReceivables: UpcomingReceivableView[] = financeCache
+    ? financeCache.upcomingReceivables.map((receivable) => ({
+        id: receivable.id,
+        description: receivable.description,
+        fromWho: receivable.fromWho,
+        amountCents: receivable.amountCents,
+        dueAt: new Date(receivable.dueAtISO)
+      }))
+    : liveUpcomingReceivables;
   const effectiveRecent: RecentTransactionView[] = financeCache
     ? financeCache.recentTransactions.map((transaction) => ({
         id: transaction.id,
@@ -292,7 +317,14 @@ export function DashboardPage() {
         amountCents: transaction.amountCents,
         mark: markForTransaction(transaction, categoryMap)
       })),
-      nextMonthProjection
+      nextMonthProjection,
+      upcomingReceivables: liveUpcomingReceivables.map((receivable) => ({
+        id: receivable.id,
+        description: receivable.description,
+        fromWho: receivable.fromWho,
+        dueAtISO: toDate(receivable.dueAt).toISOString(),
+        amountCents: receivable.amountCents
+      }))
     });
     // Deps = as fontes estáveis do dashboard (os arrays do contexto só trocam de referência
     // quando chega snapshot novo), não os objetos recomputados a cada render — senão isto
@@ -304,6 +336,7 @@ export function DashboardPage() {
     finance.accounts,
     finance.transactions,
     spendingSource,
+    finance.receivables,
     finance.bills,
     finance.recurringRules,
     finance.categories,
@@ -325,9 +358,6 @@ export function DashboardPage() {
       : committedCaption;
   const effectiveVariationPct = financeCache ? financeCache.spendingVariationPct : spendingVariationPct;
 
-  // "Próximos a receber": só o que vence em ≤5 dias, no fim da tela e SEM entrar em nenhum total —
-  // dinheiro a receber não é dinheiro que se tem (ver docs/planning/CONTAS_A_RECEBER.md).
-  const upcomingReceivables = buildUpcomingReceivables(finance.receivables);
 
   return (
     <section className="page-content">
@@ -395,8 +425,12 @@ export function DashboardPage() {
               {formatMoney(effectiveNextMonthProjection.leftoverCents)}
             </strong>
             <div className="projection-formula">
+              {/* `?? 0` em vez de `profile!...!`: o `if` acima aceita projeção vinda do CACHE, que
+                  sobrevive à remoção do salário por um render (o cache só é regravado quando o
+                  boot termina). Com as asserções, essa janela rendia `formatMoney(null)` — "R$ NaN"
+                  na tela. Janela estreita, mas o custo de fechar é um operador. */}
               <span className="projection-formula-term">
-                <Wallet size={13} aria-hidden="true" /> {formatMoney(profile!.projectedSalaryCents!)}
+                <Wallet size={13} aria-hidden="true" /> {formatMoney(profile?.projectedSalaryCents ?? 0)}
               </span>
               {profile?.projectionIncludesBalance ? (
                 <>
@@ -542,7 +576,11 @@ export function DashboardPage() {
               </div>
             ))}
           </div>
-        ) : !isCommittedLoading ? (
+        ) : !isLoading ? (
+          // `isLoading` (finanças), não `isCommittedLoading` (finanças + cartão): a lista acima
+          // usa o gate `financeCache`, que não espera cartão. Com os dois desalinhados, quem
+          // realmente não tem gasto no mês ficava com o corpo do card VAZIO — sem lista e sem
+          // estado vazio — até as faturas resolverem. Achado na varredura de 03/08/2026.
           <EmptyState
             illustration="wallet"
             compact
@@ -642,7 +680,7 @@ export function DashboardPage() {
 
       {/* Próximos a receber — no FIM da tela de propósito, e fora de qualquer total de saldo:
           é lembrete, não dinheiro em mãos. Só aparece se houver algo vencendo em ≤5 dias. */}
-      {upcomingReceivables.length > 0 ? (
+      {effectiveUpcomingReceivables.length > 0 ? (
         <article className="surface surface-pad">
           <div className="section-heading">
             <div>
@@ -654,7 +692,7 @@ export function DashboardPage() {
             </Link>
           </div>
           <div className="item-list">
-            {upcomingReceivables.map((receivable) => (
+            {effectiveUpcomingReceivables.map((receivable) => (
               <Link className="list-row list-row--link" to="/app/receivables" key={receivable.id}>
                 <div>
                   <strong>{receivable.description}</strong>
