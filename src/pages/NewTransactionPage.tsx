@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, CreditCard, Wallet } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
@@ -48,6 +48,7 @@ export function NewTransactionPage() {
   const [notes, setNotes] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [message, setMessage] = useState<string | null>(null);
+  const messageRef = useRef<HTMLDivElement | null>(null);
 
   const isCardSelected = accountId.startsWith(CARD_PREFIX);
 
@@ -69,54 +70,119 @@ export function NewTransactionPage() {
   const yesterday = yesterdayInputValue();
   const datePreset = date === today ? 'today' : date === yesterday ? 'yesterday' : 'other';
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  /**
+   * Título é opcional: vazio herda o nome da categoria escolhida (pedido do dono, 03/08/2026).
+   * Sem categoria também, cai no rótulo do tipo ("Despesa"/"Receita"/"Transferência") — o schema
+   * exige 2+ caracteres, e um título genérico é melhor que uma gravação recusada. **Nunca devolve
+   * string vazia**, então este é o único lugar que precisa saber dessa cadeia de fallback.
+   */
+  function resolveDescription() {
+    const typed = description.trim();
+    if (typed) return typed;
+    const fromCategory = finance.categories.find((c) => c.id === categoryId)?.name.trim();
+    return fromCategory || transactionTypeLabels[type];
+  }
+
+  /**
+   * Mensagem de erro + rolagem até ela. O `FormMessage` mora no topo do formulário e o botão
+   * "Salvar transação" é fixo no rodapé (`.entry-actions`): sem a rolagem, quem apertasse Salvar
+   * com a tela rolada pra baixo veria *nada acontecer* — trocaria um erro silencioso por outro.
+   */
+  function fail(text: string) {
+    setMessage(text);
+    requestAnimationFrame(() => messageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage(null);
 
     if (!workspaceId || !user) {
-      setMessage('Conclua seu cadastro inicial antes de registrar transações.');
+      fail('Conclua seu cadastro inicial antes de registrar transações.');
       return;
     }
 
     const payingWithCard = type === 'expense' && accountId.startsWith(CARD_PREFIX);
 
     if (!payingWithCard && finance.accounts.length === 0) {
-      setMessage('Crie uma conta financeira antes de registrar transações.');
+      fail('Crie uma conta financeira antes de registrar transações.');
       return;
     }
 
-    try {
-      if (payingWithCard) {
-        const { cardId } = parseAccountOrCard(accountId);
-        createCardPurchase(workspaceId, user.uid, {
-          cardId: cardId!,
-          description,
-          amountCents: parseMoneyToCents(amount),
-          purchaseDate: fromDateInputValueForWrite(date),
-          categoryId: categoryId || undefined,
-          installments
-        }).catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível criar a compra no cartão agora.')));
-        navigate(`/app/cards/${cardId}`);
-        return;
-      }
+    // ── Validação SÍNCRONA, antes de qualquer escrita ──
+    // `createTransaction`/`createCardPurchase` são `async` e rodam o `schema.parse` lá dentro, então
+    // o erro delas nasce como PROMISE REJEITADA — o `try/catch` que existia aqui nunca a pegava, e o
+    // `navigate` rodava logo depois de qualquer jeito. Era exatamente isso que fazia "Salvar
+    // transação" sem conta escolhida *parecer* que salvou: a regra já existia no schema
+    // (`accountId: min(1)`, `description: min(2)`), reprovava, e a pessoa era mandada pro Extrato
+    // sem lançamento nenhum e sem aviso (relatado pelo dono, 03/08/2026).
+    //
+    // Regra que fica: toda condição que a pessoa consegue corrigir na tela é conferida AQUI, em
+    // português, antes de sair do formulário. O schema segue sendo a rede de segurança do dado —
+    // não pode ser o primeiro lugar onde um erro previsível aparece, porque lá ele é invisível.
+    const amountCents = parseMoneyToCents(amount);
 
-      createTransaction(workspaceId, user.uid, {
-        type,
-        amountCents: parseMoneyToCents(amount),
-        description,
-        merchant,
-        categoryId,
-        accountId,
-        destinationAccountId: type === 'transfer' ? destinationAccountId : undefined,
-        date: fromDateInputValueForWrite(date),
-        tags,
-        notes
-      });
-
-      navigate('/app/transactions');
-    } catch (error) {
-      setMessage(getUserFacingErrorMessage(error, 'Não foi possível registrar a transação agora.'));
+    if (amountCents <= 0) {
+      // `moneyCentsSchema` aceita zero, então sem esta trava um valor em branco gravaria um
+      // lançamento de R$ 0,00 — e agora que o título se resolve sozinho, era o último campo que
+      // ainda barrava esse registro vazio por acidente.
+      fail('Informe o valor da transação.');
+      return;
     }
+
+    if (!accountId) {
+      fail(
+        type === 'expense' ? 'Escolha a conta ou o cartão dessa despesa.'
+          : type === 'transfer' ? 'Escolha a conta de origem da transferência.'
+            : 'Escolha a conta onde o dinheiro entrou.'
+      );
+      return;
+    }
+
+    if (type === 'transfer' && !destinationAccountId) {
+      fail('Escolha a conta de destino da transferência.');
+      return;
+    }
+
+    if (description.trim().length === 1) {
+      // O único caso que o fallback NÃO cobre (ele só age em campo vazio) e que o schema reprova
+      // (`description: min(2)`) — sem esta trava, um título de 1 letra voltaria a sumir em silêncio.
+      fail('O título precisa de pelo menos 2 letras — ou deixe em branco pra usar o nome da categoria.');
+      return;
+    }
+
+    const resolvedDescription = resolveDescription();
+
+    if (payingWithCard) {
+      const { cardId } = parseAccountOrCard(accountId);
+      createCardPurchase(workspaceId, user.uid, {
+        cardId: cardId!,
+        description: resolvedDescription,
+        amountCents,
+        purchaseDate: fromDateInputValueForWrite(date),
+        categoryId: categoryId || undefined,
+        installments
+      }).catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível criar a compra no cartão agora.')));
+      navigate(`/app/cards/${cardId}`);
+      return;
+    }
+
+    // O `.catch` faltava aqui (a compra no cartão já tinha o dela): qualquer falha inesperada da
+    // escrita virava rejeição não tratada, sem rastro nenhum.
+    createTransaction(workspaceId, user.uid, {
+      type,
+      amountCents,
+      description: resolvedDescription,
+      merchant,
+      categoryId,
+      accountId,
+      destinationAccountId: type === 'transfer' ? destinationAccountId : undefined,
+      date: fromDateInputValueForWrite(date),
+      tags,
+      notes
+    }).catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível registrar a transação agora.')));
+
+    navigate('/app/transactions');
   }
 
   return (
@@ -159,7 +225,9 @@ export function NewTransactionPage() {
       </header>
 
       <form className="entry-form" onSubmit={handleSubmit}>
-        <FormMessage>{message}</FormMessage>
+        <div ref={messageRef}>
+          <FormMessage>{message}</FormMessage>
+        </div>
 
         {finance.accounts.length === 0 ? (
           <div className="notice">
@@ -167,9 +235,16 @@ export function NewTransactionPage() {
           </div>
         ) : null}
 
+        {/* O fallback é anunciado antes de acontecer: título preenchido sozinho no Extrato, sem
+            aviso nenhum aqui, pareceria dado inventado pelo app. */}
         <label className="field">
-          <span>Título</span>
+          <span>Título <span className="text-secondary">(opcional)</span></span>
           <input className="input" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Mercado, salário, aluguel" />
+          <span className="field-hint">
+            {description.trim()
+              ? 'Como esse lançamento vai aparecer no Extrato.'
+              : `Em branco, usamos ${finance.categories.find((c) => c.id === categoryId)?.name.trim() || 'o nome da categoria'}.`}
+          </span>
         </label>
 
         <div className="field">

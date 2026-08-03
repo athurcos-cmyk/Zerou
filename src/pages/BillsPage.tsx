@@ -1,5 +1,5 @@
-import { useMemo, useState, type FormEvent } from 'react';
-import { CalendarClock, ChevronDown, HelpCircle, Pencil, Repeat, Search, X } from 'lucide-react';
+import { useMemo, useState, type CSSProperties, type FormEvent } from 'react';
+import { CalendarClock, ChevronDown, HelpCircle, Pencil, Plus, Repeat, Search, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { CategoryField } from '../components/CategoryField';
@@ -181,6 +181,30 @@ export function BillsPage() {
   }, [finance.bills, billFilter]);
 
   const billsTotalCents = useMemo(() => visibleBills.reduce((sum, b) => sum + b.amountCents, 0), [visibleBills]);
+
+  // Faixa de resumo. Os três números são os mesmos que as duas seções abaixo já somam,
+  // reunidos no topo — a tela existe pra responder "quanto eu já sei que vou pagar?", e
+  // até 02/08/2026 ela não respondia isso em lugar nenhum: abria direto num formulário
+  // fechado. "Em aberto" inclui as vencidas de propósito, igual aos chips de filtro.
+  const billsSummary = useMemo(() => {
+    let openCents = 0;
+    let overdueCents = 0;
+    for (const bill of finance.bills) {
+      if (bill.status === 'pending' || bill.status === 'overdue') openCents += bill.amountCents;
+      if (bill.status === 'overdue') overdueCents += bill.amountCents;
+    }
+    return { openCents, overdueCents };
+  }, [finance.bills]);
+
+  function openCreateSheet() {
+    setMessage(null);
+    setFormOpen(true);
+  }
+
+  function closeCreateSheet() {
+    setFormOpen(false);
+    setMessage(null);
+  }
 
   const serviceSuggestions = searchSubscriptionServices(description);
 
@@ -399,132 +423,72 @@ export function BillsPage() {
           <p className="eyebrow">O que você já sabe que vai pagar</p>
           <h1 className="page-title page-title--compact">Contas e assinaturas</h1>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+        <div className="page-heading-actions">
+          <button className="button button--subtle page-action-button" type="button" onClick={openCreateSheet}>
+            <Plus size={15} aria-hidden="true" /> Nova conta
+          </button>
           <button
-            className="icon-button"
+            className="button button--subtle page-action-button"
             type="button"
-            aria-label="Como funciona Contas e assinaturas"
-            title="Como funciona"
             onClick={openBillsTour}
           >
-            <HelpCircle size={17} aria-hidden="true" />
+            <HelpCircle size={15} aria-hidden="true" /> Como funciona
           </button>
           <SyncStatusBadge status={finance.pendingWrites ? 'pending' : 'synced'} />
         </div>
       </div>
 
+      {/* Gradiente (não `--plain`): a lista abaixo são linhas simples, sem card colorido —
+          ver a regra em global.css (.summary-hero--plain). */}
+      {(hasRecurring || hasBills) && (
+        <div className="summary-hero reveal">
+          <div className="summary-hero-inner">
+            <div className="summary-hero-stat">
+              <span className="summary-hero-eyebrow">Recorrentes</span>
+              <strong className="summary-hero-value">{formatMoney(recurringTotalCents)}</strong>
+              <span className="summary-hero-note">
+                {recurringItems.length} por mês
+              </span>
+            </div>
+            <div className="summary-hero-stat">
+              <span className="summary-hero-eyebrow">Em aberto</span>
+              <strong className={`summary-hero-value${billsSummary.openCents === 0 ? ' summary-hero-value--muted' : ''}`}>
+                {formatMoney(billsSummary.openCents)}
+              </strong>
+              <span className="summary-hero-note">contas avulsas</span>
+            </div>
+            <div className="summary-hero-stat">
+              <span className="summary-hero-eyebrow">Vencidas</span>
+              <strong className={`summary-hero-value${billsSummary.overdueCents === 0 ? ' summary-hero-value--muted' : ''}`}>
+                {formatMoney(billsSummary.overdueCents)}
+              </strong>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Linha fixa: a tela era lida como "onde eu pago minhas contas", e várias pessoas
           concluíram que só servia pra registrar a fatura do cartão. Dizer o que ela faz — e o
           que ela NÃO faz — logo no topo é a defesa mais barata contra isso. */}
+      {/* Encolhido em 02/08/2026: eram 5 linhas repetindo o que o hero acima já mostra em
+          número e o que o tour (botão "?") explica em 4 slides. Sobrou só a parte que
+          nenhum dos dois diz e que foi a origem do mal-entendido dos usuários reais —
+          que o app não paga nada sozinho. Regra do Sol: texto fixo encolhe quando existe
+          tour na mesma tela. */}
       <p className="settings-hint">
-        Cadastre aqui suas assinaturas e contas fixas. O Granativa lembra você antes de vencer e
-        já conta esses valores no seu Comprometido — <strong>ele não paga nada por você</strong>.
-        Quando a cobrança acontecer, é só confirmar que já foi.
+        O Granativa lembra você antes de vencer e já conta esses valores no seu Comprometido —{' '}
+        <strong>ele não paga nada por você</strong>.
       </p>
 
       <div className="finance-grid">
-        {/* ── Form ── */}
-        <form className="surface surface-pad form-stack" onSubmit={handleSubmit}>
-          <button
-            type="button"
-            className="form-accordion-toggle"
-            onClick={() => setFormOpen((v) => !v)}
-            aria-expanded={formOpen}
-          >
-            <div>
-              <p className="eyebrow">Nova conta</p>
-              <h2 style={{ margin: 0 }}>Adicionar conta</h2>
-            </div>
-            <ChevronDown size={20} aria-hidden="true" style={{ transform: formOpen ? 'rotate(180deg)' : 'none', transition: 'transform var(--duration-normal)', flexShrink: 0, color: 'var(--text-secondary)' }} />
-          </button>
-          {formOpen && (<>
-            <FormMessage>{message}</FormMessage>
-
-            <label className="field">
-              <span>Descrição</span>
-              <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Energia, Aluguel, Internet" autoFocus />
-            </label>
-
-            {serviceSuggestions.length > 0 && (
-              <div className="service-picker" aria-label="Sugestões">
-                <span className="field-label">{description.trim() ? 'Encontramos estas opções' : 'Sugestões rápidas'}</span>
-                <div className="service-suggestion-grid">
-                  {serviceSuggestions.map((svc) => (
-                    <button className="service-suggestion" type="button" key={svc.id} onClick={() => selectService(svc)}>
-                      <ServiceMark service={svc} />
-                      <span>{svc.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <label className="field">
-              <span>Valor</span>
-              <input className="input" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0,00" />
-              <span className="field-hint">Deixe em branco se o valor varia todo mês.</span>
-            </label>
-
-            {/* ── Recurring toggle ── */}
-            <div className="field">
-              <span className="field-label">Se repete?</span>
-              <div className="chip-row">
-                <button type="button" className={`chip${!isRecurring ? ' chip--active' : ''}`} onClick={() => setIsRecurring(false)}>Não, é avulsa</button>
-                <button type="button" className={`chip${isRecurring ? ' chip--active' : ''}`} onClick={() => setIsRecurring(true)}>Sim, recorrente</button>
-              </div>
-            </div>
-
-            {isRecurring && (
-              <SelectField
-                label="Frequência"
-                value={frequency}
-                onChange={(v) => setFrequency(v as CreateRecurringRuleInput['frequency'])}
-                options={recurringFrequencies.map((f) => ({ value: f, label: recurringFrequencyLabels[f] }))}
-              />
-            )}
-
-            <label className="field">
-              <span>{isRecurring ? 'Primeiro vencimento' : 'Vencimento'}</span>
-              <input className="input" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-            </label>
-
-            <CategoryField
-              value={categoryId}
-              onChange={setCategoryId}
-              categories={finance.categories}
-              filterType="expense"
-              {...categoryActions}
-            />
-
-            <SelectField
-              label="Conta ou cartão"
-              value={accountId}
-              onChange={setAccountId}
-              options={accountOrCardOptions}
-              placeholder="Definir depois"
-            />
-
-            {!isRecurring && accountId.startsWith(CARD_PREFIX) ? (
-              <SelectField
-                label="Parcelamento"
-                value={String(installments)}
-                onChange={(v) => setInstallments(Number(v))}
-                options={installmentOptions()}
-              />
-            ) : null}
-
-            <button className="button button--primary" type="submit">
-              {isRecurring ? 'Criar conta recorrente' : 'Criar conta'}
-            </button>
-          </>)}
-        </form>
-
         {/* ── Recorrentes ── */}
-        <article className="surface surface-pad">
+        <article className="surface surface-pad reveal" style={{ '--reveal-i': 1 } as CSSProperties}>
           <div className="section-heading">
             <div>
               <p className="eyebrow">Assinaturas e contas fixas</p>
-              <h2>Recorrentes{hasRecurring ? ` · ${recurringItems.length} · ${formatMoney(recurringTotalCents)}` : ''}</h2>
+              {/* Contagem e total saíram do título: a faixa de resumo no topo já mostra os
+                  dois, e repetidos aqui o h2 quebrava em duas linhas no celular. */}
+              <h2>Recorrentes</h2>
             </div>
             <Repeat size={22} aria-hidden="true" style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
           </div>
@@ -616,6 +580,18 @@ export function BillsPage() {
               compact
               title="Nenhuma assinatura ou conta fixa"
               description="Aluguel, internet, streaming — cadastre como recorrente e o Granativa lembra sozinho todo ciclo."
+              action={
+                <button
+                  className="button button--primary button--compact"
+                  type="button"
+                  // Já entra na sheet com "Sim, recorrente" marcado: quem toca a partir
+                  // DESTA seção quer uma recorrente, e deixar o toggle no padrão "avulsa"
+                  // faria o item criado nem aparecer na lista de onde veio o clique.
+                  onClick={() => { setIsRecurring(true); openCreateSheet(); }}
+                >
+                  <Plus size={16} aria-hidden="true" /> Cadastrar recorrente
+                </button>
+              }
             />
           )}
           {!normalizedRecurringQuery && recurringItems.length > BILLS_PAGE_SIZE && (
@@ -630,11 +606,14 @@ export function BillsPage() {
         </article>
 
         {/* ── Compromissos ── */}
-        <article className="surface surface-pad">
+        <article className="surface surface-pad reveal" style={{ '--reveal-i': 2 } as CSSProperties}>
           <div className="section-heading">
             <div>
-              <p className="eyebrow">Contas avulsas</p>
-              <h2>Compromissos{hasBills ? ` · ${visibleBills.length} · ${formatMoney(billsTotalCents)}` : ''}</h2>
+              <p className="eyebrow">Sem repetição</p>
+              {/* "Compromissos" virou "Contas avulsas" (o rótulo que já estava na eyebrow e
+                  diz o que a lista é), e o total agora é o do FILTRO — não o geral, que o
+                  hero mostra. A contagem saiu: estava no hero e quebrava o h2 em 2 linhas. */}
+              <h2>Contas avulsas{hasBills ? ` · ${formatMoney(billsTotalCents)}` : ''}</h2>
             </div>
             <CalendarClock size={22} aria-hidden="true" style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
           </div>
@@ -692,6 +671,15 @@ export function BillsPage() {
               illustration="bills"
               title="Nenhuma conta avulsa ainda"
               description="Cadastre uma conta pontual — sem repetição — e seja lembrado antes do vencimento."
+              action={
+                <button
+                  className="button button--primary button--compact"
+                  type="button"
+                  onClick={() => { setIsRecurring(false); openCreateSheet(); }}
+                >
+                  <Plus size={16} aria-hidden="true" /> Cadastrar avulsa
+                </button>
+              }
             />
           )}
           {visibleBills.length > BILLS_PAGE_SIZE && (
@@ -705,6 +693,108 @@ export function BillsPage() {
           )}
         </article>
       </div>
+
+      {/* ── Nova conta / assinatura ──
+          Era um `.form-accordion-toggle` ACIMA das duas listas: com o texto fixo da tela
+          somado ao card do formulário fechado, a primeira tela do celular não mostrava
+          nenhuma conta cadastrada (visto ao vivo, 02/08/2026). O formulário em si não
+          mudou — inclusive o toggle "Se repete?", que continua sendo o que decide entre
+          `createBill` e `createRecurringRule`. */}
+      <BottomSheet
+        open={formOpen}
+        onClose={closeCreateSheet}
+        title={isRecurring ? 'Nova conta recorrente' : 'Nova conta'}
+        subtitle="O Granativa lembra você antes de vencer — não paga nada por você"
+      >
+        <form className="form-stack" onSubmit={handleSubmit}>
+          <FormMessage>{message}</FormMessage>
+
+          <label className="field">
+            <span>Descrição</span>
+            <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Energia, Aluguel, Internet" autoFocus />
+          </label>
+
+          {/* Só depois de digitar. O estado ocioso ("Sugestões rápidas", 6 serviços fixos) foi
+              removido por pedido do dono (03/08/2026): eram 183px — o maior bloco da folha —
+              gastos exatamente no instante em que ela abre, empurrando o botão "Criar conta"
+              pra fora da vista. Sugestão fixa é palpite sobre alguém que ainda não disse nada;
+              o filtro depois de digitar responde ao que a pessoa já escreveu, custa zero
+              espaço até lá, e é ele que também preenche a categoria (`selectService`). */}
+          {description.trim().length > 0 && serviceSuggestions.length > 0 && (
+            <div className="service-picker" aria-label="Sugestões">
+              <span className="field-label">Encontramos estas opções</span>
+              <div className="service-suggestion-grid">
+                {serviceSuggestions.map((svc) => (
+                  <button className="service-suggestion" type="button" key={svc.id} onClick={() => selectService(svc)}>
+                    <ServiceMark service={svc} />
+                    <span>{svc.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <label className="field">
+            <span>Valor</span>
+            <input className="input" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0,00" />
+            <span className="field-hint">Deixe em branco se o valor varia todo mês.</span>
+          </label>
+
+          {/* ── Recurring toggle ── */}
+          <div className="field">
+            <span className="field-label">Se repete?</span>
+            <div className="chip-row">
+              <button type="button" className={`chip${!isRecurring ? ' chip--active' : ''}`} onClick={() => setIsRecurring(false)}>Não, é avulsa</button>
+              <button type="button" className={`chip${isRecurring ? ' chip--active' : ''}`} onClick={() => setIsRecurring(true)}>Sim, recorrente</button>
+            </div>
+          </div>
+
+          {isRecurring && (
+            <SelectField
+              label="Frequência"
+              value={frequency}
+              onChange={(v) => setFrequency(v as CreateRecurringRuleInput['frequency'])}
+              options={recurringFrequencies.map((f) => ({ value: f, label: recurringFrequencyLabels[f] }))}
+            />
+          )}
+
+          <label className="field">
+            <span>{isRecurring ? 'Primeiro vencimento' : 'Vencimento'}</span>
+            <input className="input" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+          </label>
+
+          <CategoryField
+            value={categoryId}
+            onChange={setCategoryId}
+            categories={finance.categories}
+            filterType="expense"
+            {...categoryActions}
+          />
+
+          <SelectField
+            label="Conta ou cartão"
+            value={accountId}
+            onChange={setAccountId}
+            options={accountOrCardOptions}
+            placeholder="Definir depois"
+          />
+
+          {!isRecurring && accountId.startsWith(CARD_PREFIX) ? (
+            <SelectField
+              label="Parcelamento"
+              value={String(installments)}
+              onChange={(v) => setInstallments(Number(v))}
+              options={installmentOptions()}
+            />
+          ) : null}
+
+          <div className="sheet-actions">
+            <button className="button button--primary" type="submit">
+              {isRecurring ? 'Criar conta recorrente' : 'Criar conta'}
+            </button>
+          </div>
+        </form>
+      </BottomSheet>
 
       {/* ── Pay BottomSheet ── */}
       <BottomSheet

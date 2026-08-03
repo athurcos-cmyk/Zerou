@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from 'react';
-import { ChevronDown, CreditCard, WifiOff } from 'lucide-react';
+import { useState, type CSSProperties, type FormEvent } from 'react';
+import { CreditCard, Plus, WifiOff } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
+import { BottomSheet } from '../components/BottomSheet';
 import { EmptyState } from '../components/EmptyState';
 import { LoadingState } from '../components/LoadingState';
 import { SelectField } from '../components/SelectField';
@@ -35,6 +36,29 @@ export function CardsPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
 
+  // Faixa de resumo: os mesmos dois números que cada card já mostra, somados. Sem isso a
+  // pessoa com 3 cartões precisa somar de cabeça pra saber quanto deve no mês.
+  let totalLimitCents = 0;
+  let totalUsedCents = 0;
+  for (const card of cardsData.cards) {
+    const active = cardsData.invoices.filter(
+      (invoice) => invoice.cardId === card.id && (invoice.status === 'open' || invoice.status === 'closed')
+    );
+    totalLimitCents += card.limitCents;
+    totalUsedCents += active.reduce((total, invoice) => total + invoice.outstandingBalanceCents, 0);
+  }
+  const totalAvailableCents = Math.max(0, totalLimitCents - totalUsedCents);
+
+  function openCreateSheet() {
+    setMessage(null);
+    setFormOpen(true);
+  }
+
+  function closeCreateSheet() {
+    setFormOpen(false);
+    setMessage(null);
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage(null);
@@ -65,6 +89,7 @@ export function CardsPage() {
     setLimit('');
     setClosingDay(10);
     setDueDay(20);
+    setFormOpen(false);
   }
 
   return (
@@ -74,8 +99,39 @@ export function CardsPage() {
           <p className="eyebrow">Pessoal</p>
           <h1 className="page-title page-title--compact">Cartões</h1>
         </div>
-        <SyncStatusBadge status={cardsData.pendingWrites ? 'pending' : 'synced'} />
+        <div className="page-heading-actions">
+          <button className="button button--subtle page-action-button" type="button" onClick={openCreateSheet}>
+            <Plus size={15} aria-hidden="true" /> Novo cartão
+          </button>
+          <SyncStatusBadge status={cardsData.pendingWrites ? 'pending' : 'synced'} />
+        </div>
       </div>
+
+      {/* `--plain` e não gradiente: cada card da lista abaixo já é um `.card-list-hero`
+          com `--gradient-slate`. Ver a regra em global.css (.summary-hero--plain).
+          Só a partir de DOIS cartões: com um só, a faixa repetia dígito por dígito os
+          números do próprio card logo abaixo (visto ao vivo, 02/08/2026) — resumo de um
+          item é o item. */}
+      {cardsData.cards.length > 1 && (
+        <div className="summary-hero summary-hero--plain reveal">
+          <div className="summary-hero-inner">
+            <div className="summary-hero-stat">
+              <span className="summary-hero-eyebrow">Limite disponível</span>
+              <strong className="summary-hero-value summary-hero-value--lead">{formatMoney(totalAvailableCents)}</strong>
+              <span className="summary-hero-note">de {formatMoney(totalLimitCents)}</span>
+            </div>
+            <div className="summary-hero-stat">
+              <span className="summary-hero-eyebrow">Faturas em aberto</span>
+              <strong className={`summary-hero-value${totalUsedCents === 0 ? ' summary-hero-value--muted' : ''}`}>
+                {formatMoney(totalUsedCents)}
+              </strong>
+              <span className="summary-hero-note">
+                {cardsData.cards.length} cartã{cardsData.cards.length !== 1 ? 'os' : 'o'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {hasPendingCardActivity && (
         <div className="notice" style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', marginBottom: '1rem' }}>
@@ -84,15 +140,16 @@ export function CardsPage() {
         </div>
       )}
 
-      <div className="finance-grid">
-        <article className="surface surface-pad">
-          <p className="eyebrow">Seus cartões</p>
-          <h2 style={{ margin: '0.25rem 0 1rem' }}>Cartões ativos</h2>
-          {cardsData.loading ? (
-            <LoadingState compact />
-          ) : cardsData.cards.length > 0 ? (
+      {/* Sem `.finance-grid` e sem `<article className="surface">` em volta: o grid existia
+          pra pôr o formulário ao lado da lista no desktop, e a superfície embrulhava cards
+          que já são superfícies (card dentro de card), com um "Seus cartões / Cartões
+          ativos" que só repetia o título da tela. Agora a lista é direta, igual a de
+          Contas. */}
+      {cardsData.loading ? (
+        <LoadingState compact />
+      ) : cardsData.cards.length > 0 ? (
             <div className="card-list-hero-list">
-              {cardsData.cards.map((card) => {
+              {cardsData.cards.map((card, index) => {
                 const activeInvoices = cardsData.invoices.filter(
                   (invoice) => invoice.cardId === card.id && (invoice.status === 'open' || invoice.status === 'closed')
                 );
@@ -105,7 +162,12 @@ export function CardsPage() {
                   usedPercent >= 70 ? 'card-list-hero-fill--warning' : '';
 
                 return (
-                  <Link className="card-list-hero" to={`/app/cards/${card.id}`} key={card.id}>
+                  <Link
+                    className="card-list-hero reveal"
+                    to={`/app/cards/${card.id}`}
+                    key={card.id}
+                    style={{ '--reveal-i': Math.min(index + 1, 8) } as CSSProperties}
+                  >
                     <div className="card-list-hero-inner">
                       <div className="card-list-hero-header">
                         <div>
@@ -142,75 +204,70 @@ export function CardsPage() {
               illustration="cards"
               title="Nenhum cartão cadastrado"
               description="Adicione seu primeiro cartão para acompanhar compras, parcelas e faturas sem misturar com o saldo das contas."
+              action={
+                <button className="button button--primary button--compact" type="button" onClick={openCreateSheet}>
+                  <Plus size={16} aria-hidden="true" /> Cadastrar cartão
+                </button>
+              }
             />
-          )}
-        </article>
+      )}
 
-        <form className="surface surface-pad form-stack" onSubmit={handleSubmit}>
-          <button
-            type="button"
-            className="form-accordion-toggle"
-            onClick={() => setFormOpen((v) => !v)}
-            aria-expanded={formOpen}
-          >
-            <div>
-              <p className="eyebrow">Adicionar cartão</p>
-              <h2 style={{ margin: 0 }}>Cadastrar novo cartão</h2>
-            </div>
-            <ChevronDown
-              size={20}
-              aria-hidden="true"
-              style={{ transform: formOpen ? 'rotate(180deg)' : 'none', transition: 'transform var(--duration-normal)', flexShrink: 0, color: 'var(--text-secondary)' }}
-            />
-          </button>
-          {formOpen && (
-            <>
-              <FormMessage>{message}</FormMessage>
-              <div className="card-limit-hero">
-                <span className="card-limit-hero-label">Limite do cartão</span>
-                <span className="card-limit-hero-wrap">
-                  <span className="card-limit-hero-currency">R$</span>
-                  <input
-                    className="card-limit-hero-input"
-                    inputMode="decimal"
-                    value={limit}
-                    onChange={(event) => setLimit(event.target.value)}
-                    placeholder="0,00"
-                    aria-label="Limite do cartão"
-                  />
-                </span>
-              </div>
-              <label className="field">
-                <span>Nome do cartão</span>
-                <input className="input" value={name} onChange={(event) => setName(event.target.value)} placeholder="Cartão principal" />
-              </label>
-              <label className="field">
-                <span>Últimos 4 dígitos</span>
-                <input className="input" inputMode="numeric" maxLength={4} value={lastFour} onChange={(event) => setLastFour(event.target.value)} placeholder="0000" />
-              </label>
-              <SelectField
-                label="Bandeira"
-                value={brand}
-                onChange={(v) => setBrand(v as CreateCreditCardInput['brand'])}
-                options={cardBrandOptions.map((b) => ({ value: b, label: b }))}
+      {/* Cadastro em sheet (02/08/2026) — era um acordeão no fim da página. O
+          `navigate` pro cartão recém-criado continua igual: `createCreditCard` devolve o
+          id na hora (write fire-and-forget), então a sheet fecha e a tela do cartão abre. */}
+      <BottomSheet
+        open={formOpen}
+        onClose={closeCreateSheet}
+        title="Cadastrar cartão"
+        subtitle="Limite, fechamento e vencimento"
+      >
+        <form className="form-stack" onSubmit={handleSubmit}>
+          <FormMessage>{message}</FormMessage>
+          <div className="card-limit-hero">
+            <span className="card-limit-hero-label">Limite do cartão</span>
+            <span className="card-limit-hero-wrap">
+              <span className="card-limit-hero-currency">R$</span>
+              <input
+                className="card-limit-hero-input"
+                inputMode="decimal"
+                value={limit}
+                onChange={(event) => setLimit(event.target.value)}
+                placeholder="0,00"
+                aria-label="Limite do cartão"
               />
-              <div className="form-grid-2">
-                <label className="field">
-                  <span>Dia de fechamento</span>
-                  <input className="input" type="number" min={1} max={28} value={closingDay} onChange={(event) => setClosingDay(Number(event.target.value))} />
-                </label>
-                <label className="field">
-                  <span>Dia de vencimento</span>
-                  <input className="input" type="number" min={1} max={28} value={dueDay} onChange={(event) => setDueDay(Number(event.target.value))} />
-                </label>
-              </div>
-              <button className="button button--primary" type="submit">
-                Adicionar cartão
-              </button>
-            </>
-          )}
+            </span>
+          </div>
+          <label className="field">
+            <span>Nome do cartão</span>
+            <input className="input" value={name} onChange={(event) => setName(event.target.value)} placeholder="Cartão principal" />
+          </label>
+          <label className="field">
+            <span>Últimos 4 dígitos</span>
+            <input className="input" inputMode="numeric" maxLength={4} value={lastFour} onChange={(event) => setLastFour(event.target.value)} placeholder="0000" />
+          </label>
+          <SelectField
+            label="Bandeira"
+            value={brand}
+            onChange={(v) => setBrand(v as CreateCreditCardInput['brand'])}
+            options={cardBrandOptions.map((b) => ({ value: b, label: b }))}
+          />
+          <div className="form-grid-2">
+            <label className="field">
+              <span>Dia de fechamento</span>
+              <input className="input" type="number" min={1} max={28} value={closingDay} onChange={(event) => setClosingDay(Number(event.target.value))} />
+            </label>
+            <label className="field">
+              <span>Dia de vencimento</span>
+              <input className="input" type="number" min={1} max={28} value={dueDay} onChange={(event) => setDueDay(Number(event.target.value))} />
+            </label>
+          </div>
+          <div className="sheet-actions">
+            <button className="button button--primary" type="submit">
+              Adicionar cartão
+            </button>
+          </div>
         </form>
-      </div>
+      </BottomSheet>
     </section>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Wallet } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
@@ -45,6 +45,7 @@ export function EditTransactionPage() {
   const [notes, setNotes] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [message, setMessage] = useState<string | null>(null);
+  const messageRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!transaction) {
@@ -77,51 +78,94 @@ export function EditTransactionPage() {
   const yesterday = yesterdayInputValue();
   const datePreset = date === today ? 'today' : date === yesterday ? 'yesterday' : 'other';
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  /** Mesma cadeia de `NewTransactionPage`: digitado → nome da categoria → rótulo do tipo. Aqui ela
+   * vale pra quem **apaga** o título de um lançamento que já existia — sem isso, limpar o campo
+   * reprovaria no `min(2)` do schema e a edição sumiria em silêncio, que é justamente o bug que
+   * esta tela tinha. Nunca devolve string vazia. */
+  function resolveDescription() {
+    const typed = description.trim();
+    if (typed) return typed;
+    const fromCategory = finance.categories.find((c) => c.id === categoryId)?.name.trim();
+    return fromCategory || transactionTypeLabels[type];
+  }
+
+  /** Erro + rolagem até ele: a mensagem fica no topo do form e o botão Salvar é fixo no rodapé. */
+  function fail(text: string) {
+    setMessage(text);
+    requestAnimationFrame(() => messageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage(null);
 
     if (!workspaceId || !user || !transactionId || !transaction) {
-      setMessage('Não foi possível localizar a transação.');
+      fail('Não foi possível localizar a transação.');
       return;
     }
+
+    // ── Validação SÍNCRONA, antes de qualquer escrita ──
+    // Mesma armadilha que `NewTransactionPage` tinha (corrigida em 03/08/2026): `updateTransaction`
+    // é `async` e roda `schema.parse` lá dentro, então o erro dela nasce como PROMISE REJEITADA —
+    // o `try/catch` daqui nunca a pegava e o `navigate` rodava em seguida de qualquer jeito.
+    // Apagar o título de uma transação existente saía da tela como se tivesse salvo.
+    const typedTitle = description.trim();
+    if (typedTitle.length === 1) {
+      // Título de 1 letra é o único caso que o fallback NÃO cobre (ele só age em campo vazio) e que
+      // o schema reprova (`min(2)`) — sem esta trava, voltaria a sumir em silêncio.
+      fail('O título precisa de pelo menos 2 letras — ou deixe em branco pra usar o nome da categoria.');
+      return;
+    }
+
+    const resolvedDescription = resolveDescription();
 
     if (isCardPurchase) {
-      try {
-        await updateCardPurchase(workspaceId, user.uid, transactionId, {
-          description,
-          categoryId: categoryId || undefined
-        });
-        navigate('/app/transactions');
-      } catch (error) {
-        setMessage(getUserFacingErrorMessage(error, 'Não foi possível atualizar a compra agora.'));
-      }
+      // Fire-and-forget (era `await`, que trava a UI esperando a rede e quebra a regra
+      // offline-first do projeto). Só é seguro soltar porque a validação acima já rodou.
+      updateCardPurchase(workspaceId, user.uid, transactionId, {
+        description: resolvedDescription,
+        categoryId: categoryId || undefined
+      }).catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível atualizar a compra agora.')));
+      navigate('/app/transactions');
       return;
     }
 
-    try {
-      updateTransaction(workspaceId, user.uid, transactionId, {
-        type: transaction.type,
-        amountCents: transaction.amountCents,
-        accountId: transaction.accountId,
-        destinationAccountId: transaction.destinationAccountId
-      }, {
-        type,
-        amountCents: parseMoneyToCents(amount),
-        description,
-        merchant,
-        categoryId,
-        accountId,
-        destinationAccountId: type === 'transfer' ? destinationAccountId : undefined,
-        date: resolveEditedDate(date, transaction.date),
-        tags,
-        notes
-      });
+    const amountCents = parseMoneyToCents(amount);
 
-      navigate('/app/transactions');
-    } catch (error) {
-      setMessage(getUserFacingErrorMessage(error, 'Não foi possível atualizar a transação agora.'));
+    if (amountCents <= 0) {
+      fail('Informe o valor da transação.');
+      return;
     }
+
+    if (!accountId) {
+      fail(type === 'transfer' ? 'Escolha a conta de origem da transferência.' : 'Escolha a conta da transação.');
+      return;
+    }
+
+    if (type === 'transfer' && !destinationAccountId) {
+      fail('Escolha a conta de destino da transferência.');
+      return;
+    }
+
+    updateTransaction(workspaceId, user.uid, transactionId, {
+      type: transaction.type,
+      amountCents: transaction.amountCents,
+      accountId: transaction.accountId,
+      destinationAccountId: transaction.destinationAccountId
+    }, {
+      type,
+      amountCents,
+      description: resolvedDescription,
+      merchant,
+      categoryId,
+      accountId,
+      destinationAccountId: type === 'transfer' ? destinationAccountId : undefined,
+      date: resolveEditedDate(date, transaction.date),
+      tags,
+      notes
+    }).catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível atualizar a transação agora.')));
+
+    navigate('/app/transactions');
   }
 
   if (!transaction && !finance.loading) {
@@ -184,7 +228,9 @@ export function EditTransactionPage() {
       </header>
 
       <form className="entry-form" onSubmit={handleSubmit}>
-        <FormMessage>{message}</FormMessage>
+        <div ref={messageRef}>
+          <FormMessage>{message}</FormMessage>
+        </div>
 
         {isCardPurchase && (
           <p className="text-secondary" style={{ margin: '-0.5rem 0 0', fontSize: '0.86rem' }}>
@@ -193,8 +239,13 @@ export function EditTransactionPage() {
         )}
 
         <label className="field">
-          <span>Título</span>
+          <span>Título <span className="text-secondary">(opcional)</span></span>
           <input className="input" value={description} onChange={(event) => setDescription(event.target.value)} />
+          <span className="field-hint">
+            {description.trim()
+              ? 'Como esse lançamento aparece no Extrato.'
+              : `Em branco, usamos ${finance.categories.find((c) => c.id === categoryId)?.name.trim() || 'o nome da categoria'}.`}
+          </span>
         </label>
 
         {!isCardPurchase && (

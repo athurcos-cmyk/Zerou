@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type CSSProperties, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { Check, Plus, Trash2 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
@@ -77,6 +77,20 @@ export function GoalsPage() {
     setCreateOpen(false);
   }
 
+  // Resumo do topo: soma o progresso de todas as metas. Sem isso, "quanto eu já guardei
+  // no total?" só dava pra responder somando os cards de cabeça.
+  const goalsSummary = (() => {
+    let savedCents = 0;
+    let targetCents = 0;
+    for (const goal of goals) {
+      savedCents += goal.savedCents;
+      targetCents += goal.targetCents;
+    }
+    // Divisor zero é real: meta pode ser criada com objetivo 0 (ou só metas assim).
+    const donePct = targetCents > 0 ? Math.min(100, Math.round((savedCents / targetCents) * 100)) : 0;
+    return { savedCents, targetCents, donePct };
+  })();
+
   return (
     <section className="page-content page-content--narrow">
       <div className="page-heading-row page-heading-row--tight">
@@ -91,6 +105,28 @@ export function GoalsPage() {
 
       {hint && goals.length === 0 ? <div className="notice notice--success">{hint}</div> : null}
 
+      {/* Gradiente (não `--plain`): os cards de meta abaixo são `.surface` branca. */}
+      {goals.length > 0 && (
+        <div className="summary-hero summary-hero--income reveal">
+          <div className="summary-hero-inner">
+            <div className="summary-hero-stat">
+              <span className="summary-hero-eyebrow">Já guardado</span>
+              <strong className="summary-hero-value">{formatMoney(goalsSummary.savedCents)}</strong>
+              <span className="summary-hero-note">
+                {goalsSummary.donePct}% do objetivo
+              </span>
+            </div>
+            <div className="summary-hero-stat">
+              <span className="summary-hero-eyebrow">Objetivo</span>
+              <strong className="summary-hero-value summary-hero-value--muted">{formatMoney(goalsSummary.targetCents)}</strong>
+              <span className="summary-hero-note">
+                {goals.length} meta{goals.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {goals.length === 0 && !loading ? (
         <EmptyState
           illustration="goals"
@@ -104,11 +140,15 @@ export function GoalsPage() {
         />
       ) : (
         <div className="goal-list">
-          {goals.map((goal) => {
+          {goals.map((goal, index) => {
             const pct = goal.targetCents > 0 ? Math.min(100, Math.round((goal.savedCents / goal.targetCents) * 100)) : 0;
             const done = goal.savedCents >= goal.targetCents && goal.targetCents > 0;
             return (
-              <article className="surface surface-pad goal-card" key={goal.id}>
+              <article
+                className="surface surface-pad goal-card reveal"
+                key={goal.id}
+                style={{ '--reveal-i': Math.min(index + 1, 8) } as CSSProperties}
+              >
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
                   <Link to={`/app/goals/${goal.id}`} style={{ flex: 1, minWidth: 0, display: 'block', color: 'inherit', textDecoration: 'none' }}>
                     <div className="goal-card-head">

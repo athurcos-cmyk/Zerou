@@ -1,5 +1,6 @@
-﻿import { useState, type FormEvent } from 'react';
-import { Building2, ChevronDown, Eye, EyeOff, Scale, Star, Trash2 } from 'lucide-react';
+﻿import { useMemo, useState, type CSSProperties, type FormEvent } from 'react';
+import { Building2, Eye, EyeOff, Plus, Scale, Star, Trash2 } from 'lucide-react';
+import { BottomSheet } from '../components/BottomSheet';
 import { useAuth } from '../auth/AuthContext';
 import { useFinanceContext } from '../finance/FinanceDataContext';
 import { SelectField } from '../components/SelectField';
@@ -9,7 +10,7 @@ import { EmptyState } from '../components/EmptyState';
 import { LoadingState } from '../components/LoadingState';
 import { AccountReconcileSheet } from '../finance/AccountReconcileSheet';
 import { findBankInstitution, searchBankInstitutions, type BankInstitution } from '../finance/bankInstitutions';
-import type { AccountBalance } from '../finance/financeCalculations';
+import { buildUpcomingCommitments, type AccountBalance } from '../finance/financeCalculations';
 import { accountTypeLabels } from '../finance/financeLabels';
 import { accountHasLiveTransactions, createAccount, deleteAccount, setAccountExcludeFromTotals, setPrimaryAccount, unsetPrimaryAccount } from '../finance/financeService';
 import { accountTypes } from '../finance/financeSchemas';
@@ -34,7 +35,36 @@ export function AccountsPage() {
   // vai ao servidor e demora o suficiente pra dar dois cliques.
   const [deleteProbeAccountId, setDeleteProbeAccountId] = useState<string | null>(null);
   const [reconcileAccount, setReconcileAccount] = useState<AccountBalance | null>(null);
+  const [excludeTarget, setExcludeTarget] = useState<AccountBalance | null>(null);
   const { confirm, dialog: confirmDialog } = useConfirm();
+
+  /** Quanto do Comprometido some se `excludeTarget` sair do saldo.
+   *
+   * Calculado chamando a função REAL (`buildUpcomingCommitments`) duas vezes e tirando a
+   * diferença — nunca reimplementando a regra aqui. Reescrever o filtro daria uma prévia que
+   * começa certa e sai de sincronia no dia em que a regra mudar, que é exatamente o tipo de drift
+   * silencioso que este projeto já pagou caro (ver a trava anti-drift de `signedCharge` vs.
+   * `calculateInvoice` em `spendingAnalysis`).
+   *
+   * `invoices`/`cards` vão vazios de propósito: fatura de cartão **não** é afetada por conta fora
+   * do saldo (cartão não é conta, e `card_purchase` nem grava `accountId`), então ela se cancela
+   * na subtração. Se um dia a exclusão passar a mexer em fatura, esta prévia passa a subestimar —
+   * por isso o acoplamento está escrito aqui. */
+  const excludeImpact = useMemo(() => {
+    if (!excludeTarget) return null;
+    const semConta = finance.excludedAccountIds;
+    const comConta = new Set([...semConta, excludeTarget.id]);
+    const total = (set: ReadonlySet<string>) =>
+      buildUpcomingCommitments(finance.bills, finance.recurringRules, [], [], finance.transactions, set);
+    const antes = total(semConta);
+    const depois = total(comConta);
+    const soma = (list: ReturnType<typeof buildUpcomingCommitments>) =>
+      list.reduce((sum, c) => sum + c.amountCents, 0);
+    return {
+      committedCents: soma(antes) - soma(depois),
+      linhas: antes.length - depois.length
+    };
+  }, [excludeTarget, finance.excludedAccountIds, finance.bills, finance.recurringRules, finance.transactions]);
   const suggestions = searchBankInstitutions(name, name.trim() ? 6 : 8);
   const syncStatusByAccountId = new Map(finance.accounts.map((account) => [account.id, account.localSyncStatus]));
   // O badge do topo é o mesmo número do "Saldo total" do Dashboard: só conta que conta como
@@ -70,12 +100,36 @@ export function AccountsPage() {
     );
   }
 
-  function handleToggleExcludeFromTotals(accountId: string, isExcluded: boolean) {
-    if (!workspaceId) {
+  /** Tirar uma conta do saldo tem efeito MUITO maior do que o ícone de olho sugere: além do Saldo
+   * total, ela sai da Análise, dos alertas de orçamento, da Projeção e do **Comprometido** — e é o
+   * Comprometido que assusta, porque toda conta a pagar e toda recorrência debitada nela somem
+   * junto (`buildUpcomingCommitments`). Achado pelo dono ao vivo (03/08/2026) marcando o Nubank:
+   * o Comprometido caiu R$ 1.700,67 sem nada na tela dizendo por quê.
+   *
+   * A explicação existia, mas só era renderizada quando `hasExcludedAccount` já era verdadeiro —
+   * ou seja, aparecia **depois** de a pessoa levar o susto. E o `title`/`aria-label` do botão não
+   * conta: num app mobile-first não existe hover. Mesma correção que a tela de contas recebeu em
+   * 02/08 (`.pay-preview`): dizer o efeito, com número real, ANTES de acontecer.
+   *
+   * Só a exclusão pede confirmação. Voltar a contar é restaurador — não surpreende ninguém. */
+  function handleToggleExcludeFromTotals(account: AccountBalance) {
+    if (!workspaceId) return;
+
+    if (account.excludeFromTotals) {
+      setAccountExcludeFromTotals(workspaceId, account.id, false).catch((error) =>
+        showError(getUserFacingErrorMessage(error, 'Não foi possível atualizar a conta agora.'))
+      );
       return;
     }
 
-    setAccountExcludeFromTotals(workspaceId, accountId, !isExcluded).catch((error) =>
+    setExcludeTarget(account);
+  }
+
+  function confirmExcludeFromTotals() {
+    const account = excludeTarget;
+    if (!workspaceId || !account) return;
+    setExcludeTarget(null);
+    setAccountExcludeFromTotals(workspaceId, account.id, true).catch((error) =>
       showError(getUserFacingErrorMessage(error, 'Não foi possível atualizar a conta agora.'))
     );
   }
@@ -100,6 +154,16 @@ export function AccountsPage() {
     setOpeningBalance('');
     setExcludeFromTotals(false);
     setFormOpen(false);
+  }
+
+  function openCreateSheet() {
+    setMessage(null);
+    setFormOpen(true);
+  }
+
+  function closeCreateSheet() {
+    setFormOpen(false);
+    setMessage(null);
   }
 
   async function handleDeleteAccount(accountId: string, accountName: string) {
@@ -162,12 +226,38 @@ export function AccountsPage() {
           <p className="eyebrow">Pessoal</p>
           <h1 className="page-title page-title--compact">Contas</h1>
         </div>
-        {finance.accountBalances.length > 0 && (
-          <span className="page-badge">{formatMoney(totalBalance)}</span>
-        )}
+        <div className="page-heading-actions">
+          <button className="button button--subtle page-action-button" type="button" onClick={openCreateSheet}>
+            <Plus size={15} aria-hidden="true" /> Nova conta
+          </button>
+        </div>
       </div>
 
       <FormMessage type={message?.tone}>{message?.text}</FormMessage>
+
+      {/* O saldo total era um `.page-badge` (pílula pequena ao lado do título) — o número
+          mais importante da tela ficava menor que qualquer saldo de conta na lista abaixo.
+          Virou faixa de resumo, com o dinheiro fora do saldo do lado quando existe. */}
+      {finance.accountBalances.length > 0 && (
+        <div className="summary-hero summary-hero--plain reveal">
+          <div className="summary-hero-inner">
+            <div className="summary-hero-stat">
+              <span className="summary-hero-eyebrow">Saldo total</span>
+              <strong className="summary-hero-value summary-hero-value--lead">{formatMoney(totalBalance)}</strong>
+              <span className="summary-hero-note">
+                {finance.accountBalances.length} conta{finance.accountBalances.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+            {hasExcludedAccount && (
+              <div className="summary-hero-stat">
+                <span className="summary-hero-eyebrow">Fora do saldo</span>
+                <strong className="summary-hero-value summary-hero-value--muted">{formatMoney(excludedBalance)}</strong>
+                <span className="summary-hero-note">não entra na Análise</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {finance.accountBalances.length > 1 && (
         <p className="settings-hint">
@@ -176,11 +266,14 @@ export function AccountsPage() {
         </p>
       )}
 
-      {hasExcludedAccount && (
+      {/* Antes esta dica só existia quando `hasExcludedAccount` já era true — a explicação chegava
+          DEPOIS do susto. Agora ela aparece sempre que há conta na tela, porque o botão de olho
+          está visível desde a primeira conta e é ele que precisa ser entendido antes do toque. */}
+      {finance.accountBalances.length > 0 && (
         <p className="settings-hint">
-          O total acima não inclui {formatMoney(excludedBalance)} em contas fora do saldo
-          (<EyeOff size={13} aria-hidden="true" style={{ verticalAlign: '-2px' }} />) — elas também
-          não entram na Análise nem no Comprometido.
+          Conta fora do saldo (<EyeOff size={13} aria-hidden="true" style={{ verticalAlign: '-2px' }} />) continua com o
+          saldo dela aqui e nos lançamentos, mas some do Saldo total, da Análise e do Comprometido.
+          É pra vale-refeição ou cartão presente — não pra conta do dia a dia.
         </p>
       )}
 
@@ -188,10 +281,14 @@ export function AccountsPage() {
         <LoadingState compact />
       ) : finance.accountBalances.length > 0 ? (
         <div className="account-card-list">
-          {finance.accountBalances.map((account) => {
+          {finance.accountBalances.map((account, index) => {
             const institution = findBankInstitution(account.name);
             return (
-              <div className="account-card-hero" key={account.id}>
+              <div
+                className="account-card-hero reveal"
+                key={account.id}
+                style={{ '--reveal-i': Math.min(index + 1, 8) } as CSSProperties}
+              >
                 <div className="account-card-hero-inner">
                   <div className="account-card-hero-header">
                     <div>
@@ -231,7 +328,7 @@ export function AccountsPage() {
                           : `Deixar ${account.name} fora do saldo total e das análises`
                       }
                       title={account.excludeFromTotals ? 'Fora do saldo e das análises' : 'Não contar no saldo nem nas análises'}
-                      onClick={() => handleToggleExcludeFromTotals(account.id, account.excludeFromTotals === true)}
+                      onClick={() => handleToggleExcludeFromTotals(account)}
                     >
                       {account.excludeFromTotals ? <EyeOff size={17} aria-hidden="true" /> : <Eye size={17} aria-hidden="true" />}
                     </button>
@@ -269,80 +366,83 @@ export function AccountsPage() {
           illustration="wallet"
           title="Nenhuma conta ainda"
           description="Adicione sua primeira conta financeira — banco, carteira ou poupança — para começar a registrar seu dinheiro."
+          action={
+            <button className="button button--primary button--compact" type="button" onClick={openCreateSheet}>
+              <Plus size={16} aria-hidden="true" /> Criar primeira conta
+            </button>
+          }
         />
       )}
 
-      <form className="surface surface-pad form-stack" onSubmit={handleSubmit} style={{ marginTop: '1rem' }}>
-        <button
-          type="button"
-          className="form-accordion-toggle"
-          onClick={() => setFormOpen((v) => !v)}
-          aria-expanded={formOpen}
-        >
-          <div>
-            <p className="eyebrow">Nova conta</p>
-            <h2 style={{ margin: 0 }}>Adicionar conta financeira</h2>
-          </div>
-          <ChevronDown
-            size={20}
-            aria-hidden="true"
-            style={{ transform: formOpen ? 'rotate(180deg)' : 'none', transition: 'transform var(--duration-normal)', flexShrink: 0, color: 'var(--text-secondary)' }}
-          />
-        </button>
-        {formOpen && (
-          <>
-            <FormMessage type={message?.tone}>{message?.text}</FormMessage>
-            <label className="field">
-              <span>Nome</span>
-              <input className="input" value={name} onChange={(event) => setName(event.target.value)} placeholder="Nubank, Carteira, Poupança" />
-            </label>
-            <div className="bank-picker" aria-label="Sugestões de instituições">
-              <span className="field-label">{name.trim() ? 'Encontramos estas opções' : 'Sugestões rápidas'}</span>
-              <div className="bank-suggestion-grid">
-                {suggestions.map((institution) => (
-                  <button
-                    className="bank-suggestion"
-                    type="button"
-                    key={institution.id}
-                    onClick={() => selectInstitution(institution)}
-                  >
-                    <BankMark institution={institution} />
-                    <span>{institution.name}</span>
-                  </button>
-                ))}
-              </div>
+      {/* Antes era um `.form-accordion-toggle` no fim da página: um card inteiro ocupado só
+          pelo título "Adicionar conta financeira", que a pessoa tinha que rolar até o fim pra
+          achar. Virou sheet acionado pelo "+ Nova conta" do cabeçalho (02/08/2026). */}
+      <BottomSheet
+        open={formOpen}
+        onClose={closeCreateSheet}
+        title="Nova conta financeira"
+        subtitle="Banco, carteira ou poupança"
+      >
+        <form className="form-stack" onSubmit={handleSubmit}>
+          <FormMessage type={message?.tone}>{message?.text}</FormMessage>
+          <label className="field">
+            <span>Nome</span>
+            <input className="input" value={name} onChange={(event) => setName(event.target.value)} placeholder="Nubank, Carteira, Poupança" autoFocus />
+          </label>
+          {/* Mesma regra do picker de serviços em `BillsPage.tsx` (03/08/2026): o estado ocioso
+              ("Sugestões rápidas", 8 bancos fixos) custava 239px numa folha que escondia 155 —
+              sem ele a folha inteira cabe sem rolagem. O filtro depois de digitar fica, e é ele
+              que preenche o tipo da conta junto com o nome (`selectInstitution`). */}
+          {name.trim().length > 0 && suggestions.length > 0 && (
+          <div className="bank-picker" aria-label="Sugestões de instituições">
+            <span className="field-label">Encontramos estas opções</span>
+            <div className="bank-suggestion-grid">
+              {suggestions.map((institution) => (
+                <button
+                  className="bank-suggestion"
+                  type="button"
+                  key={institution.id}
+                  onClick={() => selectInstitution(institution)}
+                >
+                  <BankMark institution={institution} />
+                  <span>{institution.name}</span>
+                </button>
+              ))}
             </div>
-            <SelectField
-              label="Tipo"
-              value={type}
-              onChange={(v) => setType(v as AccountType)}
-              options={accountTypes.filter((t) => t !== 'investment').map((t) => ({ value: t, label: accountTypeLabels[t] }))}
+          </div>
+          )}
+          <SelectField
+            label="Tipo"
+            value={type}
+            onChange={(v) => setType(v as AccountType)}
+            options={accountTypes.filter((t) => t !== 'investment').map((t) => ({ value: t, label: accountTypeLabels[t] }))}
+          />
+          <label className="field">
+            <span>Saldo inicial</span>
+            <input className="input" inputMode="decimal" value={openingBalance} onChange={(event) => setOpeningBalance(event.target.value)} placeholder="0,00" />
+          </label>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={excludeFromTotals}
+              onChange={(event) => setExcludeFromTotals(event.target.checked)}
             />
-            <label className="field">
-              <span>Saldo inicial</span>
-              <input className="input" inputMode="decimal" value={openingBalance} onChange={(event) => setOpeningBalance(event.target.value)} placeholder="0,00" />
-            </label>
-            <label className="checkbox-row">
-              <input
-                type="checkbox"
-                checked={excludeFromTotals}
-                onChange={(event) => setExcludeFromTotals(event.target.checked)}
-              />
-              <span>
-                Não contar no saldo nem nas análises
-                <br />
-                <span className="text-muted">
-                  Para vale-refeição, vale-alimentação ou cartão presente — dinheiro que existe, mas
-                  não se mistura com o resto. Você continua lançando gastos nela normalmente.
-                </span>
+            <span>
+              Não contar no saldo nem nas análises
+              <br />
+              <span className="text-muted">
+                Para vale-refeição, vale-alimentação ou cartão presente — dinheiro que existe, mas
+                não se mistura com o resto. Você continua lançando gastos nela normalmente.
               </span>
-            </label>
+            </span>
+          </label>
+          <div className="sheet-actions">
             <button className="button button--primary" type="submit">
               Criar conta
             </button>
-          </>
-        )}
-      </form>
+          </div>
+        </form>
+      </BottomSheet>
 
       <AccountReconcileSheet
         open={reconcileAccount !== null}
@@ -359,6 +459,46 @@ export function AccountsPage() {
           });
         }}
       />
+
+      {/* Prévia do efeito antes de tirar a conta do saldo — mesmo padrão (`.pay-preview`) da sheet
+          de "Já foi paga". O número do Comprometido sai da função real, não de uma cópia da regra. */}
+      <BottomSheet
+        open={excludeTarget !== null}
+        onClose={() => setExcludeTarget(null)}
+        title={`Tirar ${excludeTarget?.name ?? ''} do saldo?`}
+        subtitle="Pra vale-refeição, vale-alimentação ou cartão presente"
+      >
+        <div className="form-stack">
+          <p className="pay-preview">
+            {excludeTarget ? (
+              <>
+                O Saldo total cai <strong>{formatMoney(excludeTarget.balanceCents)}</strong>
+                {excludeImpact && excludeImpact.committedCents > 0 ? (
+                  <>
+                    {' '}e o <strong>Comprometido cai {formatMoney(excludeImpact.committedCents)}</strong> —{' '}
+                    {excludeImpact.linhas} conta{excludeImpact.linhas !== 1 ? 's' : ''} e assinatura
+                    {excludeImpact.linhas !== 1 ? 's' : ''} que saem dessa conta deixam de ser contadas.
+                  </>
+                ) : (
+                  <>. Nenhuma conta a pagar ou assinatura sai dessa conta, então o Comprometido não muda.</>
+                )}
+              </>
+            ) : null}
+          </p>
+          <p className="text-secondary" style={{ margin: 0, fontSize: '0.85rem', lineHeight: 1.5 }}>
+            Nada é apagado: o saldo continua aparecendo aqui, os lançamentos seguem no Extrato e a conta
+            continua nos seletores. Dá pra voltar atrás a qualquer momento no mesmo botão.
+          </p>
+          <div className="sheet-actions">
+            <button className="button button--primary" type="button" onClick={confirmExcludeFromTotals}>
+              Tirar do saldo
+            </button>
+            <button className="button button--ghost" type="button" onClick={() => setExcludeTarget(null)}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </BottomSheet>
 
       {confirmDialog}
     </section>

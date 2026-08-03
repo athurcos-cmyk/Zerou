@@ -145,7 +145,10 @@ export function SharedSpacePage() {
   const coupleMode = shared.workspace?.coupleMode ?? null;
 
   return (
-    <section className="page-content page-content--narrow">
+    // Só a entrada `.reveal` da tela: aqui não cabe faixa de resumo (a página é um fluxo
+    // de configuração do casal, não uma lista de entidades) e as seções que têm números
+    // — CoupleSavingsSection/CoupleExpensesSection — já trazem os seus.
+    <section className="page-content page-content--narrow reveal">
       <div className="page-heading-row page-heading-row--tight">
         <div>
           <p className="eyebrow">Espaço do casal</p>

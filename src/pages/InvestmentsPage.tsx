@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Plus, ArrowUpRight, RefreshCw, HelpCircle, ChevronDown, ChevronRight, Building2, Landmark, Trash2, Check } from 'lucide-react';
 import { useFinanceContext } from '../finance/FinanceDataContext';
 import { useAuth } from '../auth/AuthContext';
@@ -198,7 +198,7 @@ export function InvestmentsPage() {
     // essas duas classes não existem em `global.css` (achado ao vivo, 01/08/2026): o cabeçalho
     // ficava sem o `margin-bottom` que toda tela irmã (Cartões, Contas, Metas) já tem de graça,
     // colado no hero abaixo. Corrigido casando com o padrão em vez de inventar espaçamento novo.
-    <section className="page-content" style={{ animation: 'fadeIn var(--duration-slow) ease both' }}>
+    <section className="page-content reveal">
       <header className="page-heading-row page-heading-row--tight">
         <div>
           <h1 className="page-title page-title--compact">Investimentos</h1>
@@ -206,59 +206,37 @@ export function InvestmentsPage() {
             Acompanhe seu portfólio. Nenhum valor é automático — você decide quando atualizar.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <button className="button button--subtle" type="button" onClick={openTour}>
-            <HelpCircle size={15} aria-hidden="true" /> Como funciona
-          </button>
-          <button className="button button--subtle" type="button" onClick={() => setAccountSheetOpen(true)}>
+        <div className="page-heading-actions">
+          <button className="button button--subtle page-action-button" type="button" onClick={() => setAccountSheetOpen(true)}>
             <Plus size={15} aria-hidden="true" /> Nova conta
+          </button>
+          <button className="button button--subtle page-action-button" type="button" onClick={openTour}>
+            <HelpCircle size={15} aria-hidden="true" /> Como funciona
           </button>
         </div>
       </header>
 
-      {/* Dashboard — green gradient hero for investment/growth context */}
+      {/* Faixa de resumo. Era ~50 linhas de style inline aqui dentro; virou `.summary-hero`
+          em global.css quando a mesma faixa passou a valer pra outras 4 telas (02/08/2026).
+          Nada mudou visualmente — a classe nasceu deste markup. */}
       {hasData && (
-        <div
-          className="card-list-hero"
-          style={{
-            marginBottom: '1.25rem',
-            background: 'var(--gradient-income)',
-            animation: 'fadeIn var(--duration-slow) 0.1s ease both'
-          }}
-        >
-          <div className="card-list-hero-inner" style={{
-            background: 'none',
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: '0.75rem',
-            position: 'relative',
-            overflow: 'hidden'
-          }}>
-            {/* Decorative background dot pattern — subtle depth on the hero */}
-            <span aria-hidden="true" style={{
-              position: 'absolute', right: '-0.5rem', top: '-0.5rem',
-              width: 80, height: 80, borderRadius: '50%',
-              background: 'var(--on-accent-16)', pointerEvents: 'none'
-            }} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-              <span className="card-list-hero-eyebrow">Total investido</span>
-              <strong className="card-list-hero-balance" style={{ fontSize: 'clamp(1.1rem, 3vw, 1.35rem)' }}>
-                {formatMoney(totalContributed)}
-              </strong>
+        <div className="summary-hero summary-hero--income reveal" style={{ '--reveal-i': 1 } as CSSProperties}>
+          <div className="summary-hero-inner">
+            <div className="summary-hero-stat">
+              <span className="summary-hero-eyebrow">Total investido</span>
+              <strong className="summary-hero-value">{formatMoney(totalContributed)}</strong>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-              <span className="card-list-hero-eyebrow">Valor atual</span>
-              <strong className="card-list-hero-balance" style={{ fontSize: 'clamp(1.1rem, 3vw, 1.35rem)' }}>
-                {formatMoney(totalBalance)}
-              </strong>
+            <div className="summary-hero-stat">
+              <span className="summary-hero-eyebrow">Valor atual</span>
+              <strong className="summary-hero-value">{formatMoney(totalBalance)}</strong>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-              <span className="card-list-hero-eyebrow">Rendimento</span>
-              <strong className="card-list-hero-balance" style={{ fontSize: 'clamp(1.1rem, 3vw, 1.35rem)' }}>
+            <div className="summary-hero-stat">
+              <span className="summary-hero-eyebrow">Rendimento</span>
+              <strong className="summary-hero-value">
                 {totalReturn >= 0 ? '+' : ''}{formatMoney(totalReturn)}
               </strong>
               {totalContributed > 0 && (
-                <span style={{ fontSize: '0.72rem', color: 'var(--on-accent-82)', fontWeight: 500 }}>
+                <span className="summary-hero-note">
                   {totalReturn >= 0 ? '+' : ''}{totalReturnPct.toFixed(1)}%
                 </span>
               )}
@@ -273,10 +251,7 @@ export function InvestmentsPage() {
           a coisa errada e mostrava "sem dados suficientes" mesmo com várias atualizações no
           mesmo dia — achado ao vivo, 01/08/2026. */}
       {activeInvestments.length > 0 && (
-        <div className="surface surface-pad" style={{
-          marginBottom: '1.25rem',
-          animation: 'fadeIn var(--duration-slow) 0.15s ease both'
-        }}>
+        <div className="surface surface-pad reveal" style={{ marginBottom: '1.25rem', '--reveal-i': 2 } as CSSProperties}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem' }}>
             <span style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -295,7 +270,16 @@ export function InvestmentsPage() {
 
       {/* Investment list grouped by account */}
       {!hasData ? (
-        <EmptyState illustration="wallet" title="Nenhum investimento ainda" description="Cadastre uma conta de investimento pra começar a acompanhar seu portfólio." />
+        <EmptyState
+          illustration="wallet"
+          title="Nenhum investimento ainda"
+          description="Cadastre uma conta de investimento pra começar a acompanhar seu portfólio."
+          action={
+            <button className="button button--primary button--compact" type="button" onClick={() => setAccountSheetOpen(true)}>
+              <Plus size={16} aria-hidden="true" /> Cadastrar conta
+            </button>
+          }
+        />
       ) : (
         <div className="item-list">
           {investmentAccounts.map((account, idx) => {
@@ -307,10 +291,8 @@ export function InvestmentsPage() {
             return (
               <div
                 key={account.id}
-                className="day-group"
-                style={{
-                  animation: `fadeIn var(--duration-slow) ${0.2 + idx * 0.06}s ease both`
-                }}
+                className="day-group reveal"
+                style={{ '--reveal-i': Math.min(idx + 3, 8) } as CSSProperties}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                   <button
@@ -397,8 +379,7 @@ export function InvestmentsPage() {
                             className="list-row"
                             style={{
                               padding: '0.55rem 0.75rem 0.55rem 3.25rem',
-                              display: 'flex', flexDirection: 'column', gap: '0.45rem',
-                              animation: 'fadeIn var(--duration-fast) ease both'
+                              display: 'flex', flexDirection: 'column', gap: '0.45rem'
                             }}
                           >
                             <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>

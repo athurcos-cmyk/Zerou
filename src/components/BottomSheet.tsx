@@ -1,4 +1,4 @@
-import { useEffect, useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { useFocusTrap } from '../utils/useFocusTrap';
@@ -22,7 +22,10 @@ const DISMISS_FLICK_VELOCITY = 0.5; // px/ms
 
 export function BottomSheet({ open, onClose, title, subtitle, children, bare = false }: BottomSheetProps) {
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{ startY: number; startTime: number; delta: number; captured: boolean } | null>(null);
+  // Há conteúdo abaixo do corte? Liga o degradê no rodapé da folha (`.sheet-panel--more`).
+  const [hasMoreBelow, setHasMoreBelow] = useState(false);
 
   useFocusTrap(open, panelRef);
 
@@ -39,6 +42,35 @@ export function BottomSheet({ open, onClose, title, subtitle, children, bare = f
       document.body.style.overflow = previousOverflow;
     };
   }, [open, onClose]);
+
+  // Folha longa não avisava que rolava (achado pelo dono no sheet "Nova conta" de Contas e
+  // assinaturas, 03/08/2026): 256px de formulário — incluindo o botão de criar — ficavam fora
+  // da vista, e o corte caía justamente no espaço ENTRE dois campos, então a folha parecia ter
+  // acabado ali. O degradê no rodapé some assim que a rolagem chega ao fim, então o aviso só
+  // existe enquanto for verdade.
+  //
+  // `ResizeObserver` no conteúdo (não só no corpo) porque campo condicional — "Frequência" ao
+  // marcar recorrente, "Parcelamento" ao escolher cartão — cresce a folha sem o corpo mudar de
+  // tamanho; sem isso o degradê ficaria desatualizado exatamente nos formulários mais longos.
+  useEffect(() => {
+    if (!open) return;
+    const body = bodyRef.current;
+    if (!body) return;
+
+    // 8px de folga: `scrollHeight`/`clientHeight` são arredondados e um zoom fracionário deixa
+    // sobra de sub-pixel no fim da rolagem, que sem a folga acenderia o degradê pra sempre.
+    const update = () => setHasMoreBelow(body.scrollHeight - body.scrollTop - body.clientHeight > 8);
+    update();
+
+    body.addEventListener('scroll', update, { passive: true });
+    const observer = new ResizeObserver(update);
+    observer.observe(body);
+    if (body.firstElementChild) observer.observe(body.firstElementChild);
+    return () => {
+      body.removeEventListener('scroll', update);
+      observer.disconnect();
+    };
+  }, [open]);
 
   if (!open) return null;
 
@@ -87,7 +119,7 @@ export function BottomSheet({ open, onClose, title, subtitle, children, bare = f
   return createPortal(
     <div className="sheet-root" role="dialog" aria-modal="true" aria-label={title || 'Painel'}>
       <button className="sheet-backdrop" type="button" aria-label="Fechar" onClick={onClose} />
-      <div className="sheet-panel" ref={panelRef}>
+      <div className={`sheet-panel${hasMoreBelow ? ' sheet-panel--more' : ''}`} ref={panelRef}>
         <div
           className="sheet-drag-zone"
           onPointerDown={handleDragStart}
@@ -108,7 +140,7 @@ export function BottomSheet({ open, onClose, title, subtitle, children, bare = f
             </div>
           )}
         </div>
-        <div className="sheet-body">{children}</div>
+        <div className="sheet-body" ref={bodyRef}>{children}</div>
       </div>
     </div>,
     document.body

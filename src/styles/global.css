@@ -753,17 +753,26 @@ html[data-reduce-motion='true'] *::after {
   gap: 0.65rem;
 }
 
-.form-accordion-toggle {
+/* Grupo de ações à direita do título da tela (botão "+", ajuda, badge de sync).
+   Substitui o `style={{ display:'flex', gap, alignItems }}` que estava
+   duplicado em toda tela de lista. */
+/* `flex-wrap` porque a linha carrega até três coisas ("+ Nova conta", "Como funciona" e o
+   badge de sync): em tela estreita com fonte grande do sistema, sem wrap o último item
+   vazaria pra fora em vez de descer. */
+.page-heading-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  width: 100%;
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  text-align: left;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+/* Botão "+ Nova conta"/"+ Novo cartão" do cabeçalho: `.button--subtle` mais
+   compacto, pra caber ao lado do título sem competir com ele nem com o FAB. */
+.page-action-button {
+  font-size: 0.82rem;
+  padding: 0.42rem 0.7rem;
+  white-space: nowrap;
 }
 
 .metric-card {
@@ -1778,6 +1787,133 @@ span.service-mark--brand {
 .card-list-hero-list {
   display: grid;
   gap: 0.75rem;
+}
+
+/* ============================================================
+   Summary hero — faixa de resumo no topo de uma tela de LISTA
+   (Investimentos, Contas, Cartões, Contas e assinaturas, A receber)
+   ------------------------------------------------------------
+   Nasceu como ~50 linhas de style inline dentro de InvestmentsPage.tsx
+   (2026-08-01). Virou classe quando a mesma faixa passou a valer pra
+   outras 4 telas — ver docs/design/DESIGN.md.
+
+   Não confundir com `.card-list-hero`: aquele é UM card por entidade
+   dentro da lista; este é UMA faixa por TELA, resumindo o conjunto.
+   Por isso ele pode usar gradiente semântico (verde pra dinheiro que
+   entra) sem violar a regra do Sol de não repetir gradiente vívido em
+   card de lista — ele aparece uma vez só.
+   ============================================================ */
+.summary-hero {
+  position: relative;
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  background: var(--gradient-slate);
+  margin-bottom: 1.25rem;
+}
+
+.summary-hero--income {
+  background: var(--gradient-income);
+}
+
+/* ⚠️ REGRA (achada ao vivo, 02/08/2026): o hero de resumo só usa GRADIENTE quando a
+   lista abaixo dele NÃO usa. Em Contas e Cartões, cada item da lista já é um card com
+   `--gradient-slate` (`.account-card-hero`/`.card-list-hero`) — um hero slate no topo
+   deixa de ser resumo e é lido como "mais um card da lista", só que sem nome de conta.
+   Nessas telas usa-se `.summary-hero--plain`: mesma estrutura, superfície neutra, o
+   número em DM Sans grande. Em A receber e Contas e assinaturas, cuja lista são linhas
+   simples, o gradiente é o que dá o contraste. */
+.summary-hero--plain {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-sm);
+}
+
+.summary-hero--plain::after {
+  background: var(--action-primary-soft);
+  opacity: 0.55;
+}
+
+.summary-hero--plain .summary-hero-eyebrow {
+  color: var(--text-secondary);
+}
+
+.summary-hero--plain .summary-hero-value {
+  color: var(--text-primary);
+}
+
+.summary-hero--plain .summary-hero-value--muted {
+  color: var(--text-secondary);
+}
+
+.summary-hero--plain .summary-hero-note {
+  color: var(--text-muted);
+}
+
+/* Círculo decorativo no canto — profundidade sem custar markup na página. */
+.summary-hero::after {
+  content: '';
+  position: absolute;
+  right: -0.75rem;
+  top: -0.9rem;
+  width: 5.5rem;
+  height: 5.5rem;
+  border-radius: 50%;
+  background: var(--on-accent-16);
+  pointer-events: none;
+}
+
+.summary-hero-inner {
+  position: relative;
+  z-index: 1;
+  padding: 1rem 1.15rem;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 0.75rem;
+}
+
+.summary-hero-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.summary-hero-eyebrow {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--on-accent-55);
+  line-height: 1.25;
+}
+
+.summary-hero-value {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(1.05rem, 3.4vw, 1.35rem);
+  color: var(--on-accent-95);
+  line-height: 1.1;
+}
+
+/* Valor que existe mas não é o herói da faixa (ex.: zero, ou já resolvido). */
+.summary-hero-value--muted {
+  color: var(--on-accent-82);
+}
+
+/* Número principal de uma faixa de 1-2 colunas. Numa faixa de 3 não cabe — ali todos
+   os valores ficam no tamanho padrão, senão quebram linha no celular. */
+.summary-hero-value--lead {
+  font-size: clamp(1.5rem, 5.5vw, 2rem);
+}
+
+.summary-hero-note {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--on-accent-82);
+  line-height: 1.3;
 }
 
 .card-limit-block {
@@ -3104,10 +3240,22 @@ span.service-mark--brand {
   margin-bottom: 0.35rem;
 }
 
+/* Sublinhado em vez de retângulo de foco (pedido do dono, 03/08/2026). `input` de texto casa com
+   `:focus-visible` SEMPRE que recebe foco — não só por teclado — e este campo tem `autoFocus`,
+   então a caixa já aparecia na abertura da tela, emoldurando justamente o número que é o herói
+   dela. Tirar o indicador sem pôr nada no lugar seria regressão de acessibilidade, então
+   ele virou uma linha sob o valor: discreta parada, nítida em foco. */
 .amount-hero-input-wrap {
   display: flex;
   align-items: baseline;
   gap: 0.4rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 2px solid var(--on-accent-16);
+  transition: border-color var(--duration-fast) ease;
+}
+
+.amount-hero-field:focus-within .amount-hero-input-wrap {
+  border-bottom-color: var(--on-accent-55);
 }
 
 .amount-hero-currency {
@@ -3132,9 +3280,9 @@ span.service-mark--brand {
   outline: none;
 }
 
+/* Quem indica o foco é o sublinhado do `.amount-hero-input-wrap` acima. */
 .amount-hero-input:focus-visible {
-  outline: 3px solid var(--border-focus);
-  outline-offset: 2px;
+  outline: none;
 }
 
 .amount-hero-input::placeholder {
@@ -3565,6 +3713,33 @@ span.service-mark--brand {
   overflow-x: clip;
   min-width: 0;
   -webkit-overflow-scrolling: touch;
+}
+
+/* "Ainda tem coisa aqui embaixo": degradê no rodapé da folha, ligado por `.sheet-panel--more`
+   (BottomSheet.tsx mede a rolagem) e apagado assim que a rolagem chega ao fim.
+   Fica no PAINEL, não no corpo: como `.sheet-body` é o container que rola, um `::after` dentro
+   dele rolaria junto com o conteúdo e sumiria da vista — preso ao painel, ele mora sempre na
+   borda de baixo. Cobre também o padding inferior do painel, e por isso o degradê fecha em
+   `--bg-surface` cheio: o encontro com o fundo do painel fica invisível.
+   `pointer-events: none` porque ele passa por cima do último campo visível e não pode roubar
+   o toque dele. Escolhido em vez de seta/texto por ser o aviso que não ocupa espaço nenhum e
+   se apaga sozinho quando deixa de ser verdade. */
+.sheet-panel::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  height: 3.25rem;
+  background: linear-gradient(to top, var(--bg-surface) 40%, transparent);
+  opacity: 0;
+  transition: opacity var(--duration-normal) ease;
+  pointer-events: none;
+}
+
+.sheet-panel--more::after {
+  opacity: 1;
 }
 
 .sheet-body .segmented {
@@ -4192,6 +4367,32 @@ span.service-mark--brand {
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+   .reveal — entrada escalonada de cards/linhas de uma lista
+   ------------------------------------------------------------
+   Uso: className="reveal" + style={{ '--reveal-i': indice }}.
+   Sem a variável o delay é 0, então serve também pra um elemento
+   solto (hero, cabeçalho) que só quer o fade de entrada.
+
+   Existia como style inline repetido 5× em InvestmentsPage.tsx
+   (`0.1s`, `0.15s`, `0.2 + idx * 0.06`...). Virou classe porque a
+   mesma entrada passou a valer pra Contas, Cartões, Contas e
+   assinaturas, A receber, Metas e Espaço do casal.
+
+   ⚠️ Não colocar `.reveal` em ancestral de elemento `position: sticky`
+   (ex.: `.day-group-header` do Extrato): o `transform` da animação cria
+   containing block e mata o sticky. Em lista com cabeçalho grudento,
+   animar as linhas, nunca o contêiner que rola.
+   ============================================================ */
+.reveal {
+  animation: fadeIn var(--duration-slow) ease both;
+  animation-delay: calc(var(--reveal-i, 0) * 60ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { animation: none; }
 }
 
 /* ============================================================

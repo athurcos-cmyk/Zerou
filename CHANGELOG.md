@@ -2,6 +2,124 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-03 (parte 3) — ux(contas): tirar conta do saldo agora avisa quanto o Comprometido cai
+
+- **Relato do dono**: marcou o Nubank como "fora do saldo" e o **Comprometido despencou** sem
+  explicação na tela. A hipótese dele — *"será nas recorrentes vinculadas a essa conta?"* — estava
+  certa.
+- **Não era bug de cálculo**: `buildUpcomingCommitments` descarta, por design, contas a pagar e
+  recorrências debitadas de uma conta excluída (senão o Comprometido subtrairia uma obrigação que o
+  Saldo total nunca somou). Nos dados reais do dono isso é **R$ 1.700,67** — 6 recorrências + 1
+  conta a pagar. As 6 recorrências de **cartão** não se mexem (cartão não é conta).
+- **O problema era o aviso chegar tarde**: o gatilho é um ícone de olho cuja explicação vivia só em
+  `title`/`aria-label` (**num app mobile-first não existe hover**), e a dica de texto que explicava
+  tudo só era renderizada **depois** de a conta já estar excluída.
+- **Correção**: sheet de prévia antes de aplicar, com número real — quanto cai o Saldo total, quanto
+  cai o Comprometido, quantas linhas somem, e o que **não** acontece (nada é apagado, dá pra voltar).
+  Mesmo padrão `.pay-preview` de "Já foi paga". A dica passou a aparecer sempre. Voltar a contar
+  segue em um toque, sem confirmação.
+- **A prévia usa a função real** (`buildUpcomingCommitments` chamada duas vezes, com e sem a conta),
+  nunca uma cópia do filtro — cópia começa certa e sai de sincronia depois.
+- Conferido ao vivo: prévia bateu com o cálculo independente (R$ 1.700,67 / 7 linhas). **Cancelado
+  sem aplicar — a conta do dono não foi alterada.** `typecheck` limpo, 540/540, build ok.
+
+## 2026-08-03 (parte 2) — fix(lançamento): "Salvar transação" saía da tela sem gravar nada
+
+- **Bug real relatado pelo dono**: *"se eu colocar valor mas não colocar conta ou cartão ele deixa
+  registrar, não salva nada, mas deixa registrar"*. Confirmado e corrigido.
+- **Causa raiz**: `createTransaction` é `async` e roda `schema.parse` **lá dentro**, então o erro
+  dela nasce como **promise rejeitada**. O `try/catch` da página parecia proteger, mas não pega
+  rejeição sem `await` — e o `navigate('/app/transactions')` rodava logo depois de qualquer jeito.
+  **A validação já existia e já reprovava** (`accountId: min(1, 'Escolha uma conta.')`,
+  `description: min(2)`): ela só era invisível. A pessoa voltava pro Extrato e o lançamento não
+  estava lá. `createTransaction` também estava **sem `.catch`** (a compra no cartão já tinha o dela).
+- **Correção**: toda condição que a pessoa consegue corrigir na tela passou a ser conferida de forma
+  **síncrona, antes da escrita**, em português — conta/cartão, conta de origem e destino da
+  transferência, e valor. O `try/catch` enganoso saiu; o `.catch` que faltava entrou.
+- **Título virou opcional com herança**: em branco, o lançamento nasce com o **nome da categoria**
+  escolhida (sem categoria, cai no rótulo do tipo — nunca bloqueia). O campo anuncia isso antes de
+  acontecer e **ao vivo**: escolher "Delivery" muda a dica pra "Em branco, usamos Delivery." — título
+  preenchido sozinho no Extrato, sem aviso, pareceria dado inventado pelo app.
+- **Valor zero passou a barrar**: `moneyCentsSchema` aceita `0`, e como o título deixou de barrar,
+  esse era o último campo que impedia um registro vazio por acidente.
+- **Retângulo de foco do valor removido**: `input` de texto casa com `:focus-visible` sempre que
+  recebe foco (não só por teclado), e o campo tem `autoFocus` — a caixa aparecia já na abertura,
+  emoldurando o número que é o herói da tela. Trocada por um **sublinhado**, que mantém o indicador
+  de foco sem a moldura.
+- Mensagem de erro agora **rola até a vista**: ela vive no topo do form e o botão Salvar é fixo no
+  rodapé; sem isso, apertar Salvar rolado pra baixo trocaria um erro silencioso por outro.
+- **`EditTransactionPage` recebeu a mesma correção** (mesma armadilha, mesmo arquivo-irmão): guardas
+  síncronos, `.catch` na promise, título opcional com herança da categoria. E o `await
+  updateCardPurchase` que existia lá virou fire-and-forget — ele **violava a regra offline-first**
+  do projeto (travava a UI esperando a rede); só foi seguro soltar porque a validação passou a
+  rodar antes.
+- **Furo fechado nas duas telas**: título de **1 letra** não era coberto pelo fallback (que só age em
+  campo vazio) e o schema o reprova (`min(2)`) — voltaria a sumir em silêncio. Agora tem mensagem
+  própria.
+- Validação: `typecheck` limpo, **540/540 testes**, build ok, e os bloqueios + o caminho feliz
+  conferidos ao vivo no navegador **nas duas telas**. Detalhe: `docs/history/2026-08.md`.
+
+## 2026-08-03 — ui: acabamento da reforma (folha avisa que rola, sugestão fixa removida, ajuda com rótulo)
+
+Quatro ajustes pontuais do dono depois de usar as telas reformadas na véspera. Nenhuma lógica de
+escrita mudou; `firestore.rules` não foi tocado.
+
+- **Folha longa não avisava que rolava.** No sheet "Nova conta" de Contas e assinaturas, **256px —
+  um terço do formulário, incluindo o botão "Criar conta" — ficavam fora da vista**, e o corte caía
+  no espaço **entre dois campos**, então a folha parecia ter acabado ali. `BottomSheet` ganhou um
+  degradê no rodapé (`.sheet-panel--more`) que **apaga sozinho ao chegar no fim** — toda folha do
+  app herdou. Fica no painel, não no corpo (o corpo é quem rola; um `::after` dentro dele rolaria
+  junto e sumiria), e o `ResizeObserver` observa **o conteúdo**, não só o corpo: campo condicional
+  ("Frequência" ao marcar recorrente) cresce a folha sem o corpo mudar de tamanho. Verificado ao
+  vivo: rolar até o fim apaga o aviso; marcar "Sim, recorrente" cresce 844→939px e ele volta.
+- **"Sugestões rápidas" (estado ocioso) removido** de Contas e assinaturas e de Contas — 183px e
+  239px gastos no instante em que a folha abre, com serviços/bancos fixos que são palpite sobre
+  alguém que ainda não digitou nada. O **filtro depois de digitar fica** ("Encontramos estas
+  opções"), custa zero espaço até lá e continua preenchendo categoria/tipo junto com o nome.
+  Resultado: Contas e assinaturas caiu de 256 pra **56px** escondidos; **Contas passou a caber
+  inteira, sem rolagem** (502px de conteúdo em 502px de espaço).
+- **"Como funciona" com rótulo visível** em Contas e assinaturas e Dinheiro a receber — eram
+  `icon-button` redondos só com "?"; agora são iguais ao de Investimentos, que virou o modelo.
+  `.page-heading-actions` ganhou `flex-wrap` (a linha carrega até três coisas).
+- **"Já recebido" saiu da faixa de Dinheiro a receber**: acumulado de sempre, só cresce e nunca
+  vira decisão — e dinheiro já recebido **já está no saldo**, então repeti-lo numa tela sobre o que
+  falta entrar sugere que ainda é pendente. Sobrou espaço pra "A receber" virar o número grande
+  (`--lead`). O histórico continua no chip "Recebidos".
+- Validação: `typecheck` limpo, **540/540 testes**, build ok, e cada folha medida ao vivo no
+  navegador (altura de conteúdo vs. espaço visível, antes e depois). Detalhe: `docs/history/2026-08.md`.
+
+## 2026-08-02 (parte 4) — ui: reforma visual das telas de lista (criação em sheet, faixa de resumo, entrada animada)
+
+- **Pedido do dono**: "o botão de nova conta na tela de Investimento fica clean, bonito, tem uma
+  pequena animação — queria isso nas outras telas". Dashboard **intocado**, por pedido explícito.
+- **Diagnóstico**: o app tinha **dois padrões de criação** convivendo. Sheet (Investimentos, Metas,
+  Categorias) e **acordeão inline** `.form-accordion-toggle` (Contas, Cartões, Contas e assinaturas,
+  Dinheiro a receber) — um `<form>` estacionado no corpo da página que expandia no lugar, sem
+  animação (render condicional puro), sem foco preso, sem ESC, sem swipe. Em **A receber** e
+  **Contas e assinaturas** ele ficava *acima* da lista: a primeira tela do celular não mostrava
+  nenhum item cadastrado, só um formulário fechado.
+- **`.form-accordion-toggle` removido do projeto.** As 4 telas agora criam por `BottomSheet`,
+  acionado por um `+ Nome` no cabeçalho. Nenhuma lógica de escrita mudou (fire-and-forget intacto,
+  incluindo o `navigate` pro cartão recém-criado); **nenhum payload do Firestore mudou, então
+  `firestore.rules` não foi tocado**.
+- **`.summary-hero` novo** — faixa de resumo no topo de cada tela de lista, extraída de ~50 linhas
+  de `style` inline que viviam dentro de `InvestmentsPage.tsx`. Contas e assinaturas **não tinha
+  resumo nenhum** até aqui. **Regra achada ao vivo: gradiente só quando a lista abaixo não usa** —
+  em Contas/Cartões, cujos itens já são cards `--gradient-slate`, o hero slate era lido como "mais
+  um card"; ali entrou `.summary-hero--plain`. E **resumo de 1 item é o item**: em Cartões a faixa
+  só aparece a partir de 2 cartões, senão repetia dígito por dígito o card logo abaixo.
+- **`.reveal` novo** — a entrada escalonada que existia como inline style repetido 5× em
+  Investimentos virou classe (`--reveal-i`, respeita `prefers-reduced-motion`, índice capado em 8).
+  Aplicada em Contas, Cartões, Contas e assinaturas, A receber, Metas e Espaço do casal.
+- **Estados vazios ganharam ação**: eram texto morto — com o formulário agora em sheet, ficariam
+  sem saída visível. Em Contas e assinaturas cada seção pré-seleciona o toggle certo.
+- **Redundâncias que o hero expôs**: o texto fixo de Contas e assinaturas encolheu de 5 linhas pra 2
+  (o resto já estava no hero e no tour), "Recorrentes · 12 · R$ 1.988,88" voltou a ser "Recorrentes",
+  "Compromissos" virou "Contas avulsas" (rótulo que já estava na eyebrow), e Cartões perdeu o
+  `<article className="surface">` que embrulhava cards que já são superfícies.
+- Validação: `typecheck` limpo, **540/540 testes**, build ok, e cada tela conferida ao vivo no
+  navegador. Detalhe: `docs/history/2026-08.md`.
+
 ## 2026-08-02 (parte 3) — ux(contas): vocabulário de registro, prévia do efeito, tutoriais e rename das duas telas
 
 - **Relato do dono**: usuários não entendiam a tela de Contas a Pagar — parte achava que servia só
