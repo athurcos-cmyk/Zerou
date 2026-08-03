@@ -1415,7 +1415,29 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time;
     }
 
-    function validCoupleMemberUpdate(workspaceId, uid) {
+    /**
+ * Voltar pro MESMO espaço depois de ter saído.
+ *
+ * Sair não apaga nada (`leaveCoupleWorkspace` só marca `status: 'removed'`), e é isso que faz o
+ * cofrinho e o histórico do casal sobreviverem — decisão de produto do dono: alguém pode sair sem
+ * querer, ou sair numa briga e voltar. Mas o doc do membro **continua existindo**, então o
+ * `batch.set()` de `acceptCoupleInvite` é avaliado como UPDATE, não create — e
+ * `validCoupleMemberUpdate` só sabe levar pra 'removed'. Resultado: uma pessoa NOVA entrava no
+ * espaço numa boa e a mesma pessoa que saiu era recusada (confirmado no emulador, 2026-08-03).
+ *
+ * As exigências aqui são as mesmas de `validCouplePartnerMemberCreate` — o convite tem que estar
+ * aceito por esta pessoa, pra este workspace, e o doc do workspace tem que refletir isso no mesmo
+ * batch. A única diferença é o ponto de partida: um membro `removed` que era `partner`.
+ */
+function validCouplePartnerMemberRejoin(workspaceId, uid) {
+  return isSelf(uid)
+    && resource.data.status == 'removed'
+    && resource.data.role == 'partner'
+    && resource.data.workspaceId == workspaceId
+    && validCouplePartnerMemberCreate(workspaceId, uid);
+}
+
+function validCoupleMemberUpdate(workspaceId, uid) {
       return signedIn()
         && resource.data.workspaceId == workspaceId
         && resource.data.userId == uid
@@ -1453,6 +1475,16 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time
         && getAfter(memberDoc(workspaceId, uid)).data.role == request.resource.data.role
         && getAfter(memberDoc(workspaceId, uid)).data.status == 'active';
+    }
+
+    /** Espelho de `validCouplePartnerMemberRejoin` pro ponteiro do usuário — mesmo motivo: o doc
+     * sobrevive à saída, então o `set()` de `acceptCoupleInvite` cai na regra de update. */
+    function validCoupleWorkspaceRefRejoin(uid, workspaceId) {
+      return isSelf(uid)
+        && resource.data.status == 'removed'
+        && resource.data.type == 'couple'
+        && resource.data.workspaceId == workspaceId
+        && validCoupleWorkspaceRefCreate(uid, workspaceId);
     }
 
     function validCoupleWorkspaceRefUpdate(uid, workspaceId) {
@@ -1756,7 +1788,8 @@ service cloud.firestore {
       match /workspaceRefs/{workspaceId} {
         allow read: if isSelf(uid) || isAdmin();
         allow create: if validWorkspaceRefFoundationCreate(uid, workspaceId) || validCoupleWorkspaceRefCreate(uid, workspaceId);
-        allow update: if validCoupleWorkspaceRefUpdate(uid, workspaceId);
+        allow update: if validCoupleWorkspaceRefUpdate(uid, workspaceId)
+          || validCoupleWorkspaceRefRejoin(uid, workspaceId);
         allow delete: if canDeleteUserAccountData(uid);
       }
 
@@ -1801,7 +1834,8 @@ service cloud.firestore {
         allow create: if validMemberFoundationCreate(workspaceId, uid)
           || validCoupleOwnerMemberCreate(workspaceId, uid)
           || validCouplePartnerMemberCreate(workspaceId, uid);
-        allow update: if validCoupleMemberUpdate(workspaceId, uid);
+        allow update: if validCoupleMemberUpdate(workspaceId, uid)
+          || validCouplePartnerMemberRejoin(workspaceId, uid);
         allow delete: if canDeleteWorkspaceTree(workspaceId) || canDeleteUserAccountData(uid);
       }
 

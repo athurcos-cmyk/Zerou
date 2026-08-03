@@ -415,6 +415,20 @@ export async function acceptCoupleInvite(code: string, userId: string, displayNa
     throw new Error('Use este convite com a conta da outra pessoa.');
   }
 
+  // Guarda que faltava: nada impedia entrar num segundo espaço estando ativo em outro. Isso não
+  // dava erro — dava um espaço INVISÍVEL, porque `useSharedWorkspaceData` pega o PRIMEIRO ref
+  // ativo e ignora o resto. Ficou mais fácil de acontecer desde que voltar pro espaço de onde
+  // você saiu passou a ser possível (2026-08-03): sair, criar o seu, e aceitar o convite antigo.
+  const existingCouple = await getActiveCoupleRefForUser(userId);
+
+  if (existingCouple) {
+    throw new Error(
+      existingCouple.workspaceId === invite.workspaceId
+        ? 'Você já está neste espaço compartilhado.'
+        : 'Você já tem um espaço compartilhado ativo. Saia dele antes de entrar em outro.'
+    );
+  }
+
   const workspaceId = invite.workspaceId;
   const now = serverTimestamp();
   const db = getFirebaseDb();

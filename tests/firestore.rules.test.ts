@@ -2683,6 +2683,101 @@ describe('firestore security rules', () => {
     await assertSucceeds(batch.commit());
   });
 
+  /**
+   * Sair do espaço não apaga nada (só marca `removed`), de propósito: o cofrinho e o histórico do
+   * casal sobrevivem, porque alguém pode sair sem querer — ou sair numa briga e voltar (decisão do
+   * dono, 2026-08-03). O efeito colateral é que o member doc CONTINUA existindo, então o
+   * `batch.set()` de `acceptCoupleInvite` é avaliado como UPDATE — e antes do
+   * `validCouplePartnerMemberRejoin` uma pessoa NOVA entrava no espaço numa boa enquanto a MESMA
+   * pessoa que saiu era recusada.
+   */
+  describe('voltar pro mesmo espaço depois de sair', () => {
+    const past = Timestamp.fromDate(new Date('2026-06-14T12:00:00'));
+
+    /** Estado logo após o convidado sair: workspace intacto, bob `removed`, convite novo no ar. */
+    async function seedAfterPartnerLeft(inviteId: string) {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        const adminDb = context.firestore();
+        await setDoc(doc(adminDb, 'workspaces/couple_a'), {
+          ...coupleWorkspacePayload('couple_a', 'alice', { partnerUserId: '', activeMemberCount: 1 }),
+          createdAt: past,
+          updatedAt: past
+        });
+        await setDoc(doc(adminDb, 'workspaces/couple_a/members/alice'), {
+          ...coupleMemberPayload('couple_a', 'alice', 'owner'),
+          createdAt: past,
+          updatedAt: past,
+          joinedAt: past
+        });
+        // O doc do bob SOBREVIVE à saída — é isso que muda a regra avaliada de create pra update.
+        await setDoc(doc(adminDb, 'workspaces/couple_a/members/bob'), {
+          ...coupleMemberPayload('couple_a', 'bob', 'partner', {
+            status: 'removed',
+            acceptedInviteId: 'invite_old',
+            removedAt: past
+          }),
+          createdAt: past,
+          updatedAt: past,
+          joinedAt: past
+        });
+        await setDoc(doc(adminDb, 'users/bob/workspaceRefs/couple_a'), {
+          ...workspaceRefPayload('couple_a', 'partner', { status: 'removed' }),
+          createdAt: past,
+          updatedAt: past
+        });
+        await setDoc(doc(adminDb, 'coupleInvites', inviteId), {
+          ...invitePayload(inviteId, 'couple_a', 'alice'),
+          createdAt: past,
+          updatedAt: past
+        });
+      });
+    }
+
+    /** Espelha o batch real de `acceptCoupleInvite` (`src/shared/sharedService.ts`). */
+    function acceptInviteBatch(db: TestFirestore, uid: string, inviteId: string) {
+      const modularDb = db as unknown as Parameters<typeof writeBatch>[0];
+      const batch = writeBatch(modularDb);
+      const now = serverTimestamp();
+      batch.update(doc(modularDb, 'workspaces/couple_a'), { partnerUserId: uid, activeMemberCount: 2, updatedAt: now });
+      batch.update(doc(modularDb, 'coupleInvites', inviteId), { status: 'accepted', usedBy: uid, usedAt: now, updatedAt: now });
+      batch.set(doc(modularDb, 'workspaces/couple_a/members', uid), coupleMemberPayload('couple_a', uid, 'partner', { acceptedInviteId: inviteId }));
+      batch.set(doc(modularDb, 'users', uid, 'workspaceRefs/couple_a'), workspaceRefPayload('couple_a', 'partner'));
+      return batch;
+    }
+
+    it('a mesma pessoa que saiu consegue voltar, com o espaço e o cofrinho intactos', async () => {
+      const inviteId = 'invite_' + 'c'.repeat(32);
+      await seedAfterPartnerLeft(inviteId);
+      const bobDb = testEnv.authenticatedContext('bob').firestore();
+
+      await assertSucceeds(acceptInviteBatch(bobDb, 'bob', inviteId).commit());
+    });
+
+    it('uma pessoa nova também entra no mesmo espaço', async () => {
+      const inviteId = 'invite_' + 'd'.repeat(32);
+      await seedAfterPartnerLeft(inviteId);
+      const charlieDb = testEnv.authenticatedContext('charlie').firestore();
+
+      await assertSucceeds(acceptInviteBatch(charlieDb, 'charlie', inviteId).commit());
+    });
+
+    // O ramo de reentrada não pode virar uma porta pra "reativar" alguém sem convite: sem o
+    // convite aceito no mesmo batch, `validCouplePartnerMemberCreate` (reusada dentro dele) recusa.
+    it('nega reativar o membro sem o convite aceito no mesmo batch', async () => {
+      const inviteId = 'invite_' + 'e'.repeat(32);
+      await seedAfterPartnerLeft(inviteId);
+      const bobDb = testEnv.authenticatedContext('bob').firestore();
+      const modularBobDb = bobDb as unknown as Parameters<typeof writeBatch>[0];
+
+      const batch = writeBatch(modularBobDb);
+      batch.update(doc(modularBobDb, 'workspaces/couple_a'), { partnerUserId: 'bob', activeMemberCount: 2, updatedAt: serverTimestamp() });
+      batch.set(doc(modularBobDb, 'workspaces/couple_a/members/bob'), coupleMemberPayload('couple_a', 'bob', 'partner', { acceptedInviteId: inviteId }));
+      batch.set(doc(modularBobDb, 'users/bob/workspaceRefs/couple_a'), workspaceRefPayload('couple_a', 'partner'));
+
+      await assertFails(batch.commit());
+    });
+  });
+
   it('blocks frontend attempts to alter couple membership roles directly', async () => {
     const bobDb = testEnv.authenticatedContext('bob').firestore();
 

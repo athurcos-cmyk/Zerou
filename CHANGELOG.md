@@ -2,6 +2,30 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-03 (parte 7) - fix(casal): a mesma pessoa que saiu nao conseguia voltar pro espaco
+
+Achado pelo dono olhando a tela do anfitriao depois do deploy: o convidado saiu, o espaco continuou
+la (so na tela de convite), e ele perguntou se convidar de novo voltaria pro MESMO workspace.
+
+- **Volta, sim — e por desenho.** `leaveCoupleWorkspace` nao apaga nada: marca member doc e
+  workspaceRef como `removed` e zera `partnerUserId`. Workspace segue `active`, cofrinho/despesas/
+  acertos intactos. Decisao do dono: alguem pode sair sem querer, ou sair numa briga e voltar.
+- **⚠️ Mas so valia pra pessoa NOVA.** Confirmado no emulador antes de mexer em nada: convidar
+  outra pessoa funcionava; a **mesma pessoa que saiu era recusada**. Causa: o member doc SOBREVIVE a
+  saida, entao o `batch.set()` de `acceptCoupleInvite` e avaliado como **UPDATE**, nao create — caia
+  em `validCoupleMemberUpdate`, que so sabe levar pra `removed`. A regra de create existia e estava
+  correta, so nunca era alcancada (mesma classe do bug do log de auditoria, em outro lugar).
+- Corrigido com `validCouplePartnerMemberRejoin`/`validCoupleWorkspaceRefRejoin`, que **reusam** as
+  funcoes de create em vez de copiar as exigencias — campo novo no payload muda os dois caminhos
+  juntos. Teste garante que sem convite aceito no mesmo batch a reentrada continua negada.
+- **Guarda que faltava desde sempre**: `acceptCoupleInvite` nao impedia entrar num 2o espaco estando
+  ativo em outro. Nao dava erro — dava espaco **invisivel** (`useSharedWorkspaceData` pega o 1o ref
+  ativo e ignora o resto). Ficou mais provavel agora que voltar e possivel.
+- A tela passou a **dizer** isso: com alguem que ja saiu, o card vira "Chame alguem de volta" +
+  "Nada foi perdido — o espaco continua o mesmo". Antes era identico ao de um espaco vazio, e foi
+  por isso que o dono precisou perguntar.
+- 107 testes de regras, 555 de cliente. Detalhe: `docs/history/2026-08.md`.
+
 ## 2026-08-03 (parte 6) — feat/fix(casal): revisão completa do modo casal (5 achados, 3 relatados)
 
 Sessão pedida pelo dono depois de testar o espaço compartilhado ao vivo com duas contas. Três bugs

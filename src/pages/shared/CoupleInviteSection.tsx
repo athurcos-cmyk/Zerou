@@ -29,6 +29,15 @@ interface CoupleInviteSectionProps {
   userId: string;
   /** Active invite as it exists on the server right now — may be set even after a reload, when the raw code is gone. */
   activeInvite: CoupleInvite | undefined;
+  /**
+   * Alguém já esteve neste espaço e saiu.
+   *
+   * Muda a mensagem porque muda o fato: sair não cancela o espaço nem apaga o cofrinho, e quem
+   * entrar com o convite novo — inclusive a mesma pessoa que saiu — cai neste mesmo espaço, com
+   * tudo como estava. Sem dizer isso, a tela de convite é idêntica à de um espaço vazio e a
+   * pessoa supõe que perdeu o histórico (foi exatamente a dúvida do dono ao testar, 2026-08-03).
+   */
+  partnerLeft: boolean;
   /** Trava de conexão do espaço a dois — gerar/revogar convite mexe num doc que a outra pessoa
    * vai ler; offline isso só ficaria numa fila que ninguém consegue usar. */
   gate: ReturnType<typeof useCoupleWriteGate>;
@@ -42,7 +51,7 @@ interface CoupleInviteSectionProps {
  * code (this session), or an invite that already exists on the server but whose raw code was
  * lost on reload (it's stored hashed, so it can't be shown again).
  */
-export function CoupleInviteSection({ workspaceId, workspaceName, userId, activeInvite, gate, confirm, onMessage }: CoupleInviteSectionProps) {
+export function CoupleInviteSection({ workspaceId, workspaceName, userId, activeInvite, partnerLeft, gate, confirm, onMessage }: CoupleInviteSectionProps) {
   const [generatedInvite, setGeneratedInvite] = useState<GeneratedInvite | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -182,11 +191,22 @@ export function CoupleInviteSection({ workspaceId, workspaceName, userId, active
       <div className="section-heading">
         <div>
           <p className="eyebrow">Convite</p>
-          <h2>Chame a outra pessoa</h2>
+          <h2>{partnerLeft ? 'Chame alguém de volta' : 'Chame a outra pessoa'}</h2>
         </div>
         <QrCode size={22} aria-hidden="true" />
       </div>
-      <p className="text-secondary">Gere um código, link e QR Code para a outra pessoa entrar.</p>
+      {partnerLeft ? (
+        <div className="notice">
+          <strong>Nada foi perdido.</strong>
+          <br />
+          <span>
+            O espaço continua o mesmo: o cofrinho, as despesas e o histórico de vocês estão salvos.
+            Quem entrar com o convite novo encontra tudo como está — inclusive a mesma pessoa que saiu.
+          </span>
+        </div>
+      ) : (
+        <p className="text-secondary">Gere um código, link e QR Code para a outra pessoa entrar.</p>
+      )}
       <button className="button button--primary button--block" type="button" disabled={gate.blocked} onClick={handleGenerate}>
         Gerar convite
       </button>

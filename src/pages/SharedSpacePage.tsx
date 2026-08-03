@@ -265,6 +265,7 @@ export function SharedSpacePage() {
                 workspaceName={shared.workspace?.name ?? ''}
                 userId={user.uid}
                 activeInvite={shared.invites[0]}
+                partnerLeft={shared.members.some((member) => member.status === 'removed')}
                 gate={gate}
                 confirm={confirm}
                 onMessage={setMessage}
