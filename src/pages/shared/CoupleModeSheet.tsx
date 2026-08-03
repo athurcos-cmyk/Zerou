@@ -18,18 +18,22 @@ export const coupleModeOptions: CoupleModeOption[] = [
     desc: 'Juntamos dinheiro pra objetivos em comum. Simples assim.',
     more: 'Despesas podem ser ativadas depois'
   },
+  // "Sem cálculo de dívida" / "Sem acerto formal" saíram destas duas descrições em 2026-08-03:
+  // elas descreviam o app de antes, quando o acerto era código morto sem tela nenhuma. Agora os
+  // dois modos mostram quem deve quanto e deixam quitar — prometer o contrário era mentir na hora
+  // exata em que a pessoa está escolhendo o modo.
   {
     id: 'transparent',
     icon: Eye,
     label: 'Transparência',
-    desc: 'Cada um vê o que o outro pagou nas despesas divididas. Sem cálculo de dívida.',
+    desc: 'Cada um vê o que o outro pagou nas despesas divididas, e o app mostra quem deve quanto.',
     more: 'Equilíbrio pode ser ativado depois'
   },
   {
     id: 'balanced',
     icon: Scale,
     label: 'Equilíbrio',
-    desc: 'Vemos quem está cobrindo mais no mês, em proporção. Sem acerto formal.'
+    desc: 'Além de quem deve quanto, vemos quem está cobrindo mais no mês, em proporção.'
   }
 ];
 
