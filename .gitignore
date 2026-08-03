@@ -48,3 +48,10 @@ test-results/
 
 # Docs locais (nunca comitar — credenciais, notas de máquina local)
 *.local.md
+
+# Grafo de conhecimento (graphify) — artefato GERADO, regenerável com `graphify update .`
+# Fora do git de propósito: 19 MB e crescendo ~3,5 MB/dia (ele guarda um snapshot por dia).
+# Comitar isso incharia o repositório pra sempre, sem nada em troca — o grafo é derivado do
+# próprio código que já está versionado aqui.
+graphify-out/
+*.graphify-bak
