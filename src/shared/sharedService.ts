@@ -25,14 +25,19 @@ import { getFirebaseDb, getFirebaseFunctions } from '../firebase/config';
 import { fireWrite } from '../firebase/fireWrite';
 import { readSnapshotDoc } from '../firebase/snapshotData';
 import { getPersonalWorkspaceId } from '../workspaces/workspaceService';
+import { applyAccountEffectsToBatch } from '../finance/accountBatchEffects';
+import { invertAccountEffects, transactionAccountEffects } from '../finance/financeCalculations';
+import { monthKeyFromDate } from '../finance/financeDates';
 import {
   createSettlementSchema,
   createSharedExpenseClaimSchema,
   recordSettlementPaymentSchema,
+  registerSettlementPaymentSchema,
   updateClaimStatusSchema,
   type CreateSettlementInput,
   type CreateSharedExpenseClaimInput,
   type RecordSettlementPaymentInput,
+  type RegisterSettlementPaymentInput,
   type UpdateClaimStatusInput
 } from './sharedSchemas';
 import {
@@ -51,10 +56,24 @@ import type {
   Settlement,
   SharedExpenseClaim,
   SyncStatus,
+  Transaction,
   Workspace,
   WorkspaceMembership,
   WorkspaceRef
 } from '../types/contracts';
+
+/**
+ * Onde o registro do casal encosta nas finanças PESSOAIS de quem registrou.
+ *
+ * `personalWorkspaceId` é sempre o workspace de quem está mexendo (nunca o do parceiro — o
+ * parceiro não é membro dele e as regras recusariam). `accountId` ausente = "só anotar":
+ * grava o lado compartilhado e não cria transação nem move saldo nenhum.
+ */
+export interface PersonalEntryOptions {
+  personalWorkspaceId?: string;
+  accountId?: string;
+  categoryId?: string;
+}
 
 export type LocalSharedSynced<T> = T & {
   localSyncStatus: SyncStatus;
@@ -119,6 +138,23 @@ function membersRef(workspaceId: string) {
   return collection(getFirebaseDb(), 'workspaces', workspaceId, 'members');
 }
 
+function personalTransactionRef(personalWorkspaceId: string, transactionId: string) {
+  return doc(getFirebaseDb(), 'workspaces', personalWorkspaceId, 'transactions', transactionId);
+}
+
+/**
+ * Id da transação pessoal de um registro do casal — **derivado**, nunca guardado.
+ *
+ * O doc do casal não pode conter nenhum ponteiro pra dado pessoal (há teste de regra provando
+ * que um `sourcePersonalTransactionId` no claim é recusado, e `hasOnly` mantém isso de pé). Como
+ * o id é uma função pura do id compartilhado, excluir o claim consegue achar a transação
+ * correspondente sem que o espaço a dois jamais tenha sabido que ela existe. De brinde, sai
+ * idempotente: repetir a criação sobrescreve o mesmo doc em vez de duplicar lançamento.
+ */
+export function personalTransactionIdForShared(sharedId: string) {
+  return `txn_shr_${sharedId.replace(/^([a-z]+_)+/, '')}`;
+}
+
 function splitEqually(totalAmountCents: number, userIds: string[]) {
   const base = Math.floor(totalAmountCents / userIds.length);
   const remainder = totalAmountCents % userIds.length;
@@ -147,6 +183,64 @@ function resolveSplit(
   }
 
   return split.map((part) => ({ userId: part.userId, amountCents: part.amountCents }));
+}
+
+/**
+ * Acrescenta ao batch a transação pessoal de um registro do casal — ou nada, quando a pessoa
+ * escolheu "só anotar".
+ *
+ * O saldo da conta é movido pelo mesmo `applyAccountEffectsToBatch`/`transactionAccountEffects`
+ * que todo lançamento do app usa: o sinal por tipo mora num lugar só, então "acerto pago" nunca
+ * pode divergir de uma despesa comum.
+ */
+function addPersonalEntryToBatch(
+  batch: ReturnType<typeof writeBatch>,
+  args: {
+    sharedId: string;
+    userId: string;
+    personal: PersonalEntryOptions;
+    type: 'expense' | 'reimbursement';
+    amountCents: number;
+    description: string;
+    occurredOn: Date;
+    tags?: string[];
+  }
+) {
+  const { personalWorkspaceId, accountId, categoryId } = args.personal;
+
+  if (!personalWorkspaceId || !accountId) {
+    return;
+  }
+
+  const transactionId = personalTransactionIdForShared(args.sharedId);
+  const monthKey = monthKeyFromDate(args.occurredOn);
+
+  batch.set(personalTransactionRef(personalWorkspaceId, transactionId), {
+    id: transactionId,
+    workspaceId: personalWorkspaceId,
+    createdBy: args.userId,
+    updatedBy: args.userId,
+    type: args.type,
+    amountCents: args.amountCents,
+    description: args.description,
+    accountId,
+    ...(categoryId ? { categoryId } : {}),
+    date: Timestamp.fromDate(args.occurredOn),
+    competenceMonth: monthKey,
+    cashMonth: monthKey,
+    tags: args.tags ?? ['casal'],
+    isRecurring: false,
+    clientMutationId: transactionId,
+    syncStatus: 'synced' as const,
+    version: 1,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+  applyAccountEffectsToBatch(
+    batch,
+    personalWorkspaceId,
+    transactionAccountEffects({ type: args.type, amountCents: args.amountCents, accountId })
+  );
 }
 
 function auditEntry(workspaceId: string, actorUserId: string, type: string, targetType: AuditLog['targetType'], targetId: string, summary: string) {
@@ -409,7 +503,6 @@ export async function cancelCoupleWorkspace(workspaceId: string, userId: string,
   }
   // Validação rápida no client (feedback instantâneo). A Cloud Function repete esta
   // validação com Admin SDK e usa recursiveDelete — sem deixar subcoleções órfãs.
-  const db = getFirebaseDb();
   const wsSnap = await getDoc(workspaceRef(workspaceId));
   if (wsSnap.exists() && (wsSnap.data().activeMemberCount ?? 1) > 1) {
     throw new Error('Não é possível cancelar um espaço com parceiro ativo. Remova o parceiro primeiro.');
@@ -484,7 +577,34 @@ export async function removePartner(workspaceId: string, ownerUserId: string, pa
   await batch.commit();
 }
 
-export async function createSharedExpenseClaim(workspaceId: string, userId: string, input: CreateSharedExpenseClaimInput) {
+/**
+ * Registra uma despesa dividida — e, no MESMO batch atômico, o lançamento dela nas finanças
+ * pessoais de quem pagou.
+ *
+ * O valor lançado na conta pessoal é o **total**, não a metade: foi o total que saiu do banco.
+ * Lançar só a própria parte deixaria o saldo da conta permanentemente acima do saldo real — a
+ * mesma divergência que a tela "Acertar saldo com o banco" existe pra consertar. A parte da
+ * outra pessoa não desaparece: vira dívida dela no saldo do casal
+ * (`calculateSharedBalances`), e quita quando ela paga.
+ *
+ * Cross-workspace num batch só é o mesmo padrão de `coupleGoalDeposit` (`financeService.ts`):
+ * batch do Firestore é atômico em todo o banco, então nunca existe metade do registro.
+ *
+ * Devolve a promise do commit em vez de engolir com `fireWrite`: aqui erro do servidor é
+ * divergência entre duas pessoas, e o chamador precisa poder avisar
+ * (ver a trava de conexão em `coupleWriteGate.ts`).
+ *
+ * `async` de propósito, apesar de não haver `await`: o `schema.parse` abaixo lança, e num handler
+ * de evento uma exceção SÍNCRONA não é pega pelo `.catch` do chamador — viraria erro solto em vez
+ * de mensagem na tela. Assim falha de validação e falha do servidor caem no mesmo `.catch`. A UI
+ * ainda valida antes de chamar (guardas síncronos), isto é a rede de segurança.
+ */
+export async function createSharedExpenseClaim(
+  workspaceId: string,
+  userId: string,
+  input: CreateSharedExpenseClaimInput,
+  personal: PersonalEntryOptions = {}
+) {
   const parsed = createSharedExpenseClaimSchema.parse(input);
   const id = createId('claim');
   const now = serverTimestamp();
@@ -497,6 +617,7 @@ export async function createSharedExpenseClaim(workspaceId: string, userId: stri
     description: parsed.description,
     totalAmountCents: parsed.totalAmountCents,
     split: resolveSplit(parsed.totalAmountCents, parsed.participantUserIds, parsed.split),
+    occurredOn: Timestamp.fromDate(parsed.occurredOn),
     sourceVisibility: 'summary_only',
     status: 'pending',
     createdBy: userId,
@@ -505,11 +626,67 @@ export async function createSharedExpenseClaim(workspaceId: string, userId: stri
     createdAt: now,
     updatedAt: now
   });
+  addPersonalEntryToBatch(batch, {
+    sharedId: id,
+    userId,
+    personal,
+    type: 'expense',
+    amountCents: parsed.totalAmountCents,
+    description: parsed.description,
+    occurredOn: parsed.occurredOn
+  });
   const audit = auditEntry(workspaceId, userId, 'shared_claim_created', 'claim', id, 'Claim resumido criado.');
   batch.set(audit.reference, audit.payload);
 
-  fireWrite(batch.commit());
-  return id;
+  return batch.commit().then(() => id);
+}
+
+/**
+ * Exclui a despesa dividida e desfaz junto o lançamento pessoal dela (soft delete + saldo de
+ * volta), num batch atômico.
+ *
+ * A leitura extra (`getDoc` da transação derivada) é o preço de não guardar ponteiro pessoal no
+ * doc do casal — e só acontece no caminho de exclusão. Se a pessoa registrou com "só anotar", o
+ * doc não existe e o batch fica só com o lado compartilhado.
+ *
+ * Só quem registrou chega aqui (a regra do Firestore recusa os outros): é a única pessoa que
+ * consegue tocar nas duas pontas, porque a transação pessoal vive no workspace dela.
+ */
+export async function deleteSharedExpenseClaim(
+  workspaceId: string,
+  claimId: string,
+  userId: string,
+  personal: Pick<PersonalEntryOptions, 'personalWorkspaceId'> = {}
+) {
+  const batch = writeBatch(getFirebaseDb());
+  const now = serverTimestamp();
+
+  if (personal.personalWorkspaceId) {
+    const transactionId = personalTransactionIdForShared(claimId);
+    const reference = personalTransactionRef(personal.personalWorkspaceId, transactionId);
+    const snapshot = await getDoc(reference);
+    const transaction = snapshot.exists() ? (snapshot.data() as Transaction) : null;
+
+    if (transaction && !transaction.deletedAt) {
+      batch.update(reference, {
+        updatedBy: userId,
+        deletedAt: now,
+        updatedAt: now,
+        version: (transaction.version ?? 1) + 1
+      });
+      applyAccountEffectsToBatch(
+        batch,
+        personal.personalWorkspaceId,
+        invertAccountEffects(transactionAccountEffects(transaction))
+      );
+    }
+  }
+
+  batch.delete(claimRef(workspaceId, claimId));
+  const audit = auditEntry(workspaceId, userId, 'shared_claim_deleted', 'claim', claimId, 'Despesa dividida excluída.');
+  batch.set(audit.reference, audit.payload);
+
+  return batch.commit();
 }
 
 export async function updateSharedExpenseClaimStatus(workspaceId: string, userId: string, input: UpdateClaimStatusInput) {
@@ -532,7 +709,104 @@ export async function updateSharedExpenseClaimStatus(workspaceId: string, userId
   const audit = auditEntry(workspaceId, userId, `shared_claim_${parsed.status}`, 'claim', parsed.claimId, `Claim marcado como ${parsed.status}.`);
   batch.set(audit.reference, audit.payload);
 
-  fireWrite(batch.commit());
+  // Devolve a promise (em vez de `fireWrite`) pelo mesmo motivo de `createSharedExpenseClaim`:
+  // no espaço a dois, escrita recusada em silêncio é divergência entre duas pessoas.
+  return batch.commit();
+}
+
+/**
+ * "Já paguei minha parte" — registra um pagamento de acerto que JÁ aconteceu, junto com a
+ * despesa real na conta de quem pagou.
+ *
+ * Segue a regra de voz do app (`docs/design/DESIGN.md`): o Granativa não transfere dinheiro, a
+ * pessoa confirma um fato passado. E cada um lança só o SEU lado — a transação da outra pessoa
+ * é impossível de criar aqui (ela não é membro do workspace pessoal de ninguém além dela, e as
+ * regras recusariam), por isso quem recebe confirma depois, em `confirmSettlementReceipt`.
+ */
+// `async` pelo mesmo motivo de `createSharedExpenseClaim`: erro do `schema.parse` tem que chegar
+// no `.catch` do chamador, não estourar síncrono dentro do handler de submit.
+export async function registerSettlementPayment(
+  workspaceId: string,
+  userId: string,
+  input: RegisterSettlementPaymentInput,
+  personal: PersonalEntryOptions = {},
+  opts: { partnerLabel?: string; occurredOn?: Date } = {}
+) {
+  const parsed = registerSettlementPaymentSchema.parse(input);
+  const id = createId('settlement');
+  const now = serverTimestamp();
+  const occurredOn = opts.occurredOn ?? new Date();
+  const settled = parsed.amountCents >= parsed.totalOwedCents;
+  const batch = writeBatch(getFirebaseDb());
+
+  batch.set(settlementRef(workspaceId, id), {
+    id,
+    workspaceId,
+    fromUserId: userId,
+    toUserId: parsed.toUserId,
+    amountCents: parsed.totalOwedCents,
+    status: settled ? 'settled' : 'partially_paid',
+    paidAmountCents: parsed.amountCents,
+    createdBy: userId,
+    clientMutationId: id,
+    version: 1,
+    createdAt: now,
+    updatedAt: now
+  });
+  addPersonalEntryToBatch(batch, {
+    sharedId: id,
+    userId,
+    personal,
+    type: 'expense',
+    amountCents: parsed.amountCents,
+    description: opts.partnerLabel ? `Acerto do casal: ${opts.partnerLabel}` : 'Acerto do casal',
+    occurredOn,
+    tags: ['casal', 'acerto']
+  });
+  const audit = auditEntry(workspaceId, userId, 'settlement_payment_registered', 'settlement', id, 'Pagamento de acerto registrado.');
+  batch.set(audit.reference, audit.payload);
+
+  return batch.commit().then(() => id);
+}
+
+/**
+ * "Recebi" — quem recebe confirma o pagamento que o outro registrou e lança a entrada na
+ * própria conta.
+ *
+ * `receiptConfirmedAt` só pode ser gravado UMA vez (a regra recusa sobrescrever) — é o que
+ * impede a mesma entrada de cair duas vezes na conta de quem recebeu.
+ */
+export async function confirmSettlementReceipt(
+  workspaceId: string,
+  userId: string,
+  settlement: Pick<Settlement, 'id' | 'paidAmountCents' | 'status' | 'version'>,
+  personal: PersonalEntryOptions = {},
+  opts: { partnerLabel?: string } = {}
+) {
+  const now = serverTimestamp();
+  const occurredOn = new Date();
+  const batch = writeBatch(getFirebaseDb());
+
+  batch.update(settlementRef(workspaceId, settlement.id), {
+    status: settlement.status,
+    receiptConfirmedAt: now,
+    version: settlement.version + 1,
+    updatedAt: now
+  });
+  addPersonalEntryToBatch(batch, {
+    sharedId: `receipt_${settlement.id}`,
+    userId,
+    personal,
+    type: 'reimbursement',
+    amountCents: settlement.paidAmountCents,
+    description: opts.partnerLabel ? `Acerto do casal: ${opts.partnerLabel}` : 'Acerto do casal',
+    occurredOn,
+    tags: ['casal', 'acerto']
+  });
+  const audit = auditEntry(workspaceId, userId, 'settlement_receipt_confirmed', 'settlement', settlement.id, 'Recebimento de acerto confirmado.');
+  batch.set(audit.reference, audit.payload);
+
+  return batch.commit();
 }
 
 export async function createSettlementProposal(workspaceId: string, userId: string, input: CreateSettlementInput) {

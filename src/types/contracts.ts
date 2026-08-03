@@ -437,6 +437,10 @@ export interface SharedExpenseClaim {
   description: string;
   totalAmountCents: MoneyCents;
   split: SharedExpenseSplit[];
+  /** Quando o gasto aconteceu — a lista do casal e a transação pessoal de quem pagou usam a
+   * MESMA data, senão o mês da Análise divergiria do que os dois veem no espaço.
+   * Ausente = registro anterior a 2026-08-03, que caía no `createdAt`. */
+  occurredOn?: Timestamp;
   sourceVisibility: 'summary_only';
   status: 'pending' | 'accepted' | 'disputed' | 'settled';
   createdBy: string;
@@ -454,6 +458,9 @@ export interface Settlement {
   amountCents: MoneyCents;
   status: 'proposed' | 'accepted' | 'partially_paid' | 'settled' | 'cancelled';
   paidAmountCents: MoneyCents;
+  /** Quando quem RECEBE confirmou o recebimento (e lançou a entrada na conta dele). Gravável
+   * uma vez só, pela regra — é o que impede lançar o mesmo recebimento duas vezes. */
+  receiptConfirmedAt?: Timestamp;
   createdBy: string;
   clientMutationId: string;
   createdAt?: Timestamp;

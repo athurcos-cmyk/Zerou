@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCircle2 } from 'lucide-react';
 import { BottomSheet } from '../components/BottomSheet';
+import { fireWrite } from '../firebase/fireWrite';
 import { deleteGoal, deleteGoalWithRefund } from './financeService';
 import { formatMoney } from './money';
 import type { Account, Goal } from '../types/contracts';
@@ -44,7 +45,10 @@ export function GoalDeleteSheet({ open, workspaceId, userId, goal, accounts, onC
 
   function handleForfeit() {
     if (!workspaceId || !goal) return;
-    deleteGoal(workspaceId, goal.id);
+    // `fireWrite` aqui: meta pessoal é offline-first (uma pessoa, um dado). Quem NÃO pode engolir
+    // o erro é o cofrinho do casal — lá `deleteGoal` é chamado com `.catch` (ver
+    // `CoupleSavingsSection`), porque falha silenciosa vira cofrinho voltando ao recarregar.
+    fireWrite(deleteGoal(workspaceId, goal.id));
     onClose();
     onDeleted?.();
   }

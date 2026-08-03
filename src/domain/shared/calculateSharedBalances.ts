@@ -11,7 +11,18 @@ export interface SettlementSuggestion {
   amountCents: MoneyCents;
 }
 
-const claimStatusesThatAffectBalance = new Set<SharedExpenseClaim['status']>(['accepted', 'settled']);
+/**
+ * `pending` conta — e isso é o oposto do que estava aqui até 2026-08-03.
+ *
+ * A lista era `['accepted', 'settled']`, mas `createSharedExpenseClaim` cria TODA despesa como
+ * `pending` e nunca existiu tela pra aceitar: o saldo do casal era matematicamente sempre zero,
+ * pra sempre. Aceitar não podia ser pré-requisito de aparecer no saldo, porque quem espera é
+ * quem já pagou — se a outra pessoa não abrir o app, a dívida simplesmente não existe.
+ *
+ * O mecanismo de discordância continua, só invertido: quem foi cobrado **contesta**
+ * (`disputed`), e é isso que tira a despesa do saldo.
+ */
+const claimStatusesThatAffectBalance = new Set<SharedExpenseClaim['status']>(['pending', 'accepted', 'settled']);
 const settlementStatusesThatAffectBalance = new Set<Settlement['status']>(['accepted', 'partially_paid', 'settled']);
 
 function uniqueMembers(claims: SharedExpenseClaim[], settlements: Settlement[]) {

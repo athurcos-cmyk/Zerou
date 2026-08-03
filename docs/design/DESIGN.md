@@ -174,6 +174,13 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
 - **Pull-to-refresh bloqueado via JS cirúrgico** (`src/pwa/preventPullToRefresh.ts`, 2026-07-19): cancela o gesto só quando a página está no topo E o dedo vai pra baixo (o único caso que dispara o refresh), sem tocar no scroll normal. O PWA instalado no Android **tem** pull-to-refresh (confirmado com print do dono) — não some só por estar instalado. **NÃO usar `overscroll-behavior-y: contain`** pra isso: tentado antes e **travou todo o scroll no mobile** (interação com o `overflow-x: hidden` do body).
 - **Navegação por mês/período** (`.month-switcher`, `global.css`): `‹ Mês de Ano › ` com `.icon-button`, introduzido em `SearchPage.tsx` (2026-07-08) — padrão a reaproveitar se outra tela precisar filtrar por mês, em vez de inventar um novo controle.
 - Ação em cartão do casal/despesa que muda estado do servidor (gerar/regenerar/revogar convite): sempre com `confirm()` explicando a consequência antes de agir, principalmente se for destrutiva ou invalidar algo que já foi compartilhado com outra pessoa.
+- **Ação bloqueada por condição temporária avisa ANTES, em `.notice--warning`** (aprendido na trava
+  de conexão do casal, 2026-08-03): quando algo impede a ação agora e vai passar, o aviso vem no
+  topo da tela **antes** de a pessoa tentar — não como erro depois de falhar. Variante própria de
+  token porque as duas que existiam mentem: `--danger` diz "quebrou" (não quebrou nada) e
+  `--success` diz o oposto do que está acontecendo. Sempre os três juntos: banner explicando,
+  `disabled` nos botões que gravam, e **guarda síncrona no handler** — o estado pode mudar entre o
+  render e o toque.
 - **Estado exclusivo/progressivo precisa de indicador visível do que está ativo** (aprendido nos modos do casal, 2026-07-08): quando uma escolha é um valor único mas as opções são níveis cumulativos (cada uma mostra mais UI), o usuário acha que está "acumulando". Sempre mostrar um badge do estado atual na tela (não escondido em acordeão), usar verbo de troca ("Mudar pra X", não "Ativar X"), e no seletor marcar o valor vigente ("Atual") distinto do tentativamente selecionado.
 - **Excluir algo que guarda dinheiro de verdade (meta, cofrinho) precisa perguntar o destino do valor** (aprendido nas Metas, 2026-07-18): nunca decidir sozinho se o dinheiro some ou volta. Sheet de duas opções no molde `.choice-list`/`.choice-card` (ver `GoalDeleteSheet.tsx`) — "devolver pra uma conta" (pede pra escolher qual, nunca assume a conta original) ou "deixar sumir" — e só oferecer a devolução quando fizer sentido ter "guardado" pra devolver (não numa meta de dívida, onde o valor já foi pago a um credor real).
 

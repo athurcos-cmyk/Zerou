@@ -9,7 +9,10 @@ import { coupleGoalDeposit, coupleGoalWithdraw, createGoal, deleteGoal } from '.
 import { currentAccountBalances } from '../../finance/financeCalculations';
 import { formatMoney, parseMoneyToCents } from '../../finance/money';
 import { getUserFacingErrorMessage } from '../../utils/userFacingError';
+import { memberLabel } from './memberLabel';
+import type { WorkspaceMembership } from '../../types/contracts';
 import type { useFinanceContext } from '../../finance/FinanceDataContext';
+import type { useCoupleWriteGate } from '../../shared/coupleWriteGate';
 import type { useCoupleSavingsContext } from '../../shared/SharedDataContext';
 import type { CoupleGoalStats } from '../../shared/useCoupleSavings';
 
@@ -23,9 +26,14 @@ interface ConfirmOptions {
 interface CoupleSavingsSectionProps {
   workspaceId: string;
   userId: string;
+  /** Pra rotular "quem colocou quanto" — `byUser` é indexado por uid. */
+  activeMembers: WorkspaceMembership[];
   personalDefaultWorkspaceId: string | undefined;
   savings: ReturnType<typeof useCoupleSavingsContext>;
   personalFinance: ReturnType<typeof useFinanceContext>;
+  /** Cofrinho é dado compartilhado: os dois gravam nos MESMOS `goals`/`goalContributions`,
+   * então vale a mesma trava de conexão das despesas (ver `coupleWriteGate.ts`). */
+  gate: ReturnType<typeof useCoupleWriteGate>;
   confirm: (options: ConfirmOptions) => Promise<boolean>;
   onMessage: (message: string | null) => void;
 }
@@ -34,9 +42,11 @@ interface CoupleSavingsSectionProps {
 export function CoupleSavingsSection({
   workspaceId,
   userId,
+  activeMembers,
   personalDefaultWorkspaceId,
   savings,
   personalFinance,
+  gate,
   confirm,
   onMessage
 }: CoupleSavingsSectionProps) {
@@ -48,10 +58,20 @@ export function CoupleSavingsSection({
   const [guardarAmount, setGuardarAmount] = useState('');
   const [guardarFromAccount, setGuardarFromAccount] = useState('');
   const [guardarSign, setGuardarSign] = useState<1 | -1>(1);
+  /** Cofrinho que a pessoa tentou excluir ainda com dinheiro dentro — vira explicação, não ação. */
+  const [blockedDeleteTarget, setBlockedDeleteTarget] = useState<CoupleGoalStats | null>(null);
+  const partnerUserId = activeMembers.find((member) => member.userId !== userId)?.userId;
+
+  function blockedByConnection() {
+    if (!gate.blocked) return false;
+    onMessage(gate.message);
+    return true;
+  }
 
   function handleCreateCofrinho(event: FormEvent) {
     event.preventDefault();
     if (!cofrinhoName.trim()) return;
+    if (blockedByConnection()) return;
     onMessage(null);
     createGoal(workspaceId, userId, {
       name: cofrinhoName.trim(),
@@ -69,6 +89,7 @@ export function CoupleSavingsSection({
   function handleGuardar(event: FormEvent) {
     event.preventDefault();
     if (!guardarTarget) return;
+    if (blockedByConnection()) return;
     const amountCents = parseMoneyToCents(guardarAmount);
     if (amountCents <= 0) return;
 
@@ -106,11 +127,43 @@ export function CoupleSavingsSection({
     setGuardarSign(1);
   }
 
-  async function handleDeleteCofrinho(goalId: string) {
-    const ok = await confirm({ title: 'Excluir este cofrinho?', message: 'O histórico de quanto vocês já juntaram será removido.', confirmLabel: 'Excluir', danger: true });
+  /**
+   * Excluir cofrinho: **só quando está vazio**.
+   *
+   * A regra do sistema desde as Metas pessoais é "excluir algo que guarda dinheiro de verdade
+   * precisa perguntar o destino do valor" (`docs/design/DESIGN.md`) — e aqui a resposta "devolver
+   * pra uma conta" é **impossível de honrar**: parte do dinheiro é da outra pessoa, e transação só
+   * pode ser gravada no workspace pessoal de quem está usando o app (as regras impedem escrever na
+   * conta dela, e é isso que sustenta a privacidade). Não existe ação atômica que devolva a parte
+   * de cada um.
+   *
+   * Então em vez de decidir sozinho que o dinheiro some (o que o código fazia até 2026-08-03),
+   * a exclusão espera: cada um resgata a sua parte — caminho que já existe e já credita a conta —
+   * e o cofrinho vazio pode ser excluído por qualquer um dos dois.
+   */
+  async function handleDeleteCofrinho(stat: CoupleGoalStats) {
+    if (blockedByConnection()) return;
+    if (stat.totalCents > 0) {
+      setBlockedDeleteTarget(stat);
+      return;
+    }
+    const ok = await confirm({
+      title: 'Excluir este cofrinho?',
+      message: 'Ele está vazio. O histórico de depósitos e resgates será removido.',
+      confirmLabel: 'Excluir',
+      danger: true
+    });
     if (!ok) return;
-    deleteGoal(workspaceId, goalId)
+    deleteGoal(workspaceId, stat.goal.id)
       .catch((err) => onMessage(getUserFacingErrorMessage(err, 'Não foi possível excluir o cofrinho agora.')));
+  }
+
+  function openResgate(stat: CoupleGoalStats) {
+    setBlockedDeleteTarget(null);
+    setGuardarTarget(stat);
+    setGuardarAmount('');
+    setGuardarFromAccount('');
+    setGuardarSign(-1);
   }
 
   return (
@@ -135,7 +188,7 @@ export function CoupleSavingsSection({
               title="Nenhum cofrinho ainda"
               description="Criem um objetivo em comum — viagem, reserva, casa — e acompanhem quanto já juntaram."
               action={
-                <button className="button button--primary button--compact" type="button" onClick={() => setCofrinhoOpen(true)}>
+                <button className="button button--primary button--compact" type="button" disabled={gate.blocked} onClick={() => setCofrinhoOpen(true)}>
                   <Plus size={16} aria-hidden="true" /> Criar cofrinho
                 </button>
               }
@@ -151,7 +204,7 @@ export function CoupleSavingsSection({
                     <strong>{stat.goal.name}</strong>
                     {stat.thisMonthCents > 0 && <span>Juntos este mês: {formatMoney(stat.thisMonthCents)}</span>}
                   </div>
-                  <button className="icon-button" type="button" aria-label="Excluir cofrinho" onClick={() => void handleDeleteCofrinho(stat.goal.id)}>
+                  <button className="icon-button" type="button" aria-label="Excluir cofrinho" disabled={gate.blocked} onClick={() => void handleDeleteCofrinho(stat)}>
                     <Trash2 size={16} aria-hidden="true" />
                   </button>
                 </div>
@@ -159,6 +212,17 @@ export function CoupleSavingsSection({
                   <strong className="display-number">{formatMoney(stat.totalCents)}</strong>
                   {stat.goal.targetCents > 0 ? <span> de {formatMoney(stat.goal.targetCents)} · {stat.percent}%</span> : null}
                 </div>
+                {/* Quanto cada um colocou. `byUser` já era calculado em `calculateCoupleGoalStats`
+                    desde sempre e nunca tinha sido exibido — a pessoa não conseguia nem saber
+                    quanto do cofrinho era dela. */}
+                {stat.totalCents > 0 && (
+                  <div className="split-preview">
+                    <span><strong>Você</strong>{formatMoney(stat.byUser[userId] ?? 0)}</span>
+                    {partnerUserId && (
+                      <span><strong>{memberLabel(activeMembers.find((m) => m.userId === partnerUserId), userId)}</strong>{formatMoney(stat.byUser[partnerUserId] ?? 0)}</span>
+                    )}
+                  </div>
+                )}
                 {stat.goal.targetCents > 0 ? (
                   <div className="goal-progress-track" aria-hidden="true">
                     <span className="goal-progress-fill" style={{ width: `${Math.max(3, stat.percent)}%`, background: stat.goal.color }} />
@@ -169,6 +233,7 @@ export function CoupleSavingsSection({
                     className="button button--primary"
                     style={{ flex: 1 }}
                     type="button"
+                    disabled={gate.blocked}
                     onClick={() => { setGuardarTarget(stat); setGuardarAmount(''); setGuardarFromAccount(''); setGuardarSign(1); }}
                   >
                     <PiggyBank size={17} aria-hidden="true" /> Guardar
@@ -178,6 +243,7 @@ export function CoupleSavingsSection({
                       className="button button--subtle"
                       style={{ flex: 1 }}
                       type="button"
+                      disabled={gate.blocked}
                       onClick={() => { setGuardarTarget(stat); setGuardarAmount(''); setGuardarFromAccount(''); setGuardarSign(-1); }}
                     >
                       <Minus size={17} aria-hidden="true" /> Resgatar
@@ -186,7 +252,7 @@ export function CoupleSavingsSection({
                 </div>
               </article>
             ))}
-            <button className="button button--ghost" type="button" onClick={() => setCofrinhoOpen(true)}>
+            <button className="button button--ghost" type="button" disabled={gate.blocked} onClick={() => setCofrinhoOpen(true)}>
               <Plus size={16} aria-hidden="true" /> Novo cofrinho
             </button>
           </div>
@@ -217,7 +283,7 @@ export function CoupleSavingsSection({
             </div>
           </div>
           <div className="sheet-actions">
-            <button className="button button--primary" type="submit" disabled={!cofrinhoName.trim()}>Criar cofrinho</button>
+            <button className="button button--primary" type="submit" disabled={gate.blocked || !cofrinhoName.trim()}>Criar cofrinho</button>
           </div>
         </form>
       </BottomSheet>
@@ -242,9 +308,19 @@ export function CoupleSavingsSection({
             <input className="input input--money" inputMode="decimal" value={guardarAmount} onChange={(event) => setGuardarAmount(event.target.value)} placeholder="0,00" autoFocus />
           </label>
           {guardarSign === -1 && guardarTarget && (
-            <p className="text-muted" style={{ fontSize: '0.8rem', margin: 0 }}>
-              Disponível pra resgatar: {formatMoney(guardarTarget.totalCents)}
-            </p>
+            <>
+              <p className="text-muted" style={{ fontSize: '0.8rem', margin: 0 }}>
+                Disponível pra resgatar: {formatMoney(guardarTarget.totalCents)} · sua parte: {formatMoney(guardarTarget.byUser[userId] ?? 0)}
+              </p>
+              {/* Aviso, não trava: cofrinho de casal é dinheiro conjunto, e tirar mais do que você
+                  colocou é caso legítimo (ela deposita, você paga a viagem). O que não pode é isso
+                  acontecer sem a pessoa perceber. */}
+              {parseMoneyToCents(guardarAmount || '0') > (guardarTarget.byUser[userId] ?? 0) && (
+                <p className="text-muted" style={{ fontSize: '0.8rem', margin: 0, color: 'var(--warning)' }}>
+                  Você está resgatando mais do que colocou — o resto sai do que {memberLabel(activeMembers.find((m) => m.userId === partnerUserId), userId)} guardou.
+                </p>
+              )}
+            </>
           )}
           <div className="field">
             <span className="field-label">{guardarSign === 1 ? 'De onde sai o dinheiro?' : 'Pra qual conta vai?'}</span>
@@ -264,12 +340,50 @@ export function CoupleSavingsSection({
             <button
               className="button button--primary"
               type="submit"
-              disabled={!guardarAmount || (guardarSign === -1 && Boolean(guardarTarget) && parseMoneyToCents(guardarAmount) > (guardarTarget?.totalCents ?? 0))}
+              disabled={gate.blocked || !guardarAmount || (guardarSign === -1 && Boolean(guardarTarget) && parseMoneyToCents(guardarAmount) > (guardarTarget?.totalCents ?? 0))}
             >
               {guardarSign === 1 ? 'Guardar' : 'Resgatar'}
             </button>
           </div>
         </form>
+      </BottomSheet>
+
+      {/* Exclusão de cofrinho com dinheiro dentro: explicação + caminho, nunca uma ação que
+          decide sozinha o destino do valor (ver `handleDeleteCofrinho`). */}
+      <BottomSheet
+        open={Boolean(blockedDeleteTarget)}
+        onClose={() => setBlockedDeleteTarget(null)}
+        title="Resgatem antes de excluir"
+        subtitle={blockedDeleteTarget ? `Ainda tem ${formatMoney(blockedDeleteTarget.totalCents)} guardado em "${blockedDeleteTarget.goal.name}"` : ''}
+      >
+        {blockedDeleteTarget && (
+          <div className="form-stack">
+            <p className="text-secondary" style={{ margin: 0 }}>
+              Excluir agora faria esse dinheiro sumir sem voltar pra conta de ninguém. E não dá pra
+              devolver automaticamente: parte é de {memberLabel(activeMembers.find((m) => m.userId === partnerUserId), userId)}, e
+              o app não pode lançar nada na conta dela — só ela mesma pode.
+            </p>
+            <div className="split-preview">
+              <span><strong>Sua parte</strong>{formatMoney(blockedDeleteTarget.byUser[userId] ?? 0)}</span>
+              {partnerUserId && (
+                <span>
+                  <strong>{memberLabel(activeMembers.find((m) => m.userId === partnerUserId), userId)}</strong>
+                  {formatMoney(blockedDeleteTarget.byUser[partnerUserId] ?? 0)}
+                </span>
+              )}
+            </div>
+            <p className="text-muted" style={{ margin: 0, fontSize: '0.82rem' }}>
+              Cada um resgata a sua parte pra conta que quiser. Com o cofrinho vazio, qualquer um de
+              vocês dois pode excluir.
+            </p>
+            <div className="sheet-actions">
+              <button className="button button--primary" type="button" disabled={gate.blocked} onClick={() => openResgate(blockedDeleteTarget)}>
+                <Minus size={16} aria-hidden="true" /> Resgatar minha parte
+              </button>
+              <button className="button button--ghost" type="button" onClick={() => setBlockedDeleteTarget(null)}>Deixar como está</button>
+            </div>
+          </div>
+        )}
       </BottomSheet>
     </>
   );

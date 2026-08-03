@@ -544,10 +544,15 @@ export function subscribeGoalContributions(
   );
 }
 
-/** Apaga a meta e, junto no mesmo batch, todo o histórico de contribuições dela —
- * senão fica lixo órfão apontando pra uma meta que não existe mais. Seguro: a regra
- * de exclusão de `goalContributions` já vale pro dono do próprio workspace pessoal,
- * a mesma que `deleteCard` usa todo dia (não é um gate de "só exclusão de conta inteira"). */
+/**
+ * Apaga a meta e, junto no mesmo batch, todo o histórico de contribuições dela — senão fica lixo
+ * órfão apontando pra uma meta que não existe mais.
+ *
+ * **Devolve a promise do commit** (não engole com `fireWrite`): no cofrinho do casal um
+ * `permission-denied` aqui significa que o cofrinho volta ao recarregar, e a pessoa precisa saber.
+ * Quem chama a partir de meta PESSOAL envolve em `fireWrite` de propósito, mantendo offline-first
+ * onde ele vale (ver `GoalDeleteSheet`).
+ */
 export async function deleteGoal(workspaceId: string, goalId: string) {
   const contributions = await getDocs(query(collectionRef(workspaceId, 'goalContributions'), where('goalId', '==', goalId)));
   const batch = writeBatch(getFirebaseDb());
@@ -555,7 +560,7 @@ export async function deleteGoal(workspaceId: string, goalId: string) {
     batch.delete(contribution.ref);
   }
   batch.delete(documentRef(workspaceId, 'goals', goalId));
-  fireWrite(batch.commit());
+  return batch.commit();
 }
 
 /** Excluir meta devolvendo o valor guardado pra uma conta escolhida (só faz sentido

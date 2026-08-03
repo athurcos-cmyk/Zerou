@@ -38,6 +38,18 @@ Não implementado (decisão consciente):
 - [ ] **Procedência logos banco** — 26/29 SVGs com fonte divergente. `public/bank-logos/SOURCES.md`. Decisão do dono pendente.
 - [ ] **Emails oficiais** — suporte@/privacidade@ configurados no Cloudflare (Email Routing → zerou.contato.net@gmail.com). Conferir se entregam sem bounce.
 
+### Casal — revisão de 2026-08-03
+
+Entregue: excluir despesa, conta/categoria/data virando transação real, saída do parceiro, acerto
+com tela, trava de conexão. Detalhe em `docs/history/2026-08.md`. O que ficou:
+
+- [ ] **⚠️ DEPLOY DAS REGRAS PENDENTE** — 5 mudanças em `firestore.rules` (ramo de saída em `validAuditLogCreate`, delete de claim por quem registrou, `occurredOn` no claim, create de settlement já pago, `receiptConfirmedAt`). **Sem o deploy, "sair do espaço" continua quebrado em produção** e despesa dividida com data é rejeitada em silêncio (offline-first engole o erro). Comando: `npx firebase deploy --only firestore:rules --project zerou-26757`. 103 testes de regras verdes.
+- [ ] **Editar despesa dividida** — só dá pra excluir e registrar de novo. Mexer em valor/divisão exigiria refazer a transação pessoal do outro lado (que pode estar em fatura já paga) — mesmo raciocínio que barrou editar valor de compra no cartão em 2026-07-23.
+- [ ] **Acerto parcial não tem histórico visível** — a tela mostra o saldo atual e o pagamento aguardando confirmação, não a lista de acertos passados. Os dados existem em `settlements`.
+- [ ] **`subscribeActiveInvites` continua assinando depois do casal formado** — a seção de convite não renderiza mais nesse estado. Custo perto de zero (query sem resultado), mas é listener sem uso.
+- [ ] **Despesa dividida não aparece no Extrato como "do casal"** — a transação pessoal leva a tag `casal`, mas nada na linha do Extrato indica que ela tem uma contraparte compartilhada.
+- [ ] **Contestar não avisa o outro** — muda o status e sai do acerto, sem push nem email. A pessoa só descobre abrindo a tela.
+
 ### Produto / UX
 
 - [ ] **Vic + contexto de investimento** — `buildFinancialContext.ts` não tem seção de investimentos. Account balances inclui tudo sem filtro. Parâmetro `includeInvestments` não existe.

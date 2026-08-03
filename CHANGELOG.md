@@ -2,6 +2,45 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-03 (parte 6) — feat/fix(casal): revisão completa do modo casal (5 achados, 3 relatados)
+
+Sessão pedida pelo dono depois de testar o espaço compartilhado ao vivo com duas contas. Três bugs
+relatados por ele, dois achados na leitura do código — os dois achados eram mais graves.
+
+- **"Sair do espaço" dava "permissões insuficientes"** (relatado). Causa raiz exata:
+  `leaveCoupleWorkspace` grava, no MESMO batch, o próprio member doc como `removed` **e** um log de
+  auditoria — e `validAuditLogCreate` exigia que o autor continuasse ativo **depois** da escrita
+  (`getAfter`). Quem sai nunca continua. Batch é atômico ⇒ a saída inteira era recusada. "Remover
+  parceiro" nunca sofreu disso porque lá quem grava é o dono, que segue ativo. Regra ganhou um ramo
+  estreito pra esse caso; **teste de regressão reproduz o `PERMISSION_DENIED` sem o fix**.
+- **Não havia como excluir uma despesa dividida** (relatado): não existia botão, e a regra só
+  deixava o **dono do espaço** apagar — o parceiro convidado nunca conseguiria. Agora a linha abre
+  sheet de detalhe (padrão `.list-row--tap`: destrutivo nunca a um toque em lista rolável) com
+  **Excluir** pra quem registrou e **Contestar** pro outro.
+- **Despesa dividida não virava lançamento nenhum** (relatado): sem conta, sem categoria, sem data.
+  Quem pagava R$ 200 no mercado ficava com a conta do app R$ 200 acima do banco, sem nada explicando.
+  Agora o registro pede **data, conta e categoria** e cria a transação real no mesmo batch atômico
+  (padrão que `coupleGoalDeposit` já usava). **Debita o TOTAL, não a metade** — foi o total que saiu
+  do banco; a parte do outro vira dívida dele no acerto. Excluir desfaz as duas pontas.
+- **⚠️ Achado: "quem deve quanto a quem" era matematicamente sempre zero.**
+  `calculateSharedBalances` só contava despesa `accepted`/`settled`, mas toda despesa nasce
+  `pending` e **nunca existiu tela pra aceitar**. Invertido: `pending` conta, e **contestar** é o
+  que tira do acerto.
+- **⚠️ Achado: o fluxo de acerto inteiro era código morto.** `settlements` era assinada em cada
+  abertura da tela (custando leitura) e `suggestSettlement`/`balances` eram calculados e jogados
+  fora — nenhuma tela mostrava. Ganhou tela: **"Já paguei minha parte"** (quem deve lança a saída na
+  conta dele) e **"Recebi"** (quem recebe confirma e lança a entrada na dele). Cada um lança só o
+  próprio lado — a transação do parceiro vive no workspace pessoal dele, que as regras não deixam
+  ninguém tocar. `receiptConfirmedAt` é gravável **uma vez só** pela regra, o que impede a mesma
+  entrada de cair duas vezes.
+- **Espaço do casal virou a única parte do app que exige internet** (pedido do dono):
+  `coupleWriteGate.ts` bloqueia toda escrita offline (e quando um write passa de 8s sem o servidor
+  confirmar, sinal de conexão ruim), com aviso **antes** de a pessoa tentar — não depois de falhar.
+  Leitura do cache continua livre. Motivo: offline-first pressupõe uma pessoa por dado; duas filas
+  locais sincronizando em momentos diferentes divergem em silêncio.
+- Regras novas em `firestore.rules` (5 mudanças) **ainda não deployadas** — precisa de autorização.
+  103 testes de regras, 555 de cliente, typecheck e build ok. Detalhe: `docs/history/2026-08.md`.
+
 ## 2026-08-03 (parte 5) — fix(dashboard): varredura achou mais 3 casos de "fonte misturada"
 
 Varredura do Dashboard inteiro pedida pelo dono depois do bug do saldo zerado. Auditados os 14

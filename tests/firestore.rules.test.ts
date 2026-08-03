@@ -528,6 +528,11 @@ function sharedClaimPayload(workspaceId: string, claimId: string, payerUserId: s
       { userId: 'alice', amountCents: 5000 },
       { userId: 'bob', amountCents: 5000 }
     ],
+    // `occurredOn` entrou no payload real em 2026-08-03 (a despesa dividida passou a virar
+    // transação pessoal, e as duas precisam da MESMA data). Mantido aqui pelo motivo do
+    // comentário em `coupleWorkspacePayload`: payload de teste que não espelha o do cliente
+    // deixa a regra desatualizada passar.
+    occurredOn: Timestamp.fromDate(new Date('2026-08-01T12:00:00')),
     sourceVisibility: 'summary_only',
     status: 'pending',
     createdBy: payerUserId,
@@ -557,6 +562,38 @@ function settlementPayload(workspaceId: string, settlementId: string, uid: strin
     updatedAt: now,
     ...overrides
   };
+}
+
+/** Casal já formado (alice dona + bob parceiro), semeado com Admin SDK — o estado de partida da
+ * maioria dos testes de casal, que antes era copiado inline em cada `it`. */
+async function seedPartneredCouple(env: RulesTestEnvironment, workspaceId = 'couple_a') {
+  const past = Timestamp.fromDate(new Date('2026-06-14T12:00:00'));
+
+  await env.withSecurityRulesDisabled(async (context) => {
+    const adminDb = context.firestore();
+    await setDoc(doc(adminDb, 'workspaces', workspaceId), {
+      ...coupleWorkspacePayload(workspaceId, 'alice', { partnerUserId: 'bob', activeMemberCount: 2 }),
+      createdAt: past,
+      updatedAt: past
+    });
+    await setDoc(doc(adminDb, 'workspaces', workspaceId, 'members', 'alice'), {
+      ...coupleMemberPayload(workspaceId, 'alice', 'owner'),
+      createdAt: past,
+      updatedAt: past,
+      joinedAt: past
+    });
+    await setDoc(doc(adminDb, 'workspaces', workspaceId, 'members', 'bob'), {
+      ...coupleMemberPayload(workspaceId, 'bob', 'partner', { acceptedInviteId: 'invite_old' }),
+      createdAt: past,
+      updatedAt: past,
+      joinedAt: past
+    });
+    await setDoc(doc(adminDb, 'users/bob/workspaceRefs', workspaceId), {
+      ...workspaceRefPayload(workspaceId, 'partner'),
+      createdAt: past,
+      updatedAt: past
+    });
+  });
 }
 
 function billingAccountPayload(uid: string, canCreateCoupleWorkspace: boolean, overrides: Record<string, unknown> = {}) {
@@ -2334,6 +2371,316 @@ describe('firestore security rules', () => {
         updatedAt: serverTimestamp()
       })
     );
+  });
+
+  // Regressão do bug relatado pelo dono (2026-08-03): "Sair do espaço" dava permissão
+  // insuficiente pro parceiro convidado. `leaveCoupleWorkspace` grava, no MESMO batch, o próprio
+  // member doc como 'removed' E um log de auditoria — e `validAuditLogCreate` exigia que o autor
+  // continuasse ativo DEPOIS da escrita (`getAfter`), o que ninguém que está saindo consegue.
+  // Batch é atômico, então a saída inteira era recusada. Sem o ramo novo na regra, este teste
+  // falha exatamente como o app falhava em produção.
+  it('permite o parceiro convidado sair do espaço, com log de auditoria no mesmo batch', async () => {
+    const bobDb = testEnv.authenticatedContext('bob').firestore();
+    const modularBobDb = bobDb as unknown as Parameters<typeof writeBatch>[0];
+
+    await seedPartneredCouple(testEnv);
+
+    const batch = writeBatch(modularBobDb);
+    batch.update(doc(modularBobDb, 'workspaces/couple_a/members/bob'), {
+      status: 'removed',
+      removedAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    batch.update(doc(modularBobDb, 'users/bob/workspaceRefs/couple_a'), {
+      status: 'removed',
+      updatedAt: serverTimestamp()
+    });
+    batch.update(doc(modularBobDb, 'workspaces/couple_a'), {
+      partnerUserId: '',
+      activeMemberCount: 1,
+      updatedAt: serverTimestamp()
+    });
+    batch.set(doc(modularBobDb, 'workspaces/couple_a/auditLogs/audit_leave'), {
+      id: 'audit_leave',
+      workspaceId: 'couple_a',
+      actorUserId: 'bob',
+      type: 'member_left_workspace',
+      targetType: 'member',
+      targetId: 'bob',
+      summary: 'Membro saiu do espaco compartilhado.',
+      createdAt: serverTimestamp()
+    });
+
+    await assertSucceeds(batch.commit());
+  });
+
+  // O ramo novo é estreito de propósito: ele NÃO pode virar uma porta pra gravar qualquer log
+  // depois de sair (ou em nome de outra pessoa) sem estar ativo.
+  it('nega log de auditoria de outro tipo quando o autor sai no mesmo batch', async () => {
+    const bobDb = testEnv.authenticatedContext('bob').firestore();
+    const modularBobDb = bobDb as unknown as Parameters<typeof writeBatch>[0];
+
+    await seedPartneredCouple(testEnv);
+
+    const batch = writeBatch(modularBobDb);
+    batch.update(doc(modularBobDb, 'workspaces/couple_a/members/bob'), {
+      status: 'removed',
+      removedAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    batch.update(doc(modularBobDb, 'workspaces/couple_a'), {
+      partnerUserId: '',
+      activeMemberCount: 1,
+      updatedAt: serverTimestamp()
+    });
+    batch.set(doc(modularBobDb, 'workspaces/couple_a/auditLogs/audit_other'), {
+      id: 'audit_other',
+      workspaceId: 'couple_a',
+      actorUserId: 'bob',
+      type: 'couple_mode_changed',
+      targetType: 'workspace',
+      targetId: 'couple_a',
+      summary: 'Modo alterado enquanto saia do espaco.',
+      createdAt: serverTimestamp()
+    });
+
+    await assertFails(batch.commit());
+  });
+
+  it('deixa quem registrou excluir a despesa dividida, e nega pra outra pessoa', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    const bobDb = testEnv.authenticatedContext('bob').firestore();
+
+    await seedPartneredCouple(testEnv);
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const adminDb = context.firestore();
+      // Registrada por BOB: alice é dona do espaço, mas não registrou esta.
+      await setDoc(doc(adminDb, 'workspaces/couple_a/sharedExpenseClaims/claimBob'), {
+        ...sharedClaimPayload('couple_a', 'claimBob', 'bob'),
+        createdAt: Timestamp.fromDate(new Date('2026-08-01T12:00:00')),
+        updatedAt: Timestamp.fromDate(new Date('2026-08-01T12:00:00'))
+      });
+    });
+
+    // A dona do espaço mantém o poder de apagar (é o que a exclusão de conta usa), mas a
+    // interface só oferece isso pra quem registrou — quem registrou é a única pessoa capaz de
+    // desfazer também a transação pessoal, que vive no workspace dela.
+    await assertSucceeds(deleteDoc(doc(bobDb, 'workspaces/couple_a/sharedExpenseClaims/claimBob')));
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'workspaces/couple_a/sharedExpenseClaims/claimAlice'), {
+        ...sharedClaimPayload('couple_a', 'claimAlice', 'alice'),
+        createdAt: Timestamp.fromDate(new Date('2026-08-01T12:00:00')),
+        updatedAt: Timestamp.fromDate(new Date('2026-08-01T12:00:00'))
+      });
+    });
+    await assertFails(deleteDoc(doc(bobDb, 'workspaces/couple_a/sharedExpenseClaims/claimAlice')));
+    await assertSucceeds(deleteDoc(doc(aliceDb, 'workspaces/couple_a/sharedExpenseClaims/claimAlice')));
+  });
+
+  // O caminho novo mais arriscado de 2026-08-03: registrar despesa dividida grava, num batch
+  // atômico, o doc do casal E a transação pessoal de quem pagou (com o saldo da conta). Batch é
+  // atômico no banco inteiro, então uma regra que recusasse qualquer uma das pontas derrubaria a
+  // feature toda — é exatamente a classe de bug que a REGRA PRINCIPAL do CLAUDE.md descreve.
+  it('permite despesa dividida + transação pessoal no mesmo batch cross-workspace', async () => {
+    const bobDb = testEnv.authenticatedContext('bob').firestore();
+    const modularBobDb = bobDb as unknown as Parameters<typeof writeBatch>[0];
+
+    await seedPartneredCouple(testEnv);
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'workspaces/workspaceB/accounts/accountBob'), {
+        ...accountPayload('workspaceB', 'accountBob', 'bob'),
+        createdAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
+        updatedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00'))
+      });
+    });
+
+    const batch = writeBatch(modularBobDb);
+    batch.set(
+      doc(modularBobDb, 'workspaces/couple_a/sharedExpenseClaims/claimShared'),
+      sharedClaimPayload('couple_a', 'claimShared', 'bob')
+    );
+    // Valor da transação = TOTAL da despesa (foi o total que saiu do banco de quem pagou),
+    // não a metade — ver `createSharedExpenseClaim` em `sharedService.ts`.
+    batch.set(
+      doc(modularBobDb, 'workspaces/workspaceB/transactions/txn_shr_claimshared'),
+      transactionPayload('workspaceB', 'txn_shr_claimshared', 'bob', 'accountBob', {
+        amountCents: 10000,
+        description: 'Mercado compartilhado',
+        categoryId: 'expense_food',
+        tags: ['casal']
+      })
+    );
+    batch.update(doc(modularBobDb, 'workspaces/workspaceB/accounts/accountBob'), {
+      currentBalanceCents: 0,
+      updatedAt: serverTimestamp()
+    });
+    batch.set(doc(modularBobDb, 'workspaces/couple_a/auditLogs/audit_claim'), {
+      id: 'audit_claim',
+      workspaceId: 'couple_a',
+      actorUserId: 'bob',
+      type: 'shared_claim_created',
+      targetType: 'claim',
+      targetId: 'claimShared',
+      summary: 'Claim resumido criado.',
+      createdAt: serverTimestamp()
+    });
+
+    await assertSucceeds(batch.commit());
+  });
+
+  // Contraprova de privacidade: o batch acima é permitido porque a transação vai pro workspace
+  // de QUEM registra. Ninguém consegue lançar na conta do parceiro nem por engano.
+  it('nega lançar a transação da despesa dividida no workspace pessoal do parceiro', async () => {
+    const bobDb = testEnv.authenticatedContext('bob').firestore();
+    const modularBobDb = bobDb as unknown as Parameters<typeof writeBatch>[0];
+
+    await seedPartneredCouple(testEnv);
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'workspaces/workspaceA/accounts/accountAlice'), {
+        ...accountPayload('workspaceA', 'accountAlice', 'alice'),
+        createdAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00')),
+        updatedAt: Timestamp.fromDate(new Date('2026-06-14T12:00:00'))
+      });
+    });
+
+    const batch = writeBatch(modularBobDb);
+    batch.set(
+      doc(modularBobDb, 'workspaces/couple_a/sharedExpenseClaims/claimForged'),
+      sharedClaimPayload('couple_a', 'claimForged', 'bob')
+    );
+    batch.set(
+      doc(modularBobDb, 'workspaces/workspaceA/transactions/txn_shr_claimforged'),
+      transactionPayload('workspaceA', 'txn_shr_claimforged', 'bob', 'accountAlice')
+    );
+
+    await assertFails(batch.commit());
+  });
+
+  it('recusa despesa dividida sem data do gasto', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await seedPartneredCouple(testEnv);
+
+    const { occurredOn, ...withoutDate } = sharedClaimPayload('couple_a', 'claimNoDate', 'alice');
+    expect(occurredOn).toBeDefined();
+    await assertFails(setDoc(doc(aliceDb, 'workspaces/couple_a/sharedExpenseClaims/claimNoDate'), withoutDate));
+  });
+
+  it('só quem pagou pode criar acerto já quitado, e o status tem que bater com o valor', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    const bobDb = testEnv.authenticatedContext('bob').firestore();
+
+    await seedPartneredCouple(testEnv);
+
+    // Bob deve pra alice (fromUserId: 'bob') — quem registra o pagamento é ele.
+    await assertSucceeds(
+      setDoc(
+        doc(bobDb, 'workspaces/couple_a/settlements/settlementPaid'),
+        settlementPayload('couple_a', 'settlementPaid', 'bob', { status: 'settled', paidAmountCents: 5000 })
+      )
+    );
+    // Alice é a credora: ela não pode declarar que bob pagou.
+    await assertFails(
+      setDoc(
+        doc(aliceDb, 'workspaces/couple_a/settlements/settlementFake'),
+        settlementPayload('couple_a', 'settlementFake', 'alice', { status: 'settled', paidAmountCents: 5000 })
+      )
+    );
+    // Nem bob pode dizer "quitado" pagando uma parte.
+    await assertFails(
+      setDoc(
+        doc(bobDb, 'workspaces/couple_a/settlements/settlementLie'),
+        settlementPayload('couple_a', 'settlementLie', 'bob', { status: 'settled', paidAmountCents: 100 })
+      )
+    );
+  });
+
+  it('confirma recebimento uma vez só, e só quem recebe', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    const bobDb = testEnv.authenticatedContext('bob').firestore();
+
+    await seedPartneredCouple(testEnv);
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'workspaces/couple_a/settlements/settlementA'), {
+        ...settlementPayload('couple_a', 'settlementA', 'bob', { status: 'settled', paidAmountCents: 5000 }),
+        createdAt: Timestamp.fromDate(new Date('2026-08-01T12:00:00')),
+        updatedAt: Timestamp.fromDate(new Date('2026-08-01T12:00:00'))
+      });
+    });
+
+    // Bob pagou; quem confirma o recebimento é alice (toUserId).
+    await assertFails(
+      updateDoc(doc(bobDb, 'workspaces/couple_a/settlements/settlementA'), {
+        status: 'settled',
+        receiptConfirmedAt: serverTimestamp(),
+        version: 2,
+        updatedAt: serverTimestamp()
+      })
+    );
+    await assertSucceeds(
+      updateDoc(doc(aliceDb, 'workspaces/couple_a/settlements/settlementA'), {
+        status: 'settled',
+        receiptConfirmedAt: serverTimestamp(),
+        version: 2,
+        updatedAt: serverTimestamp()
+      })
+    );
+    // Segunda confirmação é recusada — é o que impede a mesma entrada de cair duas vezes na
+    // conta de quem recebeu.
+    await assertFails(
+      updateDoc(doc(aliceDb, 'workspaces/couple_a/settlements/settlementA'), {
+        status: 'settled',
+        receiptConfirmedAt: serverTimestamp(),
+        version: 3,
+        updatedAt: serverTimestamp()
+      })
+    );
+  });
+
+  // Regressão (2026-08-03): `goalContributions` só deixava o DONO do espaço apagar
+  // (`canDeleteWorkspaceTree`), enquanto `goals` já aceitava qualquer membro ativo — e
+  // `deleteGoal` apaga os dois no MESMO batch atômico. O parceiro convidado tinha a exclusão do
+  // cofrinho recusada por inteiro, e como `deleteGoal` usava `fireWrite`, o erro era engolido: o
+  // cofrinho sumia do cache local e voltava ao recarregar.
+  it('deixa o parceiro convidado excluir cofrinho do casal com histórico', async () => {
+    const bobDb = testEnv.authenticatedContext('bob').firestore();
+    const modularBobDb = bobDb as unknown as Parameters<typeof writeBatch>[0];
+    const past = Timestamp.fromDate(new Date('2026-06-14T12:00:00'));
+
+    await seedPartneredCouple(testEnv);
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const adminDb = context.firestore();
+      await setDoc(doc(adminDb, 'workspaces/couple_a/goals/goalA'), {
+        id: 'goalA',
+        workspaceId: 'couple_a',
+        name: 'Viagem',
+        kind: 'save',
+        targetCents: 100000,
+        savedCents: 0,
+        isActive: true,
+        createdBy: 'alice',
+        createdAt: past,
+        updatedAt: past
+      });
+      // Depósito da ALICE: o histórico que o parceiro não conseguia apagar.
+      await setDoc(doc(adminDb, 'workspaces/couple_a/goalContributions/contribAlice'), {
+        id: 'contribAlice',
+        workspaceId: 'couple_a',
+        goalId: 'goalA',
+        userId: 'alice',
+        amountCents: 50000,
+        type: 'deposit',
+        monthKey: '2026-08',
+        createdAt: past
+      });
+    });
+
+    const batch = writeBatch(modularBobDb);
+    batch.delete(doc(modularBobDb, 'workspaces/couple_a/goalContributions/contribAlice'));
+    batch.delete(doc(modularBobDb, 'workspaces/couple_a/goals/goalA'));
+
+    await assertSucceeds(batch.commit());
   });
 
   it('blocks frontend attempts to alter couple membership roles directly', async () => {

@@ -7,6 +7,7 @@ import {
   revokeCoupleInvite
 } from '../../shared/sharedService';
 import { getUserFacingErrorMessage } from '../../utils/userFacingError';
+import type { useCoupleWriteGate } from '../../shared/coupleWriteGate';
 import type { CoupleInvite } from '../../types/contracts';
 
 interface GeneratedInvite {
@@ -28,6 +29,9 @@ interface CoupleInviteSectionProps {
   userId: string;
   /** Active invite as it exists on the server right now — may be set even after a reload, when the raw code is gone. */
   activeInvite: CoupleInvite | undefined;
+  /** Trava de conexão do espaço a dois — gerar/revogar convite mexe num doc que a outra pessoa
+   * vai ler; offline isso só ficaria numa fila que ninguém consegue usar. */
+  gate: ReturnType<typeof useCoupleWriteGate>;
   confirm: (options: ConfirmOptions) => Promise<boolean>;
   onMessage: (message: string | null) => void;
 }
@@ -38,9 +42,15 @@ interface CoupleInviteSectionProps {
  * code (this session), or an invite that already exists on the server but whose raw code was
  * lost on reload (it's stored hashed, so it can't be shown again).
  */
-export function CoupleInviteSection({ workspaceId, workspaceName, userId, activeInvite, confirm, onMessage }: CoupleInviteSectionProps) {
+export function CoupleInviteSection({ workspaceId, workspaceName, userId, activeInvite, gate, confirm, onMessage }: CoupleInviteSectionProps) {
   const [generatedInvite, setGeneratedInvite] = useState<GeneratedInvite | null>(null);
   const [copied, setCopied] = useState(false);
+
+  function blockedByConnection() {
+    if (!gate.blocked) return false;
+    onMessage(gate.message);
+    return true;
+  }
 
   // Firestore already TTLs `coupleInvites` after 48h in the background — this just tidies up
   // "active" status invites that are past their expiresAt but not yet purged, so the UI never
@@ -70,6 +80,7 @@ export function CoupleInviteSection({ workspaceId, workspaceName, userId, active
   }
 
   function handleGenerate() {
+    if (blockedByConnection()) return;
     onMessage(null);
     createCoupleInvite(workspaceId, userId, workspaceName)
       .then(setGeneratedInvite)
@@ -77,6 +88,7 @@ export function CoupleInviteSection({ workspaceId, workspaceName, userId, active
   }
 
   async function handleRegenerate() {
+    if (blockedByConnection()) return;
     const ok = await confirm({
       title: 'Gerar um novo código?',
       message: activeInvite ? 'O código anterior deixa de funcionar assim que o novo for criado.' : undefined,
@@ -92,6 +104,7 @@ export function CoupleInviteSection({ workspaceId, workspaceName, userId, active
 
   async function handleRevoke() {
     if (!activeInvite) return;
+    if (blockedByConnection()) return;
     const ok = await confirm({
       title: 'Cancelar este convite?',
       message: 'Quem tiver o código ou o link deixa de conseguir entrar com ele.',
@@ -125,10 +138,10 @@ export function CoupleInviteSection({ workspaceId, workspaceName, userId, active
           </button>
         </div>
         <div className="button-row">
-          <button className="button button--ghost button--compact" type="button" onClick={() => void handleRegenerate()}>
+          <button className="button button--ghost button--compact" type="button" disabled={gate.blocked} onClick={() => void handleRegenerate()}>
             Gerar novo código
           </button>
-          <button className="button button--ghost button--compact button--danger-text" type="button" onClick={() => void handleRevoke()}>
+          <button className="button button--ghost button--compact button--danger-text" type="button" disabled={gate.blocked} onClick={() => void handleRevoke()}>
             Cancelar convite
           </button>
         </div>
@@ -153,7 +166,7 @@ export function CoupleInviteSection({ workspaceId, workspaceName, userId, active
           <br />
           <span>O código já foi enviado. Por segurança ele não pode ser reexibido — gere um novo se precisar reenviar.</span>
         </div>
-        <button className="button button--primary button--block" type="button" onClick={() => void handleRegenerate()}>
+        <button className="button button--primary button--block" type="button" disabled={gate.blocked} onClick={() => void handleRegenerate()}>
           Gerar novo código para compartilhar
         </button>
         <button className="button button--ghost button--compact button--danger-text" type="button" onClick={() => void handleRevoke()}>
@@ -174,7 +187,7 @@ export function CoupleInviteSection({ workspaceId, workspaceName, userId, active
         <QrCode size={22} aria-hidden="true" />
       </div>
       <p className="text-secondary">Gere um código, link e QR Code para a outra pessoa entrar.</p>
-      <button className="button button--primary button--block" type="button" onClick={handleGenerate}>
+      <button className="button button--primary button--block" type="button" disabled={gate.blocked} onClick={handleGenerate}>
         Gerar convite
       </button>
       <div className="shared-flow-hint" aria-hidden="true">

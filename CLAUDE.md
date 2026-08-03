@@ -69,6 +69,22 @@ setEstadoOtimista(...);               // atualiza UI imediatamente
 minhaEscrita(dados).catch(...);      // write é fire-and-forget
 ```
 
+### ⚠️ ÚNICA exceção: o espaço do casal exige internet (2026-08-03, pedido do dono)
+
+**Não "conserte" isso de volta pra offline-first.** Tudo que grava no espaço a dois — despesa
+dividida, acerto, cofrinho, convite, modo, sair/remover parceiro — passa por `useCoupleWriteGate`
+(`src/shared/coupleWriteGate.ts`), que bloqueia quando o aparelho está offline **ou** quando um
+write passa de 8s sem o servidor confirmar. E as escritas do casal **devolvem a promise** em vez de
+passar por `fireWrite`.
+
+O motivo: offline-first pressupõe **uma pessoa por dado**. No espaço pessoal a fila local nunca
+briga com ninguém. No espaço a dois são duas filas subindo em momentos diferentes na MESMA coleção —
+dá duplicata invisível e, pior, acerto calculado sobre um saldo que já mudou no servidor quita
+dívida que não existe mais. Aqui `fireWrite` engolindo o erro não é proteção, é divergência silenciosa
+entre duas pessoas.
+
+Leitura continua livre: dado que já está no cache aparece normalmente offline, só não dá pra gravar.
+
 ---
 
 ## ⚠️ REGRA PRINCIPAL: todo valor novo de enum num payload do Firestore precisa atualizar a regra no MESMO commit

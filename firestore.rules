@@ -1565,6 +1565,7 @@ service cloud.firestore {
           'description',
           'totalAmountCents',
           'split',
+          'occurredOn',
           'sourceVisibility',
           'status',
           'createdBy',
@@ -1575,6 +1576,7 @@ service cloud.firestore {
         ])
         && request.resource.data.id == claimId
         && request.resource.data.workspaceId == workspaceId
+        && request.resource.data.occurredOn is timestamp
         && request.resource.data.payerUserId == request.auth.uid
         && request.resource.data.createdBy == request.auth.uid
         && validShortText(request.resource.data.description, 2, 120)
@@ -1631,8 +1633,24 @@ service cloud.firestore {
         && isActiveMemberId(workspaceId, request.resource.data.fromUserId)
         && isActiveMemberId(workspaceId, request.resource.data.toUserId)
         && validMoneyCents(request.resource.data.amountCents)
-        && request.resource.data.status == 'proposed'
-        && request.resource.data.paidAmountCents == 0
+        && validMoneyCents(request.resource.data.paidAmountCents)
+        && request.resource.data.paidAmountCents <= request.resource.data.amountCents
+        // Duas formas de nascer: uma PROPOSTA (nada pago ainda) ou o registro de um
+        // pagamento que já aconteceu — este último só quem pagou pode gravar, e o status
+        // tem que refletir o valor (senão daria pra criar "quitado" pagando R$ 1).
+        && (
+          (request.resource.data.paidAmountCents == 0 && request.resource.data.status == 'proposed')
+          || (
+            request.resource.data.paidAmountCents > 0
+            && request.resource.data.fromUserId == request.auth.uid
+            && (
+              (request.resource.data.paidAmountCents == request.resource.data.amountCents
+                && request.resource.data.status == 'settled')
+              || (request.resource.data.paidAmountCents < request.resource.data.amountCents
+                && request.resource.data.status == 'partially_paid')
+            )
+          )
+        )
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.clientMutationId == settlementId
         && request.resource.data.version == 1
@@ -1650,11 +1668,22 @@ service cloud.firestore {
         && request.resource.data.createdBy == resource.data.createdBy
         && request.resource.data.clientMutationId == resource.data.clientMutationId
         && request.resource.data.createdAt == resource.data.createdAt
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'paidAmountCents', 'updatedAt', 'version'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'paidAmountCents', 'updatedAt', 'version', 'receiptConfirmedAt'])
         && request.resource.data.status in ['accepted', 'partially_paid', 'settled', 'cancelled']
         && request.resource.data.paidAmountCents is int
         && request.resource.data.paidAmountCents >= resource.data.paidAmountCents
         && request.resource.data.paidAmountCents <= resource.data.amountCents
+        // "Recebi" é um fato de quem recebe, gravável UMA vez só: é o que impede a pessoa
+        // de lançar a mesma entrada duas vezes na conta dela (a transação pessoal do
+        // recebimento é criada no mesmo batch que grava este campo).
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['receiptConfirmedAt'])
+          || (
+            request.auth.uid == resource.data.toUserId
+            && request.resource.data.receiptConfirmedAt == request.time
+            && !resource.data.keys().hasAny(['receiptConfirmedAt'])
+          )
+        )
         && request.resource.data.version == resource.data.version + 1
         && request.resource.data.updatedAt == request.time;
     }
@@ -1681,7 +1710,23 @@ service cloud.firestore {
         && !request.resource.data.summary.matches('.*DUO-[A-Z0-9]{4}-[A-Z0-9]{2}.*')
         && request.resource.data.createdAt == request.time
         && existsAfter(currentMemberDoc(workspaceId))
-        && getAfter(currentMemberDoc(workspaceId)).data.status == 'active';
+        && (
+          getAfter(currentMemberDoc(workspaceId)).data.status == 'active'
+          || (
+            // Sair do espaço grava o log NO MESMO batch que marca o próprio member doc como
+            // 'removed'. Com só o teste de `getAfter == 'active'`, o log era negado e — batch
+            // sendo atômico — a saída inteira virava "permissões insuficientes" pro parceiro
+            // convidado (bug real relatado pelo dono, 2026-08-03). "Remover parceiro" nunca
+            // sofreu disso porque quem grava lá é o dono, que continua ativo depois.
+            // Aqui quem precisa estar ativo é o estado ANTES (`get`), não o depois.
+            request.resource.data.type == 'member_left_workspace'
+            && request.resource.data.targetType == 'member'
+            && request.resource.data.targetId == request.auth.uid
+            && exists(currentMemberDoc(workspaceId))
+            && get(currentMemberDoc(workspaceId)).data.status == 'active'
+            && getAfter(currentMemberDoc(workspaceId)).data.status == 'removed'
+          )
+        );
     }
 
     match /users/{uid} {
@@ -1833,7 +1878,12 @@ service cloud.firestore {
         allow read: if isActiveMember(workspaceId);
         allow create: if validGoalContributionCreate(workspaceId, contribId);
         allow update: if false;
-        allow delete: if canDeleteWorkspaceTree(workspaceId);
+        // `isActiveMember`, não `canDeleteWorkspaceTree`: excluir um cofrinho do casal apaga a
+        // meta E o histórico dela no MESMO batch, e `goals` já aceita qualquer membro ativo.
+        // Com o gate antigo (só o dono do espaço), o batch do parceiro convidado era recusado
+        // por inteiro — e `deleteGoal` usa `fireWrite`, então o erro era engolido: o cofrinho
+        // sumia do cache local e voltava ao recarregar. Confirmado no emulador (2026-08-03).
+        allow delete: if isActiveMember(workspaceId);
       }
 
       match /cards/{cardId} {
@@ -1861,7 +1911,12 @@ service cloud.firestore {
         allow read: if isActiveMember(workspaceId);
         allow create: if validSharedExpenseClaimCreate(workspaceId, claimId);
         allow update: if validSharedExpenseClaimUpdate(workspaceId);
-        allow delete: if canDeleteWorkspaceTree(workspaceId);
+        // Quem registrou pode excluir a própria despesa: é a única pessoa que consegue
+        // desfazer as DUAS pontas no mesmo batch (o claim aqui e a transação pessoal dela,
+        // que vive no workspace pessoal de quem pagou e que ninguém mais pode tocar).
+        // `canDeleteWorkspaceTree` (dono) continua valendo — é o que a exclusão de conta usa.
+        allow delete: if canDeleteWorkspaceTree(workspaceId)
+          || (isActiveMember(workspaceId) && resource.data.createdBy == request.auth.uid);
       }
 
       match /settlements/{settlementId} {

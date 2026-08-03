@@ -490,6 +490,15 @@ html[data-reduce-motion='true'] *::after {
   color: var(--text-primary);
 }
 
+/* Aviso que NÃO é erro nem sucesso: algo está impedindo a ação agora e vai passar (o caso que
+   pediu isso foi a trava de conexão do espaço do casal, 2026-08-03). Vermelho de `--danger`
+   sugeriria que algo quebrou; verde diria o contrário do que está acontecendo. */
+.notice--warning {
+  border-color: var(--warning);
+  background: var(--warning-soft);
+  color: var(--text-primary);
+}
+
 /* Notice como banner solto no topo de uma página (não dentro de form/sheet, que já
    espaçam via gap): dá respiro embaixo pra não colar no conteúdo seguinte. */
 .page-content > .notice {
@@ -4669,6 +4678,18 @@ span.service-mark--brand {
   transition: border-color var(--duration-fast);
 }
 .couple-upgrade-card:hover { border-color: var(--action-primary); }
+
+/* Estes dois são `<button>` com aparência de card/badge, então `:disabled` não dá nenhum sinal
+   visual de graça como num `.button`. Sem isto a trava de conexão parecia não existir: o card
+   continuava com cara de tocável e só recusava depois do toque. */
+.couple-upgrade-card:disabled,
+.couple-mode-badge:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.couple-upgrade-card:disabled:hover,
+.couple-mode-badge:disabled:hover { border-color: var(--border-subtle); }
 .couple-upgrade-text { display: grid; gap: 0.1rem; flex: 1; min-width: 0; }
 .couple-upgrade-text strong { font-size: 0.88rem; }
 .couple-upgrade-text span   { font-size: 0.78rem; color: var(--text-secondary); }

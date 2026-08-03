@@ -8,6 +8,7 @@ import { LoadingState } from '../components/LoadingState';
 import { FormMessage } from '../components/FormMessage';
 import { useFinanceContext } from '../finance/FinanceDataContext';
 import { useCoupleSavingsContext, useSharedContext } from '../shared/SharedDataContext';
+import { useCoupleWriteGate } from '../shared/coupleWriteGate';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
 import {
   acceptCoupleInvite,
@@ -22,6 +23,7 @@ import { CoupleExpensesSection } from './shared/CoupleExpensesSection';
 import { CoupleInviteSection } from './shared/CoupleInviteSection';
 import { CoupleModeSheet, coupleModeLabels, coupleModeOptions } from './shared/CoupleModeSheet';
 import { CoupleSavingsSection } from './shared/CoupleSavingsSection';
+import { CoupleSettlementSection } from './shared/CoupleSettlementSection';
 import { memberLabel } from './shared/memberLabel';
 import type { CoupleInvite, CoupleMode } from '../types/contracts';
 
@@ -34,6 +36,10 @@ export function SharedSpacePage() {
   const ownerMember = shared.activeMembers.find((member) => member.role === 'owner');
   const partnerMember = shared.activeMembers.find((member) => member.userId !== user?.uid);
   const { confirm, dialog } = useConfirm();
+  // Espaço do casal é a única parte do app que NÃO pode ser usada offline: são duas pessoas
+  // gravando nos mesmos dados, e duas filas locais sincronizando em momentos diferentes
+  // produzem divergência silenciosa. Ver o porquê completo em `coupleWriteGate.ts`.
+  const gate = useCoupleWriteGate(shared.pendingWrites);
 
   const [message, setMessage] = useState<string | null>(null);
   const [pendingInviteCode, setPendingInviteCode] = useState('');
@@ -58,7 +64,16 @@ export function SharedSpacePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingInviteCode]);
 
+  /** Toda ação que grava no espaço a dois passa por aqui primeiro. Além de desabilitar o botão,
+   * porque o estado da conexão pode mudar entre o render e o toque. */
+  function blockedByConnection() {
+    if (!gate.blocked) return false;
+    setMessage(gate.message);
+    return true;
+  }
+
   function handleCreateWorkspace() {
+    if (blockedByConnection()) return;
     setSelectedMode('savings_only');
     setModeSheetPurpose('create');
     setModeSheetOpen(true);
@@ -66,6 +81,7 @@ export function SharedSpacePage() {
 
   function handleConfirmModeSheet() {
     setModeSheetOpen(false);
+    if (blockedByConnection()) return;
     setMessage(null);
     if (modeSheetPurpose === 'create') {
       if (!user) return;
@@ -86,6 +102,7 @@ export function SharedSpacePage() {
 
   function handleUpgradeMode(mode: CoupleMode) {
     if (!workspaceId || !user) return;
+    if (blockedByConnection()) return;
     setMessage(null);
     updateCoupleMode(workspaceId, user.uid, mode)
       .catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível mudar o modo agora.')));
@@ -93,6 +110,9 @@ export function SharedSpacePage() {
 
   function handlePreviewInvite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    // Ler o convite depende do servidor (ele nasceu no aparelho da outra pessoa, nunca esteve
+    // no cache deste) — sem conexão o erro seria técnico e confuso.
+    if (blockedByConnection()) return;
     savePendingInvite(pendingInviteCode);
     setMessage(null);
     previewCoupleInvite(pendingInviteCode)
@@ -102,6 +122,7 @@ export function SharedSpacePage() {
 
   async function handleAcceptInvite() {
     if (!user) return;
+    if (blockedByConnection()) return;
     setMessage(null);
     const ok = await confirm({
       title: 'Entrar neste espaço compartilhado?',
@@ -118,6 +139,7 @@ export function SharedSpacePage() {
 
   function handleLeaveOrRemove() {
     if (!workspaceId || !user || !shared.workspace) return;
+    if (blockedByConnection()) return;
     const isOwner = shared.workspace.ownerUserId === user.uid;
     const isOwnerRemovingPartner = isOwner && Boolean(partnerMember);
     const isOwnerAlone = isOwner && !partnerMember;
@@ -161,6 +183,16 @@ export function SharedSpacePage() {
 
       <FormMessage>{message ?? shared.error}</FormMessage>
 
+      {/* Aviso ANTES de a pessoa tentar registrar, não depois de falhar: o espaço a dois é a
+          única parte do app que não funciona offline, e isso precisa ser dito na cara. */}
+      {gate.blocked && (
+        <div className="notice notice--warning" role="status">
+          <strong>{gate.title}</strong>
+          <br />
+          <span>{gate.message}</span>
+        </div>
+      )}
+
       {/* 1) No shared space yet — create or join */}
       {shared.loading ? (
         <LoadingState compact />
@@ -183,7 +215,7 @@ export function SharedSpacePage() {
                     <br />
                     <span>Expira em {pendingInvitePreview.expiresAt.toDate().toLocaleString('pt-BR')}</span>
                   </div>
-                  <button className="button button--primary button--block" type="button" onClick={() => void handleAcceptInvite()}>
+                  <button className="button button--primary button--block" type="button" disabled={gate.blocked} onClick={() => void handleAcceptInvite()}>
                     Entrar no espaço compartilhado
                   </button>
                 </>
@@ -207,7 +239,7 @@ export function SharedSpacePage() {
           ) : (
             /* No pending invite — create workspace or enter a code */
             <>
-              <button className="button button--primary button--block" type="button" onClick={handleCreateWorkspace}>
+              <button className="button button--primary button--block" type="button" disabled={gate.blocked} onClick={handleCreateWorkspace}>
                 <Plus size={18} aria-hidden="true" /> Criar espaço compartilhado
               </button>
               <details className="advanced-panel">
@@ -233,10 +265,11 @@ export function SharedSpacePage() {
                 workspaceName={shared.workspace?.name ?? ''}
                 userId={user.uid}
                 activeInvite={shared.invites[0]}
+                gate={gate}
                 confirm={confirm}
                 onMessage={setMessage}
               />
-              <button className="button button--ghost button--block" type="button" onClick={handleLeaveOrRemove}>
+              <button className="button button--ghost button--block" type="button" disabled={gate.blocked} onClick={handleLeaveOrRemove}>
                 Cancelar espaço compartilhado
               </button>
             </>
@@ -249,7 +282,7 @@ export function SharedSpacePage() {
         <div className="form-stack">
           {coupleMode && (
             <div>
-              <button type="button" className="couple-mode-badge" onClick={handleOpenModeChange}>
+              <button type="button" className="couple-mode-badge" disabled={gate.blocked} onClick={handleOpenModeChange}>
                 {(() => {
                   const ModeIcon = coupleModeOptions.find((opt) => opt.id === coupleMode)?.icon;
                   return ModeIcon ? <ModeIcon size={15} aria-hidden="true" /> : null;
@@ -267,9 +300,11 @@ export function SharedSpacePage() {
             <CoupleSavingsSection
               workspaceId={workspaceId}
               userId={user.uid}
+              activeMembers={shared.activeMembers}
               personalDefaultWorkspaceId={profile?.defaultWorkspaceId}
               savings={savings}
               personalFinance={personalFinance}
+              gate={gate}
               confirm={confirm}
               onMessage={setMessage}
             />
@@ -285,7 +320,7 @@ export function SharedSpacePage() {
                 <Settings2 size={20} aria-hidden="true" />
               </div>
               <p className="text-secondary" style={{ margin: 0 }}>Escolham o modo que combina com vocês. Dá pra mudar quando quiser.</p>
-              <button className="button button--primary button--block" type="button" onClick={handleOpenModeChange}>
+              <button className="button button--primary button--block" type="button" disabled={gate.blocked} onClick={handleOpenModeChange}>
                 Escolher modo
               </button>
             </article>
@@ -299,7 +334,28 @@ export function SharedSpacePage() {
               activeMembers={shared.activeMembers}
               partnerMember={partnerMember}
               claims={shared.claims}
+              personalWorkspaceId={profile?.defaultWorkspaceId}
+              personalFinance={personalFinance}
+              gate={gate}
+              confirm={confirm}
               onUpgradeMode={handleUpgradeMode}
+              onMessage={setMessage}
+            />
+          ) : null}
+
+          {/* Acerto só faz sentido onde existe despesa dividida — no modo cofrinho não há
+              nada pra dever. */}
+          {workspaceId && user && coupleMode && coupleMode !== 'savings_only' ? (
+            <CoupleSettlementSection
+              workspaceId={workspaceId}
+              userId={user.uid}
+              activeMembers={shared.activeMembers}
+              partnerMember={partnerMember}
+              balances={shared.balances}
+              settlements={shared.settlements}
+              personalWorkspaceId={profile?.defaultWorkspaceId}
+              personalFinance={personalFinance}
+              gate={gate}
               onMessage={setMessage}
             />
           ) : null}
@@ -315,12 +371,12 @@ export function SharedSpacePage() {
                   <p className="text-secondary" style={{ margin: 0, fontSize: '0.82rem' }}>
                     Modo atual: <strong>{coupleModeLabels[coupleMode]}</strong>
                   </p>
-                  <button className="button button--ghost button--block" type="button" onClick={handleOpenModeChange}>
+                  <button className="button button--ghost button--block" type="button" disabled={gate.blocked} onClick={handleOpenModeChange}>
                     Mudar modo do espaço
                   </button>
                 </div>
               )}
-              <button className="button button--ghost button--danger-text" type="button" onClick={handleLeaveOrRemove}>
+              <button className="button button--ghost button--danger-text" type="button" disabled={gate.blocked} onClick={handleLeaveOrRemove}>
                 {shared.workspace?.ownerUserId === user?.uid && partnerMember ? 'Remover parceiro' : 'Sair do espaço'}
               </button>
             </div>

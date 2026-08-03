@@ -46,8 +46,18 @@ describe('shared balance calculations', () => {
     ]);
   });
 
-  it('ignores pending and disputed claims', () => {
-    expect(calculateSharedBalances([claim({ status: 'pending' }), claim({ id: 'claim-b', status: 'disputed' })], [])).toEqual([
+  // Regressão do bug de 2026-08-03: `pending` estava FORA da conta, mas toda despesa nasce
+  // `pending` e nunca existiu tela pra aceitar — o saldo do casal era sempre zero. Quem espera
+  // pelo aceite é quem já pagou, então esperar não pode ser pré-requisito pra dívida existir.
+  it('conta despesa pendente — quem já pagou não depende do aceite do outro pra ter crédito', () => {
+    expect(calculateSharedBalances([claim({ status: 'pending' })], [])).toEqual([
+      { userId: 'alice', balanceCents: 5000 },
+      { userId: 'bob', balanceCents: -5000 }
+    ]);
+  });
+
+  it('ignora despesa contestada — contestar é o que tira do acerto', () => {
+    expect(calculateSharedBalances([claim({ status: 'disputed' })], [])).toEqual([
       { userId: 'alice', balanceCents: 0 },
       { userId: 'bob', balanceCents: 0 }
     ]);
