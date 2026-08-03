@@ -97,7 +97,13 @@ export default defineConfig(({ mode }) => {
           description: 'Controle individual. Organização a dois.',
           lang: 'pt-BR',
           theme_color: '#EE5524',
-          background_color: '#FAF8F5',
+          // Branco, não o Paper (#FAF8F5): os ícones do manifest passaram a ter fundo BRANCO
+          // opaco (2026-08-03). Eles eram transparentes, e como o desenho tem um círculo que é
+          // só um contorno preto vazado, em tema escuro o vazado virava a cor do sistema e o
+          // contorno sumia — a marca aparecia como um borrão preto ao abrir o PWA. Com o ícone
+          // branco sobre um fundo creme, sobraria um quadrado visível atrás dele na splash;
+          // igualando as duas cores o ícone se funde ao fundo e some a emenda.
+          background_color: '#FFFFFF',
           display: 'standalone',
           start_url: '/',
           scope: '/',

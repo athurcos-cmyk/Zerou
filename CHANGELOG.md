@@ -2,6 +2,29 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-03 (parte 8) — fix(pwa): ícone aparecia preto ao abrir o app instalado
+
+- **Relato do dono**: "ao abrir o PWA eu vejo o ícone preto".
+- **Causa**: todos os ícones eram PNG com fundo **100% transparente** (confirmado lendo o pixel do
+  canto: `rgba(255,255,255,0)`), e o desenho tem um círculo que é **só um contorno preto vazado**.
+  Em fundo escuro o vazado vira a cor do sistema — o círculo some — e o contorno preto fica
+  invisível. Agravante: o **maskable também era transparente**, e ele é justamente o que a
+  especificação exige opaco de borda a borda, porque o launcher recorta numa forma e o que aparece
+  atrás é decidido pelo sistema (no tema escuro, preto).
+- **Correção**: achatados sobre **branco** os 4 ícones que o SO consome — `app-icon-180`
+  (apple-touch), `app-icon-192`, `app-icon-512` e `maskable-512`. Entre 79% e 90% dos pixels de cada
+  um tinham transparência. Agora são RGB, sem canal alfa.
+- ⚠️ **`granativa-icon-master-1024.png` foi deixado transparente de propósito**: é o que o
+  `BrandLockup` usa **dentro do app** (sidebar, login, páginas públicas), cru ao lado do texto, sem
+  fundo nem canto arredondado. Como existem temas escuros (Obsidian, Midnight), achatá-lo poria um
+  quadrado branco no menu — trocaria um problema por outro.
+- `background_color` do manifest: `#FAF8F5` (Paper) → `#FFFFFF`. Com ícone branco sobre creme
+  sobraria um quadrado visível atrás dele na splash. `theme_color` laranja inalterado.
+- Sem `sharp`/ImageMagick na máquina, a composição foi feita em **Node puro** (decodifica o PNG,
+  desfaz os 5 filtros, compõe sobre branco, reescreve), testada numa cópia antes dos originais.
+- ⚠️ **Só aparece reinstalando o PWA**: o Android guarda o ícone em cache no momento da instalação,
+  então atualizar o app não troca ícone da tela inicial nem splash.
+
 ## 2026-08-03 (parte 7) - fix(casal): a mesma pessoa que saiu nao conseguia voltar pro espaco
 
 Achado pelo dono olhando a tela do anfitriao depois do deploy: o convidado saiu, o espaco continuou
