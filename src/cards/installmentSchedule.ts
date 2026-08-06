@@ -74,11 +74,22 @@ function firstInvoiceMonthOf(invoiceId: string | undefined): string | undefined 
  * - `resolveInstallmentCycle(..., index)` põe a parcela `n` em `primeiraFatura + (n-1)`, meses
  *   consecutivos — por isso basta somar o índice.
  *
+ * Dois casos que exigiram **espelho na transação** porque só existiam no ledger — os dois
+ * fechados em 06/08/2026, com campo novo e regra atualizada no mesmo commit:
+ *
+ * - **`installmentStart`**: o número real da primeira parcela de uma compra já em andamento (o
+ *   "7" de "7 de 10"). Sem ele, numerar de 1 criava uma "parcela 1" falsa e disparava o
+ *   deslocamento de `installmentShiftBySource`, que a Análise nunca aplica nessas compras.
+ * - **`anticipatedInstallments`**: `mês da fatura da parcela` → `mês em que se antecipou`.
+ *   Move a parcela antecipada pro mês da antecipação, igual à Análise.
+ *
  * ## ⚠️ Onde ela ainda pode divergir da Análise (enumerado de propósito)
  *
- * 1. **Antecipação de parcela.** A Análise move o gasto pro mês em que a pessoa antecipou
- *    (decisão do dono, 2026-08-05); aqui o cronograma original continua valendo, porque
- *    antecipar só existe no ledger. Divergência real em quem antecipa.
+ * 1. **Dado antigo, gravado antes de 06/08/2026**, nos dois casos acima: sem
+ *    `installmentStart`, uma compra já em andamento cuja próxima parcela caia exatamente 1 mês
+ *    depois da data da compra continua 1 mês adiantada; sem `anticipatedInstallments`, uma
+ *    antecipação feita antes desta data continua no cronograma original. Antecipar de novo
+ *    grava o espelho e conserta a compra dali pra frente.
  * 2. **Transação fora da janela carregada.** A Análise conta a parcela mesmo sem a
  *    transação-mãe (cai em "Sem categoria"); aqui, sem a transação não há cronograma, e a
  *    parcela não aparece. Hoje inofensivo (a janela de 300 + mês completo cobre uso realista),
@@ -86,17 +97,9 @@ function firstInvoiceMonthOf(invoiceId: string | undefined): string | undefined 
  * 3. **Tarifa, juros e estorno de fatura** (`fee`/`interest`/`purchase_reversal` sem
  *    transação): só existem no ledger. Já era assim antes desta função — o Dashboard nunca os
  *    mostrou.
- * 4. **Compra "já em andamento" cadastrada com a próxima parcela caindo exatamente 1 mês
- *    depois da data da compra.** A transação guarda quantas parcelas faltam, não o número real
- *    da parcela (7/10), então sintetizamos 1..k. Quando o intervalo dá exatamente 1 mês, o
- *    deslocamento da parcela 1 é aplicado aqui e não é na Análise (que exige
- *    `installmentNumber === 1` de verdade no ledger) — a série toda fica 1 mês adiantada.
- *    Fechar isso de vez exige gravar o número inicial na transação (campo novo ⇒ atualizar
- *    `firestore.rules` no mesmo commit, ver a REGRA PRINCIPAL do `CLAUDE.md`).
  *
  * A Análise, que tem o ledger, segue sendo a tela exata. Esta é a melhor aproximação possível
- * com custo zero de leitura — e as quatro divergências acima são de casos específicos, não do
- * caso comum, que era o que estava errado antes.
+ * com custo zero de leitura.
  */
 export function invoicesForSpendingFromTransactions(transactions: Transaction[]): InvoiceForSpending[] {
   const byMonth = new Map<string, InvoiceLedgerEntry[]>();
@@ -123,30 +126,82 @@ export function invoicesForSpendingFromTransactions(transactions: Transaction[])
     const cardId = transaction.cardId;
     if (!cardId) continue;
 
+    // Compra já em andamento começa na parcela 7, 8, 11… Numerar de 1 inventaria uma "parcela 1"
+    // que `installmentShiftBySource` usaria pra deslocar a série — o que a Análise, lendo o ledger
+    // real (onde essa parcela 1 não existe), nunca faz. Ausente = fluxo normal = começa em 1.
+    const firstNumber = transaction.installmentStart ?? 1;
+    const anticipated = transaction.anticipatedInstallments;
+
+    const push = (referenceMonth: string, entry: InvoiceLedgerEntry) => {
+      const key = `${cardId}|${referenceMonth}`;
+      const entries = byMonth.get(key) ?? [];
+      entries.push(entry);
+      byMonth.set(key, entries);
+    };
+    const base = {
+      cardId,
+      workspaceId: transaction.workspaceId,
+      sourceTransactionId: transaction.id,
+      createdBy: transaction.createdBy
+    };
+
     const amounts = installmentAmounts(transaction.amountCents, installments);
     amounts.forEach((amountCents, index) => {
       const referenceMonth = shiftMonthKey(firstMonth, index);
       const invoiceId = `${cardId}_${referenceMonth}`;
-      const key = `${cardId}|${referenceMonth}`;
-      const entries = byMonth.get(key) ?? [];
-      entries.push({
-        id: `${transaction.id}_derived_${index + 1}`,
+      const number = firstNumber + index;
+
+      push(referenceMonth, {
+        ...base,
+        id: `${transaction.id}_derived_${number}`,
         invoiceId,
-        cardId,
-        workspaceId: transaction.workspaceId,
         type: 'purchase',
         amountCents,
         // A data da COMPRA, igual em todas as parcelas — é o que o ledger real grava
         // (`addCardPurchaseToBatch` usa `parsed.purchaseDate` em todas) e o que
         // `installmentShiftBySource` usa como fallback de mês da compra.
         effectiveAt: transaction.date ?? Timestamp.now(),
-        sourceTransactionId: transaction.id,
-        idempotencyKey: `${transaction.id}_derived_${index + 1}`,
-        createdBy: transaction.createdBy,
-        installmentNumber: index + 1,
+        idempotencyKey: `${transaction.id}_derived_${number}`,
+        installmentNumber: number,
         installmentTotal: installments
       });
-      byMonth.set(key, entries);
+
+      // Parcela antecipada: reproduz **o par que o ledger tem**, em vez de mover a parcela de mês.
+      // Mover parecia mais simples e estava errado — a parcela 1 PODE ser antecipada (a fatura dela
+      // é futura enquanto a atual ainda está aberta), e movê-la faria `installmentShiftBySource`
+      // perder a âncora e deixar de deslocar a série inteira. Com o par, o lançamento `purchase`
+      // fica onde sempre esteve (a âncora sobrevive) e a conta fecha pelo mesmo caminho da Análise.
+      const anticipatedIn = anticipated?.[referenceMonth];
+      if (!anticipatedIn) return;
+
+      // Crédito na MESMA fatura da parcela: herda o mesmo deslocamento e zera o mês certo por
+      // construção — igual ao ledger real (ver o comentário de `anchoredMonthOf`).
+      push(referenceMonth, {
+        ...base,
+        id: `${transaction.id}_derived_anticipated_credit_${number}`,
+        invoiceId,
+        type: 'installment_anticipation_credit',
+        amountCents,
+        effectiveAt: transaction.date ?? Timestamp.now(),
+        idempotencyKey: `${transaction.id}_derived_anticipated_credit_${number}`,
+        installmentNumber: number,
+        installmentTotal: installments
+      });
+
+      // Débito ancorado no mês em que se antecipou — `anchoredMonthOf` tem exceção pra este tipo
+      // e olha o `effectiveAt`, não a fatura, então o dia 1º do mês basta.
+      const [year, month] = anticipatedIn.split('-').map(Number);
+      push(anticipatedIn, {
+        ...base,
+        id: `${transaction.id}_derived_anticipated_debit_${number}`,
+        invoiceId: `${cardId}_${anticipatedIn}`,
+        type: 'installment_anticipation',
+        amountCents,
+        effectiveAt: Timestamp.fromDate(new Date(year, month - 1, 1, 12, 0, 0)),
+        idempotencyKey: `${transaction.id}_derived_anticipated_debit_${number}`,
+        installmentNumber: number,
+        installmentTotal: installments
+      });
     });
   }
 

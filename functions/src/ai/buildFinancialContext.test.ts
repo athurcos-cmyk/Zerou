@@ -124,6 +124,88 @@ describe('buildFinancialContext', () => {
     expect(context).toMatch(/R\$\s*50[,.]00/);
   });
 
+  // ⚠️ Compra parcelada conta UMA PARCELA por mês (regra da Análise desde 2026-08-05 e do
+  // Dashboard desde 2026-08-06). Antes a Vic somava o valor CHEIO no mês da compra e respondia
+  // número que nenhuma tela mostrava — R$ 588,00 contra R$ 147,00 de um Airbnb em 4x.
+  it('conta compra parcelada pela PARCELA do mes, nao pelo valor cheio', async () => {
+    const db = mockDb({}, {
+      ...emptyCollections,
+      'workspaces/ws1/categories': [
+        fakeDoc('cat_presente', { id: 'cat_presente', name: 'Presente', isActive: true }),
+      ],
+      'workspaces/ws1/transactions': [
+        fakeDoc('txn_airbnb', {
+          type: 'card_purchase', amountCents: 58800, accountId: undefined,
+          categoryId: 'cat_presente', cashMonth: currentMonth, competenceMonth: currentMonth,
+          cardId: 'cardA', invoiceId: `cardA_${currentMonth}`, installments: 4,
+          date: Timestamp.fromDate(makeDate(1)),
+        }),
+      ],
+      'workspaces/ws1/bills': [],
+      'workspaces/ws1/accounts': [],
+    });
+
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
+
+    expect(context).toMatch(/R\$\s*147[,.]00/);
+    expect(context).not.toMatch(/R\$\s*588[,.]00/);
+  });
+
+  // Compra "ja em andamento" (`registerOngoingInstallments`): `amountCents` e `installments` sao
+  // o que FALTA, e `installmentStart` diz que a serie nao comeca em 1 — entao nao desloca.
+  it('compra ja em andamento nao desloca a serie (installmentStart)', async () => {
+    const db = mockDb({}, {
+      ...emptyCollections,
+      'workspaces/ws1/categories': [
+        fakeDoc('cat_limite', { id: 'cat_limite', name: 'Limite', isActive: true }),
+      ],
+      'workspaces/ws1/transactions': [
+        fakeDoc('txn_ongoing', {
+          type: 'card_purchase', amountCents: 61912, accountId: undefined,
+          categoryId: 'cat_limite', cashMonth: prevMonth, competenceMonth: prevMonth,
+          cardId: 'cardA', invoiceId: `cardA_${currentMonth}`, installments: 4, installmentStart: 7,
+          date: Timestamp.fromDate(makeDate(1)),
+        }),
+      ],
+      'workspaces/ws1/bills': [],
+      'workspaces/ws1/accounts': [],
+    });
+
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
+
+    // A parcela cai no mes da fatura informada (mes corrente), com o valor da parcela.
+    expect(context).toMatch(/R\$\s*154[,.]78/);
+  });
+
+  // Estorno/reembolso/ajuste ABATEM o gasto da categoria, como nas telas. Antes eram ignorados.
+  it('estorno abate o gasto da categoria', async () => {
+    const db = mockDb({}, {
+      ...emptyCollections,
+      'workspaces/ws1/categories': [
+        fakeDoc('cat_mercado', { id: 'cat_mercado', name: 'Mercado', isActive: true }),
+      ],
+      'workspaces/ws1/transactions': [
+        fakeDoc('txn_gasto', {
+          type: 'expense', amountCents: 10000, accountId: 'acc1',
+          categoryId: 'cat_mercado', cashMonth: currentMonth, competenceMonth: currentMonth,
+          date: Timestamp.fromDate(makeDate(1)),
+        }),
+        fakeDoc('txn_estorno', {
+          type: 'refund', amountCents: 3000, accountId: 'acc1',
+          categoryId: 'cat_mercado', cashMonth: currentMonth, competenceMonth: currentMonth,
+          date: Timestamp.fromDate(makeDate(1)),
+        }),
+      ],
+      'workspaces/ws1/bills': [],
+      'workspaces/ws1/accounts': [],
+    });
+
+    const context = await buildFinancialContext(db, 'ws1', 'user1');
+
+    expect(context).toMatch(/R\$\s*70[,.]00/);
+    expect(context).not.toMatch(/R\$\s*100[,.]00/);
+  });
+
   it('counts card_purchase transactions as spending', async () => {
     const db = mockDb({}, {
       ...emptyCollections,

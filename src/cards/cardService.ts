@@ -507,6 +507,10 @@ export async function registerOngoingInstallments(
     // aqui). É esse número que `updateCardPurchase` precisa pra recriar a mesma quantidade
     // numa edição futura.
     installments: plan.length,
+    // O número REAL da primeira parcela recriada (o "7" de "7 de 10"). Sem ele, quem reconstrói o
+    // cronograma sem o ledger (`invoicesForSpendingFromTransactions`) numeraria de 1, criava uma
+    // "parcela 1" falsa e deslocava a série um mês. Ver o campo em `contracts.ts`.
+    installmentStart: parsed.currentInstallment,
     clientMutationId: transactionId,
     syncStatus: 'synced',
     version: 1,
@@ -696,6 +700,40 @@ export async function anticipateInstallments(workspaceId: string, userId: string
       })
     );
   });
+
+  // Espelho na TRANSAÇÃO de cada compra afetada: `mês da fatura da parcela` → `mês em que se
+  // antecipou`. Antecipar era 100% evento de ledger, então o "Resumo de gastos" do Dashboard — que
+  // reconstrói o cronograma sem ler o ledger, por custo de leitura — continuava mostrando a parcela
+  // no mês original, enquanto a Análise já a movia pro mês da antecipação (decisão do dono,
+  // 05/08/2026). Com este espelho os dois passam a dizer a mesma coisa.
+  //
+  // Chaveado por mês da fatura (extraído do `invoiceId`, que é `${cardId}_${yyyy-MM}`) e não por
+  // número de parcela: crédito de dado legado pode não ter `installmentNumber`, e o mês é o que a
+  // reconstrução conhece de cada parcela.
+  const anticipatedByTransaction = new Map<string, Record<string, string>>();
+  const anticipationMonth = monthKeyFromDate(parsed.effectiveAt);
+  parsed.credits.forEach((credit) => {
+    const invoiceMonth = credit.invoiceId.slice(credit.invoiceId.lastIndexOf('_') + 1);
+    if (!/^\d{4}-\d{2}$/.test(invoiceMonth)) return;
+    const current = anticipatedByTransaction.get(credit.sourceTransactionId) ?? {};
+    current[invoiceMonth] = anticipationMonth;
+    anticipatedByTransaction.set(credit.sourceTransactionId, current);
+  });
+
+  for (const [sourceTransactionId, months] of anticipatedByTransaction) {
+    // Chaves pontilhadas (`anticipatedInstallments.2026-11`) preservam o que já estava lá de uma
+    // antecipação anterior, em vez de sobrescrever o mapa inteiro — quem antecipa duas vezes na
+    // mesma compra, em meses diferentes, não perde o primeiro registro.
+    const patch: Record<string, unknown> = {
+      updatedBy: userId,
+      version: increment(1),
+      updatedAt: serverTimestamp()
+    };
+    for (const [invoiceMonth, month] of Object.entries(months)) {
+      patch[`anticipatedInstallments.${invoiceMonth}`] = month;
+    }
+    batch.update(transactionRef(workspaceId, sourceTransactionId), patch);
+  }
 
   fireWrite(batch.commit());
 }

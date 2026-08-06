@@ -2,6 +2,39 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-06 — fix(cartão/vic): as 2 divergências residuais fechadas + a Vic conta parcela, não valor cheio
+
+**Regras e a function da Vic DEPLOYADAS** (autorização explícita do dono).
+
+- **Dois campos novos na transação**, com `firestore.rules` + `npm run test:rules` no mesmo commit
+  (REGRA PRINCIPAL do `CLAUDE.md`): `installmentStart` (o "7" de "7 de 10", gravado por
+  `registerOngoingInstallments`) e `anticipatedInstallments` (mapa `mês da fatura` → `mês em que se
+  antecipou`, gravado por `anticipateInstallments` no mesmo batch do ledger).
+- **Antecipar parcela agora aparece no Dashboard.** Era 100% evento de ledger, então o "Resumo de
+  gastos" mantinha o cronograma original enquanto a Análise já movia o gasto pro mês da antecipação.
+  Reproduz o **par crédito+débito** do ledger em vez de mover a parcela: mover apagaria a âncora de
+  `installmentShiftBySource` (a parcela 1 PODE ser antecipada) e escorregaria a série inteira — tem
+  teste travando exatamente isso.
+- **Compra "já em andamento" não desloca mais a série**: sem `installmentStart` a reconstrução
+  numerava de 1, inventava uma "parcela 1" e disparava o deslocamento que a Análise nunca aplica.
+- **Vic alinhada** (`buildFinancialContext.ts`): compra parcelada conta **uma parcela por mês** (era
+  valor cheio no mês da compra — ela respondia R$ 588,00 onde as telas mostram R$ 147,00), e
+  estorno/reembolso/ajuste passaram a **abater** o gasto da categoria (eram ignorados). Regra
+  espelhada em `functions/src/shared/installmentSchedule.ts`, porta manual documentada — Cloud
+  Functions não importa `src/`.
+- **Prompt da Vic**: descreve a diluição da parcelada, diz que limite mede gasto **direto** na
+  categoria, **proíbe prometer notificação de orçamento** (não existe mais) e corrige o ponteiro de
+  tela (orçamento vive no menu da **Análise**, não numa tela "Orçamentos").
+- **Deploy cirúrgico**: `firestore:rules` + `functions:billing:financialAssistantChat` (uma função
+  só — o RUNBOOK avisa que mexer em `functions/` reimplanta o codebase inteiro e pode estourar a
+  quota de CPU do Cloud Run; `whatsappWebhook` não consome esse contexto, então ficou fora).
+- **Dedução sobre os dados do dono**: as duas compras "Limite convertido" mostram *"12 parcelas a
+  vencer"* de 12 e *"8"* de 8 — nada pago, começam na parcela 1, então nunca foram afetadas pela
+  divergência do `installmentStart`. Era teórica pra ele.
+- 611 testes de cliente (+6), 112 de regras (+5), 128 de functions (+3). Divergência residual que
+  fica: dado gravado **antes** de hoje não tem os espelhos (antecipação antiga e série em andamento
+  antiga seguem como estavam), e a Vic só vê 90 dias de transações.
+
 ## 2026-08-06 — feat(dashboard): tocar numa categoria do "Resumo de gastos" abre o Extrato filtrado
 
 - **Pedido do dono**: as 5 maiores categorias do mês viraram alvo de toque — cada linha leva pro

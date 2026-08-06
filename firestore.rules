@@ -573,6 +573,25 @@ service cloud.firestore {
         );
     }
 
+    // Número REAL da primeira parcela recriada numa compra "já em andamento" (o "7" de "7 de 10").
+    // Mesmo teto de `installments` (72) — não faz sentido ser maior que o total possível.
+    function validInstallmentStart() {
+      return !request.resource.data.keys().hasAny(['installmentStart'])
+        || (request.resource.data.installmentStart is int
+            && request.resource.data.installmentStart >= 1
+            && request.resource.data.installmentStart <= 72);
+    }
+
+    // Espelho da antecipação de parcela na transação: mapa `mês da fatura` → `mês da antecipação`
+    // ('yyyy-MM' nos dois lados). É só um cache de EXIBIÇÃO — a verdade continua no ledger da
+    // fatura, que só a Cloud Function pode alterar. O teto acompanha o de `installments`: uma
+    // compra não pode ter mais parcelas antecipadas do que parcelas.
+    function validAnticipatedInstallments() {
+      return !request.resource.data.keys().hasAny(['anticipatedInstallments'])
+        || (request.resource.data.anticipatedInstallments is map
+            && request.resource.data.anticipatedInstallments.size() <= 72);
+    }
+
     function validTransactionCreate(workspaceId, transactionId) {
       return isActiveMember(workspaceId)
         && request.resource.data.keys().hasOnly([
@@ -598,6 +617,8 @@ service cloud.firestore {
           'recurringId',
           'installmentGroupId',
           'installments',
+          'installmentStart',
+          'anticipatedInstallments',
           'clientMutationId',
           'syncStatus',
           'version',
@@ -619,6 +640,8 @@ service cloud.firestore {
         && validOptionalString('installmentGroupId', 120)
         && (!request.resource.data.keys().hasAny(['installments'])
             || (request.resource.data.installments is int && request.resource.data.installments >= 1 && request.resource.data.installments <= 72))
+        && validInstallmentStart()
+        && validAnticipatedInstallments()
         && request.resource.data.date is timestamp
         && validMonthKey(request.resource.data.competenceMonth)
         && validMonthKey(request.resource.data.cashMonth)
@@ -658,6 +681,12 @@ service cloud.firestore {
           'isRecurring',
           'recurringId',
           'installmentGroupId',
+          // Antecipar parcela escreve AQUI além do ledger (`anticipateInstallments`): sem isso o
+          // "Resumo de gastos" do Dashboard, que reconstrói o cronograma sem ler o ledger, ficava
+          // mostrando a parcela no mês original enquanto a Análise já a movia. `installments` e
+          // `installmentStart` seguem FORA da lista de propósito — o cronograma de uma compra não
+          // se edita, quem erra parcela exclui e relança (regra de 2026-07-23).
+          'anticipatedInstallments',
           'syncStatus',
           'version',
           'deletedAt',
@@ -674,6 +703,8 @@ service cloud.firestore {
         && validOptionalString('notes', 500)
         && validOptionalString('recurringId', 120)
         && validOptionalString('installmentGroupId', 120)
+        && validInstallmentStart()
+        && validAnticipatedInstallments()
         && request.resource.data.date is timestamp
         && validMonthKey(request.resource.data.competenceMonth)
         && validMonthKey(request.resource.data.cashMonth)

@@ -28,28 +28,37 @@ foram **auditados e deixados de fora de propósito**, cada um com commit própri
   removível no trilho, porque mês é o único filtro que esconde um período inteiro), filtrando por
   `cashMonth ?? competenceMonth` pra bater com o número tocado. Mês sem resultado oferece "Ver todos
   os meses" — saída pro caso de a parcela do mês vir de uma compra de meses atrás.
-- [ ] **Duas divergências residuais do Resumo de gastos, por não ler o ledger** — enumeradas na doc
-  de `invoicesForSpendingFromTransactions`, nenhuma no caso comum. (1) **Antecipação de parcela**: a
-  Análise move o gasto pro mês em que se antecipou, o Dashboard mantém o cronograma original.
-  (2) **Compra "já em andamento" cuja próxima parcela cai exatamente 1 mês depois da data da
-  compra**: a transação guarda quantas parcelas FALTAM, não o número real (7/10), então o
-  deslocamento é aplicado no Dashboard e não na Análise, adiantando a série 1 mês. Fecha de vez
-  gravando o número inicial da parcela na transação — **campo novo ⇒ `firestore.rules` +
-  `npm run test:rules` no mesmo commit** (REGRA PRINCIPAL do `CLAUDE.md`). Critério: só mexer se
-  aparecer ao vivo; hoje é caso de borda conhecido e documentado, não bug silencioso.
+- [x] ~~**Duas divergências residuais do Resumo de gastos, por não ler o ledger**~~ — **FECHADAS em
+  2026-08-06 com dois campos espelho na transação, regras DEPLOYADAS**: `installmentStart` (o "7" de
+  "7 de 10") e `anticipatedInstallments` (mapa `mês da fatura` → `mês da antecipação`). Antecipar
+  parcela agora aparece no Dashboard, e compra "já em andamento" não desloca mais a série. A
+  antecipação reproduz o **par crédito+débito** do ledger em vez de mover a parcela — mover apagaria
+  a âncora do deslocamento (a parcela 1 pode ser antecipada) e escorregaria a série inteira; tem
+  teste travando. Detalhe: `../history/2026-08.md` (06/08, parte 4).
+- [ ] **Dado gravado ANTES de 2026-08-06 não tem os espelhos** — antecipação feita antes dessa data
+  continua no cronograma original no Dashboard, e série "já em andamento" cadastrada antes segue 1 mês
+  adiantada quando a próxima parcela cai exatamente 1 mês depois da compra. Antecipar de novo grava o
+  espelho e conserta dali pra frente. **Não afeta a conta do dono** (as duas "Limite convertido"
+  começam na parcela 1 — nada pago). Critério: só migrar se aparecer em conta real; um script de
+  migração precisaria ler o ledger pra reconstruir, o que é caro e arriscado por um caso de borda.
+  Há teste documentando o comportamento do dado antigo, pra não ser esquecido.
 - [ ] **`subscribeInvoices` traz as 24 faturas MAIS ANTIGAS** — `cardService.ts` L802 usa
   `orderBy('referenceMonth','asc') + limit(24)` enquanto o comentário acima diz "24 ciclos mais
   recentes". Numa conta com >24 faturas, as futuras (que a projeção do Comprometido precisa) são as
   primeiras a cair fora da janela. Bug latente, independente da ancoragem. Critério: a Análise de um
   mês futuro continua achando a parcela numa conta com 30+ faturas.
-- [ ] **A Vic conta parcelada pelo valor cheio no mês da compra** —
-  `buildFinancialContext.ts` (L170-220, `spendingByCategoryThisMonth`) reimplementa análise de gastos
-  sem paridade com `spendingAnalysis.ts`. A Vic responde número diferente do que a tela mostra —
-  inclusive nas linhas de **orçamento** que ela monta (L390-404), que agora são a **única** superfície
-  do app fora da Análise a citar limite de categoria. Metade deste item morreu em 2026-08-06:
-  `budgetAlerts.ts` (que admitia o gap num comentário) foi removido. Critério: a Vic consome a mesma
-  regra, ou a divergência vira decisão registrada. Nota: o argumento de custo que barrou o ledger no
-  Dashboard **não vale no servidor** (roda 1×/mensagem, não por boot de todo usuário).
+- [x] ~~**A Vic conta parcelada pelo valor cheio no mês da compra**~~ — **RESOLVIDO em 2026-08-06,
+  function DEPLOYADA** (`functions:billing:financialAssistantChat`). `buildFinancialContext.ts` conta
+  **uma parcela por mês** (gasto por categoria + tendência) e passou a **abater** estorno/reembolso/
+  ajuste, que eram ignorados. A regra vive em `functions/src/shared/installmentSchedule.ts` — porta
+  manual de `src/cards/installmentSchedule.ts`, com pacto de sincronia no cabeçalho (mesmo padrão de
+  `shared/accountEffects.ts`), porque Cloud Functions não importa `src/`. Prompt também corrigido:
+  explica a diluição, não promete notificação de orçamento (não existe mais) e aponta a Análise como
+  a tela do limite. Ver `docs/ai/VIC.md`.
+- [ ] **A Vic só vê 90 dias de transações** — consequência da consulta dela
+  (`where('date','>=',ninetyDaysAgo).limit(2000)`): a parcela de uma compra mais antiga que isso não
+  entra no gasto do mês que ela relata, enquanto nas telas entra (o ledger tem a parcela). Critério:
+  só mexer se alguém notar; ampliar a janela custa leitura por mensagem.
 - [x] ~~**Alerta de orçamento conta a compra parcelada pelo VALOR CHEIO**~~ — **RESOLVIDO em
   2026-08-06 removendo as duas superfícies** (decisão do dono: *"eu acho melhor só tirar do
   dashboard"*). O banner (`BudgetAlertBanner.tsx` + `budgetAlertCache.ts`) e o push diário

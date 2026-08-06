@@ -276,6 +276,30 @@ export interface Transaction {
    * leitura depende de `get()`/`exists()`, como `isActiveMember`). Ausente em transações
    * criadas antes desta feature. */
   installments?: number;
+  /**
+   * Só em `card_purchase` cadastrada por `registerOngoingInstallments` (compra que JÁ estava em
+   * andamento): o número REAL da primeira parcela recriada — o "7" de "7 de 10". `installments`
+   * diz só quantas faltam, e sem este campo era impossível saber que a série não começa em 1.
+   *
+   * Existe porque `invoicesForSpendingFromTransactions` reconstrói as parcelas sem ler o ledger:
+   * numerando de 1, uma série já em andamento ganhava uma "parcela 1" falsa e disparava o
+   * deslocamento de `installmentShiftBySource` (que a Análise, lendo o ledger de verdade, nunca
+   * aplica nessas compras) — a série inteira aparecia 1 mês adiantada no Dashboard. Ausente em
+   * transação criada antes de 06/08/2026 ⇒ assume 1, que é o certo pro fluxo normal.
+   */
+  installmentStart?: number;
+  /**
+   * Só em `card_purchase` parcelada que teve parcela ANTECIPADA: `mês da fatura da parcela` →
+   * `mês em que se antecipou`, ambos 'yyyy-MM'. Ex.: `{ '2026-11': '2026-08' }` = a parcela que
+   * cairia na fatura de novembro foi antecipada em agosto.
+   *
+   * Antecipar é 100% um evento de ledger (`anticipateInstallments` grava crédito na fatura da
+   * parcela + débito na fatura atual, e nada na transação), então quem não lê o ledger não tinha
+   * como saber. Este espelho existe pro Dashboard mover o gasto igual à Análise faz — decisão do
+   * dono, 2026-08-05: *"se eu antecipei, gastei naquele mês"*. Chaveado por mês da fatura, não por
+   * número de parcela, porque crédito de dado legado pode não ter `installmentNumber`.
+   */
+  anticipatedInstallments?: Record<string, string>;
   clientMutationId: string;
   syncStatus: SyncStatus;
   version: number;

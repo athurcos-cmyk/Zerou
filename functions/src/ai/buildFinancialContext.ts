@@ -1,6 +1,7 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import { Timestamp } from 'firebase-admin/firestore';
 import { onboardingChallengeLabels, onboardingGoalLabels } from './onboardingLabels.js';
+import { installmentSpendingMonths } from '../shared/installmentSchedule.js';
 
 function nowInBRT(): Date {
   return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
@@ -45,6 +46,9 @@ function friendlyDate(date: Date): string {
 
 
 const SPENDING_TYPES = new Set(['expense', 'card_purchase']);
+// Abatem o gasto da categoria (crédito negativo), igual a `refundLikeTypes` em
+// src/finance/spendingAnalysis.ts. Antes eram simplesmente ignorados aqui.
+const REFUND_TYPES = new Set(['refund', 'reimbursement', 'adjustment']);
 const MAX_CONTEXT_CHARS = 5000;
 
 interface CategoryInfo {
@@ -193,19 +197,33 @@ export async function buildFinancialContext(
       recurringChargesByInvoice.set(invId, (recurringChargesByInvoice.get(invId) ?? 0) + amount);
     }
 
-    if (!SPENDING_TYPES.has(txn.type as string)) continue;
-
-    // Monthly trend (6 months back)
-    if (txnMonth >= monthKey(new Date(now.getFullYear(), now.getMonth() - 5, 1))) {
-      monthlyTotals.set(txnMonth, (monthlyTotals.get(txnMonth) ?? 0) + amount);
-    }
+    if (!SPENDING_TYPES.has(txn.type as string) && !REFUND_TYPES.has(txn.type as string)) continue;
 
     const catId = (txn.categoryId as string) || '_uncategorized';
+    const trendFloor = monthKey(new Date(now.getFullYear(), now.getMonth() - 5, 1));
+    // Estorno/reembolso/ajuste ABATEM o gasto da categoria, como na Análise e no Resumo de gastos
+    // — antes eram ignorados aqui, então a Vic dizia um gasto maior do que qualquer tela mostrava.
+    const signed = REFUND_TYPES.has(txn.type as string) ? -amount : amount;
 
-    if (txnMonth === currentMonth) {
-      spendingByCategoryThisMonth.set(catId, (spendingByCategoryThisMonth.get(catId) ?? 0) + amount);
-    } else if (txnMonth === previousMonth) {
-      spendingByCategoryPrevMonth.set(catId, (spendingByCategoryPrevMonth.get(catId) ?? 0) + amount);
+    // ⚠️ Compra parcelada no cartão conta **uma parcela por mês**, não o valor cheio no mês da
+    // compra: é a regra da Análise desde a ancoragem de 2026-08-05 e do Dashboard desde
+    // 2026-08-06. Sem isso a Vic respondia "R$ 588,00 em Presente" onde as duas telas mostravam
+    // R$ 147,00. O cronograma vem da própria transação (ver `shared/installmentSchedule.ts`),
+    // sem ler o ledger da fatura.
+    const schedule = installmentSpendingMonths(txn);
+    const buckets = schedule
+      ? schedule.map((parcel) => ({ month: parcel.month, cents: parcel.amountCents }))
+      : [{ month: txnMonth, cents: signed }];
+
+    for (const bucket of buckets) {
+      if (bucket.month >= trendFloor) {
+        monthlyTotals.set(bucket.month, (monthlyTotals.get(bucket.month) ?? 0) + bucket.cents);
+      }
+      if (bucket.month === currentMonth) {
+        spendingByCategoryThisMonth.set(catId, (spendingByCategoryThisMonth.get(catId) ?? 0) + bucket.cents);
+      } else if (bucket.month === previousMonth) {
+        spendingByCategoryPrevMonth.set(catId, (spendingByCategoryPrevMonth.get(catId) ?? 0) + bucket.cents);
+      }
     }
   }
 

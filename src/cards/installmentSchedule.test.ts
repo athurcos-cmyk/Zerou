@@ -35,6 +35,8 @@ function parcelada(over: {
   purchaseMonth: string;
   categoryId?: string;
   deletedAt?: Timestamp;
+  installmentStart?: number;
+  anticipatedInstallments?: Record<string, string>;
 }): Transaction {
   const [year, month] = over.purchaseMonth.split('-').map(Number);
   return txn({
@@ -48,7 +50,9 @@ function parcelada(over: {
     date: Timestamp.fromDate(new Date(year, month - 1, 4, 12, 0, 0)),
     competenceMonth: over.purchaseMonth,
     cashMonth: over.purchaseMonth,
-    ...(over.deletedAt ? { deletedAt: over.deletedAt } : {})
+    ...(over.deletedAt ? { deletedAt: over.deletedAt } : {}),
+    ...(over.installmentStart ? { installmentStart: over.installmentStart } : {}),
+    ...(over.anticipatedInstallments ? { anticipatedInstallments: over.anticipatedInstallments } : {})
   });
 }
 
@@ -271,5 +275,107 @@ describe('Resumo de gastos do Dashboard bate com a Análise [demais casos]', () 
     expect(dashboardSpending('2026-07', [ongoing]).get('limite')).toBeUndefined();
     expect(dashboardSpending('2026-08', [ongoing]).get('limite')).toBe(15478);
     expect(dashboardSpending('2026-11', [ongoing]).get('limite')).toBe(15478);
+  });
+});
+
+// `installmentStart` (2026-08-06): o número REAL da primeira parcela recriada numa compra que já
+// estava em andamento. Sem ele, numerar de 1 inventava uma "parcela 1" que disparava o
+// deslocamento — e a Análise, lendo o ledger real (sem parcela 1), nunca desloca.
+describe('installmentStart — compra já em andamento não desloca', () => {
+  // O caso exato da divergência: a próxima parcela cai 1 mês depois da data da compra, que é o
+  // gatilho do deslocamento. Faltam 4 de 10, começando na 7ª.
+  const ongoing = {
+    id: 'txn_ongoing',
+    amountCents: 61912,
+    installments: 4,
+    firstInvoiceMonth: '2026-08',
+    purchaseMonth: '2026-07',
+    categoryId: 'limite'
+  };
+
+  it('com installmentStart, a série começa no mês da fatura informada', () => {
+    const txn = parcelada({ ...ongoing, installmentStart: 7 });
+
+    expect(dashboardSpending('2026-07', [txn]).get('limite')).toBeUndefined();
+    expect(dashboardSpending('2026-08', [txn]).get('limite')).toBe(15478);
+    expect(dashboardSpending('2026-11', [txn]).get('limite')).toBe(15478);
+  });
+
+  it('dado ANTIGO (sem o campo) segue 1 mês adiantado — divergência residual documentada', () => {
+    const legado = parcelada(ongoing);
+
+    // Isto não é o comportamento desejado: é o registro honesto do que acontece com transação
+    // gravada antes de 06/08/2026. Se algum dia migrarmos o dado antigo, este teste muda junto.
+    expect(dashboardSpending('2026-07', [legado]).get('limite')).toBe(15478);
+  });
+});
+
+// Antecipar parcela (`anticipatedInstallments`, 2026-08-06): espelho na transação do que só
+// existia no ledger. Decisão do dono em 05/08: "se eu antecipei, gastei naquele mês".
+describe('antecipação de parcela — Dashboard passa a mover o gasto igual à Análise', () => {
+  // A tabela literal que o dono escreveu: 5x de R$ 100, antecipando as duas últimas em março.
+  const cincoVezes = {
+    id: 'txn_5x',
+    amountCents: 50000,
+    installments: 5,
+    firstInvoiceMonth: '2026-01',
+    purchaseMonth: '2026-01',
+    categoryId: 'compras'
+  };
+
+  it('reproduz a tabela: 100 / 100 / 300 / 0 / 0', () => {
+    const txn = parcelada({
+      ...cincoVezes,
+      anticipatedInstallments: { '2026-04': '2026-03', '2026-05': '2026-03' }
+    });
+
+    expect(dashboardSpending('2026-01', [txn]).get('compras')).toBe(10000);
+    expect(dashboardSpending('2026-02', [txn]).get('compras')).toBe(10000);
+    expect(dashboardSpending('2026-03', [txn]).get('compras')).toBe(30000);
+    expect(dashboardSpending('2026-04', [txn]).get('compras') ?? 0).toBe(0);
+    expect(dashboardSpending('2026-05', [txn]).get('compras') ?? 0).toBe(0);
+  });
+
+  it('conserva o valor cheio da compra', () => {
+    const txn = parcelada({
+      ...cincoVezes,
+      anticipatedInstallments: { '2026-04': '2026-03', '2026-05': '2026-03' }
+    });
+    const total = ['2026-01', '2026-02', '2026-03', '2026-04', '2026-05']
+      .map((m) => dashboardSpending(m, [txn]).get('compras') ?? 0)
+      .reduce((a, b) => a + b, 0);
+
+    expect(total).toBe(50000);
+  });
+
+  it('sem antecipação, nada muda (o cronograma original vale)', () => {
+    const txn = parcelada(cincoVezes);
+
+    expect(dashboardSpending('2026-03', [txn]).get('compras')).toBe(10000);
+    expect(dashboardSpending('2026-05', [txn]).get('compras')).toBe(10000);
+  });
+
+  // ⚠️ Trava do desenho: a parcela 1 PODE ser antecipada (a fatura dela é futura enquanto a atual
+  // ainda está aberta). A primeira versão MOVIA a parcela de mês, o que fazia
+  // `installmentShiftBySource` perder a âncora e a série INTEIRA escorregar um mês. Reproduzir o
+  // par crédito+débito do ledger mantém o lançamento `purchase` onde estava. Falha se alguém
+  // "simplificar" isso de volta.
+  it('antecipar a parcela 1 não desloca as outras parcelas', () => {
+    const airbnb = parcelada({
+      id: 'txn_airbnb',
+      amountCents: 58800,
+      installments: 4,
+      firstInvoiceMonth: '2026-09',
+      purchaseMonth: '2026-08',
+      anticipatedInstallments: { '2026-09': '2026-08' }
+    });
+
+    // Parcela 1 já contava em agosto (mês da compra), então antecipá-la em agosto não muda o mês.
+    expect(dashboardSpending('2026-08', [airbnb]).get('presente')).toBe(14700);
+    // E as outras três continuam ancoradas em set/out/nov — não escorregaram pra out/nov/dez.
+    expect(dashboardSpending('2026-09', [airbnb]).get('presente')).toBe(14700);
+    expect(dashboardSpending('2026-10', [airbnb]).get('presente')).toBe(14700);
+    expect(dashboardSpending('2026-11', [airbnb]).get('presente')).toBe(14700);
+    expect(dashboardSpending('2026-12', [airbnb]).get('presente') ?? 0).toBe(0);
   });
 });

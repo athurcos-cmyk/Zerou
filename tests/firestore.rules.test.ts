@@ -1705,6 +1705,143 @@ describe('firestore security rules', () => {
     );
   });
 
+  // ⚠️ REGRA PRINCIPAL do CLAUDE.md — dois campos NOVOS na transação, adicionados em 2026-08-06
+  // no mesmo commit que a regra. Os dois existem porque o "Resumo de gastos" do Dashboard
+  // reconstrói o cronograma de parcelas SEM ler o ledger da fatura (custo de leitura), e sem eles
+  // divergia da Análise. O payload abaixo é o REAL de `registerOngoingInstallments` — não uma
+  // versão simplificada, que foi justamente o que deixou os 2 incidentes passarem.
+  it('allows a card_purchase carrying installmentStart (compra já em andamento, "7 de 10")', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(setDoc(doc(aliceDb, 'workspaces/workspaceA/cards/cardA'), cardPayload('workspaceA', 'cardA', 'alice')));
+    await assertSucceeds(
+      setDoc(doc(aliceDb, 'workspaces/workspaceA/cards/cardA/invoices/cardA_2026-06'), invoicePayload('workspaceA', 'cardA', 'cardA_2026-06'))
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/transactions/txnOngoing'),
+        cardPurchaseTransactionPayload('workspaceA', 'txnOngoing', 'alice', {
+          // Faltam 4 parcelas, começando na 7ª de 10 — `amountCents` é o que FALTA.
+          amountCents: 61912,
+          installments: 4,
+          installmentStart: 7,
+          installmentGroupId: 'installments_abc'
+        })
+      )
+    );
+  });
+
+  it('rejects installmentStart fora de 1..72 ou não-inteiro', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(setDoc(doc(aliceDb, 'workspaces/workspaceA/cards/cardA'), cardPayload('workspaceA', 'cardA', 'alice')));
+    await assertSucceeds(
+      setDoc(doc(aliceDb, 'workspaces/workspaceA/cards/cardA/invoices/cardA_2026-06'), invoicePayload('workspaceA', 'cardA', 'cardA_2026-06'))
+    );
+    await assertFails(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/transactions/txnStart0'),
+        cardPurchaseTransactionPayload('workspaceA', 'txnStart0', 'alice', { installmentStart: 0 })
+      )
+    );
+    await assertFails(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/transactions/txnStart73'),
+        cardPurchaseTransactionPayload('workspaceA', 'txnStart73', 'alice', { installmentStart: 73 })
+      )
+    );
+    await assertFails(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/transactions/txnStartText'),
+        cardPurchaseTransactionPayload('workspaceA', 'txnStartText', 'alice', { installmentStart: '7' })
+      )
+    );
+  });
+
+  // `anticipateInstallments` grava o espelho da antecipação na transação com chave pontilhada
+  // (`anticipatedInstallments.2026-11`), no MESMO batch dos lançamentos do ledger. Precisa passar
+  // por `validTransactionUpdate` — que exige version+1, updatedBy e updatedAt.
+  it('allows anticipatedInstallments no update (espelho da antecipação)', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(setDoc(doc(aliceDb, 'workspaces/workspaceA/cards/cardA'), cardPayload('workspaceA', 'cardA', 'alice')));
+    await assertSucceeds(
+      setDoc(doc(aliceDb, 'workspaces/workspaceA/cards/cardA/invoices/cardA_2026-06'), invoicePayload('workspaceA', 'cardA', 'cardA_2026-06'))
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/transactions/txnAntecipada'),
+        cardPurchaseTransactionPayload('workspaceA', 'txnAntecipada', 'alice', { installments: 5, amountCents: 50000 })
+      )
+    );
+    await assertSucceeds(
+      updateDoc(doc(aliceDb, 'workspaces/workspaceA/transactions/txnAntecipada'), {
+        'anticipatedInstallments.2026-11': '2026-08',
+        'anticipatedInstallments.2026-12': '2026-08',
+        updatedBy: 'alice',
+        version: 2,
+        updatedAt: serverTimestamp()
+      })
+    );
+  });
+
+  it('rejects anticipatedInstallments que não é mapa', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(setDoc(doc(aliceDb, 'workspaces/workspaceA/cards/cardA'), cardPayload('workspaceA', 'cardA', 'alice')));
+    await assertSucceeds(
+      setDoc(doc(aliceDb, 'workspaces/workspaceA/cards/cardA/invoices/cardA_2026-06'), invoicePayload('workspaceA', 'cardA', 'cardA_2026-06'))
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/transactions/txnAntecipadaRuim'),
+        cardPurchaseTransactionPayload('workspaceA', 'txnAntecipadaRuim', 'alice', { installments: 5 })
+      )
+    );
+    await assertFails(
+      updateDoc(doc(aliceDb, 'workspaces/workspaceA/transactions/txnAntecipadaRuim'), {
+        anticipatedInstallments: 'agosto',
+        updatedBy: 'alice',
+        version: 2,
+        updatedAt: serverTimestamp()
+      })
+    );
+  });
+
+  // O cronograma de uma compra NÃO se edita (regra de 2026-07-23: valor/parcelas/cartão errados
+  // exigem excluir e relançar). `installments` e `installmentStart` ficaram fora da lista de
+  // campos atualizáveis de propósito — este teste trava isso.
+  it('rejects mudar installments/installmentStart num update', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertSucceeds(setDoc(doc(aliceDb, 'workspaces/workspaceA/cards/cardA'), cardPayload('workspaceA', 'cardA', 'alice')));
+    await assertSucceeds(
+      setDoc(doc(aliceDb, 'workspaces/workspaceA/cards/cardA/invoices/cardA_2026-06'), invoicePayload('workspaceA', 'cardA', 'cardA_2026-06'))
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(aliceDb, 'workspaces/workspaceA/transactions/txnCronograma'),
+        cardPurchaseTransactionPayload('workspaceA', 'txnCronograma', 'alice', { installments: 5, installmentStart: 2 })
+      )
+    );
+    await assertFails(
+      updateDoc(doc(aliceDb, 'workspaces/workspaceA/transactions/txnCronograma'), {
+        installments: 9,
+        updatedBy: 'alice',
+        version: 2,
+        updatedAt: serverTimestamp()
+      })
+    );
+    await assertFails(
+      updateDoc(doc(aliceDb, 'workspaces/workspaceA/transactions/txnCronograma'), {
+        installmentStart: 3,
+        updatedBy: 'alice',
+        version: 2,
+        updatedAt: serverTimestamp()
+      })
+    );
+  });
+
   // Rótulo "7/10" na fatura, tanto pra compra nova quanto pra uma compra parcelada que já
   // estava em andamento (`registerOngoingInstallments`). Os campos são opcionais e int 1..72.
   it('allows a purchase ledger entry carrying installmentNumber/installmentTotal', async () => {
