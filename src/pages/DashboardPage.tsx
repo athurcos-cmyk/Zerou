@@ -24,7 +24,6 @@ import { SyncStatusBadge } from '../finance/SyncStatusBadge';
 import { CategoryMark } from '../components/categoryIcons';
 import { defaultCategoryColors } from '../theme/palette';
 import { InstallPromptSheet } from '../pwa/InstallPromptSheet';
-import { BudgetAlertBanner } from '../components/BudgetAlertBanner';
 
 import { EmptyState } from '../components/EmptyState';
 
@@ -378,8 +377,6 @@ export function DashboardPage() {
           <span>Uma compra no cartão ainda não sincronizou — conecte-se à internet para atualizar o Comprometido.</span>
         </div>
       )}
-
-      <BudgetAlertBanner />
 
       <div className="dash-summary">
         <article className="surface surface-pad dash-balance dash-hero">

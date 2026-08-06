@@ -794,13 +794,18 @@ describe('rollUpByParent', () => {
 });
 
 /**
- * `[D9]` — a fonte crua não pode agrupar filha no pai. Ela alimenta três telas e só uma quer
- * roll-up (ver o aviso em `rollUpByParent`):
+ * `[D9]` — a fonte crua não pode agrupar filha no pai. Nem todo consumidor quer roll-up
+ * (ver o aviso em `rollUpByParent`):
  *
- *   • BudgetAlertBanner  → lê `spending.get(budget.categoryId)` direto deste mapa. Se o pai
- *     passasse a vir somado, um orçamento em "Casa" começaria a estourar por causa de Energia,
- *     sem ninguém ter decidido isso.
- *   • annualSummaryCalculations → mesmo risco no "Top categorias" (teste irmão lá).
+ *   • annualSummaryCalculations → "Top categorias" mudaria de número (teste irmão lá).
+ *   • orçamento → a Análise só desenha a barra de limite em categoria FOLHA justamente porque
+ *     o valor da linha do pai já é o roll-up, e o limite significa gasto DIRETO
+ *     (`SearchPage.tsx`, `leafBudget`/`groupBudget`). Se o mapa cru também viesse somado, não
+ *     sobraria nenhum lugar de onde tirar o gasto direto — um limite em "Casa" passaria a
+ *     estourar por causa de Energia, sem ninguém ter decidido isso. Decisão de produto ainda
+ *     em aberto; segue em aberto porque este teste impede que ela aconteça por acidente.
+ *     (O `BudgetAlertBanner` era o terceiro consumidor citado aqui — removido em 06/08/2026,
+ *     ver `docs/history/2026-08.md`. O motivo dele constar não morreu com ele: mudou de tela.)
  *
  * O teste é a tripwire: hoje a função nem recebe as categorias, então não TEM como agrupar.
  * No dia em que alguém passar esse mapa pra cá, ele falha e a decisão volta pra mesa.

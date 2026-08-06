@@ -132,8 +132,14 @@ Registrado em `docs/planning/TODOS.md`.
    indexado e lê só a fatia acionável do dia, então quase não cresce com a base:
    - `closeInvoicesDue` (`where closingDay == hoje`), `generateRecurrences` (`where nextOccurrenceAt <= agora`)
      e `sendDueReminders` (`where dueDate` na janela) → leem só os cartões/recorrências/contas **do dia**. ✅ enxuto.
-   - `sendBudgetAlerts` → lê **todos os orçamentos ativos** + 1 consulta do gasto do mês por orçamento.
-     Cresce com quantos usuários **usam orçamento**. ⚠️ médio.
+   - ~~`sendBudgetAlerts`~~ → **removida do ar em 06/08/2026** (lia todos os orçamentos ativos + 1
+     consulta de gasto do mês por orçamento; ⚠️ era a de custo médio, crescia com quantos usuários
+     usam orçamento). Saiu por **corretude**, não por custo: contava compra parcelada no cartão pelo
+     valor cheio no mês da compra, contra a parcela que a Análise mostra. Efeito colateral bom: uma
+     agendada a menos por dia. ⚠️ E registra o limite oposto: **o alerta de orçamento não voltou pro
+     cliente** porque colocá-lo no Dashboard exigiria assinar o ledger da fatura **no boot** —
+     estimado em ~700 leituras por boot frio numa conta com 2 cartões, ~3,5× a cota diária de um
+     usuário ativo (ver § "Ledger de fatura sob demanda" acima e `docs/history/2026-08.md`).
    - **`sendDailyLogReminder`** → `collectionGroup('fcmTokens').get()` **sem filtro**: lê o token de push
      de **todos** os usuários, todo dia, ativo ou não. **É o único que cresce linear com a base total**
      (1.000 usuários → ~1.000 leituras/dia só nisso; 10.000 → ~10.000/dia) e o **primeiro a otimizar**

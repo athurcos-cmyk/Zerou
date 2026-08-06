@@ -360,19 +360,25 @@ export interface CategoryRollUp {
 /**
  * Agrupa o gasto das subcategorias no pai — **só pra exibição no donut/lista da Análise**.
  *
- * ⚠️ **Não mova isto pra dentro de `spendingByCategoryForMonth`.** Aquela função tem três
- * consumidores e só um quer roll-up:
+ * ⚠️ **Não mova isto pra dentro de `spendingByCategoryForMonth`.** Aquela função tem mais de um
+ * consumidor e só um quer roll-up:
  *
  * ```
  * spendingByCategoryForMonth
  *   ├── SearchPage (donut + lista)   → roll-up SÓ aqui
- *   ├── BudgetAlertBanner            → NÃO: orçamento em Casa passaria a incluir Energia e Água
  *   └── annualSummaryCalculations    → NÃO: mudaria número que hoje está certo
  * ```
  *
- * Somar filha no pai dentro do orçamento é uma decisão de produto ainda **em aberto** — fazer
- * isso de lambuja, por efeito colateral, é o modo de falha silencioso que este projeto já pagou
- * caro. Travado pelos testes de regressão `[D9]`.
+ * E o roll-up daqui não pode vazar pro **orçamento**: a barra de limite da Análise só aparece em
+ * categoria FOLHA (`leafBudget`, `SearchPage.tsx`) porque na linha do pai o valor já é o
+ * roll-up, enquanto o limite significa gasto **direto** naquela categoria. Somar filha no pai
+ * dentro do orçamento é uma decisão de produto ainda **em aberto** — fazer isso de lambuja, por
+ * efeito colateral, é o modo de falha silencioso que este projeto já pagou caro. Travado pelos
+ * testes de regressão `[D9]`.
+ *
+ * (O `BudgetAlertBanner` do Dashboard aparecia nesta lista como terceiro consumidor. Foi
+ * removido em 06/08/2026 — contava compra parcelada pelo valor cheio no mês da compra, contra a
+ * parcela que esta função ancora desde 05/08. Ver `docs/history/2026-08.md`.)
  *
  * Filha órfã (pai excluído por caminho não previsto) vira linha de primeiro nível com o próprio
  * valor: perder o agrupamento é aceitável, sumir com o gasto não é.

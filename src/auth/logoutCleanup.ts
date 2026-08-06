@@ -3,6 +3,9 @@
 // exibição recriadas do zero no próximo login — a fonte real é o Firestore.
 const ACCOUNT_SCOPED_KEYS = [
   'zerou.pushToken.v1',
+  // Legado: o banner de orçamento do Dashboard (quem escrevia esta chave) foi removido em
+  // 06/08/2026. Nada mais grava aqui — a entrada FICA de propósito, pra limpar o aparelho de
+  // quem já dispensou um alerta antes da remoção. Sem ela, a chave ficaria órfã pra sempre.
   'zerou.budgetAlertsDismissed.v1',
   'zerou.pendingInviteCode',
   'zerou.defaultCategoriesPrepared',

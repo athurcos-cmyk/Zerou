@@ -22,7 +22,6 @@ vi.mock('../onboarding/welcomeTour.store', () => ({
 }));
 // Filhos que tocam Firebase/PWA/portais — irrelevantes pro que este teste verifica.
 vi.mock('../pwa/InstallPromptSheet', () => ({ InstallPromptSheet: () => null }));
-vi.mock('../components/BudgetAlertBanner', () => ({ BudgetAlertBanner: () => null }));
 vi.mock('../finance/SyncStatusBadge', () => ({ SyncStatusBadge: () => null }));
 vi.mock('../workspaces/workspaceService', () => ({
   updateProjectedSalary: vi.fn(),

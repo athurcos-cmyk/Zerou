@@ -2,6 +2,30 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-06 — remove(orçamento): alerta sai do Dashboard e do push; orçamento vive só na Análise
+
+- **O defeito**: `BudgetAlertBanner.tsx` passava `invoices: []` pra `spendingByCategoryForMonth`.
+  ⚠️ Não é que "parcela não contava" — sem faturas, `installmentPurchaseIds` volta vazio e **toda**
+  `card_purchase` é tratada como à vista, entrando pelo **valor cheio** no mês da compra. O Airbnb de
+  R$ 588 em 4x acusava **196%** de um limite de R$ 300 em agosto e **R$ 0,00** em set/out/nov.
+- **Agravante achado agora**: o app mostrava **dois percentuais do mesmo limite** — Dashboard 196%
+  vermelho, Análise 49% verde (a barra da Análise usa o número ancorado, correto).
+- **Decisão do dono: remover a superfície, não corrigir o número.** Dar o número certo ao Dashboard
+  exigiria assinar o ledger da fatura **no boot** (~700 leituras num boot frio com 2 cartões, ~3,5× a
+  cota diária de um ativo, teto grátis de ~250 → ~60-80 ativos/dia) ou uma 3ª reimplementação da conta
+  de cartão. A Análise já paga o ledger e já está certa, inclusive com antecipação e compra excluída.
+- **A Cloud Function tinha o mesmo defeito e foi removida do ar** (`sendBudgetAlerts`,
+  `functions:delete`, cirúrgico). O log de produção mostrou que ela **rodava todo dia sem erro** desde
+  01/08 — o que **fecha o item aberto** "verificar no log se funciona" — com **1 orçamento ativo em
+  todo o banco** e **nenhum alerta jamais disparado**. Job do Cloud Scheduler removido junto.
+- **Ficou**: o orçamento inteiro (criar/editar/excluir limite + barra por categoria) na Análise; a
+  chave `zerou.budgetAlertsDismissed.v1` no `logoutCleanup` pra limpar aparelho antigo; os testes
+  `[D9]` (o motivo deles mudou de tela, não morreu — comentários atualizados).
+- **Custo honesto**: o estouro não é mais empurrado pra tela de entrada, e a lista da Análise mostra 6
+  categorias por padrão. Item novo no TODOS. **A Vic segue com o número antigo** (valor cheio) — é o
+  item aberto sobre divergência de `functions/`, não foi tocado.
+- Detalhe completo, com as 3 alternativas descartadas e o motivo: `docs/history/2026-08.md`.
+
 ## 2026-08-05 — feat(análise): parcela de cartão conta no mês da COMPRA, não no da fatura
 
 - **Relato do dono**: comprou um jogo (à vista) e um presente (parcelado) no **mesmo dia** (04/08),

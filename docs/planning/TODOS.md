@@ -26,18 +26,31 @@ foram **auditados e deixados de fora de propósito**, cada um com commit própri
   recentes". Numa conta com >24 faturas, as futuras (que a projeção do Comprometido precisa) são as
   primeiras a cair fora da janela. Bug latente, independente da ancoragem. Critério: a Análise de um
   mês futuro continua achando a parcela numa conta com 30+ faturas.
-- [ ] **`functions/` conta parcelada pelo valor cheio no mês da compra** —
-  `buildFinancialContext.ts` (contexto da Vic) e `budgetAlerts.ts` reimplementam análise de gastos
-  sem paridade com `spendingAnalysis.ts` (o próprio `budgetAlerts.ts` L148-150 admite o gap num
-  comentário). A Vic responde número diferente do que a tela mostra. Critério: os dois consomem a
-  mesma regra, ou a divergência vira decisão registrada.
-- [ ] **Alerta de orçamento conta a compra parcelada pelo VALOR CHEIO** — `BudgetAlertBanner.tsx`
-  L37 passa `invoices: []`. Cuidado com a leitura fácil e errada ("parcela não conta"): sem faturas,
-  `installmentPurchaseIds` devolve conjunto vazio, então toda `card_purchase` é tratada como à vista
-  e entra pelo valor cheio no mês da compra. Uma compra de R$ 588 em 4x estoura um orçamento de
-  R$ 200 em "Presente" já no mês da compra, enquanto a Análise conta R$ 147. Pré-existente, não
-  introduzido pela ancoragem. Critério: alerta e Análise concordam no número, ou a diferença vira
-  decisão de produto registrada (orçamento é sobre compromisso assumido ou sobre desembolso do mês?).
+- [ ] **A Vic conta parcelada pelo valor cheio no mês da compra** —
+  `buildFinancialContext.ts` (L170-220, `spendingByCategoryThisMonth`) reimplementa análise de gastos
+  sem paridade com `spendingAnalysis.ts`. A Vic responde número diferente do que a tela mostra —
+  inclusive nas linhas de **orçamento** que ela monta (L390-404), que agora são a **única** superfície
+  do app fora da Análise a citar limite de categoria. Metade deste item morreu em 2026-08-06:
+  `budgetAlerts.ts` (que admitia o gap num comentário) foi removido. Critério: a Vic consome a mesma
+  regra, ou a divergência vira decisão registrada. Nota: o argumento de custo que barrou o ledger no
+  Dashboard **não vale no servidor** (roda 1×/mensagem, não por boot de todo usuário).
+- [x] ~~**Alerta de orçamento conta a compra parcelada pelo VALOR CHEIO**~~ — **RESOLVIDO em
+  2026-08-06 removendo as duas superfícies** (decisão do dono: *"eu acho melhor só tirar do
+  dashboard"*). O banner (`BudgetAlertBanner.tsx` + `budgetAlertCache.ts`) e o push diário
+  (`sendBudgetAlerts`, também **removida do ar**) foram apagados; orçamento passa a viver só na
+  Análise, que já carrega o ledger e já conta por parcela. Corrigir o número no Dashboard custaria
+  ~700 leituras por boot frio (assinar o ledger no boot) ou uma 3ª reimplementação da conta de
+  cartão — as 3 alternativas avaliadas e o motivo de cada descarte estão em
+  `../history/2026-08.md` (06/08). No caminho: descoberto que o app mostrava **dois percentuais do
+  mesmo limite** (Dashboard 196% vs Análise 49%), e que a function rodava todo dia sem nunca ter
+  disparado um alerta.
+- [ ] **Categoria estourada não é mais empurrada pra tela de entrada** — consequência aceita da
+  remoção acima. A barra de limite existe na Análise, mas a lista mostra **6 categorias** por
+  padrão: um estouro na 8ª maior do mês fica atrás do "Ver todas as N". Também não há barra em
+  categoria que virou agrupamento (o valor da linha é o roll-up, o limite é gasto direto) nem em
+  categoria sem gasto no mês. Critério: quem tem orçamento estourado vê isso sem precisar expandir
+  lista — ex.: categoria estourada sobe pro topo, ou marca/contador no cabeçalho da Análise.
+  Cuidado: não resolver isso somando filha no pai, que é decisão separada (`[D9]`).
 
 ### Segurança — auditoria 2026-07-19 ✅ FECHADA (12/12)
 
@@ -63,7 +76,12 @@ Não implementado (decisão consciente):
 ### Técnico
 
 - [ ] **⚠️ Push em dobro — NÃO RESOLVIDO** (2026-07-31). `shouldDisplayPush` (Cache Storage) nos dois lados (notifications.ts:103, vite.config.ts:36-49), mas check-then-write não é atômico. Hipóteses: corrida Cache Storage ou redelivery Web Push. 3 tentativas falharam. Ver CLAUDE.md e docs/history/2026-07.md.
-- [ ] **`sendBudgetAlerts` — verificar no log** se funciona. Código e índice deployados (budgetAlerts.ts, firestore.indexes.json:121-132). Roteiro: docs/RUNBOOK.md.
+- [x] ~~**`sendBudgetAlerts` — verificar no log** se funciona~~ — **verificado em 2026-08-06**: rodava
+  todo dia às 10h BRT desde 01/08 sem erro (`FAILED_PRECONDITION` de julho estava resolvido de fato),
+  com 1 orçamento ativo em todo o banco e **nenhum alerta jamais disparado**. A function foi
+  **removida do ar** na mesma sessão, junto com o banner — ver acima. O índice
+  `budgets.isActive` (COLLECTION_GROUP, `firestore.indexes.json:121-132`) ficou sem uso; não vale um
+  deploy pra remover, índice não usado não custa.
 - [ ] **Pacote compartilhado lógica financeira** — `functions/src/shared/accountEffects.ts` é porta manual de `transactionAccountEffects`. Hoje estão em sincronia. Só fazer se crescer ou divergir.
 - [ ] **`subscribeInvoices` limita a 24 faturas** — cardService.ts:789 (limit(24)). Inalcançável hoje (2 meses de app).
 - [ ] **Code splitting** — bundle principal 472 KB + AuthContext 453 KB. Warning dos 500 KB não dispara mais (framer-motion saiu). Firebase Auth SDK é o próximo vilão mas difícil de separar.

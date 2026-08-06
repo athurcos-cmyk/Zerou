@@ -112,9 +112,13 @@ podem estar 100% verdes com o push completamente morto**.
 
 1. **A function rodou?** `npx firebase functions:log --only sendDailyLogReminder -n 20`. As
    agendadas e seus horários (BRT): `closeInvoicesDue` 00h, `generateRecurrences` 06h,
-   `sendDueReminders` 08h, `sendBudgetAlerts` 10h, `sendDailyLogReminder` 20h.
+   `sendDueReminders` 08h, `sendDailyLogReminder` 20h.
    **Confira o log de cada uma** — foi assim que apareceu o `FAILED_PRECONDITION` diário do
-   `sendBudgetAlerts`, que as outras não tinham. Erro de índice aqui → passo 5.
+   extinto `sendBudgetAlerts`, que as outras não tinham. Erro de índice aqui → passo 5.
+   ⚠️ **Não existe mais push de orçamento**: `sendBudgetAlerts` (10h) foi **removida do ar** em
+   06/08/2026 junto com o banner do Dashboard — as duas contavam compra parcelada pelo valor
+   cheio, contra a parcela que a Análise mostra. Orçamento só na Análise. Se alguém reclamar
+   que "parou de receber aviso de orçamento", é isto, não bug. Ver `docs/history/2026-08.md`.
 2. **Existe token no banco?** `db.collectionGroup('fcmTokens').get()` com o Admin SDK
    (`serviceAccountKey.json` na raiz, apagar depois). Zero tokens → o cliente nunca registrou:
    confira `VITE_FIREBASE_VAPID_KEY` nas env vars da **Vercel** (não basta o `.env.local`; ela não

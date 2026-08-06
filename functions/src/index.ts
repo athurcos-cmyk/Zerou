@@ -12,7 +12,13 @@ import { safeReturnUrl } from './billing/urlSafety.js';
 
 // ─── Automação server-side ────────────────────────────────────────────────────
 export { closeInvoicesDue, generateRecurrences, sendDueReminders, sendDailyLogReminder } from './automation.js';
-export { sendBudgetAlerts } from './budgetAlerts.js';
+// `sendBudgetAlerts` foi REMOVIDA em 06/08/2026 (decisão do dono) junto com o banner de
+// orçamento do Dashboard: as duas contavam compra parcelada no cartão pelo VALOR CHEIO no mês
+// da compra, discordando da Análise (que conta por parcela desde a ancoragem de 05/08). Notificar
+// "estourou 196%" quando a tela mostra 49% é pior que não notificar. Orçamento agora vive só na
+// Análise, que é a única tela que carrega o ledger da fatura e aplica a regra certa.
+// Pra ressuscitar o push: o cálculo tem que ler o ledger, não só as transações do mês —
+// ver `docs/history/2026-08.md` (06/08) e `docs/planning/TODOS.md`.
 
 // ─── Assistente de IA ─────────────────────────────────────────────────────────
 export { financialAssistantChat } from './ai/financialAssistant.js';
