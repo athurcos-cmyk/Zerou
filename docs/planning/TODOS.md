@@ -11,16 +11,26 @@ Itens acionáveis. Fechou? Move para "Concluído" ou remove. Detalhe histórico 
 A parcela já conta no mês da compra na Análise (ver `../history/2026-08.md`). Estes quatro pontos
 foram **auditados e deixados de fora de propósito**, cada um com commit próprio:
 
-- [ ] **Dashboard "Resumo de gastos" conta parcelada pelo valor CHEIO** — `DashboardPage.tsx`
-  L203-220 tem uma reimplementação inline de `isCountableExpense` que não usa `spendingAnalysis`.
-  Depois da ancoragem ele concorda com a Análise no *mês* e discorda no *valor* — divergência mais
-  sutil que antes, e por isso mais confusa. **Medido ao vivo em 2026-08-05, agosto/2026 da conta do
-  dono: Dashboard mostra `Presente R$ 588,00` (a compra inteira, 4x de R$ 147) e a Análise mostra
-  `Presente R$ 147,00` (a parcela) — R$ 441,00 de diferença na mesma categoria, no mesmo mês.**
-  Há uma segunda diferença junto: o Dashboard lista a categoria CRUA (`Jogos R$ 135,58`,
-  `Cinema R$ 61,75`) e a Análise rola no pai (`Lazer R$ 197,33`) — as duas somam igual, mas a
-  leitura muda. Critério: Dashboard e Análise mostram o mesmo número pro mesmo mês. Cuidado: ele usa
-  a chave `'uncategorized'`, não `NO_CATEGORY`, e mostra só o top 5.
+- [x] ~~**Dashboard "Resumo de gastos" conta parcelada pelo valor CHEIO**~~ — **RESOLVIDO em
+  2026-08-06.** A reimplementação inline de `isCountableExpense` saiu; o Dashboard chama a MESMA
+  `spendingByCategoryForMonth` da Análise, com o cronograma das parcelas reconstruído das próprias
+  transações (`src/cards/installmentSchedule.ts`) — **sem assinar o ledger, zero leitura nova**, o
+  que preserva a decisão de custo do `docs/COSTS.md` e o fix de 25/07 (o Resumo de gastos não espera
+  cartão sincronizar). **Verificado ao vivo na conta do dono, agosto/2026**: `Presente R$ 147,00`
+  (era R$ 588,00), `Lazer R$ 197,33` no lugar de `Jogos`/`Cinema` soltos, e a variação virou -63%
+  (era -48%), batendo com a Análise categoria por categoria. Vieram de brinde 3 divergências que
+  ninguém tinha catalogado: estorno não era subtraído, o mês usava `||` em vez do fallback
+  `cashMonth ?? competenceMonth`, e a chave de sem-categoria era `'uncategorized'` em vez de
+  `NO_CATEGORY`. Detalhe: `../history/2026-08.md` (06/08).
+- [ ] **Duas divergências residuais do Resumo de gastos, por não ler o ledger** — enumeradas na doc
+  de `invoicesForSpendingFromTransactions`, nenhuma no caso comum. (1) **Antecipação de parcela**: a
+  Análise move o gasto pro mês em que se antecipou, o Dashboard mantém o cronograma original.
+  (2) **Compra "já em andamento" cuja próxima parcela cai exatamente 1 mês depois da data da
+  compra**: a transação guarda quantas parcelas FALTAM, não o número real (7/10), então o
+  deslocamento é aplicado no Dashboard e não na Análise, adiantando a série 1 mês. Fecha de vez
+  gravando o número inicial da parcela na transação — **campo novo ⇒ `firestore.rules` +
+  `npm run test:rules` no mesmo commit** (REGRA PRINCIPAL do `CLAUDE.md`). Critério: só mexer se
+  aparecer ao vivo; hoje é caso de borda conhecido e documentado, não bug silencioso.
 - [ ] **`subscribeInvoices` traz as 24 faturas MAIS ANTIGAS** — `cardService.ts` L802 usa
   `orderBy('referenceMonth','asc') + limit(24)` enquanto o comentário acima diz "24 ciclos mais
   recentes". Numa conta com >24 faturas, as futuras (que a projeção do Comprometido precisa) são as

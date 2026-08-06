@@ -44,6 +44,9 @@ import {
   type UpdateCardInput
 } from './cardSchemas';
 import { invoiceClosingDateForReferenceMonth, invoiceDueDateForReferenceMonth, invoiceIdFor, resolveInstallmentCycle } from './cardDates';
+// Divisão do valor entre as parcelas mora em módulo puro porque `invoicesForSpendingFromTransactions`
+// precisa do MESMO resultado exato pra reconstruir essas parcelas sem ler o ledger.
+import { installmentAmounts } from './installmentSchedule';
 import type { CreditCard, Invoice, InvoiceLedgerEntry, InvoiceLedgerEntryType, SyncStatus, Transaction } from '../types/contracts';
 
 export type LocalCardSynced<T> = T & {
@@ -91,13 +94,6 @@ function transactionRef(workspaceId: string, transactionId: string) {
 
 function idempotentEntryId(idempotencyKey: string) {
   return idempotencyKey.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 140);
-}
-
-function installmentAmounts(totalCents: number, installments: number) {
-  const base = Math.floor(totalCents / installments);
-  const remainder = totalCents % installments;
-
-  return Array.from({ length: installments }, (_, index) => base + (index < remainder ? 1 : 0));
 }
 
 async function loadCard(workspaceId: string, cardId: string) {

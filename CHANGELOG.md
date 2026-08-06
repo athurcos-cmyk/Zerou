@@ -2,6 +2,32 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-06 — fix(dashboard): "Resumo de gastos" usa a regra da Análise (parcela, não valor cheio)
+
+- **O defeito**: `DashboardPage.tsx` tinha uma cópia inline de `isCountableExpense` que não passava
+  por `spendingAnalysis.ts`. Medido ao vivo em agosto/2026: `Presente R$ 588,00` no Dashboard contra
+  `R$ 147,00` na Análise (R$ 441 de diferença), `Jogos`/`Cinema` soltos onde a Análise mostra
+  `Lazer R$ 197,33`, e variação **-48%** contra **-63%** (o mês anterior passava pela mesma régua
+  torta — dois erros comparados entre si).
+- **Três divergências extras que ninguém tinha catalogado**: estorno não era subtraído; o mês usava
+  `||` em vez do fallback `cashMonth ?? competenceMonth` (transação com os dois campos em meses
+  diferentes contava nos DOIS); chave de sem-categoria era `'uncategorized'`, não `NO_CATEGORY`.
+- **A correção, com custo ZERO de leitura**: o cronograma das parcelas é reconstruído das próprias
+  transações (`src/cards/installmentSchedule.ts`, novo) e alimenta a `spendingByCategoryForMonth` de
+  verdade + `rollUpByParent`. Funciona porque `invoiceIdFor` embute o `referenceMonth` no id da
+  fatura (`cardId_yyyy-MM`), que a transação já guarda, e porque `amountCents / installments` acerta
+  o valor da parcela **também** em compra já em andamento (lá os dois campos são "o que falta").
+  Sem assinar o ledger ⇒ mantém a decisão de custo do `docs/COSTS.md` e o fix de 25/07 (o card não
+  volta a esperar cartão sincronizar).
+- **Não é uma 2ª implementação da regra**: nenhuma decisão de "em que mês esta parcela conta" mora no
+  arquivo novo — o deslocamento segue calculado em `spendingAnalysis.ts`. `installmentAmounts` foi
+  **movida** (não copiada) de `cardService.ts` pro módulo puro, pra o arredondamento ser o mesmo nos
+  dois lados.
+- **Verificado ao vivo na conta do dono**: as 5 linhas e a variação passaram a bater com a Análise.
+  595 testes (+18, incluindo trava contra o caso de borda de compra "já em andamento").
+- **2 divergências residuais** ficam documentadas e em aberto no TODOS (antecipação de parcela; e
+  compra já em andamento cuja próxima parcela cai exatamente 1 mês depois da compra).
+
 ## 2026-08-06 — remove(orçamento): alerta sai do Dashboard e do push; orçamento vive só na Análise
 
 - **O defeito**: `BudgetAlertBanner.tsx` passava `invoices: []` pra `spendingByCategoryForMonth`.

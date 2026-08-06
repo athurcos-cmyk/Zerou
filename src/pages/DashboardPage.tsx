@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarClock, CreditCard, Minus, Pencil, PiggyBank, Plus, Scale, Target, Telescope, TrendingDown, TrendingUp, Wallet, WifiOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
@@ -9,6 +9,8 @@ import type { TransactionType } from '../types/contracts';
 
 import { calculateDashboardSummary, calculateNextMonthProjection, buildUpcomingReceivables, hasPendingCardLedgerActivity } from '../finance/financeCalculations';
 import { useCompleteCurrentMonth } from '../finance/useMonthlyTransactions';
+import { rollUpByParent, spendingByCategoryForMonth } from '../finance/spendingAnalysis';
+import { invoicesForSpendingFromTransactions } from '../cards/installmentSchedule';
 import {
   readCachedDashboardView,
   resolveProjectionView,
@@ -196,33 +198,65 @@ export function DashboardPage() {
   // anterior completos sob demanda — senão, custo ZERO (as 300 já cobrem). Bate com a Análise.
   const spendingSource = useCompleteCurrentMonth(workspaceId, finance.transactions, [currentMonth, previousMonth]);
   const categoryMap = new Map(finance.categories.map((c) => [c.id, c]));
-  // Espelha `isCountableExpense` da Análise (`spendingAnalysis.ts`) numa versão simplificada —
-  // incluindo descartar gasto de conta "fora do saldo", senão o vale-refeição apareceria aqui
-  // depois de sumir da Análise, e os dois números do mesmo mês não bateriam.
-  const isCountableSpend = (transaction: (typeof finance.transactions)[number], month: string) =>
-    !transaction.deletedAt &&
-    !(transaction.accountId && finance.excludedAccountIds.has(transaction.accountId)) &&
-    (transaction.type === 'expense' || transaction.type === 'card_purchase') &&
-    (transaction.cashMonth === month || transaction.competenceMonth === month) &&
-    !transaction.tags?.includes('meta') &&
-    !transaction.tags?.includes('cofrinho');
-  const spendingByCategory = spendingSource
-    .filter((transaction) => isCountableSpend(transaction, currentMonth))
-    .reduce((totals, transaction) => {
-      // `||`, não `??`: compra no cartão sem categoria grava `categoryId: ''`
-      // (`createCardPurchase`), e string vazia passa pelo `??`. Com `??`, os sem-categoria
-      // caíam em dois baldes ('' e 'uncategorized') e o resumo mostrava duas linhas
-      // "Sem categoria".
-      const categoryId = transaction.categoryId || 'uncategorized';
-      totals.set(categoryId, (totals.get(categoryId) ?? 0) + transaction.amountCents);
-      return totals;
-    }, new Map<string, number>());
-  const spendingRows = [...spendingByCategory.entries()]
-    .sort((left, right) => right[1] - left[1])
-    .slice(0, 5);
+  // O "Resumo de gastos" usa a MESMA função da Análise (`spendingByCategoryForMonth`), não mais
+  // uma cópia inline simplificada. Até 2026-08-06 havia aqui um espelho de `isCountableExpense`
+  // que contava compra parcelada no cartão pelo VALOR CHEIO no mês da compra: `Presente
+  // R$ 588,00` aqui contra `R$ 147,00` na Análise, no mesmo mês. Também divergia em estorno
+  // (não subtraía), no mês (`||` em vez do fallback `cashMonth ?? competenceMonth`), na chave de
+  // sem-categoria e no agrupamento de subcategoria.
+  //
+  // O cronograma das parcelas é reconstruído das próprias transações
+  // (`invoicesForSpendingFromTransactions`) — sem assinar o ledger da fatura, que custa leitura
+  // por abertura e é carregado só sob demanda (ver `docs/COSTS.md`). Nenhuma regra de gasto é
+  // recalculada aqui; as divergências que sobram estão enumeradas na doc daquela função.
+  const derivedInvoices = useMemo(
+    () => invoicesForSpendingFromTransactions(spendingSource),
+    [spendingSource]
+  );
+  const spendingCategoryOf = useMemo(() => {
+    const byId = new Map(spendingSource.map((t) => [t.id, t.categoryId]));
+    return (transactionId: string | undefined) => (transactionId ? byId.get(transactionId) : undefined);
+  }, [spendingSource]);
+  const purchaseMonthOf = useMemo(() => {
+    const byId = new Map(
+      spendingSource
+        .filter((t) => t.type === 'card_purchase')
+        .map((t) => [t.id, t.cashMonth ?? t.competenceMonth])
+    );
+    return (transactionId: string) => byId.get(transactionId);
+  }, [spendingSource]);
+  // Subcategoria soma no pai, igual à Análise: sem isso o Dashboard mostrava `Jogos` e `Cinema`
+  // separados onde a Análise mostra `Lazer` — a soma batia, a leitura não.
+  //
+  // Os DOIS meses (atual e anterior) passam por aqui de propósito: a variação "vs. mês passado"
+  // comparava duas réguas diferentes até 2026-08-06 (Dashboard dizia -48%, Análise -63%).
+  const rowsForMonth = useCallback(
+    (month: string) =>
+      [...rollUpByParent(
+        spendingByCategoryForMonth(
+          month,
+          spendingSource,
+          derivedInvoices,
+          spendingCategoryOf,
+          finance.excludedAccountIds,
+          purchaseMonthOf
+        ),
+        categoryMap
+      ).entries()]
+        // Mês só de estorno pode zerar/inverter uma categoria — mesmo filtro da Análise.
+        .filter(([, rollUp]) => rollUp.totalCents > 0)
+        .map(([categoryId, rollUp]) => [categoryId, rollUp.totalCents] as const)
+        .sort((left, right) => right[1] - left[1]),
+    // `categoryMap` é recriado a cada render (Map novo de `finance.categories`), então a
+    // dependência real é a lista, não o Map.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [spendingSource, derivedInvoices, spendingCategoryOf, purchaseMonthOf, finance.excludedAccountIds, finance.categories]
+  );
+  const spendingRows = useMemo(() => rowsForMonth(currentMonth), [rowsForMonth, currentMonth]);
+  const topSpendingRows = spendingRows.slice(0, 5);
   // Denormaliza as listas do jeito que o render consome — a mesma forma serve pra gravar no
   // cache e pra reler depois sem depender de `finance.categories` já ter chegado.
-  const liveSpending: CachedSpendingRow[] = spendingRows.map(([categoryId, amount]) => {
+  const liveSpending: CachedSpendingRow[] = topSpendingRows.map(([categoryId, amount]) => {
     const category = categoryMap.get(categoryId);
     return {
       categoryId,
@@ -279,10 +313,13 @@ export function DashboardPage() {
 
   // A legenda do Comprometido e a variação de gastos também entram no cache, pra não
   // piscarem "Carregando…"/"Contas e fatura." nem trocar de texto durante o boot.
-  const currentMonthSpendCents = [...spendingByCategory.values()].reduce((sum, amount) => sum + amount, 0);
-  const previousMonthSpendCents = spendingSource
-    .filter((transaction) => isCountableSpend(transaction, previousMonth))
-    .reduce((sum, transaction) => sum + transaction.amountCents, 0);
+  // Total do mês = soma de TODAS as categorias (não só as 5 exibidas), igual ao "Gasto no mês"
+  // da Análise.
+  const currentMonthSpendCents = spendingRows.reduce((sum, [, amount]) => sum + amount, 0);
+  const previousMonthSpendCents = useMemo(
+    () => rowsForMonth(previousMonth).reduce((sum, [, amount]) => sum + amount, 0),
+    [rowsForMonth, previousMonth]
+  );
   // Variação de gasto usa só transações — `isLoading` (finanças), não o combinado com cartão.
   const spendingVariationPct =
     !isLoading && previousMonthSpendCents > 0
