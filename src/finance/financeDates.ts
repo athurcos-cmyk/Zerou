@@ -35,6 +35,20 @@ export function formatFriendlyMonth(referenceMonth: string) {
   return format(new Date(year, month - 1, 1), 'MMM yyyy', { locale: ptBR });
 }
 
+const FULL_MONTH_NAMES: Record<string, string> = {
+  '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
+  '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
+  '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro',
+};
+
+/** 'yyyy-MM' → "Agosto de 2026". Nome escrito por extenso (não `MMMM` do date-fns) porque
+ * seletor de mês e rótulo de filtro precisam do mês com maiúscula inicial, e a locale devolve
+ * minúsculo. Mora aqui, e não em cada tela, pra Análise e Extrato não divergirem no rótulo. */
+export function fullMonthLabel(monthKey: string) {
+  const [year, month] = monthKey.split('-');
+  return `${FULL_MONTH_NAMES[month] ?? month} de ${year}`;
+}
+
 export function todayInputValue() {
   return format(new Date(), 'yyyy-MM-dd');
 }

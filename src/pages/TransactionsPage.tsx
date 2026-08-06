@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Plus, Search, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { Plus, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
@@ -10,7 +10,7 @@ import { CategoryMark } from '../components/categoryIcons';
 import { SelectField } from '../components/SelectField';
 import { useConfirm } from '../components/ConfirmDialog';
 import { defaultCategoryColors } from '../theme/palette';
-import { compareByDateDesc, formatFriendlyDate, toDateInputValue } from '../finance/financeDates';
+import { compareByDateDesc, formatFriendlyDate, fullMonthLabel, toDateInputValue } from '../finance/financeDates';
 import { transactionTypeLabels } from '../finance/financeLabels';
 import { balanceByDayEnd, transactionFlowByType } from '../finance/financeCalculations';
 import { dedupeById, loadMoreTransactions, softDeleteTransaction, type LocalSynced } from '../finance/financeService';
@@ -59,6 +59,10 @@ export function TransactionsPage() {
   // um F5 ressuscitaria um filtro que a pessoa acabou de tirar.
   const [searchParams, setSearchParams] = useSearchParams();
   const [categoryFilter, setCategoryFilter] = useState(() => searchParams.get('categoria') ?? '');
+  // `?mes=yyyy-MM` acompanha o atalho: o número que a pessoa tocou no Dashboard é do MÊS, então
+  // abrir o histórico inteiro da categoria respondia mais do que ela perguntou (pedido do dono,
+  // 06/08/2026: "eu cliquei em lazer, mostrou todos de lazer, nesse mês, do mês passado").
+  const [monthFilter, setMonthFilter] = useState(() => searchParams.get('mes') ?? '');
   const [tagFilter, setTagFilter] = useState<Set<string>>(new Set());
   const [filtersOpen, setFiltersOpen] = useState(false);
   // Sheet de detalhe: a linha inteira é o alvo de toque; Editar/Excluir vivem aqui dentro.
@@ -110,14 +114,23 @@ export function TransactionsPage() {
     return ids;
   }, [categoryFilter, finance.categories]);
 
-  /** Troca o filtro de categoria e mantém a URL honesta (ver o comentário do `useState`). */
+  /** Remove um parâmetro da URL depois de o filtro mudar pela tela. Sem isso um F5 ressuscitaria
+   *  o filtro que a pessoa acabou de tirar. */
+  function dropSearchParam(key: string) {
+    if (!searchParams.has(key)) return;
+    const params = new URLSearchParams(searchParams);
+    params.delete(key);
+    setSearchParams(params, { replace: true });
+  }
+
   function changeCategoryFilter(next: string) {
     setCategoryFilter(next);
-    if (searchParams.has('categoria')) {
-      const params = new URLSearchParams(searchParams);
-      params.delete('categoria');
-      setSearchParams(params, { replace: true });
-    }
+    dropSearchParam('categoria');
+  }
+
+  function changeMonthFilter(next: string) {
+    setMonthFilter(next);
+    dropSearchParam('mes');
   }
   // ── paginação "Carregar mais" (Fase 2) ──────────────────────────────────────
   // As 300 do boot continuam ao vivo (onSnapshot); páginas mais antigas entram aqui sob
@@ -139,6 +152,23 @@ export function TransactionsPage() {
     () => loadedTransactions.filter((transaction) => !transaction.deletedAt),
     [loadedTransactions]
   );
+
+  /** Meses presentes no que já foi carregado, do mais novo pro mais antigo. Mesmo campo que a
+   *  Análise e o Resumo de gastos usam (`cashMonth ?? competenceMonth`), não o dia do lançamento:
+   *  é o que faz o filtro devolver o mesmo conjunto que gerou o número tocado no Dashboard. */
+  const monthOptions = useMemo(() => {
+    const months = new Set<string>();
+    for (const transaction of activeTransactions) {
+      const month = transaction.cashMonth ?? transaction.competenceMonth;
+      if (month) months.add(month);
+    }
+    return [
+      { value: '', label: 'Todos os meses' },
+      ...[...months]
+        .sort((a, b) => b.localeCompare(a))
+        .map((month) => ({ value: month, label: fullMonthLabel(month) }))
+    ];
+  }, [activeTransactions]);
 
   async function handleLoadMore() {
     if (loadingMore || reachedEnd || !workspaceId) return;
@@ -192,6 +222,11 @@ export function TransactionsPage() {
       // do campo — não dá pra expressar isso com o valor vazio, que significa "sem filtro".
       if (categoryFilter === NO_CATEGORY && t.categoryId) return false;
       if (categoryFilterIds && !(t.categoryId && categoryFilterIds.has(t.categoryId))) return false;
+      // Mesmo campo que a Análise/Resumo de gastos usam pra decidir de que mês é o gasto — não o
+      // dia do lançamento. ⚠️ Compra parcelada é a exceção conhecida: ela mora no mês da COMPRA,
+      // então a parcela que pesa em agosto vindo de uma compra de março não aparece filtrando
+      // agosto. O estado vazio oferece "ver todos os meses" justamente por causa disso.
+      if (monthFilter && (t.cashMonth ?? t.competenceMonth) !== monthFilter) return false;
       if (typeFilter === 'income' && t.type !== 'income') return false;
       if (typeFilter === 'expense' && t.type !== 'expense' && t.type !== 'card_purchase') return false;
       if (typeFilter === 'transfer' && t.type !== 'transfer') return false;
@@ -207,7 +242,7 @@ export function TransactionsPage() {
         .toLocaleLowerCase('pt-BR');
       return haystack.includes(normalizedQuery);
     });
-  }, [activeTransactions, cardFilter, categoryFilter, categoryFilterIds, typeFilter, tagFilter, normalizedQuery, categoryMap]);
+  }, [activeTransactions, cardFilter, categoryFilter, categoryFilterIds, monthFilter, typeFilter, tagFilter, normalizedQuery, categoryMap]);
 
   // Extrato agrupado por dia (padrão de app financeiro nativo): cabeçalho "Hoje/Ontem/12 jul"
   // com o saldo no fim daquele dia. A lista já vem ordenada por data; agrupar preserva a ordem.
@@ -250,12 +285,14 @@ export function TransactionsPage() {
   // Filtros secundários (tag, cartão) ficam escondidos atrás de um botão "Filtros" —
   // mostrar os grupos soltos na tela, além do tipo, virava uma parede de chips no
   // celular (7+ chips empilhados, achado real testando em 375px).
-  const activeSecondaryFilterCount = (tagFilter.size > 0 ? 1 : 0) + (cardFilter ? 1 : 0) + (categoryFilter ? 1 : 0);
+  const activeSecondaryFilterCount =
+    (tagFilter.size > 0 ? 1 : 0) + (cardFilter ? 1 : 0) + (categoryFilter ? 1 : 0) + (monthFilter ? 1 : 0);
 
   function clearSecondaryFilters() {
     setTagFilter(new Set());
     setCardFilter('');
     changeCategoryFilter('');
+    changeMonthFilter('');
   }
 
   async function handleDelete(transaction: Transaction) {
@@ -322,6 +359,20 @@ export function TransactionsPage() {
             >
               <SlidersHorizontal size={13} aria-hidden="true" /> Filtros{activeSecondaryFilterCount > 0 ? ` · ${activeSecondaryFilterCount}` : ''}
             </button>
+            {/* O mês é o único filtro que esconde um PERÍODO inteiro, então não pode viver só no
+                contador dentro do sheet: fica como chip nomeado, e tocar nele limpa. Mesma regra
+                que fez a prévia do "fora do saldo" existir — efeito que some dado tem que estar
+                visível na tela, não atrás de um toque. */}
+            {monthFilter && (
+              <button
+                type="button"
+                className="chip chip--active"
+                onClick={() => changeMonthFilter('')}
+                aria-label={`Remover filtro de ${fullMonthLabel(monthFilter)}`}
+              >
+                {fullMonthLabel(monthFilter)} <X size={13} aria-hidden="true" />
+              </button>
+            )}
             {typeChips.map((chip) => (
               <button
                 key={chip.key}
@@ -340,9 +391,19 @@ export function TransactionsPage() {
         open={filtersOpen}
         onClose={() => setFiltersOpen(false)}
         title="Filtros"
-        subtitle="Categoria, tag e cartão"
+        subtitle="Mês, categoria, tag e cartão"
       >
         <div className="form-stack">
+          {monthOptions.length > 1 && (
+            <SelectField
+              label="Mês"
+              value={monthFilter}
+              onChange={changeMonthFilter}
+              options={monthOptions}
+              sheetTitle="Filtrar por mês"
+            />
+          )}
+
           {finance.categories.length > 0 && (
             <SelectField
               label="Categoria"
@@ -415,7 +476,23 @@ export function TransactionsPage() {
             illustration="transactions"
             compact
             title="Nenhum resultado"
-            description={normalizedQuery ? `Nada encontrado para "${query.trim()}".` : 'Nenhuma transação nesse filtro.'}
+            description={
+              normalizedQuery
+                ? `Nada encontrado para "${query.trim()}".`
+                : monthFilter
+                  ? `Nada em ${fullMonthLabel(monthFilter)} com esse filtro.`
+                  : 'Nenhuma transação nesse filtro.'
+            }
+            // Saída de emergência do recorte por mês. Existe por um caso real: a parcela que pesa
+            // no mês vem de uma compra de meses atrás, e a transação dela mora no mês da COMPRA —
+            // filtrando o mês corrente ela não aparece. Sem este botão, seria um beco sem saída.
+            action={
+              monthFilter && !normalizedQuery ? (
+                <button type="button" className="button button--ghost button--compact" onClick={() => changeMonthFilter('')}>
+                  Ver todos os meses
+                </button>
+              ) : undefined
+            }
           />
         ) : (
           <div className="item-list item-list--grouped">

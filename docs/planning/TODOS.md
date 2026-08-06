@@ -22,11 +22,12 @@ foram **auditados e deixados de fora de propósito**, cada um com commit própri
   ninguém tinha catalogado: estorno não era subtraído, o mês usava `||` em vez do fallback
   `cashMonth ?? competenceMonth`, e a chave de sem-categoria era `'uncategorized'` em vez de
   `NO_CATEGORY`. Detalhe: `../history/2026-08.md` (06/08).
-- [ ] **Extrato não tem recorte por mês** — consequência aceita do atalho novo (tocar numa categoria
-  do "Resumo de gastos" abre `/app/transactions?categoria=<id>`, 2026-08-06). O número clicado é do
-  mês corrente, a lista filtrada mostra a categoria inteira, todos os meses. Ficou assim porque o
-  Extrato é tela de histórico e "ver tudo dessa categoria" é resposta legítima. Critério: se virar
-  incômodo, um filtro de mês (chip + limpar) resolve — e aí o atalho passaria `&mes=yyyy-MM`.
+- [x] ~~**Extrato não tem recorte por mês**~~ — **FEITO no mesmo dia (2026-08-06)**, depois de o dono
+  usar a primeira versão do atalho: *"eu cliquei em lazer, mostrou todos de lazer, nesse mês, do mês
+  passado"*. O atalho manda `&mes=yyyy-MM` e o Extrato ganhou filtro de mês (opção no sheet + chip
+  removível no trilho, porque mês é o único filtro que esconde um período inteiro), filtrando por
+  `cashMonth ?? competenceMonth` pra bater com o número tocado. Mês sem resultado oferece "Ver todos
+  os meses" — saída pro caso de a parcela do mês vir de uma compra de meses atrás.
 - [ ] **Duas divergências residuais do Resumo de gastos, por não ler o ledger** — enumeradas na doc
   de `invoicesForSpendingFromTransactions`, nenhuma no caso comum. (1) **Antecipação de parcela**: a
   Análise move o gasto pro mês em que se antecipou, o Dashboard mantém o cronograma original.

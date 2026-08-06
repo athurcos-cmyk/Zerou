@@ -15,7 +15,7 @@ import { EmptyState } from '../components/EmptyState';
 import { LoadingState } from '../components/LoadingState';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { mergeInvoicesWithLedger, useInvoiceLedger } from '../cards/useInvoiceLedger';
-import { formatFriendlyDate, toDate } from '../finance/financeDates';
+import { formatFriendlyDate, fullMonthLabel, toDate } from '../finance/financeDates';
 import { dedupeById, nextOccurrenceDate } from '../finance/financeService';
 import { useMonthlyTransactions } from '../finance/useMonthlyTransactions';
 import { useIsOnline } from '../finance/useIsOnline';
@@ -60,20 +60,9 @@ const MONTH_LABELS: Record<string, string> = {
   '09': 'Set', '10': 'Out', '11': 'Nov', '12': 'Dez',
 };
 
-const FULL_MONTH_NAMES: Record<string, string> = {
-  '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
-  '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
-  '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro',
-};
-
 function monthLabel(key: string) {
   const [, mm] = key.split('-');
   return MONTH_LABELS[mm] ?? mm;
-}
-
-function fullMonthLabel(key: string) {
-  const [yyyy, mm] = key.split('-');
-  return `${FULL_MONTH_NAMES[mm] ?? mm} de ${yyyy}`;
 }
 
 /** Shifts a 'YYYY-MM' key by `delta` months (negative goes back). */

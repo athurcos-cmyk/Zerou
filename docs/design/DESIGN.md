@@ -70,9 +70,15 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
     de **duas faixas** (rótulo + barra) dentro de um grid com `gap`, então sem borda separadora nem
     cantos retos — usa margem negativa + padding pra a área de toque cobrir a barra, e um chevron
     em `--text-muted` como dica de "isto abre algo". Leva pro Extrato já filtrado na categoria.
-    ⚠️ **Um atalho que pré-filtra tem que mostrar o filtro que aplicou** — aqui o badge
-    "Filtros · 1" e o nome no sheet; filtro invisível é o mesmo defeito do ícone de olho com
-    explicação no `title` (2026-08-03).
+    ⚠️ **Um atalho que pré-filtra tem que mostrar o filtro que aplicou** — filtro invisível é o
+    mesmo defeito do ícone de olho com explicação no `title` (2026-08-03).
+- **Filtro que esconde um PERÍODO vira chip nomeado, não contador** (`chip chip--active` com `X`,
+  Transações, 2026-08-06): categoria/tag/cartão podem viver atrás do badge "Filtros · N", mas o
+  recorte por mês tira da tela tudo que não é daquele mês — então ele fica escrito no trilho
+  ("Agosto de 2026 ✕") e um toque limpa. E **todo recorte precisa de saída quando esvazia a lista**:
+  o estado vazio diz o mês e oferece "Ver todos os meses", senão o atalho pode terminar numa tela
+  vazia sem explicação (caso real: a parcela que pesa no mês vem de uma compra de meses atrás, e a
+  transação dela mora no mês da compra).
 - **Extrato agrupado por dia** (`.day-group`/`.day-group-header`, 2026-07-18): header sticky
   "Hoje/Ontem/12 jul" + resumo do dia. Cuidado: sticky dentro do `.app-main` mobile exige
   `overflow-x: clip` (não `hidden`, que vira scroll container e mata o sticky).

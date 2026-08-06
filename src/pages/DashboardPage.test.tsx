@@ -214,7 +214,9 @@ describe('DashboardPage — atalho do Resumo de gastos', () => {
 
     renderDashboard();
 
-    const row = screen.getByRole('link', { name: 'Ver transações de Alimentação' });
-    expect(row).toHaveAttribute('href', '/app/transactions?categoria=food');
+    const month = new Date().toISOString().slice(0, 7);
+    const row = screen.getByRole('link', { name: 'Ver transações de Alimentação neste mês' });
+    // Categoria E mês: o número da linha é do mês corrente, então o atalho recorta o período.
+    expect(row).toHaveAttribute('href', `/app/transactions?categoria=food&mes=${month}`);
   });
 });

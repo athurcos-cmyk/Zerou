@@ -168,4 +168,53 @@ describe('TransactionsPage — filtro de categoria vindo da URL', () => {
     expect(screen.getByText('Feira')).toBeInTheDocument();
     expect(screen.getByText('Sem categoria nenhuma')).toBeInTheDocument();
   });
+
+  // `?mes=` recorta o período. Usa `cashMonth ?? competenceMonth` (o campo da Análise), não o dia
+  // do lançamento, pra o conjunto bater com o número tocado no Dashboard.
+  describe('recorte por mês (`?mes=`)', () => {
+    beforeEach(() => {
+      state.finance = financeWithCategories([
+        categorized('t1', '2026-08-04', 'Cinema de agosto', 'cinema'),
+        categorized('t2', '2026-07-31', 'Cinema de julho', 'cinema'),
+        categorized('t3', '2026-08-02', 'Feira de agosto', 'mercado')
+      ]);
+    });
+
+    it('mostra só o mês pedido', () => {
+      renderAt('/?mes=2026-08');
+
+      expect(screen.getByText('Cinema de agosto')).toBeInTheDocument();
+      expect(screen.getByText('Feira de agosto')).toBeInTheDocument();
+      expect(screen.queryByText('Cinema de julho')).not.toBeInTheDocument();
+    });
+
+    it('combina com a categoria (é o que o atalho do Dashboard manda)', () => {
+      renderAt('/?categoria=lazer&mes=2026-08');
+
+      expect(screen.getByText('Cinema de agosto')).toBeInTheDocument();
+      expect(screen.queryByText('Cinema de julho')).not.toBeInTheDocument();
+      expect(screen.queryByText('Feira de agosto')).not.toBeInTheDocument();
+    });
+
+    it('o mês aparece como chip removível, não escondido no contador', () => {
+      renderAt('/?mes=2026-08');
+
+      expect(screen.getByRole('button', { name: 'Remover filtro de Agosto de 2026' })).toBeInTheDocument();
+    });
+
+    it('tocar no chip devolve os outros meses', () => {
+      renderAt('/?mes=2026-08');
+      fireEvent.click(screen.getByRole('button', { name: 'Remover filtro de Agosto de 2026' }));
+
+      expect(screen.getByText('Cinema de julho')).toBeInTheDocument();
+    });
+
+    it('mês sem resultado oferece saída, em vez de virar beco sem saída', () => {
+      renderAt('/?categoria=mercado&mes=2026-07');
+
+      expect(screen.getByText('Nada em Julho de 2026 com esse filtro.')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Ver todos os meses' }));
+      expect(screen.getByText('Feira de agosto')).toBeInTheDocument();
+    });
+  });
 });

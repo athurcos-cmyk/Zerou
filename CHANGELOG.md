@@ -15,10 +15,21 @@ Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/histor
   filtro". Ganhou a opção `NO_CATEGORY` ('Sem categoria'), que também é útil sozinha no sheet.
 - Limpar o filtro **apaga o parâmetro da URL** (`replace`), senão um F5 ressuscitaria um filtro que a
   pessoa acabou de tirar. O filtro chega visível no badge "Filtros · 1" e nomeado no sheet.
-- **Verificado ao vivo na conta do dono**: tocar em `Lazer R$ 197,33` abriu `Arc raides game
-  R$ 135,58` + `Cinema R$ 61,75` (soma exata do número clicado) e o "Limpar filtros" devolveu a URL
-  limpa. 600 testes (+5). **Nota honesta**: o filtro é por categoria, não por mês — a lista mostra
-  também os meses anteriores dela. Recorte por mês ficou como item em aberto no TODOS.
+- **Recorte por mês, no mesmo dia** (o dono viu a primeira versão e pediu: *"eu cliquei em lazer,
+  mostrou todos de lazer, nesse mês, do mês passado"*): o atalho manda `&mes=yyyy-MM` e o Extrato
+  ganhou **filtro de mês de verdade** — opção no sheet + **chip removível** ("Agosto de 2026 ✕") no
+  trilho. O mês é o único filtro que esconde um período inteiro, então não podia viver só no
+  contador. Filtra por `cashMonth ?? competenceMonth` (o campo da Análise), não pelo dia do
+  lançamento, pra o conjunto bater com o número tocado.
+- **Saída de emergência**: mês sem resultado mostra "Nada em Agosto de 2026 com esse filtro." +
+  botão "Ver todos os meses". Existe por um caso real — a parcela que pesa no mês vem de uma compra
+  de meses atrás, e a transação dela mora no mês da COMPRA, então o recorte não a mostra. Sem o
+  botão, seria beco sem saída.
+- `fullMonthLabel` saiu de `SearchPage.tsx` pra `financeDates.ts` (era local) — Análise e Extrato
+  agora escrevem o mês com o mesmo rótulo, sem segunda cópia dos nomes dos meses.
+- **Verificado ao vivo na conta do dono**: tocar em `Lazer R$ 197,33` abriu **só** `Arc raides game
+  R$ 135,58` + `Cinema R$ 61,75` (soma exata do número clicado); tocar no chip do mês devolveu
+  julho; "Limpar filtros" devolveu a URL limpa. 605 testes (+10).
 
 ## 2026-08-06 — fix(dashboard): "Resumo de gastos" usa a regra da Análise (parcela, não valor cheio)
 

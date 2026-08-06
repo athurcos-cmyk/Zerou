@@ -603,8 +603,11 @@ export function DashboardPage() {
               <Link
                 className="spending-row spending-row--tap"
                 key={row.categoryId}
-                to={`/app/transactions?categoria=${encodeURIComponent(row.categoryId)}`}
-                aria-label={`Ver transações de ${row.categoryName}`}
+                // `mes` junto com a categoria: o número da linha é do mês corrente, então abrir o
+                // histórico inteiro da categoria responderia mais do que a pessoa perguntou
+                // (pedido do dono, 06/08/2026). Lá o mês vira chip removível, não filtro invisível.
+                to={`/app/transactions?categoria=${encodeURIComponent(row.categoryId)}&mes=${currentMonth}`}
+                aria-label={`Ver transações de ${row.categoryName} neste mês`}
               >
                 <div className="spending-row-label">
                   <span className="spending-row-name">
