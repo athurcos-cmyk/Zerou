@@ -94,3 +94,78 @@ describe('TransactionsPage — Carregar mais', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: /Carregar mais|Carregando/ })).not.toBeInTheDocument());
   });
 });
+
+// Atalho do "Resumo de gastos" do Dashboard: tocar numa das 5 maiores categorias do mês abre o
+// Extrato já filtrado (`?categoria=<id>`). Os dois casos com armadilha estão travados aqui.
+describe('TransactionsPage — filtro de categoria vindo da URL', () => {
+  function categorized(id: string, dateISO: string, description: string, categoryId?: string) {
+    return { ...tx(id, dateISO, description), categoryId };
+  }
+
+  function financeWithCategories(transactions: unknown[]) {
+    const accounts = [{ id: 'acc1', name: 'Carteira' }];
+    return {
+      transactions,
+      // "Lazer" agrupa "Jogos" e "Cinema" — pela regra [D10], o gasto vive todo nas filhas.
+      categories: [
+        { id: 'lazer', name: 'Lazer', isActive: true },
+        { id: 'jogos', name: 'Jogos', isActive: true, parentCategoryId: 'lazer' },
+        { id: 'cinema', name: 'Cinema', isActive: true, parentCategoryId: 'lazer' },
+        { id: 'mercado', name: 'Mercado', isActive: true }
+      ],
+      accounts,
+      countedAccounts: accounts,
+      excludedAccountIds: new Set<string>(),
+      budgets: []
+    };
+  }
+
+  function renderAt(url: string) {
+    return render(
+      <MemoryRouter initialEntries={[url]}>
+        <TransactionsPage />
+      </MemoryRouter>
+    );
+  }
+
+  beforeEach(() => {
+    state.finance = financeWithCategories([
+      categorized('t1', '2026-08-04', 'Arc raides game', 'jogos'),
+      categorized('t2', '2026-08-03', 'Ingresso cinema', 'cinema'),
+      categorized('t3', '2026-08-02', 'Feira', 'mercado'),
+      categorized('t4', '2026-08-01', 'Sem categoria nenhuma', undefined)
+    ]);
+  });
+
+  it('filtra pela categoria pedida na URL', () => {
+    renderAt('/?categoria=mercado');
+
+    expect(screen.getByText('Feira')).toBeInTheDocument();
+    expect(screen.queryByText('Arc raides game')).not.toBeInTheDocument();
+  });
+
+  it('categoria-mãe inclui as subcategorias — senão a lista vinha VAZIA', () => {
+    renderAt('/?categoria=lazer');
+
+    // O gasto de Lazer é todo das filhas; sem o roll-up do filtro, nenhuma destas apareceria.
+    expect(screen.getByText('Arc raides game')).toBeInTheDocument();
+    expect(screen.getByText('Ingresso cinema')).toBeInTheDocument();
+    expect(screen.queryByText('Feira')).not.toBeInTheDocument();
+  });
+
+  it('`__none__` mostra só o que não tem categoria', () => {
+    renderAt('/?categoria=__none__');
+
+    expect(screen.getByText('Sem categoria nenhuma')).toBeInTheDocument();
+    expect(screen.queryByText('Feira')).not.toBeInTheDocument();
+    expect(screen.queryByText('Arc raides game')).not.toBeInTheDocument();
+  });
+
+  it('sem o parâmetro, mostra tudo', () => {
+    renderAt('/');
+
+    expect(screen.getByText('Arc raides game')).toBeInTheDocument();
+    expect(screen.getByText('Feira')).toBeInTheDocument();
+    expect(screen.getByText('Sem categoria nenhuma')).toBeInTheDocument();
+  });
+});

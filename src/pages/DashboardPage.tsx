@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CalendarClock, CreditCard, Minus, Pencil, PiggyBank, Plus, Scale, Target, Telescope, TrendingDown, TrendingUp, Wallet, WifiOff } from 'lucide-react';
+import { CalendarClock, ChevronRight, CreditCard, Minus, Pencil, PiggyBank, Plus, Scale, Target, Telescope, TrendingDown, TrendingUp, Wallet, WifiOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
@@ -596,18 +596,30 @@ export function DashboardPage() {
         {effectiveSpending.length > 0 ? (
           <div className="spending-bars">
             {effectiveSpending.map((row) => (
-              <div className="spending-row" key={row.categoryId}>
+              // Linha inteira é o alvo de toque (regra do `docs/design/DESIGN.md`) e leva pro
+              // Extrato já filtrado nessa categoria. Filtrar por categoria-mãe inclui as
+              // subcategorias — sem isso, tocar em "Lazer" (que é roll-up de Jogos e Cinema)
+              // abriria uma lista vazia. Ver `categoryFilterIds` em `TransactionsPage.tsx`.
+              <Link
+                className="spending-row spending-row--tap"
+                key={row.categoryId}
+                to={`/app/transactions?categoria=${encodeURIComponent(row.categoryId)}`}
+                aria-label={`Ver transações de ${row.categoryName}`}
+              >
                 <div className="spending-row-label">
                   <span className="spending-row-name">
                     <CategoryMark category={row.mark} />
                     <strong>{row.categoryName}</strong>
                   </span>
-                  <span>{formatMoney(row.amountCents)}</span>
+                  <span className="spending-row-amount">
+                    {formatMoney(row.amountCents)}
+                    <ChevronRight size={14} aria-hidden="true" />
+                  </span>
                 </div>
                 <div className="spending-bar-track" aria-hidden="true">
                   <span style={{ width: `${Math.max(8, Math.round((row.amountCents / maxSpendingCents) * 100))}%` }} />
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         ) : !isLoading ? (

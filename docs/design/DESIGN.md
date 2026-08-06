@@ -66,6 +66,13 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
 - **Lista de itens no mobile = linha inteira como alvo de toque** (`.list-row--tap`,
   extrato de Transações, 2026-07-18): nada de "Editar"/lixeira inline por linha — as ações
   vivem num sheet de detalhe. Destrutivo nunca a um toque em lista rolável.
+  - Variante `.spending-row--tap` (Resumo de gastos do Dashboard, 2026-08-06): mesma ideia num item
+    de **duas faixas** (rótulo + barra) dentro de um grid com `gap`, então sem borda separadora nem
+    cantos retos — usa margem negativa + padding pra a área de toque cobrir a barra, e um chevron
+    em `--text-muted` como dica de "isto abre algo". Leva pro Extrato já filtrado na categoria.
+    ⚠️ **Um atalho que pré-filtra tem que mostrar o filtro que aplicou** — aqui o badge
+    "Filtros · 1" e o nome no sheet; filtro invisível é o mesmo defeito do ícone de olho com
+    explicação no `title` (2026-08-03).
 - **Extrato agrupado por dia** (`.day-group`/`.day-group-header`, 2026-07-18): header sticky
   "Hoje/Ontem/12 jul" + resumo do dia. Cuidado: sticky dentro do `.app-main` mobile exige
   `overflow-x: clip` (não `hidden`, que vira scroll container e mata o sticky).

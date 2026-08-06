@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Plus, Search, SlidersHorizontal, Trash2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { BottomSheet } from '../components/BottomSheet';
@@ -15,6 +15,7 @@ import { transactionTypeLabels } from '../finance/financeLabels';
 import { balanceByDayEnd, transactionFlowByType } from '../finance/financeCalculations';
 import { dedupeById, loadMoreTransactions, softDeleteTransaction, type LocalSynced } from '../finance/financeService';
 import { formatMoney } from '../finance/money';
+import { NO_CATEGORY } from '../finance/spendingAnalysis';
 import { SyncStatusBadge } from '../finance/SyncStatusBadge';
 import type { Transaction } from '../types/contracts';
 
@@ -52,7 +53,12 @@ export function TransactionsPage() {
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense' | 'transfer'>('all');
   const [cardFilter, setCardFilter] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
+  // `?categoria=<id>` é o atalho do "Resumo de gastos" do Dashboard: tocar numa das 5 maiores
+  // categorias do mês cai aqui já filtrado. Só semeia o estado inicial (a página monta nova a
+  // cada navegação); depois quem manda é o filtro da tela, e limpá-lo também limpa a URL — senão
+  // um F5 ressuscitaria um filtro que a pessoa acabou de tirar.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [categoryFilter, setCategoryFilter] = useState(() => searchParams.get('categoria') ?? '');
   const [tagFilter, setTagFilter] = useState<Set<string>>(new Set());
   const [filtersOpen, setFiltersOpen] = useState(false);
   // Sheet de detalhe: a linha inteira é o alvo de toque; Editar/Excluir vivem aqui dentro.
@@ -74,6 +80,9 @@ export function TransactionsPage() {
   const categoryOptions = useMemo(
     () => [
       { value: '', label: 'Todas as categorias' },
+      // Precisa existir como opção pra o atalho do Dashboard ter o que exibir quando a linha
+      // clicada é a "Sem categoria" — sem ela o seletor abriria com valor desconhecido.
+      { value: NO_CATEGORY, label: 'Sem categoria' },
       ...finance.categories
         .slice()
         .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
@@ -81,6 +90,35 @@ export function TransactionsPage() {
     ],
     [finance.categories]
   );
+  /**
+   * Ids que o filtro de categoria aceita: a escolhida **e as subcategorias dela**.
+   *
+   * Sem isso, filtrar por uma categoria que virou agrupamento devolve lista VAZIA — o gasto vive
+   * todo nas filhas (regra `[D10]`: categoria com filha ativa para de receber lançamento). Ficava
+   * evidente com o atalho novo do Dashboard, que mostra `Lazer R$ 197,33` (roll-up de Jogos e
+   * Cinema, zero direto em Lazer): tocar na linha abriria um extrato vazio.
+   *
+   * ⚠️ Isto é filtro de EXIBIÇÃO de uma lista, não agregação. Não confundir com o roll-up de
+   * `spendingByCategoryForMonth`, que segue proibido de somar filha no pai (`[D9]`).
+   */
+  const categoryFilterIds = useMemo(() => {
+    if (!categoryFilter || categoryFilter === NO_CATEGORY) return null;
+    const ids = new Set([categoryFilter]);
+    for (const category of finance.categories) {
+      if (category.parentCategoryId === categoryFilter) ids.add(category.id);
+    }
+    return ids;
+  }, [categoryFilter, finance.categories]);
+
+  /** Troca o filtro de categoria e mantém a URL honesta (ver o comentário do `useState`). */
+  function changeCategoryFilter(next: string) {
+    setCategoryFilter(next);
+    if (searchParams.has('categoria')) {
+      const params = new URLSearchParams(searchParams);
+      params.delete('categoria');
+      setSearchParams(params, { replace: true });
+    }
+  }
   // ── paginação "Carregar mais" (Fase 2) ──────────────────────────────────────
   // As 300 do boot continuam ao vivo (onSnapshot); páginas mais antigas entram aqui sob
   // demanda (leitura pontual, ver `loadMoreTransactions`). Ver docs/planning/HISTORICO_TRANSACOES.md.
@@ -150,7 +188,10 @@ export function TransactionsPage() {
     return activeTransactions.filter((t) => {
       // Filtro por cartão: só as compras daquele cartão.
       if (cardFilter && (t.type !== 'card_purchase' || t.cardId !== cardFilter)) return false;
-      if (categoryFilter && t.categoryId !== categoryFilter) return false;
+      // Compra no cartão sem categoria grava `categoryId: ''`, então "sem categoria" é a ausência
+      // do campo — não dá pra expressar isso com o valor vazio, que significa "sem filtro".
+      if (categoryFilter === NO_CATEGORY && t.categoryId) return false;
+      if (categoryFilterIds && !(t.categoryId && categoryFilterIds.has(t.categoryId))) return false;
       if (typeFilter === 'income' && t.type !== 'income') return false;
       if (typeFilter === 'expense' && t.type !== 'expense' && t.type !== 'card_purchase') return false;
       if (typeFilter === 'transfer' && t.type !== 'transfer') return false;
@@ -166,7 +207,7 @@ export function TransactionsPage() {
         .toLocaleLowerCase('pt-BR');
       return haystack.includes(normalizedQuery);
     });
-  }, [activeTransactions, cardFilter, categoryFilter, typeFilter, tagFilter, normalizedQuery, categoryMap]);
+  }, [activeTransactions, cardFilter, categoryFilter, categoryFilterIds, typeFilter, tagFilter, normalizedQuery, categoryMap]);
 
   // Extrato agrupado por dia (padrão de app financeiro nativo): cabeçalho "Hoje/Ontem/12 jul"
   // com o saldo no fim daquele dia. A lista já vem ordenada por data; agrupar preserva a ordem.
@@ -214,7 +255,7 @@ export function TransactionsPage() {
   function clearSecondaryFilters() {
     setTagFilter(new Set());
     setCardFilter('');
-    setCategoryFilter('');
+    changeCategoryFilter('');
   }
 
   async function handleDelete(transaction: Transaction) {
@@ -306,7 +347,7 @@ export function TransactionsPage() {
             <SelectField
               label="Categoria"
               value={categoryFilter}
-              onChange={setCategoryFilter}
+              onChange={changeCategoryFilter}
               options={categoryOptions}
               sheetTitle="Filtrar por categoria"
               searchable

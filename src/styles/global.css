@@ -969,11 +969,46 @@ html[data-reduce-motion='true'] *::after {
   gap: 0.45rem;
 }
 
+/* Linha do "Resumo de gastos" como alvo de toque inteiro (mesma regra de `.list-row--tap`, com
+   a diferença de que aqui a linha tem duas faixas — rótulo + barra — e vive num grid com gap,
+   então não usa borda separadora nem cantos retos. Vai pro Extrato já filtrado na categoria. */
+.spending-row--tap {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  margin: -0.35rem -0.5rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.65rem;
+  transition: background var(--duration-fast) ease;
+}
+
+.spending-row--tap:hover,
+.spending-row--tap:active {
+  background: var(--bg-surface-subtle);
+}
+
+.spending-row--tap:focus-visible {
+  outline: 2px solid var(--action-primary);
+  outline-offset: -2px;
+}
+
 .spending-row-label {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+}
+
+.spending-row-amount {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+/* O chevron é só uma dica de "isto abre algo" — não compete com o valor. */
+.spending-row-amount svg {
+  color: var(--text-muted);
 }
 
 .spending-row-name {

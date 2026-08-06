@@ -2,6 +2,24 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-06 — feat(dashboard): tocar numa categoria do "Resumo de gastos" abre o Extrato filtrado
+
+- **Pedido do dono**: as 5 maiores categorias do mês viraram alvo de toque — cada linha leva pro
+  Extrato já filtrado naquela categoria (`/app/transactions?categoria=<id>`). Linha inteira é o
+  alvo, com chevron, seguindo a regra de `docs/design/DESIGN.md`.
+- **Armadilha 1 — categoria-mãe abria lista VAZIA.** O filtro do Extrato era igualdade estrita, e o
+  Dashboard mostra o roll-up (`Lazer R$ 197,33` = Jogos + Cinema, com **zero** direto em Lazer). O
+  filtro passou a aceitar a categoria **e as subcategorias dela** (`categoryFilterIds`). É filtro de
+  exibição de lista — não mexe no `[D9]`, que segue proibindo somar filha no pai na agregação.
+- **Armadilha 2 — "Sem categoria" não era expressável**: valor vazio no filtro significa "sem
+  filtro". Ganhou a opção `NO_CATEGORY` ('Sem categoria'), que também é útil sozinha no sheet.
+- Limpar o filtro **apaga o parâmetro da URL** (`replace`), senão um F5 ressuscitaria um filtro que a
+  pessoa acabou de tirar. O filtro chega visível no badge "Filtros · 1" e nomeado no sheet.
+- **Verificado ao vivo na conta do dono**: tocar em `Lazer R$ 197,33` abriu `Arc raides game
+  R$ 135,58` + `Cinema R$ 61,75` (soma exata do número clicado) e o "Limpar filtros" devolveu a URL
+  limpa. 600 testes (+5). **Nota honesta**: o filtro é por categoria, não por mês — a lista mostra
+  também os meses anteriores dela. Recorte por mês ficou como item em aberto no TODOS.
+
 ## 2026-08-06 — fix(dashboard): "Resumo de gastos" usa a regra da Análise (parcela, não valor cheio)
 
 - **O defeito**: `DashboardPage.tsx` tinha uma cópia inline de `isCountableExpense` que não passava

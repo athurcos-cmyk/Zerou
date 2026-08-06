@@ -205,3 +205,16 @@ describe('DashboardPage — listas do cache no boot', () => {
     expect(screen.queryByText('Comece em poucos minutos')).not.toBeInTheDocument();
   });
 });
+
+describe('DashboardPage — atalho do Resumo de gastos', () => {
+  it('cada categoria leva pro Extrato já filtrado nela', () => {
+    saveCachedDashboardView(WORKSPACE_ID, cachedView);
+    state.finance = financeCtx({ loading: true, transactions: [], categories: [] });
+    state.cards = cardsCtx({ loading: true });
+
+    renderDashboard();
+
+    const row = screen.getByRole('link', { name: 'Ver transações de Alimentação' });
+    expect(row).toHaveAttribute('href', '/app/transactions?categoria=food');
+  });
+});
