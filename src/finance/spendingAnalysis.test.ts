@@ -16,8 +16,13 @@ import {
   computeCategoryTrend,
   rollUpByParent,
   NO_CATEGORY,
+  installmentShiftBySource,
+  reversedSourceIds,
+  recognizedExpenseByMonth,
+  installmentPurchaseIds,
   type BillForCommitment,
   type InvoiceForSpending,
+  type PurchaseMonthOf,
   type RecurringForProjection
 } from './spendingAnalysis';
 
@@ -25,29 +30,38 @@ import {
 // uma tela nova não esqueça de passá-lo. Aqui a maioria dos casos não tem conta "fora do saldo",
 // então estes wrappers deixam o argumento implícito — os testes que exercitam a exclusão passam
 // o Set explicitamente.
+// `purchaseMonthOf` (2026-08-05) segue a mesma lógica: obrigatório na função real, implícito
+// aqui. O default `() => undefined` faz a compra cair no fallback do `effectiveAt` da parcela 1
+// — que é o comportamento de produção quando a transação está fora da janela carregada. Os
+// testes de ancoragem passam o callback explicitamente.
 type CategoryOf = (transactionId: string | undefined) => string | undefined;
+const noPurchaseMonth: PurchaseMonthOf = () => undefined;
+
 const spendingByCategoryForMonth = (
   month: string,
   transactions: Transaction[],
   invoices: InvoiceForSpending[],
   categoryOf: CategoryOf,
-  excludedAccountIds: ReadonlySet<string> = new Set()
-) => spendingByCategoryForMonthRaw(month, transactions, invoices, categoryOf, excludedAccountIds);
+  excludedAccountIds: ReadonlySet<string> = new Set(),
+  purchaseMonthOf: PurchaseMonthOf = noPurchaseMonth
+) => spendingByCategoryForMonthRaw(month, transactions, invoices, categoryOf, excludedAccountIds, purchaseMonthOf);
 
 const spendingByCategoryAcrossMonths = (
   months: string[],
   transactions: Transaction[],
   invoices: InvoiceForSpending[],
   categoryOf: CategoryOf,
-  excludedAccountIds: ReadonlySet<string> = new Set()
-) => spendingByCategoryAcrossMonthsRaw(months, transactions, invoices, categoryOf, excludedAccountIds);
+  excludedAccountIds: ReadonlySet<string> = new Set(),
+  purchaseMonthOf: PurchaseMonthOf = noPurchaseMonth
+) => spendingByCategoryAcrossMonthsRaw(months, transactions, invoices, categoryOf, excludedAccountIds, purchaseMonthOf);
 
 const monthlyTotals = (
   months: string[],
   transactions: Transaction[],
   invoices: InvoiceForSpending[],
-  excludedAccountIds: ReadonlySet<string> = new Set()
-) => monthlyTotalsRaw(months, transactions, invoices, excludedAccountIds);
+  excludedAccountIds: ReadonlySet<string> = new Set(),
+  purchaseMonthOf: PurchaseMonthOf = noPurchaseMonth
+) => monthlyTotalsRaw(months, transactions, invoices, excludedAccountIds, purchaseMonthOf);
 
 // Stepper espelhando `nextOccurrenceDate` de financeService (evita importar firebase no teste).
 function step(date: Date, frequency: 'weekly' | 'biweekly' | 'monthly' | 'yearly', anchorDay?: number): Date {
@@ -388,7 +402,7 @@ describe('committedByCategoryForMonth', () => {
       { referenceMonth: '2026-09', ledgerEntries: [entry({ id: 'p', type: 'purchase', amountCents: 30000, sourceTransactionId: 'buy', installmentTotal: 10 })] }
     ];
     const bills: BillForCommitment[] = [{ categoryId: 'moradia', amountCents: 150000, status: 'pending', dueMonth: '2026-09' }];
-    const result = committedByCategoryForMonth('2026-09', invoices, bills, (id) => (id === 'buy' ? 'compras' : undefined));
+    const result = committedByCategoryForMonth('2026-09', invoices, bills, (id) => (id === 'buy' ? 'compras' : undefined), noPurchaseMonth);
     expect(result.get('compras')).toBe(30000);
     expect(result.get('moradia')).toBe(150000);
   });
@@ -400,7 +414,7 @@ describe('lastCommittedMonth', () => {
       { referenceMonth: '2026-08', ledgerEntries: [entry({ id: 'p1', type: 'purchase', amountCents: 30000, sourceTransactionId: 'buy', installmentTotal: 3 })] },
       { referenceMonth: '2027-01', ledgerEntries: [entry({ id: 'p2', type: 'purchase', amountCents: 30000, sourceTransactionId: 'buy', installmentTotal: 3 })] }
     ];
-    expect(lastCommittedMonth('2026-07', invoices, [])).toBe('2027-01');
+    expect(lastCommittedMonth('2026-07', invoices, [], noPurchaseMonth)).toBe('2027-01');
   });
 
   it('considera conta a pagar futura mais distante que a parcela', () => {
@@ -408,14 +422,14 @@ describe('lastCommittedMonth', () => {
       { referenceMonth: '2026-08', ledgerEntries: [entry({ id: 'p1', type: 'purchase', amountCents: 30000, sourceTransactionId: 'buy', installmentTotal: 2 })] }
     ];
     const bills: BillForCommitment[] = [{ amountCents: 5000, status: 'pending', dueMonth: '2026-12' }];
-    expect(lastCommittedMonth('2026-07', invoices, bills)).toBe('2026-12');
+    expect(lastCommittedMonth('2026-07', invoices, bills, noPurchaseMonth)).toBe('2026-12');
   });
 
   it('sem nada comprometido à frente, fica no mês atual', () => {
     const invoices: InvoiceForSpending[] = [
       { referenceMonth: '2026-05', ledgerEntries: [entry({ id: 'p1', type: 'purchase', amountCents: 30000, sourceTransactionId: 'buy', installmentTotal: 2 })] }
     ];
-    expect(lastCommittedMonth('2026-07', invoices, [])).toBe('2026-07');
+    expect(lastCommittedMonth('2026-07', invoices, [], noPurchaseMonth)).toBe('2026-07');
   });
 
   it('ignora fatura futura sem cobrança líquida (toda antecipada)', () => {
@@ -425,7 +439,7 @@ describe('lastCommittedMonth', () => {
         entry({ id: 'c', type: 'installment_anticipation_credit', amountCents: 30000, sourceTransactionId: 'buy' })
       ] }
     ];
-    expect(lastCommittedMonth('2026-07', invoices, [])).toBe('2026-07');
+    expect(lastCommittedMonth('2026-07', invoices, [], noPurchaseMonth)).toBe('2026-07');
   });
 });
 
@@ -865,5 +879,301 @@ describe('contas fora do saldo (excludeFromTotals)', () => {
     const vale = txn({ id: 'b', amountCents: 3000, categoryId: 'alimentacao', accountId: 'acc-vr' });
 
     expect(spendingByCategoryForMonth('2026-07', [vale], [], () => undefined, new Set()).get('alimentacao')).toBe(3000);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ancoragem da parcela no mês da COMPRA (2026-08-05)
+//
+// Caso que originou tudo: o dono comprou um jogo à vista e um presente parcelado no MESMO dia
+// (04/08), no MESMO cartão, e os dois caíram na MESMA fatura (referência 09, cartão fecha dia
+// 2). Na Análise o jogo apareceu em agosto e o presente só em setembro. Mesma fatura, dois meses.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Mês 'yyyy-MM' a n meses de distância de (year, month1), month1 em base 1. */
+function mesEm(year: number, month1: number, offset: number): string {
+  const d = new Date(year, month1 - 1 + offset, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Parcela `purchase` de compra parcelada, com a data da COMPRA no `effectiveAt` — é assim que
+ * `addCardPurchaseToBatch` grava (a mesma data em todas as parcelas). */
+function parcela(
+  id: string,
+  sourceTransactionId: string,
+  installmentNumber: number,
+  installmentTotal: number,
+  amountCents: number,
+  purchaseDate: string
+): InvoiceLedgerEntry {
+  return entry({
+    id,
+    type: 'purchase',
+    amountCents,
+    sourceTransactionId,
+    installmentNumber,
+    installmentTotal,
+    effectiveAt: Timestamp.fromDate(new Date(purchaseDate))
+  });
+}
+
+describe('parcela ancora no mês da COMPRA', () => {
+  // Cartão fecha dia 2 → compra em 04/08 cai na fatura de referência 09.
+  const COMPRA = '2026-08-04T12:00:00';
+  const compradoEmAgosto: PurchaseMonthOf = () => '2026-08';
+  const catOf = (id?: string) => (id === 'presente' ? 'presentes' : id === 'jogo' ? 'lazer' : undefined);
+
+  /** Presente: R$300 em 3x de R$100, comprado 04/08 → faturas 09, 10, 11. */
+  function presente3x(): InvoiceForSpending[] {
+    return [
+      { referenceMonth: '2026-09', ledgerEntries: [parcela('pres_1', 'presente', 1, 3, 10000, COMPRA)] },
+      { referenceMonth: '2026-10', ledgerEntries: [parcela('pres_2', 'presente', 2, 3, 10000, COMPRA)] },
+      { referenceMonth: '2026-11', ledgerEntries: [parcela('pres_3', 'presente', 3, 3, 10000, COMPRA)] }
+    ];
+  }
+
+  it('⭐ caso real do dono: jogo à vista e presente parcelado, mesma fatura, contam no MESMO mês', () => {
+    const jogo = txn({
+      id: 'jogo', type: 'card_purchase', amountCents: 12000, categoryId: 'lazer', cardId: 'card',
+      competenceMonth: '2026-08', cashMonth: '2026-08'
+    });
+    const invoices = presente3x();
+    // A compra à vista também gera lançamento na fatura de setembro (ignorado: conta pela transação).
+    invoices[0].ledgerEntries.push(entry({
+      id: 'jogo_p', type: 'purchase', amountCents: 12000, sourceTransactionId: 'jogo',
+      effectiveAt: Timestamp.fromDate(new Date(COMPRA))
+    }));
+
+    const agosto = spendingByCategoryForMonth('2026-08', [jogo], invoices, catOf, new Set(), compradoEmAgosto);
+    expect(agosto.get('lazer')).toBe(12000);
+    expect(agosto.get('presentes')).toBe(10000); // ← antes desta mudança: undefined
+
+    const setembro = spendingByCategoryForMonth('2026-09', [jogo], invoices, catOf, new Set(), compradoEmAgosto);
+    expect(setembro.get('presentes')).toBe(10000); // a parcela 2, não a 1
+    expect(setembro.get('lazer') ?? 0).toBe(0);
+
+    expect(spendingByCategoryForMonth('2026-10', [jogo], invoices, catOf, new Set(), compradoEmAgosto).get('presentes')).toBe(10000);
+    expect(spendingByCategoryForMonth('2026-11', [jogo], invoices, catOf, new Set(), compradoEmAgosto).get('presentes') ?? 0).toBe(0);
+  });
+
+  it('preserva o espaçamento mensal: 10x vira uma parcela por mês, sem buraco nem dobra', () => {
+    const invoices: InvoiceForSpending[] = Array.from({ length: 10 }, (_, i) => ({
+      referenceMonth: mesEm(2026, 9, i),
+      ledgerEntries: [parcela(`p${i + 1}`, 'presente', i + 1, 10, 10000, COMPRA)]
+    }));
+    const meses = Array.from({ length: 12 }, (_, i) => mesEm(2026, 8, i));
+
+    const porMes = meses.map((m) => spendingByCategoryForMonth(m, [], invoices, catOf, new Set(), compradoEmAgosto).get('presentes') ?? 0);
+    expect(porMes).toEqual([10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 0, 0]);
+    expect(porMes.reduce((a, b) => a + b, 0)).toBe(100000);
+  });
+
+  it('compra ANTES do fechamento já caía no mês certo — não desloca', () => {
+    // Compra em 01/08 num cartão que fecha dia 2 → fatura de agosto mesmo. diff 0.
+    const invoices: InvoiceForSpending[] = [
+      { referenceMonth: '2026-08', ledgerEntries: [parcela('p1', 'presente', 1, 2, 10000, '2026-08-01T12:00:00')] },
+      { referenceMonth: '2026-09', ledgerEntries: [parcela('p2', 'presente', 2, 2, 10000, '2026-08-01T12:00:00')] }
+    ];
+    expect(spendingByCategoryForMonth('2026-08', [], invoices, catOf, new Set(), compradoEmAgosto).get('presentes')).toBe(10000);
+    expect(spendingByCategoryForMonth('2026-09', [], invoices, catOf, new Set(), compradoEmAgosto).get('presentes')).toBe(10000);
+  });
+
+  it('⭐ compra já em andamento (registerOngoingInstallments) NÃO desloca — não tem parcela 1', () => {
+    // Comprada em janeiro fora do app, cadastrada a partir da parcela 7. Um `clamp(diff, 0, 1)`
+    // daria shift 1 aqui (diff = 8) e recuaria tudo um mês sem motivo nenhum.
+    const invoices: InvoiceForSpending[] = [7, 8, 9, 10].map((n, i) => ({
+      referenceMonth: mesEm(2026, 9, i),
+      ledgerEntries: [parcela(`p${n}`, 'antiga', n, 10, 10000, '2026-01-15T12:00:00')]
+    }));
+    const catAntiga = (id?: string) => (id === 'antiga' ? 'presentes' : undefined);
+    const compradoEmJaneiro: PurchaseMonthOf = () => '2026-01';
+
+    expect(installmentShiftBySource(invoices, compradoEmJaneiro).size).toBe(0);
+    expect(spendingByCategoryForMonth('2026-09', [], invoices, catAntiga, new Set(), compradoEmJaneiro).get('presentes')).toBe(10000);
+    expect(spendingByCategoryForMonth('2026-08', [], invoices, catAntiga, new Set(), compradoEmJaneiro).get('presentes') ?? 0).toBe(0);
+  });
+
+  it('legado do registerOngoingInstallments antigo (effectiveAt = vencimento) não desloca', () => {
+    // A versão antiga gravava `effectiveAt` = dueDate da parcela e `cashMonth` = 1º de
+    // nextDueMonth. Pior caso: a compra TEM parcela 1, mas as duas datas mentem — o diff não
+    // dá 1, então nada se move.
+    const invoices: InvoiceForSpending[] = [
+      { referenceMonth: '2026-09', ledgerEntries: [parcela('p1', 'legado', 1, 3, 10000, '2026-09-10T12:00:00')] },
+      { referenceMonth: '2026-10', ledgerEntries: [parcela('p2', 'legado', 2, 3, 10000, '2026-10-10T12:00:00')] }
+    ];
+    const catLegado = (id?: string) => (id === 'legado' ? 'presentes' : undefined);
+
+    expect(installmentShiftBySource(invoices, () => '2026-09').size).toBe(0);
+    expect(spendingByCategoryForMonth('2026-09', [], invoices, catLegado, new Set(), () => '2026-09').get('presentes')).toBe(10000);
+  });
+
+  it('parcela sem installmentNumber (dado antigo) não desloca', () => {
+    const invoices: InvoiceForSpending[] = [
+      { referenceMonth: '2026-09', ledgerEntries: [entry({ id: 'p1', type: 'purchase', amountCents: 10000, sourceTransactionId: 'presente', installmentTotal: 3 })] }
+    ];
+    expect(installmentShiftBySource(invoices, compradoEmAgosto).size).toBe(0);
+    expect(spendingByCategoryForMonth('2026-09', [], invoices, catOf, new Set(), compradoEmAgosto).get('presentes')).toBe(10000);
+  });
+
+  it('sem purchaseMonthOf, cai no effectiveAt da parcela 1 e ancora igual', () => {
+    expect(spendingByCategoryForMonth('2026-08', [], presente3x(), catOf, new Set(), noPurchaseMonth).get('presentes')).toBe(10000);
+  });
+
+  it('nunca move mais de 1 mês: diff grande é ignorado', () => {
+    const invoices: InvoiceForSpending[] = [
+      { referenceMonth: '2026-12', ledgerEntries: [parcela('p1', 'presente', 1, 2, 10000, '2026-01-04T12:00:00')] }
+    ];
+    expect(installmentShiftBySource(invoices, () => '2026-01').size).toBe(0);
+    expect(spendingByCategoryForMonth('2026-12', [], invoices, catOf, new Set(), () => '2026-01').get('presentes')).toBe(10000);
+  });
+
+  it('diff negativo (dado torto) é ignorado', () => {
+    const invoices: InvoiceForSpending[] = [
+      { referenceMonth: '2026-08', ledgerEntries: [parcela('p1', 'presente', 1, 2, 10000, '2026-10-04T12:00:00')] }
+    ];
+    expect(installmentShiftBySource(invoices, () => '2026-10').size).toBe(0);
+  });
+
+  it('monthlyTotals bate com o donut: saída de agosto inclui jogo + parcela 1', () => {
+    const jogo = txn({
+      id: 'jogo', type: 'card_purchase', amountCents: 12000, categoryId: 'lazer', cardId: 'card',
+      competenceMonth: '2026-08', cashMonth: '2026-08'
+    });
+    const invoices = presente3x();
+    invoices[0].ledgerEntries.push(entry({
+      id: 'jogo_p', type: 'purchase', amountCents: 12000, sourceTransactionId: 'jogo',
+      effectiveAt: Timestamp.fromDate(new Date(COMPRA))
+    }));
+
+    const totais = monthlyTotals(['2026-08', '2026-09'], [jogo], invoices, new Set(), compradoEmAgosto);
+    expect(totais[0].expenseCents).toBe(22000);
+    expect(totais[1].expenseCents).toBe(10000);
+  });
+
+  it('lastCommittedMonth acompanha a ancoragem (não sobra mês futuro vazio)', () => {
+    expect(lastCommittedMonth('2026-08', presente3x(), [], compradoEmAgosto)).toBe('2026-10');
+  });
+
+  it('committedByCategoryForMonth de setembro recebe a parcela 2', () => {
+    expect(committedByCategoryForMonth('2026-09', presente3x(), [], catOf, compradoEmAgosto).get('presentes')).toBe(10000);
+  });
+
+  it('a tendência por categoria enxerga a série ancorada', () => {
+    const meses = ['2026-08', '2026-09', '2026-10', '2026-11'];
+    const byCat = spendingByCategoryAcrossMonths(meses, [], presente3x(), catOf, new Set(), compradoEmAgosto);
+    expect(byCat.get('presentes')?.get('2026-08')).toBe(10000);
+    expect(byCat.get('presentes')?.get('2026-11')).toBeUndefined();
+  });
+
+  it('⭐ ongoingInstallmentPurchases NÃO é reancorada (responde caixa, não competência)', () => {
+    // "Quanto ainda devo" conta pelas faturas 09/10/11, sem deslocar nada.
+    const ongoing = ongoingInstallmentPurchases('2026-09', presente3x(), () => 'Presente');
+    expect(ongoing).toHaveLength(1);
+    expect(ongoing[0].remainingCount).toBe(3);
+    expect(ongoing[0].remainingCents).toBe(30000);
+    expect(ongoing[0].fullAmountCents).toBe(30000);
+  });
+
+  it('conserva o valor cheio: a soma de todos os meses continua sendo a compra inteira', () => {
+    const meses = Array.from({ length: 8 }, (_, i) => mesEm(2026, 7, i));
+    const invoices = presente3x();
+    const soma = (fn: PurchaseMonthOf) =>
+      meses.reduce((acc, m) => acc + (spendingByCategoryForMonth(m, [], invoices, catOf, new Set(), fn).get('presentes') ?? 0), 0);
+
+    expect(soma(noPurchaseMonth)).toBe(30000);
+    expect(soma(compradoEmAgosto)).toBe(30000);
+  });
+});
+
+describe('antecipação sob a ancoragem', () => {
+  const COMPRA = '2026-08-04T12:00:00';
+  const compradoEmAgosto: PurchaseMonthOf = () => '2026-08';
+  const catOf = () => 'presentes';
+
+  /** R$500 em 5x de R$100, comprado 04/08 → faturas 09..01, ancoradas em ago..dez. */
+  function cincoParcelas(): InvoiceForSpending[] {
+    return Array.from({ length: 5 }, (_, i) => ({
+      referenceMonth: mesEm(2026, 9, i),
+      ledgerEntries: [parcela(`p${i + 1}`, 'presente', i + 1, 5, 10000, COMPRA)]
+    }));
+  }
+
+  it('⭐ a tabela do dono: antecipar as 2 últimas em outubro joga o gasto pra outubro', () => {
+    // Ancoragem sem antecipar: ago, set, out, nov, dez — R$100 em cada.
+    const invoices = cincoParcelas();
+    const meses = Array.from({ length: 5 }, (_, i) => mesEm(2026, 8, i));
+    const semAntecipar = meses.map((m) => spendingByCategoryForMonth(m, [], invoices, catOf, new Set(), compradoEmAgosto).get('presentes') ?? 0);
+    expect(semAntecipar).toEqual([10000, 10000, 10000, 10000, 10000]);
+
+    // Em OUTUBRO antecipa as parcelas 4 e 5 (ancoradas em nov e dez).
+    const antecipadoEm = Timestamp.fromDate(new Date('2026-10-20T12:00:00'));
+    invoices[3].ledgerEntries.push(entry({ id: 'c4', type: 'installment_anticipation_credit', amountCents: 10000, sourceTransactionId: 'presente', effectiveAt: antecipadoEm }));
+    invoices[4].ledgerEntries.push(entry({ id: 'c5', type: 'installment_anticipation_credit', amountCents: 10000, sourceTransactionId: 'presente', effectiveAt: antecipadoEm }));
+    // Os dois débitos caem na fatura ATUAL (referência 11) — um por parcela, como grava
+    // `anticipateInstallments`.
+    invoices[2].ledgerEntries.push(entry({ id: 'd4', type: 'installment_anticipation', amountCents: 10000, sourceTransactionId: 'presente', effectiveAt: antecipadoEm }));
+    invoices[2].ledgerEntries.push(entry({ id: 'd5', type: 'installment_anticipation', amountCents: 10000, sourceTransactionId: 'presente', effectiveAt: antecipadoEm }));
+
+    const comAntecipacao = meses.map((m) => spendingByCategoryForMonth(m, [], invoices, catOf, new Set(), compradoEmAgosto).get('presentes') ?? 0);
+    expect(comAntecipacao).toEqual([10000, 10000, 30000, 0, 0]);
+    // Conservação: antecipar não cria nem destrói dinheiro.
+    expect(comAntecipacao.reduce((a, b) => a + b, 0)).toBe(50000);
+  });
+
+  it('⭐ o débito da antecipação conta pelo mês em que se ANTECIPOU, não pelo da fatura', () => {
+    // Antecipou em 20/10 com o cartão já fechado → o débito cai na fatura de referência 11.
+    // Contando pela fatura, apareceria em novembro; pelo `effectiveAt`, em outubro (correto).
+    const invoices: InvoiceForSpending[] = [
+      { referenceMonth: '2026-11', ledgerEntries: [entry({
+        id: 'd', type: 'installment_anticipation', amountCents: 10000, sourceTransactionId: 'presente',
+        effectiveAt: Timestamp.fromDate(new Date('2026-10-20T12:00:00'))
+      })] }
+    ];
+    expect(spendingByCategoryForMonth('2026-10', [], invoices, catOf, new Set(), compradoEmAgosto).get('presentes')).toBe(10000);
+    expect(spendingByCategoryForMonth('2026-11', [], invoices, catOf, new Set(), compradoEmAgosto).get('presentes') ?? 0).toBe(0);
+  });
+
+  it('⭐ antecipar e depois EXCLUIR a compra zera tudo (sem crédito fantasma)', () => {
+    // `reverseCardPurchaseOnDelete` estorna TODO lançamento da compra: as parcelas e o débito
+    // viram `purchase_reversal`; o crédito de antecipação vira `anticipation_credit_reversal`.
+    const invoices = cincoParcelas();
+    const antecipadoEm = Timestamp.fromDate(new Date('2026-10-20T12:00:00'));
+    invoices[4].ledgerEntries.push(entry({ id: 'c5', type: 'installment_anticipation_credit', amountCents: 10000, sourceTransactionId: 'presente', effectiveAt: antecipadoEm }));
+    invoices[2].ledgerEntries.push(entry({ id: 'd5', type: 'installment_anticipation', amountCents: 10000, sourceTransactionId: 'presente', effectiveAt: antecipadoEm }));
+
+    const excluidoEm = Timestamp.fromDate(new Date('2026-11-05T12:00:00'));
+    invoices.forEach((inv, i) => inv.ledgerEntries.push(entry({ id: `rev_p${i + 1}`, type: 'purchase_reversal', amountCents: 10000, sourceTransactionId: 'presente', effectiveAt: excluidoEm })));
+    invoices[2].ledgerEntries.push(entry({ id: 'rev_d5', type: 'purchase_reversal', amountCents: 10000, sourceTransactionId: 'presente', effectiveAt: excluidoEm }));
+    invoices[4].ledgerEntries.push(entry({ id: 'rev_c5', type: 'anticipation_credit_reversal', amountCents: 10000, sourceTransactionId: 'presente', effectiveAt: excluidoEm }));
+
+    const meses = Array.from({ length: 8 }, (_, i) => mesEm(2026, 8, i));
+    for (const m of meses) {
+      expect(spendingByCategoryForMonth(m, [], invoices, catOf, new Set(), compradoEmAgosto).get('presentes') ?? 0).toBe(0);
+    }
+    expect(monthlyTotals(meses, [], invoices, new Set(), compradoEmAgosto).every((t) => t.expenseCents === 0)).toBe(true);
+  });
+
+  it('tarifa avulsa da fatura (sem sourceTransactionId) não é arrastada por uma compra excluída', () => {
+    const invoices: InvoiceForSpending[] = [
+      { referenceMonth: '2026-09', ledgerEntries: [
+        parcela('p1', 'presente', 1, 3, 10000, COMPRA),
+        entry({ id: 'rev', type: 'purchase_reversal', amountCents: 10000, sourceTransactionId: 'presente' }),
+        entry({ id: 'anuidade', type: 'fee', amountCents: 2500 })
+      ] }
+    ];
+    const result = spendingByCategoryForMonth('2026-09', [], invoices, (id) => (id ? 'presentes' : undefined), new Set(), compradoEmAgosto);
+    expect(result.get('presentes') ?? 0).toBe(0);      // a compra excluída some inteira
+    expect(result.get(NO_CATEGORY)).toBe(2500);         // a tarifa da fatura fica
+  });
+
+  it('reversedSourceIds e recognizedExpenseByMonth concordam com o donut', () => {
+    const invoices = cincoParcelas();
+    const parceled = installmentPurchaseIds(invoices);
+    const shifts = installmentShiftBySource(invoices, compradoEmAgosto);
+    const porMes = recognizedExpenseByMonth(invoices, parceled, shifts, reversedSourceIds(invoices));
+
+    expect(porMes.get('2026-08')).toBe(10000);
+    expect(porMes.get('2026-12')).toBe(10000);
+    expect(porMes.get('2027-01')).toBeUndefined(); // a última parcela recuou pra dezembro
   });
 });

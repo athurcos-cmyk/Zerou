@@ -42,7 +42,16 @@ export function BudgetAlertBanner() {
       },
       // Gasto no vale-refeição não pode estourar o orçamento de "Alimentação" — ele não é
       // dinheiro do orçamento. Mesma exclusão que a Análise aplica.
-      finance.excludedAccountIds
+      finance.excludedAccountIds,
+      // Sem faturas (o `[]` acima), não há parcela pra ancorar — nada a fazer aqui.
+      //
+      // ⚠️ Atenção ao que esse `[]` significa de verdade: com a lista de faturas vazia,
+      // `installmentPurchaseIds` devolve conjunto vazio, então TODA `card_purchase` é tratada como
+      // à vista e entra pelo VALOR CHEIO no mês da compra — inclusive as parceladas. Não é que
+      // "parcela não conta"; é que a compra inteira conta de uma vez. Uma compra de R$588 em 4x
+      // pesa R$588 no orçamento do mês, enquanto a Análise conta R$147.
+      // Divergência PRÉ-EXISTENTE, registrada em `docs/planning/TODOS.md`, não introduzida aqui.
+      () => undefined
     );
 
     return activeBudgets

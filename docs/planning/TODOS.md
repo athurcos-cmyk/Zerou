@@ -6,6 +6,39 @@ Itens acionáveis. Fechou? Move para "Concluído" ou remove. Detalhe histórico 
 
 ## Abertas
 
+### Coerência do gasto de cartão — sobras da ancoragem de 2026-08-05
+
+A parcela já conta no mês da compra na Análise (ver `../history/2026-08.md`). Estes quatro pontos
+foram **auditados e deixados de fora de propósito**, cada um com commit próprio:
+
+- [ ] **Dashboard "Resumo de gastos" conta parcelada pelo valor CHEIO** — `DashboardPage.tsx`
+  L203-220 tem uma reimplementação inline de `isCountableExpense` que não usa `spendingAnalysis`.
+  Depois da ancoragem ele concorda com a Análise no *mês* e discorda no *valor* — divergência mais
+  sutil que antes, e por isso mais confusa. **Medido ao vivo em 2026-08-05, agosto/2026 da conta do
+  dono: Dashboard mostra `Presente R$ 588,00` (a compra inteira, 4x de R$ 147) e a Análise mostra
+  `Presente R$ 147,00` (a parcela) — R$ 441,00 de diferença na mesma categoria, no mesmo mês.**
+  Há uma segunda diferença junto: o Dashboard lista a categoria CRUA (`Jogos R$ 135,58`,
+  `Cinema R$ 61,75`) e a Análise rola no pai (`Lazer R$ 197,33`) — as duas somam igual, mas a
+  leitura muda. Critério: Dashboard e Análise mostram o mesmo número pro mesmo mês. Cuidado: ele usa
+  a chave `'uncategorized'`, não `NO_CATEGORY`, e mostra só o top 5.
+- [ ] **`subscribeInvoices` traz as 24 faturas MAIS ANTIGAS** — `cardService.ts` L802 usa
+  `orderBy('referenceMonth','asc') + limit(24)` enquanto o comentário acima diz "24 ciclos mais
+  recentes". Numa conta com >24 faturas, as futuras (que a projeção do Comprometido precisa) são as
+  primeiras a cair fora da janela. Bug latente, independente da ancoragem. Critério: a Análise de um
+  mês futuro continua achando a parcela numa conta com 30+ faturas.
+- [ ] **`functions/` conta parcelada pelo valor cheio no mês da compra** —
+  `buildFinancialContext.ts` (contexto da Vic) e `budgetAlerts.ts` reimplementam análise de gastos
+  sem paridade com `spendingAnalysis.ts` (o próprio `budgetAlerts.ts` L148-150 admite o gap num
+  comentário). A Vic responde número diferente do que a tela mostra. Critério: os dois consomem a
+  mesma regra, ou a divergência vira decisão registrada.
+- [ ] **Alerta de orçamento conta a compra parcelada pelo VALOR CHEIO** — `BudgetAlertBanner.tsx`
+  L37 passa `invoices: []`. Cuidado com a leitura fácil e errada ("parcela não conta"): sem faturas,
+  `installmentPurchaseIds` devolve conjunto vazio, então toda `card_purchase` é tratada como à vista
+  e entra pelo valor cheio no mês da compra. Uma compra de R$ 588 em 4x estoura um orçamento de
+  R$ 200 em "Presente" já no mês da compra, enquanto a Análise conta R$ 147. Pré-existente, não
+  introduzido pela ancoragem. Critério: alerta e Análise concordam no número, ou a diferença vira
+  decisão de produto registrada (orçamento é sobre compromisso assumido ou sobre desembolso do mês?).
+
 ### Segurança — auditoria 2026-07-19 ✅ FECHADA (12/12)
 
 Relatório completo: `~/Desktop/relatorio-auditoria-2026-08-01.md`.

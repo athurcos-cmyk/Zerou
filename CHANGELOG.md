@@ -2,6 +2,39 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-05 — feat(análise): parcela de cartão conta no mês da COMPRA, não no da fatura
+
+- **Relato do dono**: comprou um jogo (à vista) e um presente (parcelado) no **mesmo dia** (04/08),
+  no mesmo cartão, e os dois caíram na **mesma fatura** (referência 09 — o cartão fecha dia 2). O
+  jogo apareceu na Análise em agosto; o presente só em setembro. *"Fica confuso, um aparece em
+  agosto e outro só em setembro sendo que é a mesma fatura do cartão?"*
+- **Causa**: desde 2026-07-28 a compra à vista conta pelo mês da compra, mas a parcelada continuou
+  contando pelo `referenceMonth` da fatura. As duas âncoras ficam deslocadas 0 ou 1 mês por causa do
+  dia de fechamento (`resolveInstallmentCycle`) — com fechamento dia 2, 28 dos 30 dias do mês
+  empurram a compra pro mês seguinte. Metade da correção de julho tinha ficado pra trás.
+- **Correção**: `installmentShiftBySource` (`spendingAnalysis.ts`) calcula um deslocamento por compra
+  e a parcela N passa a contar no mês da compra + (N−1). **Duas travas independentes** protegem o
+  dado antigo: a âncora exige `installmentNumber === 1` (compra de `registerOngoingInstallments`
+  começa na parcela 7 e nunca desloca) e o deslocamento é lista branca `diff === 1`, não
+  `clamp(0,1)`. Garantia: nenhum gasto se move mais de 1 mês nem sem parcela 1 identificada.
+- **Antecipar parcela continua movendo o gasto** (decisão do dono: *"se eu antecipei, gastei naquele
+  mês"*) — mas o débito passa a contar pelo mês em que se **antecipou** (`effectiveAt`), não pelo da
+  fatura em que caiu. Sem isso, antecipar depois do fechamento repetiria o mesmo erro de 1 mês.
+- Compra excluída sai por `sourceTransactionId` (`reversedSourceIds`, extraído de
+  `ongoingInstallmentPurchases`): o `purchase_reversal` é gravado sem `installmentNumber`, então não
+  há como ancorá-lo — casando por compra, some tudo junto e não sobra crédito fantasma.
+- **Não muda**: fatura, limite, totais do cartão, "compras parceladas em andamento" (responde caixa,
+  de propósito), alerta de orçamento e Dashboard. Detalhes e riscos em `docs/history/2026-08.md`.
+- Verificação: `typecheck` + **577 testes** + `build` verdes; **nenhum teste existente mudou de
+  resultado**, 22 novos. **Sem deploy de regras nem de functions** — nada novo é gravado no Firestore.
+- Conferido ao vivo na conta real do dono, em três camadas: (1) leitura — agosto passou a mostrar o
+  presente junto com o jogo; (2) diff antes × depois via `git stash`, com cada centavo movido
+  explicado e o seletor de mês encolhendo de set/2027 pra ago/2027; (3) **teste com escrita**
+  (autorizado) — compra de R$ 30 em 3x, antecipação de uma parcela e exclusão, com os cinco meses e
+  a fatura voltando ao **centavo exato** do baseline. O débito da antecipação caiu na fatura de
+  setembro e contou em agosto, provando a âncora por `effectiveAt` em produção. Tabelas completas em
+  `docs/history/2026-08.md`.
+
 ## 2026-08-03 (parte 8) — fix(pwa): ícone aparecia preto ao abrir o app instalado
 
 - **Relato do dono**: "ao abrir o PWA eu vejo o ícone preto".

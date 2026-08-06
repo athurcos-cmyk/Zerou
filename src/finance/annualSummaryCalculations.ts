@@ -29,7 +29,15 @@ export function computeAnnualSummary(
     months.push(`${year}-${String(m + 1).padStart(2, '0')}`);
   }
 
-  const monthly = monthlyTotals(months, transactions, invoices, excludedAccountIds);
+  // Mês da COMPRA de cada compra no cartão — ancora a parcela 1 no mês em que se comprou, e não
+  // no mês da fatura (ver `installmentShiftBySource`). Compra fora da janela de transações
+  // carregada devolve `undefined` e cai no fallback do `effectiveAt`, sem quebrar o ano.
+  const purchaseMonthByTransactionId = new Map(
+    transactions.filter((t) => t.type === 'card_purchase').map((t) => [t.id, t.cashMonth ?? t.competenceMonth])
+  );
+  const purchaseMonthOf = (transactionId: string) => purchaseMonthByTransactionId.get(transactionId);
+
+  const monthly = monthlyTotals(months, transactions, invoices, excludedAccountIds, purchaseMonthOf);
   const monthlyBreakdown = monthly.map((m) => ({
     month: m.month,
     monthLabel: MONTH_LABELS[parseInt(m.month.split('-')[1], 10) - 1] ?? m.month,
@@ -57,7 +65,7 @@ export function computeAnnualSummary(
   // Aggregate spending by category across all 12 months
   const categoryTotals = new Map<string, number>();
   for (const month of months) {
-    const byCat = spendingByCategoryForMonth(month, transactions, invoices, (id) => (id ? categoryByTransactionId.get(id) : undefined), excludedAccountIds);
+    const byCat = spendingByCategoryForMonth(month, transactions, invoices, (id) => (id ? categoryByTransactionId.get(id) : undefined), excludedAccountIds, purchaseMonthOf);
     for (const [catId, cents] of byCat) {
       if (cents <= 0) continue;
       categoryTotals.set(catId, (categoryTotals.get(catId) ?? 0) + cents);

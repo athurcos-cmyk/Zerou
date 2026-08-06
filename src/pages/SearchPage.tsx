@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Calendar, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, EllipsisVertical, Gauge, HelpCircle, LineChart, Minus, Plus, Search, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
 import {
@@ -216,6 +216,21 @@ export function SearchPage() {
     () => new Map(knownTransactions.map((t) => [t.id, t.description])),
     [knownTransactions]
   );
+  // Mês da COMPRA de cada compra no cartão — é o que ancora a parcela 1 no mês em que a pessoa
+  // comprou, em vez do mês da fatura (ver `installmentShiftBySource`). Compra fora da janela
+  // carregada devolve `undefined` e cai no fallback do `effectiveAt`, sem quebrar nada.
+  const purchaseMonthById = useMemo(
+    () => new Map(
+      knownTransactions
+        .filter((t) => t.type === 'card_purchase')
+        .map((t) => [t.id, t.cashMonth ?? t.competenceMonth])
+    ),
+    [knownTransactions]
+  );
+  const purchaseMonthOf = useCallback(
+    (transactionId: string) => purchaseMonthById.get(transactionId),
+    [purchaseMonthById]
+  );
   // Contas a pagar reduzidas ao que a projeção futura precisa (mês do vencimento resolvido aqui).
   // Conta debitada de uma conta "fora do saldo" (vale-refeição) não entra: o mês futuro mostraria
   // um comprometido que o mês passado, já realizado, não mostra.
@@ -258,10 +273,10 @@ export function SearchPage() {
   // Até onde a navegação pra frente pode ir: última parcela/conta comprometida, ou — se há
   // recorrência ativa — pelo menos 12 meses à frente (recorrência é "infinita", precisa de teto).
   const maxMonth = useMemo(() => {
-    const committed = lastCommittedMonth(currentMonth, invoicesForSpending, billsForCommitment);
+    const committed = lastCommittedMonth(currentMonth, invoicesForSpending, billsForCommitment, purchaseMonthOf);
     const recurringHorizon = hasProjectableRecurring ? shiftMonth(currentMonth, 12) : currentMonth;
     return recurringHorizon > committed ? recurringHorizon : committed;
-  }, [currentMonth, invoicesForSpending, billsForCommitment, hasProjectableRecurring]);
+  }, [currentMonth, invoicesForSpending, billsForCommitment, hasProjectableRecurring, purchaseMonthOf]);
   const isFutureMonth = selectedMonth > currentMonth;
 
   // Arriving from the Dashboard's "Buscar" shortcut opens straight into search.
@@ -284,12 +299,12 @@ export function SearchPage() {
     const catOf = (id?: string) => (id ? txnCategoryById.get(id) : undefined);
     let totals: Map<string, number>;
     if (isFutureMonth) {
-      totals = committedByCategoryForMonth(selectedMonth, invoicesForSpending, billsForCommitment, catOf);
+      totals = committedByCategoryForMonth(selectedMonth, invoicesForSpending, billsForCommitment, catOf, purchaseMonthOf);
       for (const [cat, cents] of recurringByCategoryForMonth(selectedMonth, rulesForProjection, nextOccurrenceDate)) {
         totals.set(cat, (totals.get(cat) ?? 0) + cents);
       }
     } else {
-      totals = spendingByCategoryForMonth(selectedMonth, knownTransactions, invoicesForSpending, catOf, finance.excludedAccountIds);
+      totals = spendingByCategoryForMonth(selectedMonth, knownTransactions, invoicesForSpending, catOf, finance.excludedAccountIds, purchaseMonthOf);
     }
     // Subcategoria soma no pai — SÓ aqui. Orçamento e Resumo Anual continuam lendo o cru
     // (ver o aviso em `rollUpByParent`).
@@ -318,7 +333,7 @@ export function SearchPage() {
         };
       })
       .sort((a, b) => b.amountCents - a.amountCents);
-  }, [knownTransactions, invoicesForSpending, billsForCommitment, rulesForProjection, isFutureMonth, txnCategoryById, categoryMap, categoryNames, selectedMonth]);
+  }, [knownTransactions, invoicesForSpending, billsForCommitment, rulesForProjection, isFutureMonth, txnCategoryById, categoryMap, categoryNames, selectedMonth, finance.excludedAccountIds, purchaseMonthOf]);
 
   const totalSpent = spendingByCategory.reduce((s, c) => s + c.amountCents, 0);
 
@@ -368,12 +383,12 @@ export function SearchPage() {
   // ── histórico mensal (últimos 6 meses reais — não acompanha selectedMonth) ─
   const monthlyData = useMemo(
     () =>
-      monthlyTotals(last6Months, knownTransactions, invoicesForSpending, finance.excludedAccountIds).map((m) => ({
+      monthlyTotals(last6Months, knownTransactions, invoicesForSpending, finance.excludedAccountIds, purchaseMonthOf).map((m) => ({
         month: monthLabel(m.month),
         incomeCents: m.incomeCents,
         expenseCents: m.expenseCents
       })),
-    [knownTransactions, invoicesForSpending, last6Months, finance.excludedAccountIds]
+    [knownTransactions, invoicesForSpending, last6Months, finance.excludedAccountIds, purchaseMonthOf]
   );
 
   const hasMonthlyData = monthlyData.some((m) => m.incomeCents > 0 || m.expenseCents > 0);
@@ -387,10 +402,11 @@ export function SearchPage() {
       sumPositive(
         spendingByCategoryForMonth(comparisonMonth, knownTransactions, invoicesForSpending, (id) =>
           id ? txnCategoryById.get(id) : undefined,
-          finance.excludedAccountIds
+          finance.excludedAccountIds,
+          purchaseMonthOf
         )
       ),
-    [knownTransactions, invoicesForSpending, txnCategoryById, comparisonMonth, finance.excludedAccountIds]
+    [knownTransactions, invoicesForSpending, txnCategoryById, comparisonMonth, finance.excludedAccountIds, purchaseMonthOf]
   );
   // Comparação só faz sentido entre meses realizados; mês futuro é comprometido, não gasto.
   const variation = !isFutureMonth && comparisonExpense > 0
@@ -1193,6 +1209,7 @@ export function SearchPage() {
         categories={expenseCategories}
         categoryOf={(id) => (id ? txnCategoryById.get(id) : undefined)}
         excludedAccountIds={finance.excludedAccountIds}
+        purchaseMonthOf={purchaseMonthOf}
         initialCategoryId={selectedCat?.categoryId ?? topCat?.categoryId ?? undefined}
       />
     </section>

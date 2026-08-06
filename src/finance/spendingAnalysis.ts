@@ -8,21 +8,31 @@ import type { Category, InvoiceLedgerEntry, InvoiceLedgerEntryType, InvoiceStatu
  * num cartão que fecha cedo (ex.: dia 2), quase tudo cairia na fatura do mês seguinte, e o
  * gasto de julho apareceria em agosto. Decisão do dono (2026-07-28).
  *
- * Compra **parcelada** continua contando 1 parcela por fatura (pelo ledger): uma compra de
- * R$3.000 em 10x não é R$3.000 no mês da compra, é R$300 em cada uma das 10 faturas.
+ * Compra **parcelada** conta 1 parcela por mês, **começando no mês da COMPRA**: uma compra de
+ * R$3.000 em 10x não é R$3.000 no mês da compra, é R$300 por mês durante 10 meses.
+ *
+ * A parcela 1 no mês da compra é a correção de 2026-08-05 (caso real do dono): antes ela
+ * contava pelo `referenceMonth` da FATURA, o que colocava duas compras feitas no mesmo dia, no
+ * mesmo cartão, caindo na MESMA fatura, em meses diferentes na Análise — a à vista no mês da
+ * compra, a parcelada um mês à frente. O culpado era o dia do fechamento
+ * (`resolveInstallmentCycle`), não o modelo; quem corrige o deslocamento é
+ * `installmentShiftBySource`.
  *
  * Como isso divide as fontes:
  *  - à vista   → pela TRANSAÇÃO `card_purchase` (`installmentGroupId` vazio), no mês da compra;
  *    a parcela única no ledger é IGNORADA aqui pra não contar duas vezes.
- *  - parcelado → pelo LEDGER (parcela `purchase` com `installmentTotal > 1`), no mês da fatura.
- *    Antecipar move o gasto do mês futuro pro atual naturalmente (débito na fatura atual,
- *    crédito na futura).
- *  - tarifa/juros/IOF/estorno/antecipação → pelo ledger, no mês da fatura (eventos da fatura,
- *    sem "data de compra").
+ *  - parcelado → pelo LEDGER (parcela `purchase` com `installmentTotal > 1`), no mês ANCORADO
+ *    (`anchoredMonthOf` = mês da fatura menos o deslocamento da compra).
+ *  - antecipação → o DÉBITO conta no mês em que se antecipou (`effectiveAt`), o CRÉDITO anula a
+ *    parcela original no mês ancorado dela. Antecipar move o gasto pro mês da antecipação —
+ *    decisão do dono, 2026-08-05: "se eu antecipei, gastei naquele mês".
+ *  - tarifa/juros/IOF/estorno → pelo ledger, no mês da fatura (eventos da fatura, sem "data de
+ *    compra" e sem `sourceTransactionId` pra ancorar).
  *
- * Consequência aceita de propósito: a Análise **deixa de bater 1:1 com a fatura** no mês
- * corrente (à vista migra pro mês da compra) — a Análise é sobre comportamento de gasto, não
- * sobre o extrato da fatura.
+ * Consequência aceita de propósito: a Análise **não bate 1:1 com a fatura** — a Análise é sobre
+ * comportamento de gasto, não sobre o extrato da fatura. Quem responde "o que vem na fatura" é
+ * a tela da fatura; quem responde "quanto ainda devo" é `ongoingInstallmentPurchases`, e as
+ * duas continuam contando pelo `referenceMonth`, sem ancoragem.
  */
 
 // Débitos: pesam como gasto (+). `anticipation_credit_reversal` também é débito — é o estorno
@@ -98,6 +108,134 @@ export function installmentPurchaseIds(invoices: InvoiceForSpending[]): Set<stri
   return parceled;
 }
 
+/**
+ * Mês ('yyyy-MM') em que a COMPRA aconteceu, por id da transação `card_purchase`.
+ * `undefined` = transação fora da janela carregada — a compra não é reancorada (cai no
+ * comportamento antigo, pelo mês da fatura). Obrigatório nas assinaturas que o usam, pelo
+ * mesmo motivo de `excludedAccountIds`: uma tela nova tem que DECIDIR o que passar.
+ */
+export type PurchaseMonthOf = (transactionId: string) => string | undefined;
+
+/** Meses de `earlier` até `later` ('yyyy-MM'). Negativo se `later` vier antes. `NaN` se inválido. */
+function monthDiff(later: string, earlier: string): number {
+  const [ly, lm] = later.split('-').map(Number);
+  const [ey, em] = earlier.split('-').map(Number);
+  if (!ly || !lm || !ey || !em) return NaN;
+  return (ly - ey) * 12 + (lm - em);
+}
+
+/** 'yyyy-MM' ± n meses (usa `Date` pra virar o ano sozinho). */
+function shiftMonthKey(month: string, delta: number): string {
+  const [year, m] = month.split('-').map(Number);
+  if (!year || !m) return month;
+  return monthKeyOf(new Date(year, m - 1 + delta, 1));
+}
+
+/** `effectiveAt` pode ser `Timestamp` (produção) ou `Date` (teste/dado montado à mão). */
+function monthKeyOfEffectiveAt(value: InvoiceLedgerEntry['effectiveAt'] | undefined): string | undefined {
+  if (!value) return undefined;
+  const maybe = value as unknown as { toDate?: () => Date };
+  const date = typeof maybe.toDate === 'function' ? maybe.toDate() : (value as unknown as Date);
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return undefined;
+  return monthKeyOf(date);
+}
+
+/**
+ * Deslocamento (sempre 1) entre o mês da FATURA da parcela 1 e o mês da COMPRA, por
+ * `sourceTransactionId`. Ausente do mapa = 0 = não desloca.
+ *
+ * É isto que faz a parcela 1 contar no mês da COMPRA em vez do mês da fatura. Sem isso,
+ * duas compras feitas no mesmo dia, no mesmo cartão, caindo na MESMA fatura, apareciam em
+ * meses diferentes na Análise: a à vista no mês da compra (desde 2026-07-28) e a parcelada
+ * no mês da fatura — um mês à frente sempre que o dia da compra >= dia do fechamento
+ * (`resolveInstallmentCycle`). Caso real do dono, 2026-08-05, cartão que fecha dia 2.
+ *
+ * **Duas travas independentes, ambas de propósito:**
+ *
+ * 1. **A âncora é `installmentNumber === 1`, não "a menor parcela presente".** Compra
+ *    cadastrada por `registerOngoingInstallments` (a que já estava rolando quando a pessoa
+ *    começou a usar o app) começa na parcela 7, 8, 11… — nunca tem parcela 1, então nunca
+ *    desloca. Elegê-la pela "menor presente" moveria essas compras um mês sem motivo.
+ * 2. **Lista branca `diff === 1`, não `clamp(diff, 0, 1)`.** `resolveInstallmentCycle` só
+ *    produz offset 0 ou 1; qualquer outro valor significa que a compra veio por outro
+ *    caminho (ou que o dado é legado/torto) e deslocar seria chute. `clamp` devolveria 1
+ *    pra um diff de 8 — exatamente o caso do `registerOngoingInstallments`.
+ *
+ * Consequência das duas juntas: **nenhum gasto se move mais de 1 mês, e nenhum se move sem
+ * que a parcela 1 tenha sido identificada.** Dado antigo cai no comportamento de hoje.
+ */
+export function installmentShiftBySource(
+  invoices: InvoiceForSpending[],
+  purchaseMonthOf: PurchaseMonthOf
+): Map<string, number> {
+  const shifts = new Map<string, number>();
+  for (const invoice of invoices) {
+    for (const entry of invoice.ledgerEntries) {
+      if (entry.type !== 'purchase' || entry.installmentNumber !== 1 || !entry.sourceTransactionId) continue;
+      // `cashMonth` da transação é a fonte boa; o `effectiveAt` da própria parcela 1 é o
+      // fallback (em dado novo ele É a data da compra, copiada igual em todas as parcelas —
+      // ver `addCardPurchaseToBatch`). Sem nenhum dos dois, não desloca.
+      const purchaseMonth = purchaseMonthOf(entry.sourceTransactionId) ?? monthKeyOfEffectiveAt(entry.effectiveAt);
+      if (!purchaseMonth) continue;
+      if (monthDiff(invoice.referenceMonth, purchaseMonth) === 1) shifts.set(entry.sourceTransactionId, 1);
+    }
+  }
+  return shifts;
+}
+
+/**
+ * Compras EXCLUÍDAS: `reverseCardPurchaseOnDelete` estorna todo lançamento de uma compra
+ * excluída, e `purchase_reversal`/`anticipation_credit_reversal` só existem por exclusão —
+ * então qualquer estorno marca a compra INTEIRA como removida.
+ *
+ * Quem consome isso descarta **todos** os lançamentos daquele `sourceTransactionId`, em vez
+ * de tentar casar cada estorno com o que ele anula. Não é preferência de estilo: o estorno é
+ * gravado sem `installmentNumber` e com `effectiveAt` da hora da EXCLUSÃO
+ * (`functions/src/cards/reverseCardPurchaseOnDelete.ts`), então não há como ancorá-lo no mesmo
+ * mês do lançamento que ele cancela. Casando por compra, some tudo junto e a conta fecha.
+ */
+export function reversedSourceIds(invoices: InvoiceForSpending[]): Set<string> {
+  const reversed = new Set<string>();
+  for (const invoice of invoices) {
+    for (const entry of invoice.ledgerEntries) {
+      if (!entry.sourceTransactionId) continue;
+      if (entry.type === 'purchase_reversal' || entry.type === 'anticipation_credit_reversal') {
+        reversed.add(entry.sourceTransactionId);
+      }
+    }
+  }
+  return reversed;
+}
+
+/**
+ * Mês em que UM lançamento do ledger conta na Análise. Único lugar que conhece a exceção
+ * abaixo — as duas funções de agregação chamam esta, nunca reimplementam a regra.
+ *
+ * Regra geral: `referenceMonth` da fatura menos o deslocamento da compra.
+ *
+ * **Exceção: `installment_anticipation` (o débito da antecipação) conta pelo mês em que a
+ * pessoa ANTECIPOU** (`effectiveAt`), não pelo mês da fatura em que ele caiu. Decisão do dono
+ * (2026-08-05): *"se eu antecipei, gastei naquele mês"*. A compra cria um cronograma;
+ * antecipar é um ato novo, tomado depois, que consome dinheiro no mês em que foi feito.
+ * Sem esta exceção, antecipar depois do fechamento jogaria o débito pro mês seguinte — o
+ * mesmo erro de 1 mês que `installmentShiftBySource` existe pra corrigir.
+ *
+ * O CRÉDITO da antecipação (`installment_anticipation_credit`) não precisa de exceção: ele
+ * mora na mesma fatura da parcela que anula, então herda o mesmo deslocamento e zera o mês
+ * certo por construção — inclusive em dado legado sem `installmentNumber` no crédito.
+ */
+function anchoredMonthOf(
+  entry: Pick<InvoiceLedgerEntry, 'type' | 'effectiveAt' | 'sourceTransactionId'>,
+  invoiceReferenceMonth: string,
+  shiftBySource: ReadonlyMap<string, number>
+): string {
+  if (entry.type === 'installment_anticipation') {
+    return monthKeyOfEffectiveAt(entry.effectiveAt) ?? invoiceReferenceMonth;
+  }
+  const shift = (entry.sourceTransactionId && shiftBySource.get(entry.sourceTransactionId)) || 0;
+  return shift === 0 ? invoiceReferenceMonth : shiftMonthKey(invoiceReferenceMonth, -shift);
+}
+
 /** Compra no cartão à vista (1x): `card_purchase` cujo id NÃO está no conjunto de parcelados.
  * Na Análise por competência conta pela DATA DA COMPRA (via transação), como despesa comum. */
 function isSingleCardPurchase(t: Pick<Transaction, 'type' | 'id'>, parceledIds: Set<string>): boolean {
@@ -170,10 +308,13 @@ export function spendingByCategoryForMonth(
   transactions: Transaction[],
   invoices: InvoiceForSpending[],
   categoryOfTransaction: (transactionId: string | undefined) => string | undefined,
-  excludedAccountIds: ReadonlySet<string>
+  excludedAccountIds: ReadonlySet<string>,
+  purchaseMonthOf: PurchaseMonthOf
 ): Map<string, number> {
   const totals = new Map<string, number>();
   const parceledIds = installmentPurchaseIds(invoices);
+  const shifts = installmentShiftBySource(invoices, purchaseMonthOf);
+  const reversed = reversedSourceIds(invoices);
   const add = (categoryId: string | undefined, cents: number) => {
     if (cents === 0) return;
     const key = categoryId || NO_CATEGORY;
@@ -185,10 +326,13 @@ export function spendingByCategoryForMonth(
     add(t.categoryId, refundLikeTypes.has(t.type) ? -t.amountCents : t.amountCents);
   }
 
+  // Varre TODAS as faturas (não só as do mês): com a ancoragem, o mês em que um lançamento
+  // conta não é mais o `referenceMonth` da fatura que o contém — a parcela pode recuar um mês.
   for (const invoice of invoices) {
-    if (invoice.referenceMonth !== month) continue;
     for (const entry of invoice.ledgerEntries) {
+      if (entry.sourceTransactionId && reversed.has(entry.sourceTransactionId)) continue; // compra excluída
       if (isSinglePurchaseLedgerEntry(entry, parceledIds)) continue; // à vista → contado pela transação
+      if (anchoredMonthOf(entry, invoice.referenceMonth, shifts) !== month) continue;
       const signed = signedCharge(entry);
       if (signed === 0) continue;
       add(categoryOfTransaction(entry.sourceTransactionId), signed);
@@ -283,11 +427,12 @@ export function spendingByCategoryAcrossMonths(
   transactions: Transaction[],
   invoices: InvoiceForSpending[],
   categoryOfTransaction: (transactionId: string | undefined) => string | undefined,
-  excludedAccountIds: ReadonlySet<string>
+  excludedAccountIds: ReadonlySet<string>,
+  purchaseMonthOf: PurchaseMonthOf
 ): Map<string, Map<string, number>> {
   const byCategory = new Map<string, Map<string, number>>();
   for (const month of months) {
-    const perCategory = spendingByCategoryForMonth(month, transactions, invoices, categoryOfTransaction, excludedAccountIds);
+    const perCategory = spendingByCategoryForMonth(month, transactions, invoices, categoryOfTransaction, excludedAccountIds, purchaseMonthOf);
     for (const [categoryId, cents] of perCategory) {
       if (cents <= 0) continue;
       let byMonth = byCategory.get(categoryId);
@@ -368,17 +513,33 @@ export function computeCategoryTrend(
 }
 
 /**
- * Gasto de uma fatura que a Análise conta PELA FATURA — parcelas + tarifas/juros/estornos/
- * antecipação. Exclui a compra à vista (contada pela data da compra, via transação), pra bater
- * com `spendingByCategoryForMonth`. Não é mais o "recognizedExpenseCents" cru da fatura.
+ * Gasto que a Análise conta PELO LEDGER — parcelas + tarifas/juros/estornos/antecipação —
+ * somado por MÊS ANCORADO (ver `anchoredMonthOf`). Exclui a compra à vista (contada pela data
+ * da compra, via transação) e as compras excluídas, pra bater com `spendingByCategoryForMonth`.
+ *
+ * Substituiu `invoiceRecognizedExpense`, que devolvia um número POR FATURA: com a ancoragem,
+ * uma mesma fatura pode contribuir pra dois meses diferentes (a parcela recua pro mês da
+ * compra, mas uma tarifa da fatura fica onde está), então "uma fatura → um número" deixou de
+ * ser representável.
  */
-export function invoiceRecognizedExpense(invoice: InvoiceForSpending, parceledIds: Set<string>): number {
-  let sum = 0;
-  for (const entry of invoice.ledgerEntries) {
-    if (isSinglePurchaseLedgerEntry(entry, parceledIds)) continue; // à vista entra pela transação, não pela fatura
-    sum += signedCharge(entry);
+export function recognizedExpenseByMonth(
+  invoices: InvoiceForSpending[],
+  parceledIds: Set<string>,
+  shiftBySource: ReadonlyMap<string, number>,
+  reversedSources: ReadonlySet<string>
+): Map<string, number> {
+  const byMonth = new Map<string, number>();
+  for (const invoice of invoices) {
+    for (const entry of invoice.ledgerEntries) {
+      if (entry.sourceTransactionId && reversedSources.has(entry.sourceTransactionId)) continue;
+      if (isSinglePurchaseLedgerEntry(entry, parceledIds)) continue; // à vista entra pela transação
+      const signed = signedCharge(entry);
+      if (signed === 0) continue;
+      const month = anchoredMonthOf(entry, invoice.referenceMonth, shiftBySource);
+      byMonth.set(month, (byMonth.get(month) ?? 0) + signed);
+    }
   }
-  return sum;
+  return byMonth;
 }
 
 export interface MonthlyTotals {
@@ -399,15 +560,16 @@ export function monthlyTotals(
   months: string[],
   transactions: Transaction[],
   invoices: InvoiceForSpending[],
-  excludedAccountIds: ReadonlySet<string>
+  excludedAccountIds: ReadonlySet<string>,
+  purchaseMonthOf: PurchaseMonthOf
 ): MonthlyTotals[] {
   const parceledIds = installmentPurchaseIds(invoices);
-  const cardExpenseByMonth = new Map<string, number>();
-  for (const invoice of invoices) {
-    const recognized = invoiceRecognizedExpense(invoice, parceledIds);
-    if (recognized === 0) continue;
-    cardExpenseByMonth.set(invoice.referenceMonth, (cardExpenseByMonth.get(invoice.referenceMonth) ?? 0) + recognized);
-  }
+  const cardExpenseByMonth = recognizedExpenseByMonth(
+    invoices,
+    parceledIds,
+    installmentShiftBySource(invoices, purchaseMonthOf),
+    reversedSourceIds(invoices)
+  );
 
   return months.map((month) => {
     let incomeCents = 0;
@@ -453,10 +615,15 @@ export interface OngoingInstallmentPurchase {
  * mesmo que o mês dela ainda não tenha virado: pagar a fatura é o que realmente resolve a
  * dívida, não só o calendário passar.
  *
- * Compra EXCLUÍDA some por completo: o ledger é imutável, mas excluir gera estornos
- * (`purchase_reversal`/`anticipation_credit_reversal`, que só existem por exclusão), e qualquer
- * um deles marca a compra como removida. Sem isso, uma parcelada errada excluída continuava
- * "em andamento" enquanto a fatura tivesse outra parcela mantendo o saldo devedor > 0.
+ * Compra EXCLUÍDA some por completo, via `reversedSourceIds` (o mesmo conjunto que a Análise
+ * usa pra descartar compra excluída — extraído daqui justamente pra as duas leituras nunca
+ * divergirem). Sem isso, uma parcelada errada excluída continuava "em andamento" enquanto a
+ * fatura tivesse outra parcela mantendo o saldo devedor > 0.
+ *
+ * ⚠️ **Esta função continua contando pelo `referenceMonth` da fatura, sem a ancoragem no mês
+ * da compra** (`installmentShiftBySource`) — de propósito. Ela responde "quanto ainda devo",
+ * que é uma pergunta de CAIXA: o que importa é em qual fatura a parcela vai ser cobrada, não
+ * em que mês o gasto é reconhecido. Quem reancora é a Análise, que responde outra pergunta.
  */
 export function ongoingInstallmentPurchases(
   currentMonth: string,
@@ -486,16 +653,14 @@ export function ongoingInstallmentPurchases(
   // excluída, e `purchase_reversal`/`anticipation_credit_reversal` só existem por exclusão.
   // Então qualquer estorno marca a compra inteira como removida — ela não deve mais aparecer
   // como "em andamento" (a recadastrada certa tem outro sourceTransactionId, sem estorno).
-  const reversedSources = new Set<string>();
+  const reversedSources = reversedSourceIds(invoices);
 
   // 1ª passada: total/valor da parcela (de qualquer parcela, passada ou futura) e quais meses
   // futuros foram antecipados — precisa ver todo mundo antes de decidir o que conta como restante.
   for (const invoice of invoices) {
     for (const entry of invoice.ledgerEntries) {
       if (!entry.sourceTransactionId) continue;
-      if (entry.type === 'purchase_reversal' || entry.type === 'anticipation_credit_reversal') {
-        reversedSources.add(entry.sourceTransactionId);
-      } else if (entry.type === 'purchase' && (entry.installmentTotal ?? 0) > 1) {
+      if (entry.type === 'purchase' && (entry.installmentTotal ?? 0) > 1) {
         const group = groupFor(entry.sourceTransactionId);
         group.installmentTotal = entry.installmentTotal ?? group.installmentTotal;
         group.installmentValueCents = entry.amountCents;
@@ -585,13 +750,14 @@ export function committedByCategoryForMonth(
   month: string,
   invoices: InvoiceForSpending[],
   bills: BillForCommitment[],
-  categoryOfTransaction: (transactionId: string | undefined) => string | undefined
+  categoryOfTransaction: (transactionId: string | undefined) => string | undefined,
+  purchaseMonthOf: PurchaseMonthOf
 ): Map<string, number> {
   // Sem transações: num mês futuro não há gasto realizado, só o comprometido. Por isso o
   // conjunto de contas excluídas é provavelmente irrelevante aqui (não há transação pra
   // filtrar) — quem cuida de tirar conta a pagar/recorrência de conta excluída é o caller,
   // filtrando `bills`/`rules` antes de montar essas listas.
-  const totals = spendingByCategoryForMonth(month, [], invoices, categoryOfTransaction, new Set<string>());
+  const totals = spendingByCategoryForMonth(month, [], invoices, categoryOfTransaction, new Set<string>(), purchaseMonthOf);
   for (const [categoryId, cents] of billsByCategoryForMonth(month, bills)) {
     totals.set(categoryId, (totals.get(categoryId) ?? 0) + cents);
   }
@@ -606,12 +772,22 @@ export function committedByCategoryForMonth(
 export function lastCommittedMonth(
   currentMonth: string,
   invoices: InvoiceForSpending[],
-  bills: BillForCommitment[]
+  bills: BillForCommitment[],
+  purchaseMonthOf: PurchaseMonthOf
 ): string {
   const parceledIds = installmentPurchaseIds(invoices);
   let max = currentMonth;
-  for (const invoice of invoices) {
-    if (invoice.referenceMonth > max && invoiceRecognizedExpense(invoice, parceledIds) > 0) max = invoice.referenceMonth;
+  // Pelo mês ANCORADO, não pelo `referenceMonth`: a última parcela recua junto com as outras,
+  // e sem isto o seletor de mês ofereceria um mês futuro vazio no fim da lista. Somar por mês
+  // antes de testar `> 0` também faz duas faturas que caem no mesmo mês ancorado se compensarem.
+  const recognized = recognizedExpenseByMonth(
+    invoices,
+    parceledIds,
+    installmentShiftBySource(invoices, purchaseMonthOf),
+    reversedSourceIds(invoices)
+  );
+  for (const [month, cents] of recognized) {
+    if (month > max && cents > 0) max = month;
   }
   for (const bill of bills) {
     if (bill.dueMonth > max && isOpenBill(bill)) max = bill.dueMonth;

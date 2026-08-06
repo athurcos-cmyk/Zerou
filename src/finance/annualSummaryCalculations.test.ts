@@ -153,3 +153,58 @@ describe('Resumo Anual NÃO agrupa subcategoria no pai [D9]', () => {
     expect(result.topCategories.find((c) => c.categoryId === 'casa')?.amountCents).not.toBe(60000);
   });
 });
+
+describe('Resumo Anual segue a ancoragem da parcela no mês da compra (2026-08-05)', () => {
+  /** Compra parcelada: transação com o mês da compra + uma parcela por fatura. */
+  function parcelada(
+    id: string,
+    purchaseMonth: string,
+    purchaseDate: Date,
+    faturas: { referenceMonth: string; installmentNumber: number }[],
+    amountCents: number
+  ) {
+    const transaction = makeTxn({
+      id, type: 'card_purchase', amountCents: amountCents * faturas.length, categoryId: 'compras',
+      cardId: 'card', competenceMonth: purchaseMonth, cashMonth: purchaseMonth,
+      date: Timestamp.fromDate(purchaseDate)
+    });
+    const invoices: InvoiceForSpending[] = faturas.map((f) => ({
+      referenceMonth: f.referenceMonth,
+      ledgerEntries: [makeEntry({
+        id: `${id}_${f.installmentNumber}`, type: 'purchase', amountCents,
+        sourceTransactionId: id, installmentNumber: f.installmentNumber, installmentTotal: faturas.length,
+        effectiveAt: Timestamp.fromDate(purchaseDate)
+      })]
+    }));
+    return { transaction, invoices };
+  }
+
+  it('parcela 1 de compra de agosto entra em AGOSTO, não em setembro (fatura)', () => {
+    // Cartão fecha dia 2: compra em 04/08 cai na fatura de referência 09.
+    const { transaction, invoices } = parcelada('presente', '2026-08', new Date(2026, 7, 4), [
+      { referenceMonth: '2026-09', installmentNumber: 1 },
+      { referenceMonth: '2026-10', installmentNumber: 2 }
+    ], 10000);
+
+    const result = computeAnnualSummary(2026, [transaction], invoices, new Map([['compras', 'Compras']]));
+    const porMes = new Map(result.monthlyBreakdown.map((m) => [m.month, m.expenseCents]));
+    expect(porMes.get('2026-08')).toBe(10000);
+    expect(porMes.get('2026-09')).toBe(10000); // a parcela 2, não a 1
+    expect(porMes.get('2026-10') ?? 0).toBe(0);
+    expect(result.topCategories.find((c) => c.categoryId === 'compras')?.amountCents).toBe(20000);
+  });
+
+  it('fronteira de ano: compra de dez/2025 cuja fatura era jan/2026 SAI do total de 2026', () => {
+    const { transaction, invoices } = parcelada('natal', '2025-12', new Date(2025, 11, 20), [
+      { referenceMonth: '2026-01', installmentNumber: 1 },
+      { referenceMonth: '2026-02', installmentNumber: 2 }
+    ], 10000);
+
+    const result = computeAnnualSummary(2026, [transaction], invoices, new Map([['compras', 'Compras']]));
+    const porMes = new Map(result.monthlyBreakdown.map((m) => [m.month, m.expenseCents]));
+    // A parcela 1 recuou pra dez/2025 (fora deste ano); só a parcela 2 continua em 2026.
+    expect(porMes.get('2026-01')).toBe(10000);
+    expect(porMes.get('2026-02') ?? 0).toBe(0);
+    expect(result.totalExpenseCents).toBe(10000);
+  });
+});

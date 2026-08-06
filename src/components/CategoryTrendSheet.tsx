@@ -8,7 +8,7 @@ import {
 import { BottomSheet } from './BottomSheet';
 import { EmptyState } from './EmptyState';
 import { spendingByCategoryAcrossMonths, computeCategoryTrend } from '../finance/spendingAnalysis';
-import type { InvoiceForSpending } from '../finance/spendingAnalysis';
+import type { InvoiceForSpending, PurchaseMonthOf } from '../finance/spendingAnalysis';
 import { formatMoney } from '../finance/money';
 import { defaultCategoryColor, resolveCategoryColor } from '../theme/palette';
 import type { Transaction } from '../types/contracts';
@@ -35,6 +35,10 @@ interface Props {
   /** Contas "fora do saldo" (`Account.excludeFromTotals`) — a tendência tem que bater com o
    * donut da Análise, então o gasto delas fica de fora aqui também. */
   excludedAccountIds: ReadonlySet<string>;
+  /** Mês da compra de cada `card_purchase` — ancora a parcela 1 no mês em que se comprou. Vem
+   * por prop (e não derivado de `transactions` aqui) pelo mesmo motivo de `excludedAccountIds`:
+   * a tendência precisa enxergar exatamente o mesmo recorte que o donut da Análise. */
+  purchaseMonthOf: PurchaseMonthOf;
   /** Categoria pra abrir focada (a destacada no donut, ou a maior). */
   initialCategoryId?: string;
 }
@@ -60,13 +64,13 @@ function TrendTooltip({ active, payload }: { active?: boolean; payload?: { paylo
 
 export function CategoryTrendSheet({
   open, onClose, months, currentMonth, transactions, invoices, categories, categoryOf,
-  excludedAccountIds, initialCategoryId,
+  excludedAccountIds, purchaseMonthOf, initialCategoryId,
 }: Props) {
   const reducedMotion = useReducedMotion();
 
   const byCategory = useMemo(
-    () => spendingByCategoryAcrossMonths(months, transactions, invoices, categoryOf, excludedAccountIds),
-    [months, transactions, invoices, categoryOf, excludedAccountIds],
+    () => spendingByCategoryAcrossMonths(months, transactions, invoices, categoryOf, excludedAccountIds, purchaseMonthOf),
+    [months, transactions, invoices, categoryOf, excludedAccountIds, purchaseMonthOf],
   );
 
   const categoryMeta = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
