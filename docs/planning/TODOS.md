@@ -6,6 +6,19 @@ Itens acionáveis. Fechou? Move para "Concluído" ou remove. Detalhe histórico 
 
 ## Abertas
 
+### Auditar as outras listas que usam `.list-row` pelo bug de quebra do valor
+
+Achado em 2026-08-07 nas duas telas de cartão e corrigido só nelas (`.invoice-row`, `.entry-row`).
+**`.list-row` é flex e a coluna de texto nasce com `min-width: auto`**, então a 375px um rótulo
+comprido empurra o valor pra uma linha própria embaixo, alinhado à esquerda — o dinheiro deixa de
+ancorar a leitura. Não é hipótese: aconteceu em 3 listas das 2 telas auditadas.
+
+- [ ] Rodar `rg 'className="list-row' src/` e abrir cada tela a **375px** com um rótulo longo real
+  (nome de estabelecimento, "Uber para estação pós Karen"). Onde quebrar, trocar por `.entry-row` —
+  a classe já existe e é genérica.
+- [ ] Na mesma passada, aplicar a régua de cor: **valor neutro quando toda linha da lista tem a mesma
+  direção de dinheiro** (ver a regra no `../design/DESIGN.md`). Cor só onde ela distingue algo.
+
 ### Coerência do gasto de cartão — sobras da ancoragem de 2026-08-05
 
 A parcela já conta no mês da compra na Análise (ver `../history/2026-08.md`). Estes quatro pontos

@@ -2,6 +2,39 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-07 (4) — design(cartao/fatura): a lista de faturas virou grafico, e o gradiente virou so-dado
+
+Passada de `/frontend-design` nas duas telas de cartao, a segunda sob a direcao do dono: *"deixar o
+app mais clean e mais moderno tipo a Nubank, atualmente sao minha inspiracao no design"*. **Zero
+mudanca de comportamento, zero escrita nova no Firestore, `firestore.rules` intocado.**
+
+- **A LINHA É O GRÁFICO** (`.invoice-row`): as 13 faturas a pagar não são 13 itens equivalentes — o
+  parcelamento faz o compromisso decair até virar platô (909 → 714 → 674 → 607 → 264 ×4 → 109 ×3), e
+  isso não aparecia em lugar nenhum. Cada linha ganhou uma barra escalada pela **maior fatura a
+  pagar** (não pelas visíveis, senão "Ver todas" reescalaria o que já está na tela). **Só a barra da
+  fatura atual é opaca**, as outras a 42% — 13 barras cheias competiriam com o hero e o FAB.
+- **⚠️ Regra nova: o gradiente da marca é pra DADO, nunca pra ação nem pra explicação.** O hero da
+  fatura tinha virado caixa pra um botão e um parágrafo de 4 linhas — **396px, 49% da primeira tela**,
+  com a explicação em branco-sobre-laranja. Agora **234px (29%)**: só valor, vencimento, selo e
+  totais. O hero de limite do Cartão já cumpria a regra e ficou como está.
+- **Botão e explicação desceram**: rótulo virou `Antecipar fatura` (o `(pagar antes de fechar)`
+  quebrava em 2 linhas *e* repetia o parágrafo), e a explicação virou folha atrás de "Entenda o que
+  muda ›", separando os dois conceitos que confundem — antecipar a *fatura* × antecipar uma *parcela*.
+  Esconder texto cobra preço, então a folha de pagamento ganhou `.pay-preview` no **topo**.
+- **Bug de layout em 3 listas** (faturas, compras, pagamentos): `.list-row` é flex e a coluna de texto
+  nasce com `min-width: auto`, então a 375px o valor era empurrado pra uma linha própria embaixo — o
+  dinheiro virava rodapé. `.invoice-row`/`.entry-row` ancoram o valor à direita.
+- **Cor que não varia dentro da lista é decoração**: saíram os 13 "Aberta" e o vermelho de 11 de 11
+  compras; vermelho agora marca só fatura **vencida**, e R$ 0,00 de fatura paga ficou muted (verde ali
+  dizia "dinheiro a favor", e não há). Verde **ficou** nos pagamentos.
+- **O `▶` nativo dos acordeões** era a única peça desenhada pelo navegador, não pelo design system —
+  virou chevron próprio que gira ao abrir (os 5 acordeões do app ganharam junto).
+- **Bug pré-existente corrigido**: `.anticipation-explain` é `display: grid`, e num grid cada trecho
+  de texto solto vira item anônimo — a frase quebrava em três linhas. Invisível porque o painel nasce
+  fechado.
+- 651 testes, build ✅. Verificado ao vivo em Paper e tema escuro, 375px e desktop, fatura aberta e
+  paga. Detalhe: `docs/history/2026-08.md`.
+
 ## 2026-08-07 (3) — fix(cartao): fatura paga nao saia da lista; virou ABA, e o ledger dela nao e mais lido
 
 O dono pagou a fatura, confirmou que o pagamento entrou, e nada mudou de grupo: *"percebi que nao foi

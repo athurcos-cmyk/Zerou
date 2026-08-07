@@ -1971,6 +1971,151 @@ span.service-mark--brand {
   gap: 0.75rem;
 }
 
+.card-invoice-current-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.card-invoice-current-main {
+  min-width: 0;
+}
+
+.card-invoice-current-main .eyebrow {
+  margin-bottom: 0.15rem;
+}
+
+/* O número é o herói (DESIGN.md). A 1.1rem a fatura do mês — o valor que a pessoa veio ver —
+   ficava MENOR que o "Faturas do cartão" do card logo abaixo, que é só um título de seção. */
+.card-invoice-current-value {
+  display: block;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(1.5rem, 6vw, 1.85rem);
+  line-height: 1.1;
+}
+
+.card-invoice-current-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.card-invoice-current-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* --- Lista de faturas (CardDetailPage) -------------------------------------------------------
+   A LINHA É O GRÁFICO. Uma lista de 13 faturas futuras não é 13 itens equivalentes: parcelamento
+   faz o compromisso decair mês a mês até virar um platô (as parcelas compridas que sobram). Essa
+   curva é o dado mais verdadeiro da tela e não estava em lugar nenhum — cada linha era três faixas
+   de texto à esquerda, com o valor quebrando pra baixo a 375px porque `.list-row` é flex sem
+   `min-width: 0` na coluna de texto.
+
+   Forma da barra segue a regra do design system: base quadrada, ponta arredondada (4px) — nunca
+   pílula dos dois lados, e o `border-radius` precisa estar no track E no fill.
+
+   ⚠️ Só a barra da fatura ATUAL é opaca; as outras ficam a 42%. São 13 barras numa tela que já tem
+   o hero tangerina e o FAB tangerina — cheias, competiriam cor com cor (mesma razão de a lista de
+   cartões usar `--gradient-slate` em vez do gradiente vívido). A 42% elas leem como silhueta da
+   curva, e a única vívida é a que exige ação hoje. */
+.invoice-row {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: 0.95rem;
+  color: inherit;
+  text-decoration: none;
+  transition: background var(--duration-fast) ease;
+}
+
+.invoice-row:hover,
+.invoice-row:active {
+  background: var(--bg-surface-subtle);
+}
+
+.invoice-row:focus-visible {
+  outline: 2px solid var(--action-primary);
+  outline-offset: -2px;
+}
+
+.invoice-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.invoice-row-month {
+  min-width: 0;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.invoice-row-amount {
+  flex-shrink: 0;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.02rem;
+}
+
+.invoice-row-amount--overdue {
+  color: var(--danger);
+}
+
+/* Fatura quitada: R$ 0,00 verde não dizia nada (verde é "dinheiro a favor", e não há). O selo
+   "Paga" logo abaixo é quem carrega o significado — o número só recua. */
+.invoice-row-amount--zero {
+  color: var(--text-muted);
+}
+
+.invoice-row-bar {
+  overflow: hidden;
+  height: 0.3rem;
+  border-radius: 0 4px 4px 0;
+  background: var(--bg-surface-muted);
+}
+
+.invoice-row-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 0 4px 4px 0;
+  background: var(--action-primary);
+  opacity: 0.42;
+  transition: width var(--duration-slow) ease;
+}
+
+.invoice-row--current .invoice-row-bar span {
+  opacity: 1;
+}
+
+.invoice-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+/* Amarra a linha ao card "Fatura atual" lá em cima: sem isso os dois mostram o mesmo valor e o de
+   baixo parece repetição. Com o selo, vira relação. */
+.invoice-row-tag {
+  flex-shrink: 0;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: var(--action-primary-soft);
+  color: var(--action-primary);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
 .card-limit-bar-track {
   overflow: hidden;
   height: 0.55rem;
@@ -2009,15 +2154,89 @@ span.service-mark--brand {
   line-height: 1;
 }
 
+/* ⚠️ O gradiente da marca é pra DADO — nunca pra ação nem pra explicação (decisão do dono,
+   07/08/2026). Este hero chegou a abrigar o botão de pagar e um parágrafo de 4 linhas, e por isso
+   media 396px: 49% da primeira tela num aparelho de 812px, com a explicação em branco-sobre-laranja.
+   Hoje entra aqui só valor, vencimento, selo de status e os totais; ação e explicação vivem no
+   fundo claro logo abaixo (`.invoice-actions`). Mesma régua vale pro hero de limite do
+   CardDetailPage, que já a cumpria: tudo nele é dado, e a barra de uso precisa do fundo colorido. */
 .invoice-hero {
   display: grid;
   gap: 0.5rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
   border-color: transparent;
   border-radius: 1rem;
   background: var(--gradient-brand);
   padding: 1.25rem 1.5rem;
   box-shadow: var(--shadow-brand-26);
+}
+
+/* Respiro maior do que o de duas superfícies quaisquer: com o botão primário tirado de dentro do
+   hero, os dois blocos laranja passaram a ficar EMPILHADOS, e o brilho do `--shadow-brand-26`
+   sangra pra baixo — a 1rem eles liam como uma coisa só. */
+.invoice-hero + .invoice-actions {
+  margin-top: 1.75rem;
+}
+
+.invoice-hero-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.invoice-hero-main {
+  min-width: 0;
+}
+
+.invoice-hero-main .eyebrow {
+  margin-bottom: 0.35rem;
+}
+
+.invoice-hero-due {
+  margin-top: 0.35rem;
+  font-size: 0.86rem;
+}
+
+/* Ação principal fora do gradiente, no fundo claro. */
+.invoice-actions {
+  display: grid;
+  justify-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Link discreto que abre a explicação numa folha — mesma família do `.list-toggle`: é uma saída
+   opcional pra quem quer mais, não um segundo botão competindo com o primário. */
+.invoice-explain-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: none;
+  background: none;
+  padding: 0.35rem 0.5rem;
+  color: var(--action-primary);
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.invoice-explain-link:focus-visible {
+  outline: 2px solid var(--action-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
+.explain-item {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.explain-item p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.55;
 }
 
 .invoice-hero .eyebrow {
@@ -2031,14 +2250,6 @@ span.service-mark--brand {
   font-variant-numeric: tabular-nums;
   line-height: 1;
   color: var(--on-accent-95);
-}
-
-.invoice-hero-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  color: var(--on-accent-82);
-  font-size: 0.86rem;
 }
 
 .invoice-hero p.text-secondary,
@@ -2095,13 +2306,53 @@ span.service-mark--brand {
   color: var(--on-accent-95);
 }
 
-.button--invoice-cta {
-  background: var(--accent-foreground);
-  color: var(--action-primary);
+/* --- Linha de lançamento de uma fatura (compra, pagamento) ------------------------------------
+   `.list-row` é flex e a coluna de texto nasce com `min-width: auto`, então um nome comprido a
+   375px empurrava o valor pra uma linha própria embaixo, alinhado à esquerda: o dinheiro virava
+   rodapé em vez de âncora de leitura. Aqui o texto encolhe (`min-width: 0` + ellipsis) e o valor
+   nunca sai do canto direito. */
+.entry-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0;
 }
 
-.button--invoice-cta:hover {
-  background: var(--on-accent-90);
+.item-list--entries {
+  gap: 0;
+}
+
+.item-list--entries .entry-row + .entry-row {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.entry-row-main {
+  min-width: 0;
+}
+
+.entry-row-label {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entry-row-meta {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+/* Neutro por padrão. Numa lista em que TODA linha é uma compra, vermelho em todas não distinguia
+   nada — só pintava a tela (mesma regra do `.day-group-total`). Quem precisa de cor semântica
+   ainda soma `.amount--income`/`.amount--expense` por cima, como faz a lista de Pagamentos. */
+.entry-row-amount {
+  flex-shrink: 0;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.98rem;
 }
 
 /* Respiro entre as seções empilhadas da fatura. Sem margem, superfícies de mesma
@@ -2125,9 +2376,15 @@ span.service-mark--brand {
   line-height: 1.55;
 }
 
-.anticipation-explain strong {
+/* `>` de propósito: só o título do bloco cresce. O <strong> que grifa "últimas" dentro do
+   parágrafo tem que manter o tamanho do corpo, senão vira um degrau no meio da frase. */
+.anticipation-explain > strong {
   color: var(--text-primary);
   font-size: 0.9rem;
+}
+
+.anticipation-explain p {
+  margin: 0;
 }
 
 /* Destaque pra trazer compras existentes ao entrar num cartão recém-criado. */
@@ -2378,10 +2635,51 @@ span.service-mark--brand {
   padding: 1rem;
 }
 
+/* O marcador nativo do <summary> (o ▶ preto do navegador) é a única peça da tela que não passou
+   pelo design system — desenho, tamanho e posição são do user agent. Substituído por um chevron
+   próprio à direita, que gira ao abrir: assim o controle diz em que estado está sem depender de
+   ler o rótulo. Vale pros 5 acordeões do app (fatura, transação nova/editar, espaço do casal). */
 .advanced-panel summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   color: var(--text-primary);
   cursor: pointer;
   font-weight: 800;
+  list-style: none;
+}
+
+/* `list-style: none` já basta em Chrome/Firefox atuais; o `::-webkit-details-marker` é quem ainda
+   apaga o marcador no Safari/iOS — e este app é um PWA mobile-first instalado em iPhone. */
+.advanced-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-panel summary::after {
+  content: '';
+  flex-shrink: 0;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-right: 0.25rem;
+  border-right: 2px solid var(--text-secondary);
+  border-bottom: 2px solid var(--text-secondary);
+  transform: rotate(45deg);
+  transition: transform var(--duration-fast) ease;
+}
+
+.advanced-panel[open] summary::after {
+  transform: rotate(-135deg);
+}
+
+.advanced-panel summary:focus-visible {
+  outline: 2px solid var(--action-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .advanced-panel summary::after { transition: none; }
 }
 
 .advanced-panel .form-stack {

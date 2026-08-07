@@ -99,6 +99,10 @@ export function CardDetailPage() {
   /** Quantas faturas "a pagar" mostrar antes de recolher — 12 meses ("de agosto a agosto"). */
   const TO_PAY_COLLAPSE = 12;
   const shownToPay = showAllToPay ? invoicesToPay : invoicesToPay.slice(0, TO_PAY_COLLAPSE);
+  // Escala das barras da lista. Sai de TODAS as faturas a pagar, não das visíveis: usar as visíveis
+  // faria as barras já na tela mudarem de tamanho ao tocar em "Ver todas", como se o valor tivesse
+  // mudado. `Math.max()` sem argumento devolve -Infinity — o zero à frente cobre a lista vazia.
+  const maxToPayCents = Math.max(0, ...invoicesToPay.map((invoice) => invoice.outstandingBalanceCents));
 
   async function handleLoadMoreInvoices() {
     if (loadingMoreInvoices || reachedInvoiceEnd || !workspaceId || !cardId) return;
@@ -252,21 +256,57 @@ export function CardDetailPage() {
       .finally(() => setPaySubmitting(false));
   }
 
-  /** Uma linha da lista de faturas — usada pelas duas abas ("a pagar" e "pagas"). */
-  function invoiceRow(invoice: (typeof visibleInvoices)[number]) {
+  /** Uma linha da lista de faturas — usada pelas duas abas ("a pagar" e "pagas").
+   *
+   *  A barra é a assinatura desta lista. Uma lista de 13 faturas futuras não é 13 itens
+   *  equivalentes: parcelamento faz o compromisso DECAIR mês a mês até virar um platô (as parcelas
+   *  compridas que sobram). Escalada pela MAIOR fatura à vista, a barra desenha esse degrau
+   *  conforme a pessoa rola — 909 → 714 → 674 → 607 → 264, 264, 264… — sem precisar de um gráfico
+   *  separado. Na aba "Pagas" não existe barra: saldo zero em todas, ela não diria nada.
+   *
+   *  ⚠️ O rótulo de status só aparece quando ele VARIA. Antes as 13 linhas diziam "Aberta", e a do
+   *  DESIGN.md ("cor que nunca varia é decoração, não dado") vale igual pra texto: o que informa é
+   *  a exceção — fechada, vencida, parcial. Mesmo motivo de o valor não ser mais vermelho por
+   *  padrão; vermelho em 13 de 13 linhas não distinguia nada, e agora marca só o que venceu.
+   */
+  function invoiceRow(invoice: (typeof visibleInvoices)[number], maxCents: number) {
     const isPaid = invoice.status === 'paid' || invoice.status === 'overpaid';
+    const isCurrent = invoice.id === openInvoice?.id;
+    // Mínimo de 2% pra fatura de valor baixo não virar uma barra invisível (mesma guarda do
+    // hero de limite logo acima).
+    const barPercent =
+      maxCents > 0 ? Math.max(2, Math.round((invoice.outstandingBalanceCents / maxCents) * 100)) : 0;
     return (
-      <Link className="list-row list-row--link" key={invoice.id} to={`/app/cards/${invoice.cardId}/invoices/${invoice.id}`}>
-        <div>
-          <strong>Fatura {formatFriendlyMonth(invoice.referenceMonth)}</strong>
-          <span className="text-secondary">
-            {invoiceStatusLabels[invoice.status]} · vence {formatFriendlyDate(invoice.dueDate)}
+      <Link
+        className={`invoice-row${isCurrent ? ' invoice-row--current' : ''}`}
+        key={invoice.id}
+        to={`/app/cards/${invoice.cardId}/invoices/${invoice.id}`}
+      >
+        <div className="invoice-row-head">
+          <strong className="invoice-row-month">{formatFriendlyMonth(invoice.referenceMonth)}</strong>
+          <span
+            className={`invoice-row-amount${
+              invoice.status === 'overdue'
+                ? ' invoice-row-amount--overdue'
+                : invoice.outstandingBalanceCents === 0
+                  ? ' invoice-row-amount--zero'
+                  : ''
+            }`}
+          >
+            {formatMoney(invoice.outstandingBalanceCents)}
           </span>
         </div>
-        <div className="list-row-end">
-          <strong className={isPaid ? 'amount--income' : invoice.outstandingBalanceCents > 0 ? 'amount--expense' : ''}>
-            {formatMoney(invoice.outstandingBalanceCents)}
-          </strong>
+        {maxCents > 0 && (
+          // aria-hidden: a barra é redundante com o valor que está na linha de cima, lido a um
+          // palmo dali. Anunciá-la só somaria ruído em leitor de tela.
+          <div className="invoice-row-bar" aria-hidden="true">
+            <span style={{ width: `${barPercent}%` }} />
+          </div>
+        )}
+        <div className="invoice-row-meta">
+          {isCurrent && <span className="invoice-row-tag">Atual</span>}
+          <span>vence {formatFriendlyDate(invoice.dueDate)}</span>
+          {!isPaid && invoice.status !== 'open' && <span>· {invoiceStatusLabels[invoice.status]}</span>}
           {isPaid && <span className="sync-badge sync-badge--synced">Paga</span>}
         </div>
       </Link>
@@ -309,8 +349,8 @@ export function CardDetailPage() {
             {card ? `${card.brand} ···· ${card.lastFour} · fecha dia ${card.closingDay} · vence dia ${card.dueDay}` : 'Carregando dados.'}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <Link className="button button--secondary" to="/app/cards">
+        <div className="page-heading-actions">
+          <Link className="button button--secondary button--compact" to="/app/cards">
             Todos os cartões
           </Link>
           <button className="icon-button" type="button" onClick={() => void handleDeleteCard()} aria-label="Excluir cartão">
@@ -358,19 +398,21 @@ export function CardDetailPage() {
 
           {openInvoice ? (
             <div className="surface surface-pad card-invoice-current">
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-                <div>
-                  <p className="eyebrow" style={{ marginBottom: '0.15rem' }}>Fatura atual</p>
-                  <strong className="display-number" style={{ display: 'block', fontSize: '1.1rem' }}>
-                    <span className={openInvoice.outstandingBalanceCents > 0 ? 'amount--expense' : 'amount--income'}>
-                      {formatMoney(openInvoice.outstandingBalanceCents)}
-                    </span>
-                  </strong>
+              <div className="card-invoice-current-top">
+                <div className="card-invoice-current-main">
+                  <p className="eyebrow">Fatura atual</p>
+                  <span
+                    className={`card-invoice-current-value ${
+                      openInvoice.outstandingBalanceCents > 0 ? 'amount--expense' : 'amount--income'
+                    }`}
+                  >
+                    {formatMoney(openInvoice.outstandingBalanceCents)}
+                  </span>
                   <span className="text-secondary">
                     {formatFriendlyMonth(openInvoice.referenceMonth)} · {openInvoice.status === 'open' ? 'em aberto' : 'fechada'} · vence {formatFriendlyDate(openInvoice.dueDate)}
                   </span>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+                <div className="card-invoice-current-actions">
                   <button className="button button--primary button--compact" type="button" onClick={handleOpenPaySheet}>
                     {openInvoice.status === 'open' ? 'Antecipar' : 'Pagar agora'}
                   </button>
@@ -380,7 +422,7 @@ export function CardDetailPage() {
                 </div>
               </div>
               {openInvoice.status === 'open' && (
-                <p className="text-muted" style={{ fontSize: '0.8rem', margin: 0 }}>
+                <p className="card-invoice-current-hint">
                   Antecipar a fatura é quitar este ciclo antes de fechar — o valor libera seu limite na hora.
                 </p>
               )}
@@ -466,7 +508,7 @@ export function CardDetailPage() {
                     <ChevronRight size={16} aria-hidden="true" className="text-secondary" />
                   </button>
                 )}
-                {shownToPay.map((invoice) => invoiceRow(invoice))}
+                {shownToPay.map((invoice) => invoiceRow(invoice, maxToPayCents))}
                 {invoicesToPay.length > TO_PAY_COLLAPSE && (
                   <button type="button" className="list-toggle" onClick={() => setShowAllToPay((v) => !v)}>
                     {showAllToPay ? (
@@ -484,7 +526,7 @@ export function CardDetailPage() {
               </div>
             ) : (
               <div className="item-list" id="faturas-painel-pagas" role="tabpanel" aria-labelledby="faturas-tab-pagas">
-                {invoicesSettled.map((invoice) => invoiceRow(invoice))}
+                {invoicesSettled.map((invoice) => invoiceRow(invoice, 0))}
                 {invoicesSettled.length === 0 && (
                   <p className="text-secondary" style={{ margin: '0.5rem 0 0' }}>
                     Nenhuma fatura paga ainda.

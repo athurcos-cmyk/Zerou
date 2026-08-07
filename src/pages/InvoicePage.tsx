@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, ChevronUp, Search } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronRight, ChevronUp, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../auth/AuthContext';
@@ -59,6 +59,8 @@ export function InvoicePage() {
   const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [paySheetOpen, setPaySheetOpen] = useState(false);
+  /** Explicação do "antecipar" — vive numa folha, não no corpo da tela. Ver `.invoice-explain-link`. */
+  const [explainSheetOpen, setExplainSheetOpen] = useState(false);
   const [payAmount, setPayAmount] = useState('');
   const [payAccountId, setPayAccountId] = useState('');
   const [payDate, setPayDate] = useState(todayInputValue());
@@ -356,17 +358,23 @@ export function InvoicePage() {
 
       {invoice ? (
         <>
-          {/* Hero */}
+          {/* Hero — SÓ DADO. Decisão do dono (07/08/2026): o gradiente da marca é pra número e
+              fato, nunca pra ação nem pra texto explicativo. Antes ele também abrigava o botão de
+              pagar e um parágrafo de 4 linhas, e com isso ocupava 396px — 49% da primeira tela num
+              iPhone —, com a explicação em branco-sobre-laranja, o texto menos legível da tela. O
+              botão desceu pro fundo claro (`.invoice-actions`) e a explicação virou folha
+              (`explainSheetOpen`). Vale igual pro hero de limite em `CardDetailPage.tsx`, que já
+              seguia a regra por acaso: tudo dentro dele é dado, e a barra precisa do fundo colorido. */}
           <div className="invoice-hero">
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <div>
-                <p className="eyebrow" style={{ marginBottom: '0.35rem' }}>
+            <div className="invoice-hero-top">
+              <div className="invoice-hero-main">
+                <p className="eyebrow">
                   {isPaid ? 'Fatura paga' : 'Valor a pagar'}
                 </p>
                 <span className="invoice-hero-amount">
                   {formatMoney(invoice.outstandingBalanceCents)}
                 </span>
-                <p className="text-secondary" style={{ marginTop: '0.35rem', fontSize: '0.86rem' }}>
+                <p className="text-secondary invoice-hero-due">
                   Vence {formatFriendlyDate(invoice.dueDate)}
                   {isOpen ? ' · fatura ainda aberta' : ''}
                 </p>
@@ -390,22 +398,24 @@ export function InvoicePage() {
               )}
             </div>
             )}
-
-            {!isPaid && (
-              <>
-                <button className="button button--invoice-cta" type="button" onClick={handleOpenPaySheet}>
-                  {isOpen ? 'Antecipar fatura (pagar antes de fechar)' : 'Pagar fatura'}
-                </button>
-                {isOpen && (
-                  <p className="text-muted" style={{ fontSize: '0.8rem', margin: '0.4rem 0 0' }}>
-                    Antecipar a fatura é quitar este ciclo antes do fechamento — o valor sai da conta que você escolher e o
-                    limite é liberado na hora. Diferente de <strong>antecipar parcela</strong>, que traz uma parcela de um mês
-                    futuro pra cá.
-                  </p>
-                )}
-              </>
-            )}
           </div>
+
+          {/* Ação no fundo claro, fora do gradiente. O rótulo perdeu o parêntese explicativo
+              ("Antecipar fatura (pagar antes de fechar)") — ele quebrava em duas linhas e ainda
+              assim repetia o parágrafo que vinha logo abaixo. Rótulo curto + um link que abre a
+              explicação inteira numa folha. */}
+          {!isPaid && (
+            <div className="invoice-actions">
+              <button className="button button--primary button--block" type="button" onClick={handleOpenPaySheet}>
+                {isOpen ? 'Antecipar fatura' : 'Pagar fatura'}
+              </button>
+              {isOpen && (
+                <button className="invoice-explain-link" type="button" onClick={() => setExplainSheetOpen(true)}>
+                  Entenda o que muda <ChevronRight size={14} aria-hidden="true" />
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Compras desta fatura */}
           <article className="surface surface-pad">
@@ -436,18 +446,23 @@ export function InvoicePage() {
                 style={{ marginBottom: '0.75rem' }}
               />
             )}
+            {/* `.entry-row` no lugar de `.list-row`: aquele é flex sem `min-width: 0` na coluna de
+                texto, então a 375px o valor era empurrado pra uma linha própria embaixo — o
+                dinheiro, que o design system elege como herói, virava rodapé da linha. E o vermelho
+                saiu: TODA compra é despesa, então vermelho em 11 de 11 linhas não distinguia nada
+                (mesma regra do `.day-group-total`, DESIGN.md). */}
             {visiblePurchaseRows.length > 0 ? (
-              <div className="item-list">
+              <div className="item-list item-list--entries">
                 {visiblePurchaseRows.map(({ entry, label, prefix }) => (
-                  <div className="list-row" key={entry.id}>
-                    <div>
-                      <strong>{label}</strong>
-                      <span className="text-secondary">
+                  <div className="entry-row" key={entry.id}>
+                    <div className="entry-row-main">
+                      <strong className="entry-row-label">{label}</strong>
+                      <span className="entry-row-meta">
                         {prefix ? `${prefix} · ` : ''}
                         {formatFriendlyDate(entry.effectiveAt)}
                       </span>
                     </div>
-                    <strong className="amount--expense">{formatMoney(entry.amountCents)}</strong>
+                    <span className="entry-row-amount">{formatMoney(entry.amountCents)}</span>
                   </div>
                 ))}
               </div>
@@ -475,14 +490,16 @@ export function InvoicePage() {
           {payments.length > 0 && (
             <article className="surface surface-pad">
               <p className="eyebrow" style={{ marginBottom: '0.5rem' }}>Pagamentos</p>
-              <div className="item-list">
+              {/* Aqui o verde FICA: numa tela onde tudo é dívida, pagamento é a única linha que
+                  anda no sentido contrário — e o `−` sozinho é fácil demais de não ver. */}
+              <div className="item-list item-list--entries">
                 {payments.map((entry) => (
-                  <div className="list-row" key={entry.id}>
-                    <div>
-                      <strong>{ledgerTypeLabels[entry.type as InvoiceLedgerEntryType]}</strong>
-                      <span className="text-secondary">{formatFriendlyDate(entry.effectiveAt)}</span>
+                  <div className="entry-row" key={entry.id}>
+                    <div className="entry-row-main">
+                      <strong className="entry-row-label">{ledgerTypeLabels[entry.type as InvoiceLedgerEntryType]}</strong>
+                      <span className="entry-row-meta">{formatFriendlyDate(entry.effectiveAt)}</span>
                     </div>
-                    <strong className="amount--income">− {formatMoney(entry.amountCents)}</strong>
+                    <span className="entry-row-amount amount--income">− {formatMoney(entry.amountCents)}</span>
                   </div>
                 ))}
               </div>
@@ -496,9 +513,16 @@ export function InvoicePage() {
           <details className="advanced-panel">
             <summary>Antecipar parcelas de faturas futuras</summary>
             <div className="form-stack" style={{ marginTop: '0.75rem' }}>
+              {/* O corpo precisa vir dentro de um <p>: `.anticipation-explain` é `display: grid`, e
+                  num contêiner de grid cada trecho de texto solto entre elementos vira um item
+                  anônimo — "Traz as", "últimas" e o resto da frase quebravam em três linhas
+                  separadas. Bug que ninguém via porque o painel nasce fechado. */}
               <div className="anticipation-explain">
                 <strong>O que é antecipar?</strong>
-                Traz as <strong>últimas</strong> parcelas de uma compra para esta fatura — pagando adiantado da última pra trás, como no cartão. O valor entra aqui e sai das faturas futuras; o total devido não muda.
+                <p>
+                  Traz as <strong>últimas</strong> parcelas de uma compra para esta fatura — pagando adiantado da última
+                  pra trás, como no cartão. O valor entra aqui e sai das faturas futuras; o total devido não muda.
+                </p>
               </div>
               {anticipatableGroups.length === 0 ? (
                 <p className="text-secondary" style={{ fontSize: '0.86rem' }}>Nenhuma parcela futura disponível.</p>
@@ -638,6 +662,16 @@ export function InvoicePage() {
         }
       >
         <div className="form-stack">
+          {/* `.pay-preview` no TOPO da folha, não uma nota solta no rodapé: o efeito tem que ser
+              lido antes de preencher, não depois. Com a explicação longa fora da tela (virou
+              folha), esta frase é o que garante que ninguém antecipa sem saber o que acontece. */}
+          {invoice && (
+            <p className="pay-preview">
+              {isOpen
+                ? `Vamos registrar este pagamento na fatura de ${formatFriendlyMonth(invoice.referenceMonth)}, que ainda está aberta — o limite volta na hora.`
+                : `Vamos registrar este pagamento na fatura de ${formatFriendlyMonth(invoice.referenceMonth)}.`}
+            </p>
+          )}
           <label className="field">
             <span>Valor a pagar</span>
             <input
@@ -674,11 +708,6 @@ export function InvoicePage() {
             <span>Data do pagamento</span>
             <input className="input" type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
           </label>
-          {isOpen && (
-            <p className="text-muted" style={{ fontSize: '0.8rem', margin: 0 }}>
-              Fatura ainda aberta — pagamentos antes do fechamento liberam limite imediatamente.
-            </p>
-          )}
           <FormMessage>{payMessage}</FormMessage>
           <div className="sheet-actions">
             {/* Só `paySubmitting` desabilita. Conta não escolhida, saldo zero e ledger carregando
@@ -687,6 +716,33 @@ export function InvoicePage() {
             <button className="button button--primary" type="button" disabled={paySubmitting} onClick={handlePay}>
               Confirmar pagamento
             </button>
+          </div>
+        </div>
+      </BottomSheet>
+
+      {/* A explicação que morava no hero em branco-sobre-laranja. Numa folha ela ganha contraste
+          normal, espaço pra separar os DOIS conceitos que as pessoas confundem (antecipar a
+          fatura × antecipar uma parcela) e sai do caminho de quem já sabe o que está fazendo. */}
+      <BottomSheet
+        open={explainSheetOpen}
+        onClose={() => setExplainSheetOpen(false)}
+        title="Antecipar fatura"
+        subtitle="O que muda quando você antecipa"
+      >
+        <div className="form-stack">
+          <div className="explain-item">
+            <strong>Antecipar a fatura</strong>
+            <p>
+              É quitar este ciclo antes do fechamento. O valor sai da conta que você escolher e o limite volta na hora,
+              sem esperar o vencimento.
+            </p>
+          </div>
+          <div className="explain-item">
+            <strong>Antecipar uma parcela</strong>
+            <p>
+              É outra coisa: traz uma parcela de um mês futuro pra esta fatura. O total que você deve não muda — ele só
+              sai de lá e entra aqui. Fica em "Antecipar parcelas de faturas futuras", mais abaixo nesta tela.
+            </p>
           </div>
         </div>
       </BottomSheet>
