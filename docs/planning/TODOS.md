@@ -59,10 +59,14 @@ foram **auditados e deixados de fora de propósito**, cada um com commit própri
   A compra no cartão foi pra 48x em 07/08 sem deploy porque lá as regras já aceitavam 72.
   `installmentOptions(max)` já exige o teto explícito, e `MAX_BILL_INSTALLMENTS` é o ponto único a
   mudar do lado do cliente. Critério: subir junto com o próximo deploy de regras que já for acontecer.
-- [ ] **Grupo "Quitadas" e "Ver mais faturas" sem verificação ao vivo** — implementados e cobertos por
-  teste unitário (`invoiceGroups.test.ts`), mas a conta do dono não tem nenhuma fatura quitada
-  (ago/2026 segue com R$ 1.238,98 em aberto) nem fatura anterior à janela de 24 meses. Critério:
-  conferir na primeira fatura que ele pagar.
+- [x] **Aba "Pagas" verificada ao vivo (07/08)** — o dono pagou a fatura de ago/2026 no mesmo dia e ela
+  **não** saiu do grupo: o critério usava `referenceMonth >= mês corrente`, e fatura fecha e é paga
+  DENTRO do próprio mês de referência. Passou a ser `paymentsTotalCents > 0` com saldo zerado, e o grupo
+  recolhido virou **aba** (o pedido dele). Verificado ao vivo: `A pagar (13)` / `Pagas (1)`, limite usado
+  batendo com a soma das 13.
+- [ ] **"Ver mais faturas" ainda sem verificação ao vivo** — a conta do dono não tem fatura anterior à
+  janela de 24 meses, então o botão nunca traz nada. Coberto só por teste unitário. Critério: conferir
+  quando existir fatura fora da janela, ou montar o caso no emulador.
 - [ ] **A Vic só vê 90 dias de transações** — consequência da consulta dela
   (`where('date','>=',ninetyDaysAgo).limit(2000)`): a parcela de uma compra mais antiga que isso não
   entra no gasto do mês que ela relata, enquanto nas telas entra (o ledger tem a parcela). Critério:

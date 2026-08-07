@@ -2,6 +2,33 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-07 (3) — fix(cartao): fatura paga nao saia da lista; virou ABA, e o ledger dela nao e mais lido
+
+O dono pagou a fatura, confirmou que o pagamento entrou, e nada mudou de grupo: *"percebi que nao foi
+nada para nenhum grupo, esperava uma aba de quitadas e nao apareceu"*.
+
+- **Causa exata**: o critério era `outstandingBalanceCents > 0 || referenceMonth >= mes corrente`, e a
+  fatura paga era a de **ago/2026 em agosto** — `'2026-08' >= '2026-08'` mantinha ela em "a pagar". Como
+  nenhuma outra fatura era passada+zerada, o grupo "quitadas" ficava vazio e nem era renderizado. Fatura
+  fecha e é paga **dentro** do próprio mês de referência (este cartão fecha dia 2): o mês nunca ia dar
+  conta disso. Em setembro a de agosto sairia, mas a de setembro entraria no lugar — o problema que ele
+  descreveu.
+- **Critério novo**: sai da lista quem **foi pago** (`paymentsTotalCents > 0` com saldo zerado). O mês
+  virou só o secundário, pro passado zerado por outro caminho (crédito, estorno, dado legado). Fatura
+  futura vazia continua em "a pagar" — saldo zero sem pagamento é fatura vazia, não fatura paga.
+- **Deixou de ser grupo recolhido e virou ABA** (`.segmented` com `role="tablist"`, componente que já
+  existia): *"depois de cinco faturas pagas eu já vou ter que ficar arrastando a tela pra baixo pra ver
+  as que eu preciso pagar"*. Mesmo recolhida, a seção somava altura no fim da mesma lista. Em aba,
+  fatura paga sai do fluxo de rolagem. "Ver mais faturas" mudou pra dentro da aba "Pagas".
+- **Corta leitura, como ele previu** (*"essa aba ia tirar a leitura da fatura que já foi paga"*): o
+  ledger das faturas pagas **não é mais assinado** na tela do cartão. Em dois anos de uso são ~24
+  assinaturas por abertura, pagas pra renderizar linhas "Paga · R$ 0,00". Seguro porque a linha só usa
+  campos persistidos, `activeInvoices` (limite usado) só olha `open`/`closed`, e ao abrir a fatura a
+  `InvoicePage` assina o ledger dela. Quem decide o que assinar usa os totais **persistidos** — usar os
+  recalculados seria circular.
+- 651 testes (+3), build ✅. **Verificado ao vivo na conta real**: `A pagar (13)` / `Pagas (1)`, a de
+  ago/2026 na aba certa, limite usado `R$ 4.663,33` batendo com a soma das 13.
+
 ## 2026-08-07 (2) — fix(cartao): pagar fatura era IMPOSSIVEL — id truncado divergia da chave
 
 O erro que a correcao da manha fez aparecer (`Missing or insufficient permissions.`) tinha causa

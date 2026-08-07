@@ -31,7 +31,29 @@ export function CardDetailPage() {
   const finance = useFinanceContext();
   const card = cardsData.cards.find((item) => item.id === cardId);
   const invoices = cardsData.invoices.filter((invoice) => invoice.cardId === cardId);
-  const invoiceRefs = useMemo(() => invoices.map((invoice) => ({ id: invoice.id, cardId: invoice.cardId })), [invoices]);
+  const currentMonth = monthKeyFromDate(new Date());
+
+  // ⚠️ Só o ledger das faturas EM ABERTO é assinado, e isso é um pedido direto do dono
+  // (07/08/2026): *"essa aba ia tirar a leitura da fatura que já foi paga"*. Fatura paga acumula pra
+  // sempre — em dois anos de uso são ~24 assinaturas de ledger a cada abertura da tela do cartão,
+  // pagas pra renderizar linhas que dizem "Paga · R$ 0,00".
+  //
+  // É seguro porque esta tela não precisa do ledger de fatura paga pra NADA: a linha mostra mês,
+  // status e saldo, todos campos persistidos que a Cloud Function mantém; `activeInvoices`
+  // (limite usado) só olha `open`/`closed`; e ao abrir a fatura, `InvoicePage` assina o ledger dela.
+  //
+  // O agrupamento que decide o que assinar usa os totais PERSISTIDOS de propósito — usar os
+  // recalculados seria circular (precisaria do ledger pra decidir se assina o ledger). Fatura paga
+  // agora mesmo, cuja Function ainda não processou, tem saldo persistido > 0 ⇒ segue assinada até a
+  // Function alcançar, que é justo o instante em que ainda vale a pena olhar o ledger dela.
+  const ledgerTargets = useMemo(
+    () => groupInvoicesForDisplay(invoices, currentMonth).toPay,
+    [invoices, currentMonth]
+  );
+  const invoiceRefs = useMemo(
+    () => ledgerTargets.map((invoice) => ({ id: invoice.id, cardId: invoice.cardId })),
+    [ledgerTargets]
+  );
   const { entries: ledgerEntries, loading: ledgerLoading, error: ledgerError, loadedInvoiceKeys } =
     useInvoiceLedger(workspaceId, invoiceRefs, finance.transactionIndex);
   const invoicesWithLedger = useMemo(
@@ -58,8 +80,9 @@ export function CardDetailPage() {
   const [loadingMoreInvoices, setLoadingMoreInvoices] = useState(false);
   const [reachedInvoiceEnd, setReachedInvoiceEnd] = useState(false);
   const [loadMoreInvoicesFailed, setLoadMoreInvoicesFailed] = useState(false);
-  const [showAllSettled, setShowAllSettled] = useState(false);
   const [showAllToPay, setShowAllToPay] = useState(false);
+  /** Aba do card de faturas. Abre sempre em "a pagar" — o que a pessoa precisa fazer vem primeiro. */
+  const [invoiceTab, setInvoiceTab] = useState<'toPay' | 'paid'>('toPay');
 
   const visibleInvoices = useMemo(() => {
     const byId = new Map<string, (typeof subscribedVisible)[number]>();
@@ -69,7 +92,6 @@ export function CardDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [olderInvoices, invoicesWithLedger, loadedInvoiceKeys]);
 
-  const currentMonth = monthKeyFromDate(new Date());
   const { toPay: invoicesToPay, settled: invoicesSettled } = useMemo(
     () => groupInvoicesForDisplay(visibleInvoices, currentMonth),
     [visibleInvoices, currentMonth]
@@ -230,7 +252,7 @@ export function CardDetailPage() {
       .finally(() => setPaySubmitting(false));
   }
 
-  /** Uma linha da lista de faturas — usada pelos dois grupos ("a pagar" e "quitadas"). */
+  /** Uma linha da lista de faturas — usada pelas duas abas ("a pagar" e "pagas"). */
   function invoiceRow(invoice: (typeof visibleInvoices)[number]) {
     const isPaid = invoice.status === 'paid' || invoice.status === 'overpaid';
     return (
@@ -392,72 +414,102 @@ export function CardDetailPage() {
         <div className="section-heading">
           <div>
             <p className="eyebrow">Faturas</p>
-            <h2>Histórico de faturas</h2>
+            <h2>Faturas do cartão</h2>
           </div>
           <CalendarClock size={22} aria-hidden="true" />
         </div>
         {cardsData.loading || ledgerLoading ? (
           <LoadingState compact />
         ) : (card && !showOnboardingCallout) || visibleInvoices.length > 0 ? (
-          <div className="item-list">
-            {card && !showOnboardingCallout && (
+          <>
+            {/* Duas ABAS, não dois grupos empilhados. A versão anterior recolhia as pagas no fim da
+                mesma lista, e o dono apontou o furo (07/08/2026): a fatura paga do mês corrente
+                continuava na lista principal, e mesmo recolhida a seção soma altura. *"Depois de
+                cinco faturas pagas eu já vou ter que ficar arrastando a tela pra baixo pra ver as
+                que eu preciso pagar."* Em aba, fatura paga sai do fluxo de rolagem — e o ledger dela
+                nem é lido (ver `ledgerTargets`). */}
+            <div className="segmented segmented--tabs" role="tablist" aria-label="Faturas do cartão">
               <button
                 type="button"
-                className="list-row list-row--tap list-row--with-icon"
-                onClick={() => setOngoingSheetOpen(true)}
+                role="tab"
+                id="faturas-tab-a-pagar"
+                aria-selected={invoiceTab === 'toPay'}
+                aria-controls="faturas-painel-a-pagar"
+                onClick={() => setInvoiceTab('toPay')}
               >
-                <div className="list-row-body" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                  <Layers size={17} aria-hidden="true" />
-                  <strong>Lançar compra parcelada que já começou</strong>
-                </div>
-                <ChevronRight size={16} aria-hidden="true" className="text-secondary" />
+                A pagar{invoicesToPay.length > 0 ? ` (${invoicesToPay.length})` : ''}
               </button>
-            )}
-            {shownToPay.map((invoice) => invoiceRow(invoice))}
-            {invoicesToPay.length > TO_PAY_COLLAPSE && (
-              <button type="button" className="list-toggle" onClick={() => setShowAllToPay((v) => !v)}>
-                {showAllToPay ? (
-                  <>Ver menos <ChevronUp size={14} aria-hidden="true" /></>
-                ) : (
-                  <>Ver todas as {invoicesToPay.length} <ChevronDown size={14} aria-hidden="true" /></>
+              <button
+                type="button"
+                role="tab"
+                id="faturas-tab-pagas"
+                aria-selected={invoiceTab === 'paid'}
+                aria-controls="faturas-painel-pagas"
+                onClick={() => setInvoiceTab('paid')}
+              >
+                Pagas{invoicesSettled.length > 0 ? ` (${invoicesSettled.length})` : ''}
+              </button>
+            </div>
+
+            {invoiceTab === 'toPay' ? (
+              <div className="item-list" id="faturas-painel-a-pagar" role="tabpanel" aria-labelledby="faturas-tab-a-pagar">
+                {card && !showOnboardingCallout && (
+                  <button
+                    type="button"
+                    className="list-row list-row--tap list-row--with-icon"
+                    onClick={() => setOngoingSheetOpen(true)}
+                  >
+                    <div className="list-row-body" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                      <Layers size={17} aria-hidden="true" />
+                      <strong>Lançar compra parcelada que já começou</strong>
+                    </div>
+                    <ChevronRight size={16} aria-hidden="true" className="text-secondary" />
+                  </button>
                 )}
-              </button>
-            )}
-
-            {invoicesSettled.length > 0 && (
-              <>
-                {/* Quitadas recolhidas: em 2027 a lista abriria em jan/2026 paga, com a fatura
-                    vigente enterrada no meio (pedido do dono, 07/08/2026). Critério é mês passado
-                    + saldo zero, NÃO `status === 'paid'` — ver `groupInvoicesForDisplay`. */}
-                <button type="button" className="list-toggle" onClick={() => setShowAllSettled((v) => !v)}>
-                  {showAllSettled ? (
-                    <>Ocultar quitadas <ChevronUp size={14} aria-hidden="true" /></>
-                  ) : (
-                    <>Ver {invoicesSettled.length} {invoicesSettled.length === 1 ? 'fatura quitada' : 'faturas quitadas'} <ChevronDown size={14} aria-hidden="true" /></>
-                  )}
-                </button>
-                {showAllSettled && invoicesSettled.map((invoice) => invoiceRow(invoice))}
-              </>
-            )}
-
-            {showAllSettled && !reachedInvoiceEnd && (
-              <div aria-live="polite">
-                <button
-                  type="button"
-                  className="button button--ghost button--compact"
-                  onClick={handleLoadMoreInvoices}
-                  disabled={loadingMoreInvoices}
-                >
-                  {loadingMoreInvoices ? 'Carregando…' : 'Ver mais faturas'}
-                </button>
-                {loadMoreInvoicesFailed && (
-                  <p className="text-muted" style={{ fontSize: '0.82rem', margin: '0.4rem 0 0' }}>
-                    Não foi possível buscar faturas mais antigas. Verifique a conexão.
+                {shownToPay.map((invoice) => invoiceRow(invoice))}
+                {invoicesToPay.length > TO_PAY_COLLAPSE && (
+                  <button type="button" className="list-toggle" onClick={() => setShowAllToPay((v) => !v)}>
+                    {showAllToPay ? (
+                      <>Ver menos <ChevronUp size={14} aria-hidden="true" /></>
+                    ) : (
+                      <>Ver todas as {invoicesToPay.length} <ChevronDown size={14} aria-hidden="true" /></>
+                    )}
+                  </button>
+                )}
+                {invoicesToPay.length === 0 && (
+                  <p className="text-secondary" style={{ margin: '0.5rem 0 0' }}>
+                    Nenhuma fatura a pagar neste cartão.
                   </p>
                 )}
               </div>
+            ) : (
+              <div className="item-list" id="faturas-painel-pagas" role="tabpanel" aria-labelledby="faturas-tab-pagas">
+                {invoicesSettled.map((invoice) => invoiceRow(invoice))}
+                {invoicesSettled.length === 0 && (
+                  <p className="text-secondary" style={{ margin: '0.5rem 0 0' }}>
+                    Nenhuma fatura paga ainda.
+                  </p>
+                )}
+                {!reachedInvoiceEnd && (
+                  <div aria-live="polite">
+                    <button
+                      type="button"
+                      className="button button--ghost button--compact"
+                      onClick={handleLoadMoreInvoices}
+                      disabled={loadingMoreInvoices}
+                    >
+                      {loadingMoreInvoices ? 'Carregando…' : 'Ver mais faturas'}
+                    </button>
+                    {loadMoreInvoicesFailed && (
+                      <p className="text-muted" style={{ fontSize: '0.82rem', margin: '0.4rem 0 0' }}>
+                        Não foi possível buscar faturas mais antigas. Verifique a conexão.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
-          </div>
+          </>
         ) : (
           <EmptyState
             illustration="cards"

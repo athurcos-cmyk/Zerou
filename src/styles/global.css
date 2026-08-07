@@ -2611,10 +2611,24 @@ span.service-mark--brand {
   overflow-wrap: anywhere;
 }
 
-.segmented button[aria-pressed='true'], .segmented button[aria-checked='true'] {
+.segmented button[aria-pressed='true'], .segmented button[aria-checked='true'], .segmented button[aria-selected='true'] {
   background: var(--bg-surface);
   color: var(--text-primary);
   box-shadow: var(--shadow-xs);
+}
+
+/* Variante em ABA (role="tablist"): ocupa a largura toda e divide o espaço igualmente, pro alvo de
+   toque não depender do tamanho do rótulo. Usada no card de faturas do cartão. */
+.segmented--tabs {
+  display: flex;
+  width: 100%;
+  margin-bottom: 0.85rem;
+}
+
+.segmented--tabs button {
+  flex: 1 1 0;
+  text-align: center;
+  justify-content: center;
 }
 
 .mobile-nav {

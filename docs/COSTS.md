@@ -73,6 +73,13 @@ Otimizações que já existem e mantêm o custo baixo — **não desfazer**:
 - **Página de fatura antiga é `getDocs`, não listener** (`loadMoreInvoices`): histórico velho quase
   não muda, e ela vive só na tela do Cartão — não entra em `cardsData.invoices` nem ganha listener
   de ledger. ~12 leituras por toque no "Ver mais faturas".
+- **Tela do Cartão não assina o ledger de fatura PAGA** (07/08/2026, `ledgerTargets` em
+  `CardDetailPage`). Fatura paga acumula pra sempre: em 2 anos de uso são ~24 assinaturas de ledger por
+  abertura da tela, pagas pra renderizar linhas "Paga · R$ 0,00". A linha usa só campos persistidos
+  (que a Cloud Function mantém), `activeInvoices` (limite usado) só olha `open`/`closed`, e ao abrir a
+  fatura a `InvoicePage` assina o ledger dela. ⚠️ Quem decide o que assinar usa os totais
+  **persistidos**, não os recalculados do ledger — o contrário seria circular. Fatura paga cuja Function
+  ainda não processou segue assinada até ela alcançar, que é quando o ledger ao vivo ainda importa.
 
 Gravações por ação: lançar uma transação ≈ 1–3 gravações (transação + ajuste de saldo + às vezes
 total da fatura via Cloud Function).
