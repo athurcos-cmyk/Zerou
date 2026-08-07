@@ -2,6 +2,33 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-07 (2) — fix(cartao): pagar fatura era IMPOSSIVEL — id truncado divergia da chave
+
+O erro que a correcao da manha fez aparecer (`Missing or insufficient permissions.`) tinha causa
+concreta, medida nos dados reais do dono.
+
+- **`firestore.rules` exige `idempotencyKey == entryId`** (`validInvoiceLedgerCreate`). O cliente
+  derivava o id com `slice(140)`, e a chave real de um pagamento tem **150** caracteres numa conta
+  real: id truncado, chave intacta, regra recusando — e como o batch e atomico, o pagamento inteiro
+  caia. **Nao era intermitente: pagar a fatura daquele cartao era impossivel, sempre.** Medido nas
+  4 contas dele.
+- **Duas causas na mesma cadeia**: (1) `invoicePaymentTransactionId` reprefixava o `cardId`, que o
+  `invoiceId` ja contem (`invoiceIdFor`), desperdicando 37 caracteres; (2) o corte em 140 tambem
+  podia **colidir** — duas chaves que diferem so depois do caractere 140 truncavam pro mesmo id e o
+  segundo lancamento virava "duplicata". Era o mesmo defeito corrigido em 23/07 nos ids de estorno.
+- **Correcao sistemica**: `ledgerPayload` passou a derivar `idempotencyKey` do proprio `id`, no unico
+  lugar que monta payload de ledger — a invariante da regra ficou impossivel de violar por
+  sanitizacao ou truncamento, em qualquer escrita de ledger. `idempotentEntryId` virou modulo proprio
+  (`ledgerEntryId.ts`) e, quando a chave nao cabe, o excedente vira **hash** em vez de ser jogado
+  fora: id deterministico e unico, com prefixo legivel.
+- ⚠️ **Por que os testes nao pegavam**: o helper do teste de regras montava `idempotencyKey: entryId`
+  **a mao** — o payload de teste satisfazia a invariante que o cliente violava. E o espelho do erro
+  da REGRA PRINCIPAL do `CLAUDE.md`: la o payload de teste era simplificado demais e escondia regra
+  desatualizada; aqui era correto demais e escondia cliente errado. Nos dois casos o teste testava a
+  si mesmo. Os guardas novos vivem do lado do cliente (`ledgerEntryId.test.ts`,
+  `cardService.test.ts`) e foram **verificados revertendo cada correcao** — cada um falha sozinho.
+- 648 testes de cliente (+8), 114 de regras (+2). Sem deploy: `firestore.rules` nao mudou.
+
 ## 2026-08-07 — cartão: pagar fatura, janela de faturas em duas queries, 48x e histórico agrupado
 
 Sessão longa, dois bugs relatados ao vivo e quatro partes de plano. **Nenhum deploy de regras nem de

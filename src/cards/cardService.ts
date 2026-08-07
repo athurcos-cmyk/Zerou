@@ -49,6 +49,9 @@ import { invoiceClosingDateForReferenceMonth, invoiceDueDateForReferenceMonth, i
 // Divisão do valor entre as parcelas mora em módulo puro porque `invoicesForSpendingFromTransactions`
 // precisa do MESMO resultado exato pra reconstruir essas parcelas sem ler o ledger.
 import { installmentAmounts } from './installmentSchedule';
+// Derivação do id do lançamento mora em módulo puro pra o TESTE DE REGRAS poder usar a função de
+// verdade — o helper do teste montava `idempotencyKey: entryId` à mão e por isso nunca pegou o bug.
+import { idempotentEntryId } from './ledgerEntryId';
 import type { CreditCard, Invoice, InvoiceLedgerEntry, InvoiceLedgerEntryType, SyncStatus, Transaction } from '../types/contracts';
 
 export type LocalCardSynced<T> = T & {
@@ -94,10 +97,6 @@ function transactionRef(workspaceId: string, transactionId: string) {
   return doc(getFirebaseDb(), 'workspaces', workspaceId, 'transactions', transactionId);
 }
 
-function idempotentEntryId(idempotencyKey: string) {
-  return idempotencyKey.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 140);
-}
-
 async function loadCard(workspaceId: string, cardId: string) {
   const snapshot = await getDoc(cardRef(workspaceId, cardId));
 
@@ -139,7 +138,6 @@ function ledgerPayload(input: {
   type: InvoiceLedgerEntryType;
   amountCents: number;
   effectiveAt: Date;
-  idempotencyKey: string;
   createdBy: string;
   sourceTransactionId?: string;
   installmentNumber?: number;
@@ -154,7 +152,13 @@ function ledgerPayload(input: {
     amountCents: input.amountCents,
     effectiveAt: Timestamp.fromDate(input.effectiveAt),
     sourceTransactionId: input.sourceTransactionId ?? '',
-    idempotencyKey: input.idempotencyKey,
+    // ⚠️ SEMPRE igual ao id do documento, por construção. `firestore.rules`
+    // (`validInvoiceLedgerCreate`) exige `idempotencyKey == entryId`, e derivar aqui — no único
+    // lugar que monta payload de ledger — torna impossível violar essa invariante por
+    // sanitização/truncamento do id. Era exatamente o que quebrava o pagamento de fatura em
+    // 07/08/2026: a chave tinha 150 caracteres, o id 140, e o batch atômico inteiro era recusado.
+    // A deduplicação de `calculateInvoice` continua valendo (id é único por definição).
+    idempotencyKey: input.id,
     createdBy: input.createdBy,
     createdAt: serverTimestamp()
   };
@@ -277,7 +281,6 @@ export async function addCardPurchaseToBatch(
         type: 'purchase',
         amountCents,
         effectiveAt: parsed.purchaseDate,
-        idempotencyKey,
         createdBy: userId,
         sourceTransactionId: transactionId,
         // Rótulo "2/10" na fatura. Só quando parcelado (1x à vista não vira "1/1").
@@ -473,7 +476,6 @@ export async function registerOngoingInstallments(
         // Antes usava `item.dueDate`, que é igual pra toda parcela da mesma fatura e fazia a tela de
         // detalhes da fatura mostrar o dia de vencimento do cartão como se fosse a data da compra.
         effectiveAt: parsed.purchaseDate,
-        idempotencyKey,
         createdBy: userId,
         sourceTransactionId: transactionId,
         installmentNumber: item.installmentNumber,
@@ -570,13 +572,22 @@ export function markClosedInvoices(
     .forEach((invoice) => closeInvoice(workspaceId, invoice.cardId, invoice.id));
 }
 
-/** ID determinístico de UM pagamento de fatura. Fatura pode ser paga em partes, então
- * `paidAt` + `amountCents` separam pagamentos distintos; um retry/clique duplo repete
- * o MESMO input e cai no mesmo documento — a regra rejeita a segunda escrita. */
+/**
+ * ID determinístico de UM pagamento de fatura. Fatura pode ser paga em partes, então `paidAt` +
+ * `amountCents` separam pagamentos distintos; um retry/clique duplo repete o MESMO input e cai no
+ * mesmo documento — a regra rejeita a segunda escrita (FIN-03).
+ *
+ * ⚠️ **Não recoloque o `cardId` aqui**: `invoiceId` já é `${cardId}_${referenceMonth}`
+ * (`invoiceIdFor`), então prefixar o cartão repetia 37 caracteres à toa e levava a chave do
+ * lançamento a 150 — acima do teto de 140 do id, o que fazia `idempotentEntryId` truncar e a regra
+ * recusar o pagamento inteiro. O hash em `idempotentEntryId` já protege contra isso, mas encurtar a
+ * chave evita chegar lá e mantém o id legível.
+ */
 export function invoicePaymentTransactionId(
   cardId: string, invoiceId: string, accountId: string, paidAt: Date, amountCents: number
 ) {
-  return `${cardId}_${invoiceId}_${accountId}_${paidAt.getTime()}_${amountCents}`;
+  const invoiceScope = invoiceId.startsWith(`${cardId}_`) ? invoiceId : `${cardId}_${invoiceId}`;
+  return `${invoiceScope}_${accountId}_${paidAt.getTime()}_${amountCents}`;
 }
 
 export async function recordInvoicePayment(workspaceId: string, userId: string, input: RecordInvoicePaymentInput) {
@@ -601,7 +612,6 @@ export async function recordInvoicePayment(workspaceId: string, userId: string, 
       type,
       amountCents: parsed.amountCents,
       effectiveAt: parsed.paidAt,
-      idempotencyKey,
       createdBy: userId,
       sourceTransactionId: transactionId
     })
@@ -681,7 +691,6 @@ export async function anticipateInstallments(workspaceId: string, userId: string
         type: 'installment_anticipation_credit',
         amountCents: credit.amountCents,
         effectiveAt: parsed.effectiveAt,
-        idempotencyKey: creditKey,
         createdBy: userId,
         sourceTransactionId: credit.sourceTransactionId,
         installmentNumber: credit.installmentNumber,
@@ -701,7 +710,6 @@ export async function anticipateInstallments(workspaceId: string, userId: string
         type: 'installment_anticipation',
         amountCents: credit.amountCents,
         effectiveAt: parsed.effectiveAt,
-        idempotencyKey: debitKey,
         createdBy: userId,
         sourceTransactionId: credit.sourceTransactionId,
         // Rótulo "parcela 8/10 antecipada" na fatura de origem — sem isso, a fatura de destino
@@ -773,7 +781,6 @@ async function addLedgerOnlyEntry(
       type,
       amountCents,
       effectiveAt,
-      idempotencyKey,
       createdBy: userId
     })
   ));

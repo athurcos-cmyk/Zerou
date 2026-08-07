@@ -108,6 +108,36 @@ Isso vale tanto pra campo novo (`createdBy`) quanto pra valor novo dentro de um 
 
 ---
 
+## ⚠️ Payload de teste que satisfaz a invariante que o CLIENTE viola (2026-08-07)
+
+A REGRA PRINCIPAL acima fala do payload de teste **simplificado demais**, que esconde regra
+desatualizada. Existe o espelho disso, e ele custou um bug de "pagar fatura não funciona, sempre":
+
+`validInvoiceLedgerCreate` (`firestore.rules`) exige **`idempotencyKey == entryId`** — o campo tem
+que ser igual ao id do documento. O cliente derivava o id com `slice(0, 140)`, e a chave real de um
+pagamento tem **150** caracteres numa conta real (o `invoiceId` já começa com o `cardId`, e a chave
+reprefixava o cartão). Id truncado, chave intacta, regra recusando, batch atômico caindo,
+`fireWrite` engolindo. **Pagar fatura de cartão era impossível desde sempre.**
+
+O teste de regras não pegou porque o helper dele montava `idempotencyKey: entryId` **à mão** — o
+payload de teste satisfazia a invariante que o cliente violava. O teste testava a si mesmo.
+
+**Regra**: quando a regra do Firestore impõe uma relação entre dois campos (ou entre um campo e o id
+do documento), o teste **não pode montar essa relação à mão**. Ou ele usa a mesma função do cliente
+que deriva o valor (extraia pra módulo puro se preciso — foi o que `src/cards/ledgerEntryId.ts` virou),
+ou o guarda tem que morar do lado do cliente, afirmando o payload que ele realmente grava.
+
+E o mais eficaz: **faça a invariante impossível de violar em vez de testável**. `ledgerPayload` passou
+a derivar `idempotencyKey` do próprio `id`, no único lugar que monta payload de ledger — nenhuma
+escrita futura pode divergir, independentemente de como o id foi calculado.
+
+Corolário sobre truncar id: `slice(n)` num id determinístico **colide em silêncio** (duas chaves que
+diferem depois do caractere n viram o mesmo documento, e a segunda escrita "vira duplicata"). Já
+tinha custado uma correção em 23/07/2026 nos ids de estorno de antecipação e voltou em 07/08 no
+pagamento, porque a correção de julho foi pontual. Truncou? Use hash no excedente.
+
+---
+
 ## ⚠️ Query (`list`) com `where()` contra uma regra em OR: precisa fechar UM ramo inteiro, não todo campo (2026-07-31)
 
 Achado auditando exclusão de conta: uma query `where('usedBy', '==', uid)` em `coupleInvites` falhava com `"Property workspaceId is undefined for 'list'"` — nenhum documento real tinha esse campo faltando. A causa é o motor de regras do Firestore, não o dado.

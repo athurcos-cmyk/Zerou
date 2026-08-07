@@ -48,11 +48,12 @@ foram **auditados e deixados de fora de propósito**, cada um com commit própri
   em qualquer número — foi o dono quem derrubou a primeira versão do plano perguntando o que acontece
   com 48x hoje + outra 48x em 4 meses (~52 meses de horizonte). A ordem `asc` da lista não depende
   mais da direção da query: `useCardsData` ordena a união. Detalhe: `../history/2026-08.md` (07/08).
-- [ ] **Origem dos dois `permission-denied` de escrita no console** — vistos em 07/08, sem sintoma
-  visível. Descartado `markClosedInvoices` (a fatura de ago/2026 já está `closed` no banco, com todos
-  os campos). O buffer do console persiste entre reloads, então podem vir de qualquer tela anterior,
-  inclusive escrita de boot. Critério: `fireWrite` agora captura a pilha de quem chamou (só em DEV),
-  então basta esperar a próxima ocorrência e ler o log — não vale caçar linha antiga.
+- [x] ~~**Origem dos dois `permission-denied` de escrita no console**~~ — **RESOLVIDO em 2026-08-07**:
+  era o pagamento de fatura. `validInvoiceLedgerCreate` exige `idempotencyKey == entryId`, e o cliente
+  truncava o id em 140 enquanto a chave tinha 150 — regra recusando, batch atômico caindo, `fireWrite`
+  engolindo. Pagar fatura de cartão era impossível desde sempre. Ver `../history/2026-08.md` (07/08,
+  parte 2) e a seção nova do `CLAUDE.md` sobre payload de teste que satisfaz a invariante que o
+  cliente viola.
 - [ ] **Conta a pagar paga no cartão ainda trava em 24x** — o teto está na REGRA
   (`validBillInstallments`, `firestore.rules`), não no schema do cliente, então subir exige deploy.
   A compra no cartão foi pra 48x em 07/08 sem deploy porque lá as regras já aceitavam 72.

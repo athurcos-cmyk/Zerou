@@ -33,7 +33,7 @@ vi.mock('../firebase/config', () => ({
   getFirebaseDb: vi.fn().mockReturnValue({})
 }));
 
-const { addCardPurchaseToBatch, markClosedInvoices, registerOngoingInstallments, subscribeInvoiceLedger, updateCardPurchase } = await import('./cardService');
+const { addCardPurchaseToBatch, invoicePaymentTransactionId, markClosedInvoices, registerOngoingInstallments, subscribeInvoiceLedger, updateCardPurchase } = await import('./cardService');
 
 function invoice(id: string, status: 'open' | 'closed' | 'paid', referenceMonth: string) {
   return { id, cardId: 'card-1', status, referenceMonth };
@@ -261,5 +261,60 @@ describe('subscribeInvoiceLedger', () => {
     firestoreMocks.orderBy.mockClear();
     subscribeInvoiceLedger('ws1', 'card1', 'inv1', () => undefined, () => undefined);
     expect(firestoreMocks.orderBy).toHaveBeenCalledWith('effectiveAt', 'desc');
+  });
+});
+
+// ⚠️ Regressão de 07/08/2026 — pagar fatura era IMPOSSÍVEL e o erro era engolido.
+//
+// `firestore.rules` (`validInvoiceLedgerCreate`) exige `idempotencyKey == entryId`. O cliente
+// derivava o id com `slice(140)` e a chave real de um pagamento chegava a 150 caracteres numa conta
+// real (medido nos dados do dono): id truncado, chave intacta, regra recusando o batch atômico
+// inteiro. O teste de regras não pegava porque o helper dele montava os dois campos iguais à mão.
+//
+// Este é o guarda do lado do CLIENTE: qualquer lançamento de ledger que ele grave tem que sair com
+// `idempotencyKey` igual ao `id`, com ids do tamanho dos de produção.
+describe('ledger: idempotencyKey é sempre o id do documento', () => {
+  function ledgerWrites() {
+    return firestoreMocks.batch.set.mock.calls
+      .map((call) => call[1] as Record<string, unknown>)
+      .filter((payload) => typeof payload?.idempotencyKey === 'string');
+  }
+
+  it('compra parcelada com ids do tamanho real', async () => {
+    firestoreMocks.batch.set.mockClear();
+    const longCardId = `card_${'f'.repeat(32)}`;
+    firestoreMocks.getDoc.mockResolvedValue({
+      exists: () => true,
+      id: longCardId,
+      data: () => ({ id: longCardId, closingDay: 2, dueDay: 10, isActive: true })
+    });
+
+    await addCardPurchaseToBatch(firestoreMocks.batch as never, `personal_${'q'.repeat(28)}`, `user_${'u'.repeat(28)}`, {
+      cardId: longCardId,
+      description: 'Compra longa',
+      amountCents: 480000,
+      purchaseDate: new Date(2026, 7, 4, 12, 0, 0),
+      installments: 48
+    });
+
+    const writes = ledgerWrites();
+    expect(writes.length).toBe(48);
+    for (const payload of writes) {
+      expect(payload.idempotencyKey).toBe(payload.id);
+      expect(String(payload.id).length).toBeLessThanOrEqual(140);
+    }
+  });
+
+  // A chave do pagamento não deve reprefixar o cardId: `invoiceId` já começa com ele, e era essa
+  // duplicação que levava a chave a 150.
+  it('a chave do pagamento não repete o cardId', () => {
+    const cardId = `card_${'f'.repeat(32)}`;
+    const invoiceId = `${cardId}_2026-08`;
+    const accountId = `acct_${'a'.repeat(32)}`;
+    const id = invoicePaymentTransactionId(cardId, invoiceId, accountId, new Date(1786000000000), 123898);
+
+    expect(id.startsWith(`${cardId}_${cardId}`)).toBe(false);
+    expect(id.startsWith(invoiceId)).toBe(true);
+    expect(`${id}_payment`.length).toBeLessThanOrEqual(140);
   });
 });

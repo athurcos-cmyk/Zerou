@@ -335,6 +335,12 @@ function invoicePayload(workspaceId: string, cardId: string, invoiceId: string, 
   };
 }
 
+/**
+ * ⚠️ Este helper monta `idempotencyKey: entryId` **à mão**, e é exatamente por isso que ele nunca
+ * pegou o bug de 07/08/2026: a regra exige `idempotencyKey == entryId`, o payload de teste satisfazia
+ * a invariante, e o CLIENTE a violava (a chave real tinha 150 caracteres e o id 140 — truncado).
+ * Pra escrita cujo id vem da derivação de verdade, use `ledgerPayloadFromKey` abaixo.
+ */
 function ledgerPayload(
   workspaceId: string,
   cardId: string,
@@ -1701,6 +1707,39 @@ describe('firestore security rules', () => {
       setDoc(
         doc(aliceDb, 'workspaces/workspaceA/transactions/txnBadInstallments2'),
         cardPurchaseTransactionPayload('workspaceA', 'txnBadInstallments2', 'alice', { installments: 73 })
+      )
+    );
+  });
+
+  // ⚠️ Regressão de 07/08/2026 — pagar fatura era IMPOSSÍVEL e ninguém via.
+  //
+  // `validInvoiceLedgerCreate` exige `idempotencyKey == entryId`. O cliente derivava o id com
+  // `slice(140)`, e a chave real de um pagamento (`${cardId}_${invoiceId}_${accountId}_${paidAt}_
+  // ${amountCents}_payment`) chega a 150 caracteres numa conta real — id truncado, chave intacta,
+  // regra recusando o batch atômico inteiro, `fireWrite` engolindo o erro.
+  //
+  // ⚠️ O guarda deste bug NÃO pode viver aqui: depois da correção o cliente deriva
+  // `idempotencyKey` do próprio id, então nenhum payload que ele monte pode violar a invariante — um
+  // teste de regras "aceita a escrita" passaria com ou sem o bug (tentei, e passava). O que fica aqui
+  // é o lado da REGRA: ela precisa recusar um payload divergente. Os guardas do CLIENTE estão em
+  // `src/cards/ledgerEntryId.test.ts` (unicidade do id acima do teto) e em `cardService.test.ts`
+  // (todo lançamento gravado tem `idempotencyKey === id`).
+  it('recusa lançamento cujo idempotencyKey não é o id do documento', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    await assertSucceeds(setDoc(doc(aliceDb, 'workspaces/workspaceA/cards/cardA'), cardPayload('workspaceA', 'cardA', 'alice')));
+    await assertSucceeds(
+      setDoc(doc(aliceDb, 'workspaces/workspaceA/cards/cardA/invoices/cardA_2026-06'), invoicePayload('workspaceA', 'cardA', 'cardA_2026-06'))
+    );
+
+    // Reproduz o bug: id truncado, chave inteira. É o que o cliente fazia.
+    const chaveLonga = `${'x'.repeat(200)}_payment`;
+    await assertFails(
+      setDoc(
+        doc(aliceDb, `workspaces/workspaceA/cards/cardA/invoices/cardA_2026-06/ledger/${chaveLonga.slice(0, 140)}`),
+        ledgerPayload('workspaceA', 'cardA', 'cardA_2026-06', chaveLonga.slice(0, 140), 'alice', {
+          type: 'payment',
+          idempotencyKey: chaveLonga
+        })
       )
     );
   });
