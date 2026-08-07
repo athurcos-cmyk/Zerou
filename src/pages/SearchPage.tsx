@@ -176,25 +176,38 @@ export function SearchPage() {
     () => cardsData.invoices.map((inv) => ({ id: inv.id, cardId: inv.cardId })),
     [cardsData.invoices]
   );
-  const { entries: ledgerEntries, loading: ledgerLoading, error: ledgerError } = useInvoiceLedger(workspaceId, invoiceRefs, finance.transactionIndex);
+  const {
+    entries: ledgerEntries,
+    loading: ledgerLoading,
+    error: ledgerError,
+    loadedInvoiceKeys,
+    partial: ledgerPartial
+  } = useInvoiceLedger(workspaceId, invoiceRefs, finance.transactionIndex);
   // "Sem gasto" e "ainda carregando" pareciam a mesma coisa pro usuário: o donut e o
   // histórico só olhavam o total calculado, sem checar se a fonte já resolveu. Numa
   // conta nova/rede lenta a tela mostrava "nenhum gasto" por alguns segundos até os
   // dados chegarem sozinhos (sem re-render visível de erro) — parecia quebrado até
   // alguém trocar de tela e voltar (o que reassina do zero e geralmente já pega o
   // dado pronto). Mesmo padrão que o Dashboard já usa pra cartões.
-  const isLoadingChartData = finance.loading || cardsData.loading || analysis.loading || ledgerLoading;
+  // ⚠️ `ledgerPartial` entra aqui de propósito. `ledgerLoading` vira false depois de
+  // `LEDGER_BOOT_TIMEOUT_MS` por fatura MESMO SEM o ledger ter chegado, e sem os lançamentos a
+  // Análise não é só incompleta, ela fica ERRADA: `installmentPurchaseIds` não reconhece a compra
+  // parcelada e ela volta a contar pelo VALOR CHEIO no mês da compra (na conta do dono, agosto
+  // saltou de R$ 750,07 pra R$ 2.341,46 em 07/08/2026). Melhor continuar dizendo "carregando" do
+  // que apresentar um número confiante e errado.
+  const isLoadingChartData =
+    finance.loading || cardsData.loading || analysis.loading || ledgerLoading || ledgerPartial;
   const chartDataError = finance.error || cardsData.error || analysis.error || ledgerError;
   // Faturas reduzidas ao que a Análise precisa (referenceMonth + ledger por parcela).
   const invoicesForSpending = useMemo<InvoiceForSpending[]>(
     () =>
-      mergeInvoicesWithLedger(cardsData.invoices, ledgerEntries).map((inv) => ({
+      mergeInvoicesWithLedger(cardsData.invoices, ledgerEntries, loadedInvoiceKeys).map((inv) => ({
         referenceMonth: inv.referenceMonth,
         ledgerEntries: inv.ledgerEntries,
         status: inv.status,
         outstandingBalanceCents: inv.outstandingBalanceCents
       })),
-    [cardsData.invoices, ledgerEntries]
+    [cardsData.invoices, ledgerEntries, loadedInvoiceKeys]
   );
   // Cartão entra na Análise pela parcela; a categoria/descrição de cada parcela vem da transação-mãe.
   const txnCategoryById = useMemo(

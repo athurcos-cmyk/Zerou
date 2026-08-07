@@ -1,7 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { Timestamp } from 'firebase/firestore';
-import { useInvoiceLedger, mergeInvoicesWithLedger, type InvoiceLedgerRef } from './useInvoiceLedger';
+import { useInvoiceLedger, mergeInvoicesWithLedger, invoiceLedgerKey, type InvoiceLedgerRef } from './useInvoiceLedger';
 import type { TransactionDeletionIndex } from '../finance/useFinanceData';
 import type { Invoice, InvoiceLedgerEntry } from '../types/contracts';
 
@@ -257,13 +257,18 @@ describe('mergeInvoicesWithLedger — totais ao vivo', () => {
     };
   }
 
+  /** Declara que o ledger DESTA fatura chegou — o caso normal destes testes. */
+  function loaded(...invoices: Array<{ cardId: string; id: string }>) {
+    return new Set(invoices.map((inv) => invoiceLedgerKey(inv.cardId, inv.id)));
+  }
+
   it('reflete um lançamento recém-criado na hora, mesmo com o campo persistido ainda em zero (Cloud Function não processou — offline ou latência)', () => {
     // outstandingBalanceCents/purchasesTotalCents ainda em 0: simula a Cloud Function não ter
     // rodado ainda (offline, ou os poucos segundos antes dela processar em rede normal).
     const staleInvoice = invoice({ outstandingBalanceCents: 0, purchasesTotalCents: 0 });
     const pendingEntry = entry({ amountCents: 5000 });
 
-    const [merged] = mergeInvoicesWithLedger([staleInvoice], [{ ...pendingEntry, localSyncStatus: 'pending' }]);
+    const [merged] = mergeInvoicesWithLedger([staleInvoice], [{ ...pendingEntry, localSyncStatus: 'pending' }], loaded(staleInvoice));
 
     expect(merged.outstandingBalanceCents).toBe(5000);
     expect(merged.purchasesTotalCents).toBe(5000);
@@ -273,7 +278,7 @@ describe('mergeInvoicesWithLedger — totais ao vivo', () => {
     const syncedInvoice = invoice({ outstandingBalanceCents: 5000, purchasesTotalCents: 5000 });
     const syncedEntry = entry({ amountCents: 5000 });
 
-    const [merged] = mergeInvoicesWithLedger([syncedInvoice], [{ ...syncedEntry, localSyncStatus: 'synced' }]);
+    const [merged] = mergeInvoicesWithLedger([syncedInvoice], [{ ...syncedEntry, localSyncStatus: 'synced' }], loaded(syncedInvoice));
 
     expect(merged.outstandingBalanceCents).toBe(5000);
   });
@@ -288,7 +293,8 @@ describe('mergeInvoicesWithLedger — totais ao vivo', () => {
       [
         { ...purchase, localSyncStatus: 'synced' },
         { ...pendingPayment, localSyncStatus: 'pending' }
-      ]
+      ],
+      loaded(staleInvoice)
     );
 
     expect(merged.outstandingBalanceCents).toBe(3000);
@@ -305,10 +311,92 @@ describe('mergeInvoicesWithLedger — totais ao vivo', () => {
       [
         { ...thisInvoiceEntry, localSyncStatus: 'synced' },
         { ...otherInvoiceEntry, localSyncStatus: 'synced' }
-      ]
+      ],
+      loaded(staleInvoice)
     );
 
     expect(merged.outstandingBalanceCents).toBe(5000);
     expect(merged.ledgerEntries.map((e) => e.id)).toEqual(['entry-1']);
+  });
+});
+
+// ⚠️ Bug real de 07/08/2026: com 14 faturas e cache frio, o timeout de 2,5s por fatura destravava
+// o `loading` antes de a maioria do ledger chegar. `mergeInvoicesWithLedger` então recalculava os
+// totais sobre lista VAZIA (`calculateInvoice([])` = saldo 0, status 'closed'), e o app apresentava
+// isso como fato: limite usado despencou, 13 das 14 faturas sumiram da tela do cartão, e na Análise
+// a compra parcelada voltou a contar pelo valor cheio.
+describe('mergeInvoicesWithLedger — fatura cujo ledger NÃO chegou', () => {
+  function invoice(overrides: Partial<Invoice> = {}) {
+    return {
+      id: 'invoice-1',
+      cardId: 'card-1',
+      workspaceId: 'ws-1',
+      referenceMonth: '2026-08',
+      status: 'closed' as const,
+      dueDate: Timestamp.fromDate(new Date('2026-08-10')),
+      purchasesTotalCents: 123898,
+      paymentsTotalCents: 0,
+      creditsTotalCents: 0,
+      feesTotalCents: 0,
+      outstandingBalanceCents: 123898,
+      overpaidCreditCents: 0,
+      ...overrides
+    } as Invoice;
+  }
+
+  it('preserva os totais persistidos em vez de zerar', () => {
+    const naoCarregada = invoice();
+
+    const [merged] = mergeInvoicesWithLedger([naoCarregada], [], new Set());
+
+    expect(merged.outstandingBalanceCents).toBe(123898);
+    expect(merged.purchasesTotalCents).toBe(123898);
+    expect(merged.ledgerEntries).toEqual([]);
+  });
+
+  it('preserva o status persistido em vez de derivar de lista vazia', () => {
+    const aberta = invoice({ status: 'open' });
+
+    const [merged] = mergeInvoicesWithLedger([aberta], [], new Set());
+
+    expect(merged.status).toBe('open');
+  });
+
+  it('zera apenas a fatura que CHEGOU e está de fato vazia', () => {
+    const vazia = invoice({ id: 'invoice-vazia', outstandingBalanceCents: 4200, purchasesTotalCents: 4200 });
+
+    const [merged] = mergeInvoicesWithLedger(
+      [vazia],
+      [],
+      new Set([invoiceLedgerKey(vazia.cardId, vazia.id)])
+    );
+
+    expect(merged.outstandingBalanceCents).toBe(0);
+  });
+
+  it('mistura: a carregada recalcula, a não carregada mantém o persistido', () => {
+    const carregada = invoice({ id: 'inv-a', outstandingBalanceCents: 999 });
+    const naoCarregada = invoice({ id: 'inv-b', outstandingBalanceCents: 55555 });
+    const entryA = {
+      id: 'e1',
+      invoiceId: 'inv-a',
+      cardId: 'card-1',
+      workspaceId: 'ws-1',
+      type: 'purchase' as const,
+      amountCents: 7000,
+      effectiveAt: Timestamp.fromDate(new Date('2026-08-01')),
+      idempotencyKey: 'k1',
+      createdBy: 'user-1',
+      localSyncStatus: 'synced' as const
+    };
+
+    const merged = mergeInvoicesWithLedger(
+      [carregada, naoCarregada],
+      [entryA],
+      new Set([invoiceLedgerKey('card-1', 'inv-a')])
+    );
+
+    expect(merged[0].outstandingBalanceCents).toBe(7000);
+    expect(merged[1].outstandingBalanceCents).toBe(55555);
   });
 });

@@ -632,7 +632,17 @@ export async function recordInvoicePayment(workspaceId: string, userId: string, 
     transactionAccountEffects({ type: 'card_payment', amountCents: parsed.amountCents, accountId: parsed.accountId })
   );
 
-  fireWrite(batch.commit());
+  // ⚠️ DEVOLVE a promise do commit, ao contrário do resto do arquivo (que usa `fireWrite`).
+  //
+  // Pagar fatura é a escrita que MAIS precisa de retorno, e era a que menos tinha: `fireWrite` tem
+  // catch vazio em produção, e como esta função é `async` sem `await` no commit, ela resolvia na
+  // hora — então os `.catch` das telas (InvoicePage/CardDetailPage) eram **código morto** e
+  // qualquer `permission-denied` era invisível pro usuário E pro log. Em 06/08/2026 o dono não
+  // conseguiu pagar uma fatura e não havia nenhuma forma de saber por quê.
+  //
+  // Offline-first segue intacto: quem chama fecha o sheet ANTES e só encadeia `.then`/`.catch` —
+  // ninguém dá `await` pra liberar a UI. Mesmo padrão que o espaço do casal já usa.
+  await batch.commit();
   return transactionId;
 }
 
@@ -823,9 +833,37 @@ export function subscribeCards(
   );
 }
 
-// Limitado aos 24 ciclos mais recentes (~2 anos de fatura mensal): sem isso, cada
-// fatura carregada abre seu próprio listener de ledger em useCardsData, e o total
-// cresce sem limite pra sempre conforme a conta envelhece.
+/**
+ * Faturas de um cartão. Esta query faz DUAS coisas ao mesmo tempo, e é importante saber qual é
+ * qual antes de mexer:
+ *
+ * **1. `orderBy('referenceMonth', 'asc')` = a ordem da lista na tela do Cartão** (a mais antiga
+ * primeiro, cronológica). Não é detalhe de implementação: era `desc` e foi trocado de propósito
+ * (commit `b9cd0e6`, 24/07/2026) porque compra parcelada cria faturas **futuras**, então "mais
+ * nova primeiro" jogava fatura de 2027 pro topo, antes das de 2026. `CardDetailPage` renderiza na
+ * ordem em que chega, sem reordenar. **Não volte pra `desc`** sem resolver a exibição.
+ *
+ * **2. `limit(24)` = quantas faturas o app baixa.** Existe por custo, e o custo é real: esta
+ * assinatura roda **por cartão, em todo boot** (`useCardsData`, o Comprometido do Dashboard
+ * precisa das faturas), e cada fatura carregada vira **um listener de ledger** nas telas que leem
+ * ledger — `CardDetailPage` assina o de todas as faturas daquele cartão, e a Análise
+ * (`SearchPage`) o de **todas as faturas de todos os cartões**. Sem teto, isso cresce pra sempre
+ * conforme a conta envelhece. (O comentário anterior atribuía esse listener ao `useCardsData`,
+ * que na verdade não assina ledger nenhum — o custo existe, mas nas telas, não no boot.)
+ *
+ * ⚠️ **O efeito colateral que ninguém pesou quando a direção mudou:** ordem + limite juntos
+ * significam que a janela são as **24 mais ANTIGAS**. Num cartão que passe de 24 faturas, o que
+ * fica de fora é o **fim da fila** — a fatura atual e as futuras, justamente as que o Comprometido
+ * (`selectCurrentCycleInvoices`) e a Análise de um mês futuro precisam. Quando era `desc`, "24
+ * mais recentes" era literal e esse problema não existia.
+ *
+ * **O gatilho não é o tempo de uso do app, é o tamanho do parcelamento**: o app aceita até 24x
+ * (`cardSchemas.ts`), e uma compra em 24x cria 24 faturas futuras de uma vez.
+ *
+ * **Quando isso virar real, o conserto não é mexer na ordem** (a lista depende dela): é ancorar a
+ * janela no presente (`where('referenceMonth', '>=', ...)`) e paginar o passado sob demanda, no
+ * mesmo padrão de `loadMoreTransactions` ("Carregar mais" do Extrato). Ver `docs/planning/TODOS.md`.
+ */
 export function subscribeInvoices(
   workspaceId: string,
   cardId: string,

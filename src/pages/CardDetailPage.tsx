@@ -13,7 +13,7 @@ import { FormMessage } from '../components/FormMessage';
 import { invoiceStatusLabels } from '../cards/cardLabels';
 import { deleteCard, recordInvoicePayment, updateCard } from '../cards/cardService';
 import { pickCurrentInvoice } from '../cards/cardDates';
-import { mergeInvoicesWithLedger, useInvoiceLedger } from '../cards/useInvoiceLedger';
+import { invoiceLedgerKey, mergeInvoicesWithLedger, useInvoiceLedger } from '../cards/useInvoiceLedger';
 
 import { formatFriendlyDate, formatFriendlyMonth } from '../finance/financeDates';
 import { centsToInputValue, formatMoney, parseMoneyToCents } from '../finance/money';
@@ -30,19 +30,36 @@ export function CardDetailPage() {
   const card = cardsData.cards.find((item) => item.id === cardId);
   const invoices = cardsData.invoices.filter((invoice) => invoice.cardId === cardId);
   const invoiceRefs = useMemo(() => invoices.map((invoice) => ({ id: invoice.id, cardId: invoice.cardId })), [invoices]);
-  const { entries: ledgerEntries, loading: ledgerLoading, error: ledgerError } = useInvoiceLedger(workspaceId, invoiceRefs, finance.transactionIndex);
-  const invoicesWithLedger = useMemo(() => mergeInvoicesWithLedger(invoices, ledgerEntries), [invoices, ledgerEntries]);
+  const { entries: ledgerEntries, loading: ledgerLoading, error: ledgerError, loadedInvoiceKeys } =
+    useInvoiceLedger(workspaceId, invoiceRefs, finance.transactionIndex);
+  const invoicesWithLedger = useMemo(
+    () => mergeInvoicesWithLedger(invoices, ledgerEntries, loadedInvoiceKeys),
+    [invoices, ledgerEntries, loadedInvoiceKeys]
+  );
   // Uma fatura futura cuja única parcela foi antecipada pra cá some do histórico — igual sumiu
   // da própria tela dela (`anticipatedAwayEntryIds`). Se uma compra nova cair nela depois, ela
   // deixa de ficar vazia e reaparece sozinha (não é um estado gravado, é sempre recalculado).
-  const visibleInvoices = invoicesWithLedger.filter((invoice) => invoiceHasVisibleActivity(invoice.ledgerEntries));
+  //
+  // ⚠️ Só esconde fatura cujo ledger REALMENTE chegou. Sem essa condição, fatura ainda sem resposta
+  // (`ledgerEntries: []`) era tratada como "vazia" e sumia da lista — foi o "só aparece a fatura
+  // atual" de 07/08/2026, com 13 das 14 faturas do cartão desaparecendo no cache frio.
+  const visibleInvoices = invoicesWithLedger.filter(
+    (invoice) =>
+      !loadedInvoiceKeys.has(invoiceLedgerKey(invoice.cardId, invoice.id)) ||
+      invoiceHasVisibleActivity(invoice.ledgerEntries)
+  );
   const [message, setMessage] = useState<string | null>(null);
+  /** `danger` por padrão; vira `success` só na confirmação de pagamento (ver `handleQuickPay`). */
+  const [messageType, setMessageType] = useState<'success' | 'danger'>('danger');
   const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [paySheetOpen, setPaySheetOpen] = useState(false);
   const [payAmount, setPayAmount] = useState('');
   const [payAccountId, setPayAccountId] = useState('');
   const [paySubmitting, setPaySubmitting] = useState(false);
+  /** Mensagem DENTRO do sheet — o motivo de não dar pra pagar tem que aparecer onde a pessoa
+   *  está olhando, com o sheet ainda aberto. */
+  const [payMessage, setPayMessage] = useState<string | null>(null);
   const paidAtRef = useRef(new Date());
   const [ongoingSheetOpen, setOngoingSheetOpen] = useState(false);
   const [editSheetOpen, setEditSheetOpen] = useState(false);
@@ -58,6 +75,7 @@ export function CardDetailPage() {
     setPayAmount('');
     setPayAccountId('');
     setPaySubmitting(false);
+    setPayMessage(null);
     paidAtRef.current = new Date();
     setPaySheetOpen(true);
   }
@@ -75,7 +93,10 @@ export function CardDetailPage() {
     updateCard(workspaceId, cardId, {
       name: editName.trim(),
       limitCents: parseMoneyToCents(editLimit)
-    }).catch((error) => setMessage(getUserFacingErrorMessage(error, 'Não foi possível salvar as alterações do cartão.')));
+    }).catch((error) => {
+      setMessageType('danger');
+      setMessage(getUserFacingErrorMessage(error, 'Não foi possível salvar as alterações do cartão.'));
+    });
   }
 
   async function handleDeleteCard() {
@@ -99,13 +120,43 @@ export function CardDetailPage() {
   }
 
   function handleQuickPay() {
-    if (!workspaceId || !user || !card || !openInvoice || !payAccountId || paySubmitting) return;
-    const cents = payAmount.trim() ? parseMoneyToCents(payAmount) : openInvoice.outstandingBalanceCents;
-    if (!cents) return;
+    if (!workspaceId || !user || !card || paySubmitting) return;
+    // Guardas que MOSTRAM o motivo e mantêm o sheet aberto — antes eram `return` mudos, e o clique
+    // sem efeito nenhum foi o "cliquei pra pagar e não vai" de 06/08/2026. Ver `InvoicePage.tsx`.
+    if (!openInvoice) {
+      setPayMessage('Nenhuma fatura em aberto neste cartão.');
+      return;
+    }
+    if (!payAccountId) {
+      setPayMessage('Escolha a conta de onde vai sair o pagamento.');
+      return;
+    }
+    if (ledgerLoading) {
+      setPayMessage('Ainda carregando os lançamentos da fatura — aguarde um instante.');
+      return;
+    }
+    // `parseMoneyToCents` LANÇA com texto não-numérico (`money.ts`) — sem este try, a exceção morre
+    // dentro do handler de clique e o usuário não vê nada. Ver `InvoicePage.tsx`.
+    let cents: number;
+    try {
+      cents = payAmount.trim() ? parseMoneyToCents(payAmount) : openInvoice.outstandingBalanceCents;
+    } catch (err) {
+      setPayMessage(getUserFacingErrorMessage(err, 'Informe um valor em reais válido.'));
+      return;
+    }
+    if (!cents) {
+      setPayMessage(
+        payAmount.trim()
+          ? 'Informe um valor maior que zero.'
+          : 'Esta fatura não tem saldo em aberto. Se quiser registrar outro pagamento, digite o valor.'
+      );
+      return;
+    }
     setPaySubmitting(true);
     setPaySheetOpen(false);
     setPayAmount('');
     setPayAccountId('');
+    setPayMessage(null);
     recordInvoicePayment(workspaceId, user.uid, {
       cardId: card.id,
       invoiceId: openInvoice.id,
@@ -113,7 +164,16 @@ export function CardDetailPage() {
       amountCents: cents,
       paidAt: paidAtRef.current,
       advance: openInvoice.status === 'open'
-    }).catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível registrar o pagamento.')));
+    })
+      .then(() => {
+        setMessageType('success');
+        setMessage(`Pagamento de ${formatMoney(cents)} registrado.`);
+      })
+      .catch((err) => {
+        setMessageType('danger');
+        setMessage(getUserFacingErrorMessage(err, 'Não foi possível registrar o pagamento.'));
+      })
+      .finally(() => setPaySubmitting(false));
   }
 
   if (!card && !cardsData.loading) {
@@ -232,7 +292,7 @@ export function CardDetailPage() {
         </>
       ) : null}
 
-      <FormMessage>{message}</FormMessage>
+      <FormMessage type={messageType}>{message}</FormMessage>
       {ledgerError && (
         <div className="notice notice--danger" role="alert" style={{ marginBottom: '0.75rem' }}>{ledgerError}</div>
       )}
@@ -354,11 +414,14 @@ export function CardDetailPage() {
               Fatura ainda aberta — pode pagar qualquer valor agora. O limite é liberado imediatamente.
             </p>
           )}
+          <FormMessage>{payMessage}</FormMessage>
           <div className="sheet-actions">
+            {/* Só `paySubmitting` desabilita — falta de conta, saldo zero e ledger carregando viram
+                MENSAGEM no `handleQuickPay`, não botão morto sem explicação. */}
             <button
               className="button button--primary"
               type="button"
-              disabled={!payAccountId || paySubmitting}
+              disabled={paySubmitting}
               onClick={handleQuickPay}
             >
               Confirmar pagamento

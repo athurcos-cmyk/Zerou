@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, ChevronDown, ChevronUp, Search } from 'lucide-react';
 import { format } from 'date-fns';
@@ -49,8 +49,12 @@ export function InvoicePage() {
   const card = cardsData.cards.find((item) => item.id === cardId);
   const cardInvoices = useMemo(() => cardsData.invoices.filter((item) => item.cardId === cardId), [cardsData.invoices, cardId]);
   const invoiceRefs = useMemo(() => cardInvoices.map((item) => ({ id: item.id, cardId: item.cardId })), [cardInvoices]);
-  const { entries: ledgerEntries, loading: ledgerLoading, error: ledgerError } = useInvoiceLedger(workspaceId, invoiceRefs, finance.transactionIndex);
-  const cardInvoicesWithLedger = useMemo(() => mergeInvoicesWithLedger(cardInvoices, ledgerEntries), [cardInvoices, ledgerEntries]);
+  const { entries: ledgerEntries, loading: ledgerLoading, error: ledgerError, loadedInvoiceKeys } =
+    useInvoiceLedger(workspaceId, invoiceRefs, finance.transactionIndex);
+  const cardInvoicesWithLedger = useMemo(
+    () => mergeInvoicesWithLedger(cardInvoices, ledgerEntries, loadedInvoiceKeys),
+    [cardInvoices, ledgerEntries, loadedInvoiceKeys]
+  );
   const invoice = cardInvoicesWithLedger.find((item) => item.id === invoiceId);
   const { confirm, dialog: confirmDialog } = useConfirm();
 
@@ -59,6 +63,10 @@ export function InvoicePage() {
   const [payAccountId, setPayAccountId] = useState('');
   const [payDate, setPayDate] = useState(todayInputValue());
   const [paySubmitting, setPaySubmitting] = useState(false);
+  /** Mensagem DENTRO do sheet de pagamento — separada de `message` (que fica na página) porque o
+   *  motivo de não dar pra pagar tem que aparecer onde a pessoa está olhando, com o sheet aberto. */
+  const [payMessage, setPayMessage] = useState<string | null>(null);
+  const paidAtRef = useRef(new Date());
 
   const [creditAmount, setCreditAmount] = useState('');
   const [creditType, setCreditType] = useState<'refund_credit' | 'chargeback_credit' | 'manual_credit'>('refund_credit');
@@ -67,6 +75,9 @@ export function InvoicePage() {
   // Quantas das ÚLTIMAS parcelas antecipar, por compra (sourceTransactionId → N).
   const [anticipateCounts, setAnticipateCounts] = useState<Record<string, number>>({});
   const [message, setMessage] = useState<string | null>(null);
+  /** `danger` por padrão (todo o resto da tela só reporta erro); vira `success` na confirmação de
+   *  pagamento — que antes não existia, e cuja ausência fazia a pessoa achar que não tinha ido. */
+  const [messageType, setMessageType] = useState<'success' | 'danger'>('danger');
 
   // Lista de Compras: colapsada além de 5 linhas, com busca por nome só quando há
   // muitas compras diferentes na fatura (não ajuda quando é a mesma compra parcelada
@@ -100,24 +111,76 @@ export function InvoicePage() {
     setPayAccountId('');
     setPayDate(todayInputValue());
     setPaySubmitting(false);
+    setPayMessage(null);
+    // Instante congelado na ABERTURA do sheet, e é ele que entra no id idempotente do pagamento
+    // (`recordInvoicePayment`). Duplo clique dentro do mesmo sheet reusa o mesmo id — a proteção
+    // do FIN-03 continua valendo. Reabrir o sheet gera id novo, o que **destrava a retentativa**:
+    // antes o id vinha de `fromDateInputValue`, que devolve meio-dia com 0 ms, então tentar de
+    // novo no mesmo dia com os mesmos valores gerava id idêntico, o ledger recusava (`allow
+    // update: if false`) e o erro era engolido — nenhuma retentativa jamais funcionava.
+    paidAtRef.current = new Date();
     setPaySheetOpen(true);
   }
 
   function handlePay() {
-    if (!workspaceId || !user || !cardId || !invoiceId || !payAccountId || paySubmitting) return;
-    const amount = payAmount.trim() ? parseMoneyToCents(payAmount) : (invoice?.outstandingBalanceCents ?? 0);
-    if (!amount) return;
+    if (!workspaceId || !user || !cardId || !invoiceId || paySubmitting) return;
+    // ⚠️ Estas guardas MOSTRAM o motivo e mantêm o sheet aberto. Antes eram `return` mudos: com o
+    // saldo em aberto igual a 0 (ou com o ledger ainda carregando, que faz `calculateInvoice([])`
+    // devolver 0), o clique não escrevia nada, não fechava o sheet e não dizia nada — foi o
+    // "cliquei pra pagar e simplesmente não vai" relatado em 06/08/2026.
+    if (!payAccountId) {
+      setPayMessage('Escolha a conta de onde vai sair o pagamento.');
+      return;
+    }
+    if (ledgerLoading) {
+      setPayMessage('Ainda carregando os lançamentos da fatura — aguarde um instante.');
+      return;
+    }
+    // `parseMoneyToCents` LANÇA com texto não-numérico (`money.ts`), e exceção dentro de handler de
+    // clique não mostra nada pro usuário — mais um caminho de falha muda deste fluxo, achado
+    // escrevendo o teste desta correção.
+    let amount: number;
+    try {
+      amount = payAmount.trim() ? parseMoneyToCents(payAmount) : (invoice?.outstandingBalanceCents ?? 0);
+    } catch (err) {
+      setPayMessage(getUserFacingErrorMessage(err, 'Informe um valor em reais válido.'));
+      return;
+    }
+    if (!amount) {
+      setPayMessage(
+        payAmount.trim()
+          ? 'Informe um valor maior que zero.'
+          : 'Esta fatura não tem saldo em aberto. Se quiser registrar outro pagamento, digite o valor.'
+      );
+      return;
+    }
+
     setPaySubmitting(true);
     setPaySheetOpen(false);
+    setPayMessage(null);
     setMessage(null);
+    const paidAt = payDate === todayInputValue() ? paidAtRef.current : fromDateInputValue(payDate);
     recordInvoicePayment(workspaceId, user.uid, {
       cardId,
       invoiceId,
       accountId: payAccountId,
       amountCents: amount,
-      paidAt: fromDateInputValue(payDate),
+      paidAt,
       advance: invoice?.status === 'open'
-    }).catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível registrar o pagamento.')));
+    })
+      // `recordInvoicePayment` agora DEVOLVE a promise do commit (antes usava `fireWrite`, que tem
+      // catch vazio em produção — este `.catch` era código morto e nenhuma rejeição das regras
+      // aparecia pra ninguém). O sheet já fechou acima, então offline-first segue intacto: ninguém
+      // espera o servidor pra liberar a UI.
+      .then(() => {
+        setMessageType('success');
+        setMessage(`Pagamento de ${formatMoney(amount)} registrado.`);
+      })
+      .catch((err) => {
+        setMessageType('danger');
+        setMessage(getUserFacingErrorMessage(err, 'Não foi possível registrar o pagamento.'));
+      })
+      .finally(() => setPaySubmitting(false));
   }
 
   async function handleAnticipation() {
@@ -159,7 +222,10 @@ export function InvoicePage() {
       currentInvoiceId: invoiceId,
       credits,
       effectiveAt: new Date()
-    }).catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível registrar a antecipação.')));
+    }).catch((err) => {
+      setMessageType('danger');
+      setMessage(getUserFacingErrorMessage(err, 'Não foi possível registrar a antecipação.'));
+    });
   }
 
   function handleCredit(event: FormEvent<HTMLFormElement>) {
@@ -176,7 +242,10 @@ export function InvoicePage() {
       amountCents: amount,
       effectiveAt: new Date(),
       description: ledgerTypeLabels[creditType]
-    }).catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível registrar o crédito.')));
+    }).catch((err) => {
+      setMessageType('danger');
+      setMessage(getUserFacingErrorMessage(err, 'Não foi possível registrar o crédito.'));
+    });
   }
 
   function handleFee(event: FormEvent<HTMLFormElement>) {
@@ -193,7 +262,10 @@ export function InvoicePage() {
       amountCents: amount,
       effectiveAt: new Date(),
       description: ledgerTypeLabels[feeType]
-    }).catch((err) => setMessage(getUserFacingErrorMessage(err, 'Não foi possível registrar a tarifa.')));
+    }).catch((err) => {
+      setMessageType('danger');
+      setMessage(getUserFacingErrorMessage(err, 'Não foi possível registrar a tarifa.'));
+    });
   }
 
   if (!invoice && !cardsData.loading) {
@@ -277,7 +349,7 @@ export function InvoicePage() {
         </Link>
       </div>
 
-      <FormMessage>{message}</FormMessage>
+      <FormMessage type={messageType}>{message}</FormMessage>
       {ledgerError && (
         <div className="notice notice--danger" role="alert" style={{ marginBottom: '0.75rem' }}>{ledgerError}</div>
       )}
@@ -556,7 +628,14 @@ export function InvoicePage() {
         open={paySheetOpen}
         onClose={() => setPaySheetOpen(false)}
         title={isOpen ? 'Antecipar fatura' : 'Pagar fatura'}
-        subtitle={invoice ? `${formatFriendlyMonth(invoice.referenceMonth)} · ${formatMoney(invoice.outstandingBalanceCents)} em aberto` : undefined}
+        // Enquanto o ledger carrega, `mergeInvoicesWithLedger` recalcula os totais a partir de uma
+        // lista vazia e o saldo em aberto sai como R$ 0,00 — anunciar isso como fato era o que
+        // levava a pessoa a confirmar um pagamento de zero.
+        subtitle={
+          invoice
+            ? `${formatFriendlyMonth(invoice.referenceMonth)} · ${ledgerLoading ? 'carregando o saldo…' : `${formatMoney(invoice.outstandingBalanceCents)} em aberto`}`
+            : undefined
+        }
       >
         <div className="form-stack">
           <label className="field">
@@ -566,7 +645,7 @@ export function InvoicePage() {
               inputMode="decimal"
               value={payAmount}
               onChange={(e) => setPayAmount(e.target.value)}
-              placeholder={invoice ? formatMoney(invoice.outstandingBalanceCents) : '0,00'}
+              placeholder={ledgerLoading ? 'carregando…' : invoice ? formatMoney(invoice.outstandingBalanceCents) : '0,00'}
               autoFocus
             />
             <span className="field-hint">Deixe em branco para pagar o total.</span>
@@ -600,8 +679,12 @@ export function InvoicePage() {
               Fatura ainda aberta — pagamentos antes do fechamento liberam limite imediatamente.
             </p>
           )}
+          <FormMessage>{payMessage}</FormMessage>
           <div className="sheet-actions">
-            <button className="button button--primary" type="button" disabled={!payAccountId || paySubmitting} onClick={handlePay}>
+            {/* Só `paySubmitting` desabilita. Conta não escolhida, saldo zero e ledger carregando
+                agora viram MENSAGEM no `handlePay` — botão desabilitado sem dizer por quê é o
+                mesmo "estado morto" que a tela de Contas e assinaturas já corrigiu em 02/08. */}
+            <button className="button button--primary" type="button" disabled={paySubmitting} onClick={handlePay}>
               Confirmar pagamento
             </button>
           </div>

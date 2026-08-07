@@ -17,11 +17,24 @@
  * `fireWrite`, para que erros de validação ainda cheguem ao chamador.
  */
 export function fireWrite(op: Promise<unknown>) {
+  // Pilha capturada AQUI, na chamada — o stack do `FirebaseError` que chega no `catch` é o da
+  // camada de transporte do SDK e não diz quem tentou escrever. Sem isso, o log dizia "escrita
+  // rejeitada" e a pessoa tinha que adivinhar entre as ~40 chamadas de `fireWrite` do app (em
+  // 07/08/2026 gastei uma investigação inteira olhando o lugar errado por causa disso). Só em
+  // DEV: criar um `Error` por escrita não vai pra produção.
+  const callSite = import.meta.env.DEV ? new Error().stack : undefined;
+
   void op.catch((error: unknown) => {
     if (import.meta.env.DEV) {
       const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : 'unknown';
+      const origem = callSite
+        ?.split('\n')
+        .slice(2, 6)
+        .map((line) => line.trim())
+        .join(' <- ');
       console.error(
-        `[fireWrite] escrita rejeitada (${code}). Em permission-denied, confira se firestore.rules aceita este payload.`,
+        `[fireWrite] escrita rejeitada (${code}). Em permission-denied, confira se firestore.rules aceita este payload.` +
+          (origem ? `\n  chamada em: ${origem}` : ''),
         error
       );
     }

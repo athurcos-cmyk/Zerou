@@ -14,6 +14,28 @@ export interface InvoiceLedgerState {
   entries: Array<LocalCardSynced<InvoiceLedgerEntry>>;
   loading: boolean;
   error: string | null;
+  /**
+   * Faturas cujo ledger REALMENTE chegou (`${cardId}:${invoiceId}`) — marcado só no callback do
+   * snapshot, nunca por timeout nem por erro.
+   *
+   * ⚠️ Existe porque "não chegou" e "chegou vazio" são coisas diferentes e eram indistinguíveis.
+   * `mergeInvoicesWithLedger` recalculava os totais de TODA fatura sobre os lançamentos em mão; pra
+   * uma fatura que ainda não respondeu, isso é `calculateInvoice([])` = saldo 0 + status 'closed'.
+   * Com 14 faturas e cache frio (relato do dono, 07/08/2026), o `LEDGER_BOOT_TIMEOUT_MS` destravava
+   * o `loading` antes de a maioria chegar, e a tela do cartão mostrava limite usado só do que tinha
+   * chegado e escondia as outras faturas (`invoiceHasVisibleActivity([])` é falso). Na Análise, o
+   * efeito era pior: sem os lançamentos, `installmentPurchaseIds` não reconhece a compra parcelada
+   * e ela volta a contar pelo VALOR CHEIO no mês da compra.
+   */
+  loadedInvoiceKeys: ReadonlySet<string>;
+  /** Alguma fatura foi dada como resolvida pelo timeout/erro sem nunca entregar o ledger. Quem
+   *  exibe número agregado (Análise) deve tratar isso como "ainda incompleto", não como final. */
+  partial: boolean;
+}
+
+/** Chave de fatura usada por `loadedInvoiceKeys`. Mesma forma em todos os consumidores. */
+export function invoiceLedgerKey(cardId: string, invoiceId: string) {
+  return `${cardId}:${invoiceId}`;
 }
 
 const emptyIds: ReadonlySet<string> = new Set();
@@ -43,6 +65,8 @@ export function useInvoiceLedger(
   // Quais faturas já tiveram o ledger resolvido (sucesso, erro ou timeout) pelo menos uma vez —
   // usado só pra saber quando `loading` pode virar false, não guarda dado.
   const [resolvedRefKeys, setResolvedRefKeys] = useState<ReadonlySet<string>>(emptyIds);
+  // Só o callback do snapshot marca aqui — timeout e erro NÃO entram. Ver `loadedInvoiceKeys`.
+  const [loadedRefKeys, setLoadedRefKeys] = useState<ReadonlySet<string>>(emptyIds);
   const [error, setError] = useState<string | null>(null);
 
   const refsKey = useMemo(
@@ -54,6 +78,7 @@ export function useInvoiceLedger(
     if (!workspaceId || !refsKey) {
       setLedgerEntries(emptyEntries);
       setResolvedRefKeys(emptyIds);
+      setLoadedRefKeys(emptyIds);
       setError(null);
       return undefined;
     }
@@ -64,11 +89,17 @@ export function useInvoiceLedger(
     });
 
     setResolvedRefKeys(emptyIds);
+    setLoadedRefKeys(emptyIds);
     setError(null);
     const timers: number[] = [];
 
     function markRefResolved(refKey: string) {
       setResolvedRefKeys((current) => (current.has(refKey) ? current : new Set(current).add(refKey)));
+    }
+
+    /** Chegou dado de verdade — diferente de "resolvido", que inclui timeout e erro. */
+    function markRefLoaded(refKey: string) {
+      setLoadedRefKeys((current) => (current.has(refKey) ? current : new Set(current).add(refKey)));
     }
 
     const unsubscribers = refs.map((ref) => {
@@ -91,6 +122,7 @@ export function useInvoiceLedger(
               window.clearTimeout(bootTimer);
               markLoaded();
               markRefResolved(refKey);
+              markRefLoaded(refKey);
               setLedgerEntries((current) => [
                 ...current.filter((entry) => entry.invoiceId !== ref.id || entry.cardId !== ref.cardId),
                 ...items
@@ -198,7 +230,12 @@ export function useInvoiceLedger(
     return refsKey.split(',').some((refKey) => !resolvedRefKeys.has(refKey));
   }, [refsKey, resolvedRefKeys]);
 
-  return { entries, loading, error };
+  const partial = useMemo(() => {
+    if (!refsKey) return false;
+    return refsKey.split(',').some((refKey) => !loadedRefKeys.has(refKey));
+  }, [refsKey, loadedRefKeys]);
+
+  return { entries, loading, error, loadedInvoiceKeys: loadedRefKeys, partial };
 }
 
 /**
@@ -220,15 +257,35 @@ export function useInvoiceLedger(
  * Cloud Function de estorno, ver `docs/history/2026-07.md`) faria o total ao vivo divergir do
  * persistido se usasse o ledger cru; com o filtrado, o total bate com o que a tela realmente
  * exibe — mais correto que o campo persistido nesse caso raro, não menos.
+ *
+ * ⚠️ **`loadedInvoiceKeys` é obrigatório, e o motivo é um bug real de 07/08/2026.** Recalcular só
+ * vale pra fatura cujo ledger CHEGOU. Antes desta guarda, uma fatura ainda sem resposta era
+ * recalculada sobre lista vazia — `calculateInvoice([])` devolve saldo 0 e status `'closed'` — e o
+ * app apresentava isso como fato: na tela do Cartão o limite usado despencou e as faturas
+ * desapareceram da lista (`invoiceHasVisibleActivity([])` é falso), e na Análise a compra parcelada
+ * deixou de ser reconhecida como parcelada e voltou a contar pelo VALOR CHEIO (gasto do mês pulou
+ * de R$ 750,07 pra R$ 2.341,46 na conta do dono). O gatilho é banal: 14 faturas com cache frio, e o
+ * `LEDGER_BOOT_TIMEOUT_MS` destravando o `loading` antes de a maioria responder.
+ *
+ * Fatura sem ledger carregado sai daqui **intacta** — com os totais persistidos que a Cloud
+ * Function mantém, que é a melhor informação disponível nesse instante — e com `ledgerEntries: []`.
+ * Quem precisa distinguir "vazia" de "não carregada" usa `loadedInvoiceKeys` direto.
+ *
+ * Parâmetro obrigatório de propósito (mesmo motivo de `excludedAccountIds` em `spendingAnalysis`):
+ * uma tela nova tem que DECIDIR o que passar, em vez de herdar o comportamento errado em silêncio.
  */
 export function mergeInvoicesWithLedger<T extends Invoice>(
   invoices: T[],
-  ledgerEntries: Array<LocalCardSynced<InvoiceLedgerEntry>>
+  ledgerEntries: Array<LocalCardSynced<InvoiceLedgerEntry>>,
+  loadedInvoiceKeys: ReadonlySet<string>
 ): Array<T & { ledgerEntries: InvoiceLedgerEntry[] }> {
   return invoices.map((invoice) => {
     const invoiceLedgerEntries = ledgerEntries.filter(
       (entry) => entry.cardId === invoice.cardId && entry.invoiceId === invoice.id
     );
+    if (!loadedInvoiceKeys.has(invoiceLedgerKey(invoice.cardId, invoice.id))) {
+      return { ...invoice, ledgerEntries: [] };
+    }
     const live = calculateInvoice(
       invoiceLedgerEntries.map((entry) => ({
         id: entry.id,
