@@ -72,6 +72,13 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
     em `--text-muted` como dica de "isto abre algo". Leva pro Extrato já filtrado na categoria.
     ⚠️ **Um atalho que pré-filtra tem que mostrar o filtro que aplicou** — filtro invisível é o
     mesmo defeito do ícone de olho com explicação no `title` (2026-08-03).
+- **Lista longa com passado e futuro junta separa por RELEVÂNCIA, não por data** (histórico de
+  faturas, 2026-08-07): a tela do Cartão mostra "a pagar" (com saldo em aberto **ou** mês
+  corrente/futuro) expandido e "quitadas" recolhidas atrás de `.list-toggle`. Sem isso, em 2027 a
+  lista abriria numa fatura paga de 2026 com a vigente enterrada no meio. ⚠️ Fatura **vencida e não
+  paga** fica no grupo de cima por antiga que seja — dívida não é histórico. E o critério de grupo
+  nunca pode ser um estado **derivado em memória** (aqui, `status === 'paid'`, que só nasce quando o
+  ledger chega): a linha pularia de grupo durante o boot. Use dado estável desde o primeiro render.
 - **Filtro que esconde um PERÍODO vira chip nomeado, não contador** (`chip chip--active` com `X`,
   Transações, 2026-08-06): categoria/tag/cartão podem viver atrás do badge "Filtros · N", mas o
   recorte por mês tira da tela tudo que não é daquele mês — então ele fica escrito no trilho

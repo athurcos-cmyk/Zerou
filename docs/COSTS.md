@@ -64,6 +64,15 @@ Otimizações que já existem e mantêm o custo baixo — **não desfazer**:
 - **Ledger de fatura sob demanda**: só carrega ao abrir Cartão/Fatura/Análise, não no boot.
 - **Soft-delete**: excluir no app marca `deletedAt` (conta como **gravação**, não exclusão) — a
   cota de exclusões fica quase intocada.
+- **Faturas: duas assinaturas por cartão, não uma** (07/08/2026). A janela é `24 meses de passado`
+  (desc) + `tudo pra frente` (asc, com rede de segurança de 96). O volume por boot é o mesmo de
+  antes na prática (~24-48 docs pequenos), e o lado futuro é limitado pelo maior parcelamento ativo
+  (48x ⇒ até ~48 faturas, encolhendo sozinho conforme as séries terminam). O que mudou não foi o
+  volume, foi **de que lado o corte acontece**: com uma query só (`asc + limit`), o que deixava de
+  chegar era a fatura atual e as futuras.
+- **Página de fatura antiga é `getDocs`, não listener** (`loadMoreInvoices`): histórico velho quase
+  não muda, e ela vive só na tela do Cartão — não entra em `cardsData.invoices` nem ganha listener
+  de ledger. ~12 leituras por toque no "Ver mais faturas".
 
 Gravações por ação: lançar uma transação ≈ 1–3 gravações (transação + ajuste de saldo + às vezes
 total da fatura via Cloud Function).

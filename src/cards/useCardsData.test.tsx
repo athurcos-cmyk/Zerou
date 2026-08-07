@@ -4,7 +4,7 @@ import { useCardsData } from './useCardsData';
 
 const cardMocks = vi.hoisted(() => ({
   subscribeCards: vi.fn(),
-  subscribeInvoices: vi.fn(),
+  subscribeInvoicesWindow: vi.fn(),
   markClosedInvoices: vi.fn()
 }));
 
@@ -35,8 +35,9 @@ describe('useCardsData', () => {
       onNext([{ id: 'card-1', workspaceId: 'ws-1', name: 'Cartão', isActive: true, closingDay: 10, localSyncStatus: 'synced' }]);
       return vi.fn();
     });
-    cardMocks.subscribeInvoices.mockImplementation((_workspaceId, _cardId, onNext) => {
-      onNext([invoice()]);
+    // Duas assinaturas por cartão agora: `future` (>= mês atual) e `past` (< mês atual).
+    cardMocks.subscribeInvoicesWindow.mockImplementation((_ws, _cardId, invoiceWindow, _month, onNext) => {
+      onNext(invoiceWindow === 'future' ? [invoice()] : []);
       return vi.fn();
     });
   });
@@ -67,7 +68,7 @@ describe('useCardsData', () => {
   });
 
   it('calcula status "paid" pra fatura fechada e totalmente quitada', () => {
-    cardMocks.subscribeInvoices.mockImplementation((_workspaceId, _cardId, onNext) => {
+    cardMocks.subscribeInvoicesWindow.mockImplementation((_ws, _cardId, invoiceWindow, _month, onNext) => {
       onNext([
         invoice({
           status: 'closed',
@@ -88,21 +89,31 @@ describe('useCardsData', () => {
   // faturas — se `loading` virasse false assim que o CARTÃO chegasse (sem esperar a
   // FATURA), o Dashboard calculava por um instante como se a fatura fosse zero (valor
   // inflado) e corrigia um instante depois, um "piscar" visível pro usuário.
-  it('mantém loading=true até a fatura de todo cartão ativo chegar, não só o cartão', () => {
-    let deliverInvoice: (() => void) | undefined;
-    cardMocks.subscribeInvoices.mockImplementation((_workspaceId, _cardId, onNext) => {
-      deliverInvoice = () => onNext([invoice()]);
+  // Desde 07/08/2026 são DUAS assinaturas por cartão (janela futura e passada, direções opostas),
+  // e o cartão só conta como resolvido quando as duas respondem — senão o Dashboard calcularia o
+  // Comprometido com metade das faturas.
+  it('mantém loading=true até as DUAS janelas de fatura chegarem', () => {
+    const deliver = new Map<string, () => void>();
+    cardMocks.subscribeInvoicesWindow.mockImplementation((_ws, _cardId, invoiceWindow, _month, onNext) => {
+      deliver.set(invoiceWindow, () => onNext(invoiceWindow === 'future' ? [invoice()] : []));
       return vi.fn();
     });
 
     const { result } = renderHook(() => useCardsData('ws-1'));
 
-    // O cartão já chegou (via subscribeCards, síncrono no mock), mas a fatura ainda não.
+    // O cartão já chegou (via subscribeCards, síncrono no mock), mas nenhuma fatura ainda.
     expect(result.current.cards.map((c) => c.id)).toEqual(['card-1']);
     expect(result.current.loading).toBe(true);
 
     act(() => {
-      deliverInvoice?.();
+      deliver.get('future')?.();
+    });
+
+    // Só metade respondeu — ainda carregando.
+    expect(result.current.loading).toBe(true);
+
+    act(() => {
+      deliver.get('past')?.();
     });
 
     expect(result.current.loading).toBe(false);
@@ -119,7 +130,7 @@ describe('useCardsData', () => {
       ]);
       return vi.fn();
     });
-    cardMocks.subscribeInvoices.mockImplementation((_workspaceId, cardId, onNext) => {
+    cardMocks.subscribeInvoicesWindow.mockImplementation((_ws, cardId, invoiceWindow, _month, onNext) => {
       onNext([invoice({ id: `invoice-${cardId}`, cardId })]);
       return vi.fn();
     });
@@ -128,5 +139,86 @@ describe('useCardsData', () => {
 
     expect(result.current.cards.map((card) => card.id)).toEqual(['card-1']);
     expect(result.current.invoices.map((inv) => inv.cardId)).toEqual(['card-1']);
+  });
+});
+
+// ⚠️ O bug que as duas janelas existem pra matar: com uma query só (`asc + limit(24)`) o corte era
+// sempre no FUTURO, em qualquer número de limite. Aqui a garantia é que as duas metades coexistem
+// e saem ordenadas, sem uma apagar a outra.
+describe('useCardsData — união das duas janelas de fatura', () => {
+  function inv(id: string, referenceMonth: string) {
+    return {
+      id,
+      cardId: 'card-1',
+      workspaceId: 'ws-1',
+      referenceMonth,
+      status: 'open',
+      purchasesTotalCents: 1000,
+      paymentsTotalCents: 0,
+      creditsTotalCents: 0,
+      feesTotalCents: 0,
+      outstandingBalanceCents: 1000,
+      overpaidCreditCents: 0,
+      localSyncStatus: 'synced'
+    };
+  }
+
+  beforeEach(() => {
+    cardMocks.subscribeCards.mockImplementation((_ws: unknown, onNext: (c: unknown[]) => void) => {
+      onNext([{ id: 'card-1', workspaceId: 'ws-1', name: 'Cartão', isActive: true, closingDay: 2, localSyncStatus: 'synced' }]);
+      return vi.fn();
+    });
+  });
+
+  it('mantém passado E futuro juntos — uma janela não apaga a outra', () => {
+    cardMocks.subscribeInvoicesWindow.mockImplementation((_ws, _cardId, invoiceWindow, _month, onNext) => {
+      onNext(
+        invoiceWindow === 'future'
+          ? [inv('i-2026-08', '2026-08'), inv('i-2027-09', '2027-09')]
+          : [inv('i-2026-07', '2026-07'), inv('i-2026-06', '2026-06')]
+      );
+      return vi.fn();
+    });
+
+    const { result } = renderHook(() => useCardsData('ws-1'));
+
+    expect(result.current.invoices.map((i) => i.referenceMonth)).toEqual([
+      '2026-06',
+      '2026-07',
+      '2026-08',
+      '2027-09'
+    ]);
+  });
+
+  it('ordena por referenceMonth asc mesmo com o passado chegando depois (a tela renderiza na ordem de chegada)', () => {
+    const deliver = new Map<string, () => void>();
+    cardMocks.subscribeInvoicesWindow.mockImplementation((_ws, _cardId, invoiceWindow, _month, onNext) => {
+      deliver.set(invoiceWindow, () =>
+        onNext(invoiceWindow === 'future' ? [inv('i-2026-08', '2026-08')] : [inv('i-2026-05', '2026-05')])
+      );
+      return vi.fn();
+    });
+
+    const { result } = renderHook(() => useCardsData('ws-1'));
+    act(() => {
+      deliver.get('future')?.();
+    });
+    act(() => {
+      deliver.get('past')?.();
+    });
+
+    expect(result.current.invoices.map((i) => i.referenceMonth)).toEqual(['2026-05', '2026-08']);
+  });
+
+  it('passa o mês corrente e as duas direções pra query', () => {
+    renderHook(() => useCardsData('ws-1'));
+
+    // `mock.calls` pode acumular entre re-renders do hook — o que importa é que as DUAS direções
+    // foram assinadas e que as duas usam o mesmo mês de fronteira.
+    const windows = new Set(cardMocks.subscribeInvoicesWindow.mock.calls.map((c: unknown[]) => c[2]));
+    const months = new Set(cardMocks.subscribeInvoicesWindow.mock.calls.map((c: unknown[]) => c[3]));
+    expect([...windows].sort()).toEqual(['future', 'past']);
+    expect(months.size).toBe(1);
+    expect([...months][0]).toMatch(/^\d{4}-\d{2}$/);
   });
 });

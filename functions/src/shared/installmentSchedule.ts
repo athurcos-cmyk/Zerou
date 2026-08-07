@@ -90,6 +90,9 @@ export function installmentSpendingMonths(
       ? (txn.anticipatedInstallments as Record<string, unknown>)
       : undefined;
 
+  // Mesma fórmula de `installmentShiftOf` em src/finance/spendingAnalysis.ts — mudou lá, muda
+  // aqui. As duas travas: série "já em andamento" (`start !== 1`) nunca desloca, e `diff === 1`
+  // exato em vez de clamp (qualquer outro valor é dado legado/torto e deslocar seria chute).
   const shift =
     start === 1 && purchaseMonth && monthDiff(firstInvoiceMonth, purchaseMonth) === 1 ? 1 : 0;
 

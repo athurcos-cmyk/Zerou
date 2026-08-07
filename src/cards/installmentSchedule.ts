@@ -1,4 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
+import { referenceMonthFromInvoiceId } from './cardDates';
 import type { InvoiceForSpending } from '../finance/spendingAnalysis';
 import type { InvoiceLedgerEntry, Transaction } from '../types/contracts';
 
@@ -25,21 +26,6 @@ function shiftMonthKey(month: string, delta: number): string {
   if (!year || !m) return month;
   const shifted = new Date(year, m - 1 + delta, 1);
   return `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, '0')}`;
-}
-
-/**
- * Mês da PRIMEIRA fatura da série, lido do próprio `invoiceId` gravado na transação.
- *
- * Não é palpite: `invoiceIdFor` (`cardDates.ts`) monta o id como `${cardId}_${referenceMonth}`,
- * e a transação de uma compra parcelada guarda `invoiceId` = a fatura da **primeira parcela
- * criada** (`addCardPurchaseToBatch` e `registerOngoingInstallments` fazem os dois isso). É por
- * isso que esta função não precisa dos documentos de fatura — e o "Resumo de gastos" do
- * Dashboard não volta a esperar o cartão sincronizar (correção de 2026-07-25).
- */
-function firstInvoiceMonthOf(invoiceId: string | undefined): string | undefined {
-  if (!invoiceId) return undefined;
-  const candidate = invoiceId.slice(invoiceId.lastIndexOf('_') + 1);
-  return /^\d{4}-\d{2}$/.test(candidate) ? candidate : undefined;
 }
 
 /**
@@ -117,7 +103,7 @@ export function invoicesForSpendingFromTransactions(transactions: Transaction[])
     // parecer parcelada pra `installmentPurchaseIds`, que testa `> 1`.
     if (installments <= 1) continue;
 
-    const firstMonth = firstInvoiceMonthOf(transaction.invoiceId);
+    const firstMonth = referenceMonthFromInvoiceId(transaction.invoiceId);
     // Sem o mês da primeira fatura não há cronograma: a compra fica de fora do conjunto de
     // parceladas e cai no comportamento antigo (valor cheio no mês da compra). Pior que o
     // ideal, melhor que inventar um cronograma — e não deve acontecer em dado gravado pelo app.

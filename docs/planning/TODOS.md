@@ -42,28 +42,26 @@ foram **auditados e deixados de fora de propósito**, cada um com commit própri
   começam na parcela 1 — nada pago). Critério: só migrar se aparecer em conta real; um script de
   migração precisaria ler o ledger pra reconstruir, o que é caro e arriscado por um caso de borda.
   Há teste documentando o comportamento do dado antigo, pra não ser esquecido.
-- [ ] **`subscribeInvoices`: a janela de 24 faturas corta pelo fim, não pelo começo** — revisado em
-  2026-08-06, e a leitura anterior deste item estava **errada**: o `orderBy('referenceMonth','asc')`
-  **não é bug**, é a correção do dono (commit `b9cd0e6`, 24/07) pra a lista do Cartão ser cronológica
-  — era `desc` e jogava fatura futura pro topo. Quem deve mudar é o **`limit(24)`**: ordem + limite
-  juntos fazem a janela ser as 24 **mais antigas**, então num cartão com >24 faturas o que não é
-  baixado é a fatura atual e as futuras — o que o Comprometido (`selectCurrentCycleInvoices`) e a
-  Análise de mês futuro precisam. O limite em si é legítimo: a assinatura roda por cartão em todo
-  boot, e cada fatura carregada vira um listener de ledger na tela do Cartão e na Análise (que assina
-  o de TODAS as faturas de TODOS os cartões). **Gatilho é o tamanho do parcelamento, não o tempo de
-  uso**: o app aceita até 24x, e uma compra em 24x cria 24 faturas futuras de uma vez. Critério:
-  ancorar a janela no presente (`where('referenceMonth','>=',...)`) e paginar o passado sob demanda,
-  no padrão de `loadMoreTransactions` ("Carregar mais" do Extrato) — **sem mexer na ordem**, que a
-  lista usa. Cuidado ao dimensionar a janela: a Análise mostra 6 meses de histórico por padrão e o
-  Resumo Anual 12, então uma janela curta demais tira gasto de cartão desses gráficos.
-- [x] ~~**A Vic conta parcelada pelo valor cheio no mês da compra**~~ — **RESOLVIDO em 2026-08-06,
-  function DEPLOYADA** (`functions:billing:financialAssistantChat`). `buildFinancialContext.ts` conta
-  **uma parcela por mês** (gasto por categoria + tendência) e passou a **abater** estorno/reembolso/
-  ajuste, que eram ignorados. A regra vive em `functions/src/shared/installmentSchedule.ts` — porta
-  manual de `src/cards/installmentSchedule.ts`, com pacto de sincronia no cabeçalho (mesmo padrão de
-  `shared/accountEffects.ts`), porque Cloud Functions não importa `src/`. Prompt também corrigido:
-  explica a diluição, não promete notificação de orçamento (não existe mais) e aponta a Análise como
-  a tela do limite. Ver `docs/ai/VIC.md`.
+- [x] ~~**`subscribeInvoices`: a janela de 24 faturas corta pelo fim**~~ — **RESOLVIDO em 2026-08-07**
+  com DUAS assinaturas por cartão em direções opostas (`>= mês atual` asc + `< mês atual` desc, ver
+  `subscribeInvoicesWindow`). ⚠️ Aumentar o limite não resolvia: com `asc` o corte é sempre no futuro,
+  em qualquer número — foi o dono quem derrubou a primeira versão do plano perguntando o que acontece
+  com 48x hoje + outra 48x em 4 meses (~52 meses de horizonte). A ordem `asc` da lista não depende
+  mais da direção da query: `useCardsData` ordena a união. Detalhe: `../history/2026-08.md` (07/08).
+- [ ] **Origem dos dois `permission-denied` de escrita no console** — vistos em 07/08, sem sintoma
+  visível. Descartado `markClosedInvoices` (a fatura de ago/2026 já está `closed` no banco, com todos
+  os campos). O buffer do console persiste entre reloads, então podem vir de qualquer tela anterior,
+  inclusive escrita de boot. Critério: `fireWrite` agora captura a pilha de quem chamou (só em DEV),
+  então basta esperar a próxima ocorrência e ler o log — não vale caçar linha antiga.
+- [ ] **Conta a pagar paga no cartão ainda trava em 24x** — o teto está na REGRA
+  (`validBillInstallments`, `firestore.rules`), não no schema do cliente, então subir exige deploy.
+  A compra no cartão foi pra 48x em 07/08 sem deploy porque lá as regras já aceitavam 72.
+  `installmentOptions(max)` já exige o teto explícito, e `MAX_BILL_INSTALLMENTS` é o ponto único a
+  mudar do lado do cliente. Critério: subir junto com o próximo deploy de regras que já for acontecer.
+- [ ] **Grupo "Quitadas" e "Ver mais faturas" sem verificação ao vivo** — implementados e cobertos por
+  teste unitário (`invoiceGroups.test.ts`), mas a conta do dono não tem nenhuma fatura quitada
+  (ago/2026 segue com R$ 1.238,98 em aberto) nem fatura anterior à janela de 24 meses. Critério:
+  conferir na primeira fatura que ele pagar.
 - [ ] **A Vic só vê 90 dias de transações** — consequência da consulta dela
   (`where('date','>=',ninetyDaysAgo).limit(2000)`): a parcela de uma compra mais antiga que isso não
   entra no gasto do mês que ela relata, enquanto nas telas entra (o ledger tem a parcela). Critério:
@@ -117,7 +115,7 @@ Não implementado (decisão consciente):
   `budgets.isActive` (COLLECTION_GROUP, `firestore.indexes.json:121-132`) ficou sem uso; não vale um
   deploy pra remover, índice não usado não custa.
 - [ ] **Pacote compartilhado lógica financeira** — `functions/src/shared/accountEffects.ts` é porta manual de `transactionAccountEffects`. Hoje estão em sincronia. Só fazer se crescer ou divergir.
-- [ ] **`subscribeInvoices` limita a 24 faturas** — ver o item detalhado na seção "Coerência do gasto de cartão". ⚠️ O "inalcançável hoje (2 meses de app)" que estava escrito aqui partia de premissa errada: o gatilho é o **tamanho do parcelamento** (24x = 24 faturas futuras de uma vez), não o tempo de uso.
+- [x] ~~**`subscribeInvoices` limita a 24 faturas**~~ — resolvido em 2026-08-07 (duas queries em direções opostas). Ver a seção "Coerência do gasto de cartão".
 - [ ] **Code splitting** — bundle principal 472 KB + AuthContext 453 KB. Warning dos 500 KB não dispara mais (framer-motion saiu). Firebase Auth SDK é o próximo vilão mas difícil de separar.
 - [ ] **App Check, backups Firestore, alertas custo** — infra, nada implementado.
 - [ ] **Procedência logos banco** — 26/29 SVGs com fonte divergente. `public/bank-logos/SOURCES.md`. Decisão do dono pendente.

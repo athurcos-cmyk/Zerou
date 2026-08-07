@@ -37,10 +37,32 @@ export function parseAccountOrCard(value: string): { accountId?: string; cardId?
   return { accountId: value };
 }
 
-/** Opções de parcelamento (1x à vista .. 24x) pro campo "Parcelamento", mesmo limite de
- * `createCardPurchaseSchema`/`createBillSchema`. */
-export function installmentOptions(): AccountOrCardOption[] {
-  return Array.from({ length: 24 }, (_, i) => i + 1).map((n) => ({
+/**
+ * Teto de parcelas de uma COMPRA no cartão — 48x desde 07/08/2026 (pedido do dono: carro, móvel).
+ * `firestore.rules` já aceitava até 72 em `installments` da transação e do ledger, então subir
+ * daqui não precisou de deploy de regra. Espelha `createCardPurchaseSchema`.
+ */
+export const MAX_CARD_PURCHASE_INSTALLMENTS = 48;
+
+/**
+ * Teto de parcelas de uma CONTA A PAGAR paga no cartão — segue em 24.
+ *
+ * ⚠️ Não subir sem deploy: aqui o limite está na **regra** (`validBillInstallments`,
+ * `firestore.rules`), e não no schema do cliente. Subir só este número faria o app oferecer 48x e
+ * o servidor rejeitar em silêncio (`fireWrite` engole) — exatamente o modo de falha que a REGRA
+ * PRINCIPAL do `CLAUDE.md` descreve. Item anotado em `docs/planning/TODOS.md`.
+ */
+export const MAX_BILL_INSTALLMENTS = 24;
+
+/**
+ * Opções de parcelamento (1x à vista .. `max`) pro campo "Parcelamento".
+ *
+ * `max` é obrigatório porque os dois fluxos que usam este seletor têm tetos DIFERENTES e por
+ * motivos diferentes (um no schema do cliente, outro na regra do servidor) — herdar um número
+ * único aqui foi o que quase fez a conta a pagar oferecer 48x com a regra travada em 24.
+ */
+export function installmentOptions(max: number): AccountOrCardOption[] {
+  return Array.from({ length: max }, (_, i) => i + 1).map((n) => ({
     value: String(n),
     label: n === 1 ? '1x à vista' : `${n}x`
   }));

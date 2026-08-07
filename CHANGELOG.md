@@ -2,6 +2,43 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-07 — cartão: pagar fatura, janela de faturas em duas queries, 48x e histórico agrupado
+
+Sessão longa, dois bugs relatados ao vivo e quatro partes de plano. **Nenhum deploy de regras nem de
+functions** — as regras já aceitavam o que mudou.
+
+- **Pagar fatura voltou a funcionar.** Cinco caminhos de falha muda no mesmo fluxo: `return` antes de
+  qualquer feedback, `parseMoneyToCents` lançando exceção dentro do handler de clique, nenhuma
+  confirmação de sucesso, `recordInvoicePayment` usando `fireWrite` (catch vazio em produção, o
+  `.catch` das telas era código morto) e o id idempotente do FIN-03 derivado de meio-dia com 0 ms,
+  o que fazia **toda retentativa no mesmo dia** cair no mesmo documento e ser recusada em silêncio.
+- **Fatura sem ledger deixou de ser tratada como zerada.** `mergeInvoicesWithLedger` recalculava os
+  totais de toda fatura sobre os lançamentos em mão; pra fatura que ainda não respondeu isso é
+  `calculateInvoice([])` = saldo 0. Medido: limite usado R$ 909,79 em vez de R$ 5.902,31 e 13 das 14
+  faturas desaparecendo da tela. Agora o hook expõe `loadedInvoiceKeys` (marcado só no snapshot,
+  nunca por timeout) e a fatura sem ledger sai intacta, com os totais persistidos.
+- **A janela de faturas virou DUAS queries em direções opostas** (`>= mês atual` asc + `< mês atual`
+  desc). Era uma só, `asc + limit(24)` = as 24 mais **antigas**, então num cartão com mais de 24
+  faturas o que não chegava era a atual e as futuras. ⚠️ Aumentar o limite não resolvia: com `asc` o
+  corte é sempre no futuro, em qualquer número — achado do dono fazendo a conta de duas compras em
+  48x escalonadas (~52 meses de horizonte).
+- **Parcelamento até 48x** em compra no cartão (carro, móvel). Só o schema do cliente — as regras já
+  aceitavam 72. Conta a pagar no cartão **fica em 24x**: lá o teto está na regra, e subir sem deploy
+  faria o app oferecer 48x pro servidor recusar em silêncio. `installmentOptions(max)` passou a
+  exigir o teto explícito pra os dois fluxos não herdarem um número só.
+- **A âncora da parcela 1 passou a ser derivada da TRANSAÇÃO**, com a varredura do ledger como
+  fallback. Sem isso o 48x quebrava a ancoragem: no fim da série a fatura da parcela 1 está 47 meses
+  atrás, fora de qualquer janela, e as parcelas finais apareciam 1 mês adiante. A fórmula ficou num
+  lugar só (`installmentShiftOf`), com a porta da Vic apontando pra ela.
+- **Histórico de faturas agrupado**: "a pagar" (com saldo **ou** mês corrente/futuro, 12 visíveis) e
+  "quitadas" recolhidas, mais "Ver mais faturas" paginando o passado sob demanda (`getDocs`, molde
+  do "Carregar mais" do Extrato, com a regra de que página incompleta só é "fim" quando há conexão).
+  Critério de grupo é mês + saldo, **não** `status === 'paid'` — "paga" nasce em memória quando o
+  ledger chega, e agrupar por status faria a fatura piscar de um grupo pro outro no boot.
+- **`fireWrite` agora diz QUEM tentou escrever** (pilha capturada na chamada, só em DEV). O log
+  dizia só "escrita rejeitada" e obrigava a adivinhar entre ~40 call sites.
+- 640 testes de cliente (+29), 112 de regras, 128 de functions. Detalhe: `docs/history/2026-08.md`.
+
 ## 2026-08-06 — fix(cartão/vic): as 2 divergências residuais fechadas + a Vic conta parcela, não valor cheio
 
 **Regras e a function da Vic DEPLOYADAS** (autorização explícita do dono).

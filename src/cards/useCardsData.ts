@@ -1,19 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { resolveInvoiceStatus } from '../domain/invoices/calculateInvoice';
+import { monthKeyFromDate } from '../finance/financeDates';
 import { subscribeWithTransientRetry } from '../firebase/firestoreRetry';
-import { markClosedInvoices, subscribeCards, subscribeInvoices, type LocalCardSynced } from './cardService';
+import { markClosedInvoices, subscribeCards, subscribeInvoicesWindow, type LocalCardSynced } from './cardService';
 import type { CreditCard, Invoice } from '../types/contracts';
 
 interface CardsState {
   cards: Array<LocalCardSynced<CreditCard>>;
-  invoices: Array<LocalCardSynced<Invoice>>;
+  /**
+   * Faturas por (cartão, janela) — `${cardId}|past` e `${cardId}|future`.
+   *
+   * ⚠️ Não é uma lista só de propósito: são DUAS assinaturas por cartão, em direções opostas (ver
+   * `subscribeInvoicesWindow`), e cada snapshot só pode substituir a própria metade. Guardar tudo
+   * numa lista e trocá-la inteira a cada snapshot faria as duas se apagarem mutuamente.
+   */
+  invoicesByWindow: Record<string, Array<LocalCardSynced<Invoice>>>;
   loading: boolean;
   error: string | null;
 }
 
 const initialState: CardsState = {
   cards: [],
-  invoices: [],
+  invoicesByWindow: {},
   loading: true,
   error: null
 };
@@ -81,53 +89,66 @@ export function useCardsData(workspaceId?: string) {
 
   useEffect(() => {
     if (!workspaceId || !cardIds) {
-      setState((current) => ({ ...current, invoices: [] }));
+      setState((current) => ({ ...current, invoicesByWindow: {} }));
       return undefined;
     }
 
     const cards = cardsRef.current;
     const timers: number[] = [];
 
-    function markInvoiceLoaded(cardId: string) {
-      setLoadedInvoiceCardIds((current) => (current.has(cardId) ? current : new Set(current).add(cardId)));
+    // Chave composta `${cardId}|${janela}`: são duas assinaturas por cartão e o cartão só está
+    // resolvido quando as DUAS responderam (ou estouraram o timeout).
+    function markInvoiceLoaded(key: string) {
+      setLoadedInvoiceCardIds((current) => (current.has(key) ? current : new Set(current).add(key)));
     }
 
-    const unsubscribers = cards.map((card) => {
-      let resolved = false;
-      const bootTimer = window.setTimeout(() => {
-        resolved = true;
-        markInvoiceLoaded(card.id);
-      }, INVOICE_BOOT_TIMEOUT_MS);
-      timers.push(bootTimer);
+    // Mês de referência das duas janelas, congelado na assinatura. Se o app ficar aberto virando o
+    // mês, a fronteira só se move na próxima reassinatura — a fatura do mês novo já está do lado
+    // "futuro" (era `>= mês anterior`), então nada desaparece nesse meio-tempo.
+    const currentMonth = monthKeyFromDate(new Date());
+    const windows: Array<'past' | 'future'> = ['future', 'past'];
 
-      return subscribeWithTransientRetry({
-        subscribe: (onError, markLoaded) =>
-          subscribeInvoices(
-            workspaceId,
-            card.id,
-            (items) => {
+    const unsubscribers = cards.flatMap((card) =>
+      windows.map((invoiceWindow) => {
+        const key = `${card.id}|${invoiceWindow}`;
+        let resolved = false;
+        const bootTimer = window.setTimeout(() => {
+          resolved = true;
+          markInvoiceLoaded(key);
+        }, INVOICE_BOOT_TIMEOUT_MS);
+        timers.push(bootTimer);
+
+        return subscribeWithTransientRetry({
+          subscribe: (onError, markLoaded) =>
+            subscribeInvoicesWindow(
+              workspaceId,
+              card.id,
+              invoiceWindow,
+              currentMonth,
+              (items) => {
+                resolved = true;
+                window.clearTimeout(bootTimer);
+                markInvoiceLoaded(key);
+                markLoaded();
+                markClosedInvoices(workspaceId, items, card.closingDay);
+                setState((current) => ({
+                  ...current,
+                  invoicesByWindow: { ...current.invoicesByWindow, [key]: items }
+                }));
+              },
+              onError
+            ),
+          onError: () => {
+            if (!resolved) {
               resolved = true;
               window.clearTimeout(bootTimer);
-              markInvoiceLoaded(card.id);
-              markLoaded();
-              markClosedInvoices(workspaceId, items, card.closingDay);
-              setState((current) => ({
-                ...current,
-                invoices: [...current.invoices.filter((invoice) => invoice.cardId !== card.id), ...items]
-              }));
-            },
-            onError
-          ),
-        onError: () => {
-          if (!resolved) {
-            resolved = true;
-            window.clearTimeout(bootTimer);
-            markInvoiceLoaded(card.id);
+              markInvoiceLoaded(key);
+            }
+            setState((current) => ({ ...current, error: 'Não foi possível carregar faturas.' }));
           }
-          setState((current) => ({ ...current, error: 'Não foi possível carregar faturas.' }));
-        }
-      });
-    });
+        });
+      })
+    );
 
     return () => {
       timers.forEach((timer) => window.clearTimeout(timer));
@@ -140,7 +161,9 @@ export function useCardsData(workspaceId?: string) {
   // (a fatura ainda não foi subtraída) até a fatura chegar e corrigir, um "piscar"
   // visível pro usuário. Só considera resolvido quando toda conta ativa já tiver
   // resposta (sucesso, erro ou timeout) da própria fatura.
-  const invoicesLoading = activeCards.some((card) => !loadedInvoiceCardIds.has(card.id));
+  const invoicesLoading = activeCards.some(
+    (card) => !loadedInvoiceCardIds.has(`${card.id}|future`) || !loadedInvoiceCardIds.has(`${card.id}|past`)
+  );
 
   const calculatedInvoices = useMemo(() => {
     // Faturas de um cartão que acabou de ser excluído continuam em `state.invoices`
@@ -148,7 +171,19 @@ export function useCardsData(workspaceId?: string) {
     // elas seguiriam contando no "Comprometido" do Dashboard.
     const activeCardIds = new Set(activeCards.map((card) => card.id));
 
-    return state.invoices.filter((invoice) => activeCardIds.has(invoice.cardId)).map((invoice) => {
+    // União das duas janelas, deduplicada por id e ORDENADA por `referenceMonth asc`.
+    //
+    // ⚠️ A ordenação é responsabilidade daqui, num lugar só. `CardDetailPage` renderiza na ordem de
+    // chegada, e antes das duas janelas a direção da query ERA a ordem da lista — foi assim que
+    // fatura futura acabou no topo até o commit `b9cd0e6` (24/07). Com duas assinaturas, ordem de
+    // chegada não significa nada, então a garantia tem que ser explícita.
+    const byId = new Map<string, LocalCardSynced<Invoice>>();
+    for (const items of Object.values(state.invoicesByWindow)) {
+      for (const invoice of items) byId.set(invoice.id, invoice);
+    }
+    const merged = [...byId.values()].sort((a, b) => a.referenceMonth.localeCompare(b.referenceMonth));
+
+    return merged.filter((invoice) => activeCardIds.has(invoice.cardId)).map((invoice) => {
       // Totais (purchasesTotalCents, outstandingBalanceCents, etc.) já vêm certos do
       // documento — mantidos incrementalmente por invoiceLedgerEntryTrigger.ts. Só o status
       // fino ('paid'/'partial'/'overdue'/'overpaid') continua calculado no client, porque
@@ -166,11 +201,14 @@ export function useCardsData(workspaceId?: string) {
 
       return { ...invoice, status };
     });
-  }, [state.invoices, activeCards]);
+  }, [state.invoicesByWindow, activeCards]);
 
   const pendingWrites = useMemo(
-    () => [...state.cards, ...state.invoices].some((item) => item.localSyncStatus === 'pending'),
-    [state.cards, state.invoices]
+    () =>
+      [...state.cards, ...Object.values(state.invoicesByWindow).flat()].some(
+        (item) => item.localSyncStatus === 'pending'
+      ),
+    [state.cards, state.invoicesByWindow]
   );
 
   return {

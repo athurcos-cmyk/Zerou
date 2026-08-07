@@ -3,6 +3,7 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
   increment,
   limit,
   onSnapshot,
@@ -11,6 +12,7 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
+  where,
   writeBatch,
   type DocumentData,
   type QueryDocumentSnapshot,
@@ -864,18 +866,95 @@ export function subscribeCards(
  * janela no presente (`where('referenceMonth', '>=', ...)`) e paginar o passado sob demanda, no
  * mesmo padrão de `loadMoreTransactions` ("Carregar mais" do Extrato). Ver `docs/planning/TODOS.md`.
  */
-export function subscribeInvoices(
+/** Quantos meses de fatura PASSADA carregar. 24 porque é o que a Análise consome: Resumo Anual do
+ *  ano anterior chega a 23 meses atrás, comparação "mesmo mês do ano passado" a 12, histórico e
+ *  tendência a 6. Passado é o lado que cresce pra sempre — por isso é o lado com teto. */
+export const PAST_INVOICE_WINDOW_MONTHS = 24;
+
+/**
+ * Rede de segurança do lado FUTURO — **não é limite funcional**, e não pode ser dimensionado "no
+ * olho". O futuro é limitado por natureza (no máximo o maior parcelamento ativo) e encolhe sozinho
+ * conforme as séries terminam, então ele NÃO é cortado.
+ *
+ * ⚠️ Este número tem que ficar folgado em relação ao horizonte alcançável, e **sobe junto** se o
+ * teto de parcelas subir. Com 48x (`MAX_CARD_PURCHASE_INSTALLMENTS`), duas compras longas
+ * escalonadas alcançam ~52 meses à frente (pergunta do dono, 07/08/2026: "parcelo 48x agora e
+ * outra 48x em 4 meses"); 96 deixa quase o dobro de folga. Se um dia bater aqui, o sintoma é o
+ * bug que estas duas queries existem pra matar: fatura futura simplesmente não chega.
+ */
+export const FUTURE_INVOICE_SAFETY_LIMIT = 96;
+
+/**
+ * Faturas de um cartão, em DUAS assinaturas com direções opostas.
+ *
+ * ⚠️ Era uma query só: `orderBy('referenceMonth','asc') + limit(24)`. Isso carregava as 24 mais
+ * ANTIGAS, então num cartão com mais de 24 faturas o que não chegava era a fatura atual e as
+ * futuras — justamente o que o Comprometido (`selectCurrentCycleInvoices`) e a Análise de mês
+ * futuro precisam. **Aumentar o limite não resolvia**: com `asc`, o corte é sempre no futuro,
+ * em qualquer número (achado do dono, 07/08/2026, fazendo a conta de duas compras em 48x
+ * escalonadas). O conserto é estrutural — cada lado corta do lado certo:
+ *
+ *   futuro/atual: `>= mês atual`  asc   (sem corte real, só a rede de segurança)
+ *   passado:      `<  mês atual`  desc  (as 24 mais recentes)
+ *
+ * A ordem `asc` da exibição **não depende mais disto**: `useCardsData` ordena a união. Antes a
+ * tela do Cartão renderizava na ordem de chegada, e por isso a direção da query era a ordem da
+ * lista (commit `b9cd0e6`, 24/07 — trocada de `desc` pra `asc` porque fatura futura aparecia no
+ * topo). Aquela correção continua valendo, agora garantida por ordenação explícita.
+ *
+ * `onNext` recebe QUAL janela entregou, porque quem consome precisa substituir só aquela metade —
+ * um `onNext` que trocasse a lista inteira faria as duas assinaturas se apagarem mutuamente.
+ */
+export function subscribeInvoicesWindow(
   workspaceId: string,
   cardId: string,
+  window: 'past' | 'future',
+  currentMonth: string,
   onNext: (items: Array<LocalCardSynced<Invoice>>) => void,
   onError: (error: Error) => void
 ): Unsubscribe {
+  const constraints =
+    window === 'future'
+      ? [where('referenceMonth', '>=', currentMonth), orderBy('referenceMonth', 'asc'), limit(FUTURE_INVOICE_SAFETY_LIMIT)]
+      : [
+          where('referenceMonth', '<', currentMonth),
+          orderBy('referenceMonth', 'desc'),
+          limit(PAST_INVOICE_WINDOW_MONTHS)
+        ];
+
   return onSnapshot(
-    query(invoicesRef(workspaceId, cardId), orderBy('referenceMonth', 'asc'), limit(24)),
+    query(invoicesRef(workspaceId, cardId), ...constraints),
     { includeMetadataChanges: true },
     (snapshot) => onNext(snapshot.docs.map((item) => withLocalSync<Invoice>(item))),
     onError
   );
+}
+
+/**
+ * Página de faturas ANTIGAS, sob demanda — o "ver mais faturas" da tela do Cartão.
+ *
+ * `getDocs`, não `onSnapshot`: histórico velho quase não muda e escutar tudo ao vivo custaria à
+ * toa. Mesmo desenho de `loadMoreTransactions` (`financeService.ts`), inclusive o cursor por valor
+ * — aqui `referenceMonth` é único por cartão, então não precisa do cursor por snapshot.
+ *
+ * ⚠️ Fatura carregada por aqui vive **só na tela do Cartão**, não entra em `cardsData.invoices` —
+ * então isto NÃO amplia o histórico da Análise. Ampliar exigiria pagar o ledger dessas faturas.
+ */
+export async function loadMoreInvoices(
+  workspaceId: string,
+  cardId: string,
+  beforeReferenceMonth: string,
+  pageSize = 12
+): Promise<Array<LocalCardSynced<Invoice>>> {
+  const snapshot = await getDocs(
+    query(
+      invoicesRef(workspaceId, cardId),
+      where('referenceMonth', '<', beforeReferenceMonth),
+      orderBy('referenceMonth', 'desc'),
+      limit(pageSize)
+    )
+  );
+  return snapshot.docs.map((item) => withLocalSync<Invoice>(item));
 }
 
 export function subscribeInvoiceLedger(

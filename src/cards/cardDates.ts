@@ -89,6 +89,21 @@ export function invoiceIdFor(cardId: string, referenceMonth: string) {
 }
 
 /**
+ * O inverso de `invoiceIdFor`: tira o `referenceMonth` de um id de fatura. `undefined` quando o
+ * sufixo não é um mês válido (id de outro formato, ou dado torto).
+ *
+ * Mora aqui porque quem define o formato do id é `invoiceIdFor`, logo acima — as duas precisam
+ * mudar juntas se o formato mudar. Consumidores: a reconstrução de parcelas sem ler o ledger
+ * (`installmentSchedule.ts`) e o deslocamento da série (`spendingAnalysis.ts`), que usam o mês da
+ * PRIMEIRA fatura gravado na própria transação (`invoiceId`) em vez de precisar da fatura carregada.
+ */
+export function referenceMonthFromInvoiceId(invoiceId: string | undefined): string | undefined {
+  if (!invoiceId) return undefined;
+  const candidate = invoiceId.slice(invoiceId.lastIndexOf('_') + 1);
+  return /^\d{4}-\d{2}$/.test(candidate) ? candidate : undefined;
+}
+
+/**
  * Início (00:00) do dia de fechamento da fatura de um `referenceMonth`, dado o cartão —
  * sempre o `closingDay` clampado no próprio mês de referência.
  *

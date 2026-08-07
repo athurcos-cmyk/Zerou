@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { CalendarClock, ChevronRight, Layers, Pencil, Trash2 } from 'lucide-react';
+import { CalendarClock, ChevronDown, ChevronRight, ChevronUp, Layers, Pencil, Trash2 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useCardsContext, useFinanceContext } from '../finance/FinanceDataContext';
 import { BottomSheet } from '../components/BottomSheet';
@@ -8,16 +8,18 @@ import { EmptyState } from '../components/EmptyState';
 import { LoadingState } from '../components/LoadingState';
 import { OngoingInstallmentsSheet } from '../cards/OngoingInstallmentsSheet';
 import { invoiceHasVisibleActivity } from '../cards/anticipation';
+import { groupInvoicesForDisplay } from '../cards/invoiceGroups';
 import { useConfirm } from '../components/ConfirmDialog';
 import { FormMessage } from '../components/FormMessage';
 import { invoiceStatusLabels } from '../cards/cardLabels';
-import { deleteCard, recordInvoicePayment, updateCard } from '../cards/cardService';
+import { deleteCard, loadMoreInvoices, recordInvoicePayment, updateCard, type LocalCardSynced } from '../cards/cardService';
 import { pickCurrentInvoice } from '../cards/cardDates';
 import { invoiceLedgerKey, mergeInvoicesWithLedger, useInvoiceLedger } from '../cards/useInvoiceLedger';
 
-import { formatFriendlyDate, formatFriendlyMonth } from '../finance/financeDates';
+import { formatFriendlyDate, formatFriendlyMonth, monthKeyFromDate } from '../finance/financeDates';
 import { centsToInputValue, formatMoney, parseMoneyToCents } from '../finance/money';
 
+import type { Invoice } from '../types/contracts';
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
 
 export function CardDetailPage() {
@@ -43,11 +45,63 @@ export function CardDetailPage() {
   // ⚠️ Só esconde fatura cujo ledger REALMENTE chegou. Sem essa condição, fatura ainda sem resposta
   // (`ledgerEntries: []`) era tratada como "vazia" e sumia da lista — foi o "só aparece a fatura
   // atual" de 07/08/2026, com 13 das 14 faturas do cartão desaparecendo no cache frio.
-  const visibleInvoices = invoicesWithLedger.filter(
+  const subscribedVisible = invoicesWithLedger.filter(
     (invoice) =>
       !loadedInvoiceKeys.has(invoiceLedgerKey(invoice.cardId, invoice.id)) ||
       invoiceHasVisibleActivity(invoice.ledgerEntries)
   );
+
+  // Páginas de fatura ANTIGA trazidas pelo "Ver mais faturas". Vivem só nesta tela: não entram em
+  // `cardsData.invoices` (não queremos assinar ledger delas — custo) nem em `invoiceRefs`. Sem
+  // ledger, ficam com os totais persistidos, que é exatamente o certo pra fatura velha já quitada.
+  const [olderInvoices, setOlderInvoices] = useState<Array<LocalCardSynced<Invoice>>>([]);
+  const [loadingMoreInvoices, setLoadingMoreInvoices] = useState(false);
+  const [reachedInvoiceEnd, setReachedInvoiceEnd] = useState(false);
+  const [loadMoreInvoicesFailed, setLoadMoreInvoicesFailed] = useState(false);
+  const [showAllSettled, setShowAllSettled] = useState(false);
+  const [showAllToPay, setShowAllToPay] = useState(false);
+
+  const visibleInvoices = useMemo(() => {
+    const byId = new Map<string, (typeof subscribedVisible)[number]>();
+    for (const invoice of olderInvoices) byId.set(invoice.id, { ...invoice, ledgerEntries: [] });
+    for (const invoice of subscribedVisible) byId.set(invoice.id, invoice);
+    return [...byId.values()].sort((a, b) => a.referenceMonth.localeCompare(b.referenceMonth));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [olderInvoices, invoicesWithLedger, loadedInvoiceKeys]);
+
+  const currentMonth = monthKeyFromDate(new Date());
+  const { toPay: invoicesToPay, settled: invoicesSettled } = useMemo(
+    () => groupInvoicesForDisplay(visibleInvoices, currentMonth),
+    [visibleInvoices, currentMonth]
+  );
+  /** Quantas faturas "a pagar" mostrar antes de recolher — 12 meses ("de agosto a agosto"). */
+  const TO_PAY_COLLAPSE = 12;
+  const shownToPay = showAllToPay ? invoicesToPay : invoicesToPay.slice(0, TO_PAY_COLLAPSE);
+
+  async function handleLoadMoreInvoices() {
+    if (loadingMoreInvoices || reachedInvoiceEnd || !workspaceId || !cardId) return;
+    const oldest = visibleInvoices[0];
+    if (!oldest) return;
+    setLoadingMoreInvoices(true);
+    setLoadMoreInvoicesFailed(false);
+    try {
+      const page = await loadMoreInvoices(workspaceId, cardId, oldest.referenceMonth);
+      const known = new Set(visibleInvoices.map((invoice) => invoice.id));
+      const fresh = page.filter((invoice) => !known.has(invoice.id));
+      if (fresh.length > 0) setOlderInvoices((current) => [...current, ...fresh]);
+      if (page.length < 12) {
+        // Página incompleta só significa "fim" quando há conexão. Offline pode ser cache parcial —
+        // dizer "fim" ali esconderia histórico que existe. Mesma regra do "Carregar mais" do
+        // Extrato (`TransactionsPage`).
+        if (typeof navigator !== 'undefined' && navigator.onLine) setReachedInvoiceEnd(true);
+        else setLoadMoreInvoicesFailed(true);
+      }
+    } catch {
+      setLoadMoreInvoicesFailed(true);
+    } finally {
+      setLoadingMoreInvoices(false);
+    }
+  }
   const [message, setMessage] = useState<string | null>(null);
   /** `danger` por padrão; vira `success` só na confirmação de pagamento (ver `handleQuickPay`). */
   const [messageType, setMessageType] = useState<'success' | 'danger'>('danger');
@@ -174,6 +228,27 @@ export function CardDetailPage() {
         setMessage(getUserFacingErrorMessage(err, 'Não foi possível registrar o pagamento.'));
       })
       .finally(() => setPaySubmitting(false));
+  }
+
+  /** Uma linha da lista de faturas — usada pelos dois grupos ("a pagar" e "quitadas"). */
+  function invoiceRow(invoice: (typeof visibleInvoices)[number]) {
+    const isPaid = invoice.status === 'paid' || invoice.status === 'overpaid';
+    return (
+      <Link className="list-row list-row--link" key={invoice.id} to={`/app/cards/${invoice.cardId}/invoices/${invoice.id}`}>
+        <div>
+          <strong>Fatura {formatFriendlyMonth(invoice.referenceMonth)}</strong>
+          <span className="text-secondary">
+            {invoiceStatusLabels[invoice.status]} · vence {formatFriendlyDate(invoice.dueDate)}
+          </span>
+        </div>
+        <div className="list-row-end">
+          <strong className={isPaid ? 'amount--income' : invoice.outstandingBalanceCents > 0 ? 'amount--expense' : ''}>
+            {formatMoney(invoice.outstandingBalanceCents)}
+          </strong>
+          {isPaid && <span className="sync-badge sync-badge--synced">Paga</span>}
+        </div>
+      </Link>
+    );
   }
 
   if (!card && !cardsData.loading) {
@@ -338,27 +413,50 @@ export function CardDetailPage() {
                 <ChevronRight size={16} aria-hidden="true" className="text-secondary" />
               </button>
             )}
-            {visibleInvoices.map((invoice) => {
-              const isPaid = invoice.status === 'paid' || invoice.status === 'overpaid';
-              return (
-                <Link className="list-row list-row--link" key={invoice.id} to={`/app/cards/${invoice.cardId}/invoices/${invoice.id}`}>
-                  <div>
-                    <strong>Fatura {formatFriendlyMonth(invoice.referenceMonth)}</strong>
-                    <span className="text-secondary">
-                      {invoiceStatusLabels[invoice.status]} · vence {formatFriendlyDate(invoice.dueDate)}
-                    </span>
-                  </div>
-                  <div className="list-row-end">
-                    <strong className={isPaid ? 'amount--income' : invoice.outstandingBalanceCents > 0 ? 'amount--expense' : ''}>
-                      {formatMoney(invoice.outstandingBalanceCents)}
-                    </strong>
-                    {isPaid && (
-                      <span className="sync-badge sync-badge--synced">Paga</span>
-                    )}
-                  </div>
-                </Link>
-              );
-            })}
+            {shownToPay.map((invoice) => invoiceRow(invoice))}
+            {invoicesToPay.length > TO_PAY_COLLAPSE && (
+              <button type="button" className="list-toggle" onClick={() => setShowAllToPay((v) => !v)}>
+                {showAllToPay ? (
+                  <>Ver menos <ChevronUp size={14} aria-hidden="true" /></>
+                ) : (
+                  <>Ver todas as {invoicesToPay.length} <ChevronDown size={14} aria-hidden="true" /></>
+                )}
+              </button>
+            )}
+
+            {invoicesSettled.length > 0 && (
+              <>
+                {/* Quitadas recolhidas: em 2027 a lista abriria em jan/2026 paga, com a fatura
+                    vigente enterrada no meio (pedido do dono, 07/08/2026). Critério é mês passado
+                    + saldo zero, NÃO `status === 'paid'` — ver `groupInvoicesForDisplay`. */}
+                <button type="button" className="list-toggle" onClick={() => setShowAllSettled((v) => !v)}>
+                  {showAllSettled ? (
+                    <>Ocultar quitadas <ChevronUp size={14} aria-hidden="true" /></>
+                  ) : (
+                    <>Ver {invoicesSettled.length} {invoicesSettled.length === 1 ? 'fatura quitada' : 'faturas quitadas'} <ChevronDown size={14} aria-hidden="true" /></>
+                  )}
+                </button>
+                {showAllSettled && invoicesSettled.map((invoice) => invoiceRow(invoice))}
+              </>
+            )}
+
+            {showAllSettled && !reachedInvoiceEnd && (
+              <div aria-live="polite">
+                <button
+                  type="button"
+                  className="button button--ghost button--compact"
+                  onClick={handleLoadMoreInvoices}
+                  disabled={loadingMoreInvoices}
+                >
+                  {loadingMoreInvoices ? 'Carregando…' : 'Ver mais faturas'}
+                </button>
+                {loadMoreInvoicesFailed && (
+                  <p className="text-muted" style={{ fontSize: '0.82rem', margin: '0.4rem 0 0' }}>
+                    Não foi possível buscar faturas mais antigas. Verifique a conexão.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         ) : (
           <EmptyState

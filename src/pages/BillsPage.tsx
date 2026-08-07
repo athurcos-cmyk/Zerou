@@ -13,7 +13,7 @@ import { FormMessage } from '../components/FormMessage';
 import { useConfirm } from '../components/ConfirmDialog';
 import { formatFriendlyDate, fromDateInputValue, toDateInputValue, todayInputValue } from '../finance/financeDates';
 import { billStatusLabels, recurringFrequencyLabels } from '../finance/financeLabels';
-import { CARD_PREFIX, buildAccountOrCardOptions, installmentOptions, parseAccountOrCard } from '../finance/accountOrCardOptions';
+import { CARD_PREFIX, MAX_BILL_INSTALLMENTS, buildAccountOrCardOptions, installmentOptions, parseAccountOrCard } from '../finance/accountOrCardOptions';
 import {
   canRegisterRecurrence,
   createBill,
@@ -784,7 +784,7 @@ export function BillsPage() {
               label="Parcelamento"
               value={String(installments)}
               onChange={(v) => setInstallments(Number(v))}
-              options={installmentOptions()}
+              options={installmentOptions(MAX_BILL_INSTALLMENTS)}
             />
           ) : null}
 
@@ -855,7 +855,7 @@ export function BillsPage() {
                 label="Parcelamento"
                 value={String(payInstallments)}
                 onChange={(v) => setPayInstallments(Number(v))}
-                options={installmentOptions()}
+                options={installmentOptions(MAX_BILL_INSTALLMENTS)}
               />
             ) : null}
             {payTarget?.kind === 'recurring' && (
@@ -964,7 +964,7 @@ export function BillsPage() {
               label="Parcelamento"
               value={String(editBillInstallments)}
               onChange={(v) => setEditBillInstallments(Number(v))}
-              options={installmentOptions()}
+              options={installmentOptions(MAX_BILL_INSTALLMENTS)}
             />
           ) : null}
           <div className="sheet-actions">

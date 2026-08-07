@@ -17,6 +17,7 @@ import {
   rollUpByParent,
   NO_CATEGORY,
   installmentShiftBySource,
+  installmentShiftOf,
   reversedSourceIds,
   recognizedExpenseByMonth,
   installmentPurchaseIds,
@@ -993,7 +994,7 @@ describe('parcela ancora no mês da COMPRA', () => {
     const catAntiga = (id?: string) => (id === 'antiga' ? 'presentes' : undefined);
     const compradoEmJaneiro: PurchaseMonthOf = () => '2026-01';
 
-    expect(installmentShiftBySource(invoices, compradoEmJaneiro).size).toBe(0);
+    expect(installmentShiftBySource(invoices, compradoEmJaneiro, () => undefined).size).toBe(0);
     expect(spendingByCategoryForMonth('2026-09', [], invoices, catAntiga, new Set(), compradoEmJaneiro).get('presentes')).toBe(10000);
     expect(spendingByCategoryForMonth('2026-08', [], invoices, catAntiga, new Set(), compradoEmJaneiro).get('presentes') ?? 0).toBe(0);
   });
@@ -1008,7 +1009,7 @@ describe('parcela ancora no mês da COMPRA', () => {
     ];
     const catLegado = (id?: string) => (id === 'legado' ? 'presentes' : undefined);
 
-    expect(installmentShiftBySource(invoices, () => '2026-09').size).toBe(0);
+    expect(installmentShiftBySource(invoices, () => '2026-09', () => undefined).size).toBe(0);
     expect(spendingByCategoryForMonth('2026-09', [], invoices, catLegado, new Set(), () => '2026-09').get('presentes')).toBe(10000);
   });
 
@@ -1016,7 +1017,7 @@ describe('parcela ancora no mês da COMPRA', () => {
     const invoices: InvoiceForSpending[] = [
       { referenceMonth: '2026-09', ledgerEntries: [entry({ id: 'p1', type: 'purchase', amountCents: 10000, sourceTransactionId: 'presente', installmentTotal: 3 })] }
     ];
-    expect(installmentShiftBySource(invoices, compradoEmAgosto).size).toBe(0);
+    expect(installmentShiftBySource(invoices, compradoEmAgosto, () => undefined).size).toBe(0);
     expect(spendingByCategoryForMonth('2026-09', [], invoices, catOf, new Set(), compradoEmAgosto).get('presentes')).toBe(10000);
   });
 
@@ -1028,7 +1029,7 @@ describe('parcela ancora no mês da COMPRA', () => {
     const invoices: InvoiceForSpending[] = [
       { referenceMonth: '2026-12', ledgerEntries: [parcela('p1', 'presente', 1, 2, 10000, '2026-01-04T12:00:00')] }
     ];
-    expect(installmentShiftBySource(invoices, () => '2026-01').size).toBe(0);
+    expect(installmentShiftBySource(invoices, () => '2026-01', () => undefined).size).toBe(0);
     expect(spendingByCategoryForMonth('2026-12', [], invoices, catOf, new Set(), () => '2026-01').get('presentes')).toBe(10000);
   });
 
@@ -1036,7 +1037,7 @@ describe('parcela ancora no mês da COMPRA', () => {
     const invoices: InvoiceForSpending[] = [
       { referenceMonth: '2026-08', ledgerEntries: [parcela('p1', 'presente', 1, 2, 10000, '2026-10-04T12:00:00')] }
     ];
-    expect(installmentShiftBySource(invoices, () => '2026-10').size).toBe(0);
+    expect(installmentShiftBySource(invoices, () => '2026-10', () => undefined).size).toBe(0);
   });
 
   it('monthlyTotals bate com o donut: saída de agosto inclui jogo + parcela 1', () => {
@@ -1174,11 +1175,91 @@ describe('antecipação sob a ancoragem', () => {
   it('reversedSourceIds e recognizedExpenseByMonth concordam com o donut', () => {
     const invoices = cincoParcelas();
     const parceled = installmentPurchaseIds(invoices);
-    const shifts = installmentShiftBySource(invoices, compradoEmAgosto);
+    const shifts = installmentShiftBySource(invoices, compradoEmAgosto, () => undefined);
     const porMes = recognizedExpenseByMonth(invoices, parceled, shifts, reversedSourceIds(invoices));
 
     expect(porMes.get('2026-08')).toBe(10000);
     expect(porMes.get('2026-12')).toBe(10000);
     expect(porMes.get('2027-01')).toBeUndefined(); // a última parcela recuou pra dezembro
+  });
+});
+
+// ⚠️ Parcelamento longo (até 48x desde 07/08/2026) quebrava a ancoragem: o deslocamento era
+// descoberto procurando no LEDGER o lançamento com `installmentNumber === 1`, e no fim de uma 48x
+// essa fatura está 47 meses atrás — fora de qualquer janela de carregamento. Sem ela, a série
+// perdia o deslocamento e as parcelas finais apareciam 1 mês adiante.
+//
+// A correção deriva o deslocamento da TRANSAÇÃO (`invoiceId` + `installments` + `installmentStart`),
+// que a tela já tem em mão, e mantém a varredura do ledger só como fallback.
+describe('deslocamento derivado da transação (parcelamento longo) [08-07]', () => {
+  const CARD = 'card_nu';
+
+  function compraLonga(over: Partial<Transaction> = {}): Transaction {
+    return txn({
+      id: 'txn_48x',
+      type: 'card_purchase',
+      amountCents: 480000,
+      categoryId: 'casa',
+      cardId: CARD,
+      // Comprada em agosto/2026; parcela 1 caiu na fatura de SETEMBRO (cartão já fechado) —
+      // é o `diff === 1` que dispara o deslocamento.
+      invoiceId: `${CARD}_2026-09`,
+      installments: 48,
+      competenceMonth: '2026-08',
+      cashMonth: '2026-08',
+      ...over
+    });
+  }
+
+  /** Só a fatura da parcela 47 está carregada — a da parcela 1 (set/2026) não. */
+  const soAParcela47: InvoiceForSpending[] = [
+    { referenceMonth: '2030-07', ledgerEntries: [parcela('e47', 'txn_48x', 47, 48, 10000, '2026-08-04T12:00:00')] }
+  ];
+  const catOf = (id?: string) => (id === 'txn_48x' ? 'casa' : undefined);
+  const compradoEmAgosto = () => '2026-08';
+
+  it('ancora a parcela 47 pelo deslocamento que a TRANSAÇÃO conhece', () => {
+    const totals = spendingByCategoryForMonth(
+      '2030-06',
+      [compraLonga()],
+      soAParcela47,
+      catOf,
+      new Set(),
+      compradoEmAgosto
+    );
+
+    expect(totals.get('casa')).toBe(10000);
+  });
+
+  it('sem a transação carregada, cai no fallback do ledger e NÃO desloca (comportamento antigo)', () => {
+    // Nenhuma transação em mão: é o que `committedByCategoryForMonth`/`lastCommittedMonth` fazem.
+    const totals = spendingByCategoryForMonth('2030-07', [], soAParcela47, catOf, new Set(), compradoEmAgosto);
+
+    expect(totals.get('casa')).toBe(10000);
+  });
+
+  it('compra JÁ EM ANDAMENTO com diff 1 não desloca — a trava agora vem de `installmentStart`', () => {
+    // Antes só o ledger dizia isso (ausência de parcela 1). Agora a transação diz, e diz melhor:
+    // funciona mesmo quando a fatura da primeira parcela recriada está carregada.
+    const ongoing = compraLonga({ id: 'txn_ongoing', installmentStart: 7, installments: 4, amountCents: 40000 });
+    const invoices: InvoiceForSpending[] = [
+      { referenceMonth: '2026-09', ledgerEntries: [parcela('o7', 'txn_ongoing', 7, 10, 10000, '2026-08-04T12:00:00')] }
+    ];
+    const catOngoing = (id?: string) => (id === 'txn_ongoing' ? 'casa' : undefined);
+
+    // A parcela conta no mês da FATURA (set), não em agosto.
+    expect(spendingByCategoryForMonth('2026-08', [ongoing], invoices, catOngoing, new Set(), compradoEmAgosto).get('casa')).toBeUndefined();
+    expect(spendingByCategoryForMonth('2026-09', [ongoing], invoices, catOngoing, new Set(), compradoEmAgosto).get('casa')).toBe(10000);
+  });
+
+  it('installmentShiftOf: a fórmula, isolada', () => {
+    expect(installmentShiftOf({ firstInvoiceMonth: '2026-09', installmentStart: 1, purchaseMonth: '2026-08' })).toBe(1);
+    // mesmo mês: cartão que fecha tarde, sem deslocamento
+    expect(installmentShiftOf({ firstInvoiceMonth: '2026-08', installmentStart: 1, purchaseMonth: '2026-08' })).toBe(0);
+    // já em andamento: nunca desloca
+    expect(installmentShiftOf({ firstInvoiceMonth: '2026-09', installmentStart: 7, purchaseMonth: '2026-08' })).toBe(0);
+    // diff maior que 1 é dado torto/legado: não chuta
+    expect(installmentShiftOf({ firstInvoiceMonth: '2027-04', installmentStart: 1, purchaseMonth: '2026-08' })).toBe(0);
+    expect(installmentShiftOf({ firstInvoiceMonth: '2026-09', installmentStart: 1, purchaseMonth: undefined })).toBe(0);
   });
 });

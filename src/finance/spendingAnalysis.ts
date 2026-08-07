@@ -1,3 +1,4 @@
+import { referenceMonthFromInvoiceId } from '../cards/cardDates';
 import type { Category, InvoiceLedgerEntry, InvoiceLedgerEntryType, InvoiceStatus, Transaction } from '../types/contracts';
 
 /**
@@ -164,14 +165,83 @@ function monthKeyOfEffectiveAt(value: InvoiceLedgerEntry['effectiveAt'] | undefi
  * Consequência das duas juntas: **nenhum gasto se move mais de 1 mês, e nenhum se move sem
  * que a parcela 1 tenha sido identificada.** Dado antigo cai no comportamento de hoje.
  */
+/**
+ * O que a TRANSAÇÃO sabe sobre uma série parcelada — suficiente pra decidir o deslocamento sem
+ * depender de a fatura da parcela 1 estar carregada.
+ */
+export interface InstallmentSeries {
+  /** Mês da fatura da PRIMEIRA parcela criada, lido do `invoiceId` da transação. */
+  firstInvoiceMonth: string;
+  /** Número real da primeira parcela: 1 no fluxo normal, 7 em "7 de 10" já em andamento. */
+  installmentStart: number;
+  purchaseMonth: string | undefined;
+}
+
+/** `undefined` = esta compra não tem transação carregada; cai no fallback pelo ledger. */
+export type InstallmentSeriesOf = (transactionId: string) => InstallmentSeries | undefined;
+
+/**
+ * A FÓRMULA do deslocamento, num lugar só.
+ *
+ * As duas travas seguem sendo as mesmas de 2026-08-05, só que agora expressas em dados da
+ * transação em vez da posição da parcela 1 no ledger:
+ * 1. `installmentStart === 1` — compra "já em andamento" nunca desloca (é a trava que antes vinha
+ *    de exigir `installmentNumber === 1` no ledger).
+ * 2. `diff === 1` exato, não `clamp` — qualquer outro valor significa que a compra veio por outro
+ *    caminho, ou que o dado é legado/torto, e deslocar seria chute.
+ *
+ * ⚠️ Porta manual em `functions/src/shared/installmentSchedule.ts` (a Vic). Mudou aqui, muda lá.
+ */
+export function installmentShiftOf(series: InstallmentSeries): number {
+  if (series.installmentStart !== 1 || !series.purchaseMonth) return 0;
+  return monthDiff(series.firstInvoiceMonth, series.purchaseMonth) === 1 ? 1 : 0;
+}
+
+/**
+ * Constrói o resolvedor a partir das transações que a tela já tem em mão. Só compra parcelada
+ * (`installments > 1`) entra — à vista não desloca nada.
+ */
+export function installmentSeriesFromTransactions(transactions: Transaction[]): InstallmentSeriesOf {
+  const byId = new Map<string, InstallmentSeries>();
+  for (const transaction of transactions) {
+    if (transaction.type !== 'card_purchase' || transaction.deletedAt) continue;
+    if ((transaction.installments ?? 1) <= 1) continue;
+    const firstInvoiceMonth = referenceMonthFromInvoiceId(transaction.invoiceId);
+    if (!firstInvoiceMonth) continue;
+    byId.set(transaction.id, {
+      firstInvoiceMonth,
+      installmentStart: transaction.installmentStart ?? 1,
+      purchaseMonth: transaction.cashMonth ?? transaction.competenceMonth
+    });
+  }
+  return (transactionId: string) => byId.get(transactionId);
+}
+
 export function installmentShiftBySource(
   invoices: InvoiceForSpending[],
-  purchaseMonthOf: PurchaseMonthOf
+  purchaseMonthOf: PurchaseMonthOf,
+  seriesOf: InstallmentSeriesOf
 ): Map<string, number> {
   const shifts = new Map<string, number>();
+
+  // Primeiro o que a TRANSAÇÃO sabe: não depende de a fatura da parcela 1 estar carregada.
+  for (const invoice of invoices) {
+    for (const entry of invoice.ledgerEntries) {
+      if (!entry.sourceTransactionId || shifts.has(entry.sourceTransactionId)) continue;
+      const series = seriesOf(entry.sourceTransactionId);
+      if (!series) continue;
+      const shift = installmentShiftOf(series);
+      if (shift > 0) shifts.set(entry.sourceTransactionId, shift);
+      else shifts.set(entry.sourceTransactionId, 0); // decidido: não olhar o ledger pra esta compra
+    }
+  }
+
+  // Fallback pelo ledger, só pra compra que o resolvedor não conhece (transação fora da janela
+  // carregada, ou tela que não tem transação nenhuma em mão — `committedByCategoryForMonth`).
   for (const invoice of invoices) {
     for (const entry of invoice.ledgerEntries) {
       if (entry.type !== 'purchase' || entry.installmentNumber !== 1 || !entry.sourceTransactionId) continue;
+      if (shifts.has(entry.sourceTransactionId)) continue;
       // `cashMonth` da transação é a fonte boa; o `effectiveAt` da própria parcela 1 é o
       // fallback (em dado novo ele É a data da compra, copiada igual em todas as parcelas —
       // ver `addCardPurchaseToBatch`). Sem nenhum dos dois, não desloca.
@@ -180,6 +250,11 @@ export function installmentShiftBySource(
       if (monthDiff(invoice.referenceMonth, purchaseMonth) === 1) shifts.set(entry.sourceTransactionId, 1);
     }
   }
+
+  // Zeros não precisam ficar no mapa (`anchoredMonthOf` já trata ausência como 0) e mantê-los
+  // faria `shifts.size` mentir nos testes que contam entradas.
+  for (const [id, shift] of shifts) if (shift === 0) shifts.delete(id);
+
   return shifts;
 }
 
@@ -313,7 +388,7 @@ export function spendingByCategoryForMonth(
 ): Map<string, number> {
   const totals = new Map<string, number>();
   const parceledIds = installmentPurchaseIds(invoices);
-  const shifts = installmentShiftBySource(invoices, purchaseMonthOf);
+  const shifts = installmentShiftBySource(invoices, purchaseMonthOf, installmentSeriesFromTransactions(transactions));
   const reversed = reversedSourceIds(invoices);
   const add = (categoryId: string | undefined, cents: number) => {
     if (cents === 0) return;
@@ -573,7 +648,7 @@ export function monthlyTotals(
   const cardExpenseByMonth = recognizedExpenseByMonth(
     invoices,
     parceledIds,
-    installmentShiftBySource(invoices, purchaseMonthOf),
+    installmentShiftBySource(invoices, purchaseMonthOf, installmentSeriesFromTransactions(transactions)),
     reversedSourceIds(invoices)
   );
 
@@ -789,7 +864,8 @@ export function lastCommittedMonth(
   const recognized = recognizedExpenseByMonth(
     invoices,
     parceledIds,
-    installmentShiftBySource(invoices, purchaseMonthOf),
+    // Sem transações em mão nesta função: só o fallback pelo ledger. Declarado, não esquecido.
+    installmentShiftBySource(invoices, purchaseMonthOf, () => undefined),
     reversedSourceIds(invoices)
   );
   for (const [month, cents] of recognized) {

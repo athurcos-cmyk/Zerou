@@ -379,3 +379,49 @@ describe('antecipação de parcela — Dashboard passa a mover o gasto igual à 
     expect(dashboardSpending('2026-12', [airbnb]).get('presente') ?? 0).toBe(0);
   });
 });
+
+// 48x desde 07/08/2026. O que precisava ser provado não é o teto em si, é que a ancoragem
+// sobrevive a uma série longa — antes da Parte 3 as parcelas finais escorregavam um mês porque a
+// fatura da parcela 1 fica 47 meses atrás.
+describe('parcelamento longo (48x)', () => {
+  const compra48x = () =>
+    parcelada({
+      id: 'txn_48x',
+      amountCents: 480000,
+      installments: 48,
+      firstInvoiceMonth: '2026-09',
+      purchaseMonth: '2026-08',
+      categoryId: 'casa'
+    });
+
+  it('gera 48 parcelas em meses consecutivos, sem sobra de centavo', () => {
+    const derived = invoicesForSpendingFromTransactions([compra48x()]);
+    const entries = derived.flatMap((i) => i.ledgerEntries);
+
+    expect(derived).toHaveLength(48);
+    expect(entries).toHaveLength(48);
+    expect(entries.every((e) => e.amountCents === 10000)).toBe(true);
+    expect(derived.map((i) => i.referenceMonth).sort()[0]).toBe('2026-09');
+    expect(derived.map((i) => i.referenceMonth).sort().at(-1)).toBe('2030-08');
+  });
+
+  it('a parcela 1 conta no mês da COMPRA e a última no mês certo, 47 meses depois', () => {
+    const txn48 = compra48x();
+
+    expect(dashboardSpending('2026-08', [txn48]).get('casa')).toBe(10000);
+    expect(dashboardSpending('2030-07', [txn48]).get('casa')).toBe(10000);
+    expect(dashboardSpending('2030-08', [txn48]).get('casa') ?? 0).toBe(0);
+  });
+
+  it('conserva o valor cheio ao longo dos 48 meses', () => {
+    const txn48 = compra48x();
+    let total = 0;
+    for (let i = 0; i < 48; i += 1) {
+      const year = 2026 + Math.floor((7 + i) / 12);
+      const month = ((7 + i) % 12) + 1;
+      total += dashboardSpending(`${year}-${String(month).padStart(2, '0')}`, [txn48]).get('casa') ?? 0;
+    }
+
+    expect(total).toBe(480000);
+  });
+});

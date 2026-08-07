@@ -15,7 +15,7 @@ import { createTransaction } from '../finance/financeService';
 import { useCategoryActions } from '../finance/useCategoryActions';
 import { type SupportedTransactionType } from '../finance/financeSchemas';
 import { parseMoneyToCents } from '../finance/money';
-import { CARD_PREFIX, buildAccountOrCardOptions, installmentOptions, parseAccountOrCard } from '../finance/accountOrCardOptions';
+import { CARD_PREFIX, MAX_CARD_PURCHASE_INSTALLMENTS, buildAccountOrCardOptions, installmentOptions, parseAccountOrCard } from '../finance/accountOrCardOptions';
 
 import { getUserFacingErrorMessage } from '../utils/userFacingError';
 
@@ -280,7 +280,7 @@ export function NewTransactionPage() {
             label="Parcelamento"
             value={String(installments)}
             onChange={(v) => setInstallments(Number(v))}
-            options={installmentOptions()}
+            options={installmentOptions(MAX_CARD_PURCHASE_INSTALLMENTS)}
           />
         ) : null}
 

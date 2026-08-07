@@ -28,7 +28,10 @@ export const createCardPurchaseSchema = z.object({
   amountCents: moneyCentsSchema,
   purchaseDate: z.date(),
   categoryId: z.string().trim().max(120).optional(),
-  installments: z.number().int().min(1).max(24).default(1)
+  // 48x desde 07/08/2026 (carro, móvel — pedido do dono). `firestore.rules` já aceitava até 72
+  // em `installments`, então subir aqui não exigiu deploy de regra. Teto espelhado em
+  // `MAX_CARD_PURCHASE_INSTALLMENTS` (`accountOrCardOptions.ts`), que monta o seletor.
+  installments: z.number().int().min(1).max(48).default(1)
 });
 
 export const recordInvoicePaymentSchema = z.object({
