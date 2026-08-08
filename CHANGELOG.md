@@ -2,6 +2,34 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-08 — fix(android): faixa preta embaixo da bottom nav no PWA (inset dinâmico vs estático)
+
+Bug **antigo**, não regressão das correções de hoje — só ficou visível porque passamos a sessão
+olhando o rodapé. No PWA instalado sobrava uma tira preta abaixo da bottom nav; numa aba do
+Chrome a mesma faixa aparecia creme (fundo da página).
+
+- **`env(safe-area-inset-bottom)` é DINÂMICO no Chrome 135+ do Android**, que liga edge-to-edge
+  por padrão: vale **zero** enquanto o "chin" (faixa da navegação por gestos) está visível, e só
+  cresce quando ele retrai. Nosso `padding-bottom: calc(0.3rem + env(safe-area-inset-bottom))`
+  somava zero exatamente na hora que precisava valer algo — o fundo da barra não entrava na
+  faixa e o sistema pintava ela de preto.
+- **Passou a usar `env(safe-area-max-inset-bottom)`**, a versão estática, via
+  `--safe-area-max-inset-bottom` com cadeia de fallback: `max` (Chrome Android) →
+  `safe-area-inset-bottom` (iOS, onde o inset é estático e essa é a medida certa) → `0px`.
+  Uma regra serve as três plataformas.
+- **A barra desce e compensa no padding**, padrão recomendado pelo Chrome:
+  `bottom: calc(env(safe-area-inset-bottom, 0px) - var(--safe-area-max-inset-bottom))`. Com o chin
+  visível a caixa desce a folga inteira e o fundo pinta a faixa; com o chin retraído a conta dá 0
+  e nada se move. Medido no navegador simulando os dois estados: o fundo passa a terminar 36px
+  abaixo da janela e os ícones ficam no **mesmo pixel** (807 nos dois casos).
+- `--bottom-nav-space` também passou pro estático, senão a folga do conteúdo encolheria justo
+  quando o chin está visível e o último item ficaria embaixo da barra.
+- Dois testes novos travam a regra: a barra não pode usar o inset dinâmico no padding, e a cadeia
+  de fallback precisa passar pelo inset do iOS antes de cair pra zero (sem esse degrau, o iPhone
+  — que não conhece o `max` — voltaria a ignorar o entalhe de baixo).
+
+Fonte: [Chrome on Android edge-to-edge migration guide](https://developer.chrome.com/docs/css-ui/edge-to-edge).
+
 ## 2026-08-08 — fix(ios): `clip` sai do `html` e fica só no `body` (barra do sistema preta)
 
 Correção da correção logo abaixo, algumas horas depois. Ao trocar `overflow-x: hidden` por

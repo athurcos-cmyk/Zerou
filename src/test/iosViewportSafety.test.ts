@@ -15,11 +15,17 @@ const indexHtml = readFileSync(join(projectRoot, 'index.html'), 'utf8');
  * de verdade (o comentário do `html` cita `overflow-x: hidden` justamente pra dizer por que
  * não usar).
  */
-function ruleBody(css: string, selector: string): string {
+function ruleBody(css: string, selector: string, mustContain = ''): string {
   const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, '');
-  const match = new RegExp(`^${selector}\\s*\\{([^}]*)\\}`, 'm').exec(withoutComments);
-  if (!match) throw new Error(`regra "${selector}" não encontrada em global.css`);
-  return match[1];
+  // Todas as regras com esse seletor, não só a primeira: `.mobile-nav` aparece em mais de uma
+  // (uma delas dividida com `.sidebar-nav`), e sem o filtro o teste mede a regra errada.
+  const bodies = [...withoutComments.matchAll(new RegExp(`^${selector}\\s*\\{([^}]*)\\}`, 'gm'))]
+    .map((match) => match[1])
+    .filter((body) => body.includes(mustContain));
+  if (bodies.length === 0) {
+    throw new Error(`regra "${selector}"${mustContain ? ` contendo "${mustContain}"` : ''} não encontrada em global.css`);
+  }
+  return bodies[0];
 }
 
 describe('viewport no iOS', () => {
@@ -48,7 +54,23 @@ describe('viewport no iOS', () => {
     expect(globalCss).toMatch(/env\(safe-area-inset-top\)/);
   });
 
-  it('continua tratando o entalhe de baixo', () => {
-    expect(globalCss).toMatch(/env\(safe-area-inset-bottom\)/);
+  // O entalhe de baixo tem que sair do inset ESTÁTICO. O Chrome 135+ do Android zera o
+  // `safe-area-inset-bottom` enquanto a faixa de gestos está visível, então quem reserva espaço
+  // ou estende fundo com o valor dinâmico soma zero justo na hora que precisava valer algo —
+  // e sobra a tira preta embaixo da nav no PWA. Ver o comentário do :root em global.css.
+  it('a folga de baixo sai do inset estático, não do dinâmico', () => {
+    const nav = ruleBody(globalCss, '\\.mobile-nav', 'position: fixed');
+    expect(nav).toMatch(/padding:[^;]*var\(--safe-area-max-inset-bottom\)/);
+    expect(nav).not.toMatch(/padding:[^;]*env\(safe-area-inset-bottom/);
+    expect(globalCss).toMatch(/--bottom-nav-space:[^;]*var\(--safe-area-max-inset-bottom\)/);
+  });
+
+  // A cadeia de fallback é o que faz a mesma regra servir Android, iOS e desktop. Sem o segundo
+  // degrau (`safe-area-inset-bottom`), o iPhone — que não conhece o `max` — cairia direto no 0px
+  // e o entalhe de baixo voltaria a ser ignorado lá.
+  it('o inset estático cai pro inset do iOS antes de cair pra zero', () => {
+    expect(globalCss).toMatch(
+      /--safe-area-max-inset-bottom:\s*env\(\s*safe-area-max-inset-bottom\s*,\s*env\(\s*safe-area-inset-bottom\s*,\s*0px\s*\)\s*\)/
+    );
   });
 });

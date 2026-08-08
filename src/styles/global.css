@@ -6,6 +6,21 @@
   box-sizing: border-box;
 }
 
+:root {
+  /* Folga do entalhe de BAIXO, em versão ESTÁTICA. Não troque por `safe-area-inset-bottom`.
+     O Chrome 135+ do Android liga edge-to-edge por padrão, e lá o `safe-area-inset-bottom` é
+     DINÂMICO: vale **zero** enquanto o "chin" (a faixa da navegação por gestos) está visível, e
+     só cresce quando ele retrai. Resultado de somar zero: o fundo da bottom nav não entra na
+     faixa e sobra uma tira preta embaixo dela no PWA instalado (branca numa aba do Chrome, que
+     é a cor da UI do navegador). O `max` é o valor cheio, sempre.
+
+     Cadeia de fallback, do mais específico pro mais burro:
+     1. `safe-area-max-inset-bottom` — Chrome 135+ Android;
+     2. `safe-area-inset-bottom` — iOS, onde o inset é estático e essa é a medida certa;
+     3. `0px` — desktop e qualquer tela sem entalhe. */
+  --safe-area-max-inset-bottom: env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px));
+}
+
 /* Tailwind v4 nao processa as diretivas @tailwind base/components/utilities
    (legado v3) deste arquivo, entao o preflight nunca roda — em especial o
    reset que faz <button>/<input>/<select>/<textarea> herdarem `color` do
@@ -3036,8 +3051,13 @@ span.service-mark--brand {
 .mobile-nav {
   position: fixed;
   right: 0;
-  bottom: 0;
   left: 0;
+  /* Desce a barra pela diferença entre o inset cheio e o de agora, e compensa no padding.
+     Com o chin visível (inset 0) a caixa desce a folga inteira e o fundo pinta a faixa de
+     gestos; com o chin retraído (inset == max) a conta dá 0 e nada se move. Nos dois casos os
+     ícones ficam no mesmo lugar, porque o padding-bottom devolve exatamente o que o bottom
+     tirou. Padrão recomendado pelo Chrome: developer.chrome.com/docs/css-ui/edge-to-edge */
+  bottom: calc(env(safe-area-inset-bottom, 0px) - var(--safe-area-max-inset-bottom));
   z-index: 10;
   display: none;
   align-items: center;
@@ -3045,7 +3065,7 @@ span.service-mark--brand {
   border-top: 1px solid var(--border-subtle);
   background: var(--bg-surface);
   box-shadow: var(--shadow-nav);
-  padding: 0.3rem 0.5rem calc(0.3rem + env(safe-area-inset-bottom));
+  padding: 0.3rem 0.5rem calc(0.3rem + var(--safe-area-max-inset-bottom));
 }
 
 .mobile-nav .nav-link {
@@ -3404,7 +3424,9 @@ span.service-mark--brand {
      Única fonte da medida — usada no padding do .app-main e no offset do
      CTA sticky do lançamento (.entry-actions). */
   :root {
-    --bottom-nav-space: calc(5.75rem + env(safe-area-inset-bottom));
+    /* Usa o inset ESTÁTICO pelo mesmo motivo da .mobile-nav: com o dinâmico, a folga encolheria
+       pra 5.75rem justo quando o chin está visível e o último item ficaria embaixo da barra. */
+    --bottom-nav-space: calc(5.75rem + var(--safe-area-max-inset-bottom));
   }
 
   .marketing-hero {
