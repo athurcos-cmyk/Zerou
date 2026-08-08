@@ -74,12 +74,16 @@ function AppRoutesOrDeletedNotice({ children }: { children: ReactNode }) {
 
 export function App() {
   return (
+    // O boundary fica ACIMA do AuthProvider de propósito. Ele já esteve abaixo, e nessa posição
+    // não via nada do que o provider lançasse — justo o provider que mexe com Firebase Auth,
+    // Firestore e IndexedDB, a origem mais provável de erro no boot. Provider quebrando acima do
+    // boundary = árvore inteira sem montar = tela branca sem mensagem (investigado em 07/08/2026).
+    <AppErrorBoundary>
     <AuthProvider>
       <ThemeRuntime />
       <AppearanceSyncBridge />
       <ScrollToTop />
 
-      <AppErrorBoundary>
       <AppRoutesOrDeletedNotice>
       <Routes>
         <Route path="/" element={<RootRoute />} />
@@ -143,7 +147,7 @@ export function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </AppRoutesOrDeletedNotice>
-      </AppErrorBoundary>
     </AuthProvider>
+    </AppErrorBoundary>
   );
 }
