@@ -23,13 +23,21 @@ function ruleBody(css: string, selector: string): string {
 }
 
 describe('viewport no iOS', () => {
-  // `overflow-x: hidden` força o overflow-y a computar `auto`, e aí o elemento vira scroll
-  // container. Com o <body> rolando, o Safari do iOS descola os `position: fixed` — a bottom
-  // nav congela no meio da tela. `clip` corta o transbordo igual sem criar scroll container.
-  it.each(['html', 'body'])('%s corta o transbordo com clip, nunca com hidden', (selector) => {
-    const body = ruleBody(globalCss, selector);
+  // O corte do transbordo mora SÓ no body e propaga pra viewport. `hidden` está proibido nos
+  // dois: força o overflow-y a computar `auto`, o body vira scroll container e o Safari do
+  // iOS descola os `position: fixed` — a bottom nav congela no meio da tela.
+  it('body corta o transbordo com clip, nunca com hidden', () => {
+    const body = ruleBody(globalCss, 'body');
     expect(body).toMatch(/overflow-x:\s*clip/);
     expect(body).not.toMatch(/overflow-x:\s*hidden/);
+  });
+
+  // E o root não pode ter overflow-x NENHUM. `hidden` quebra o position:fixed do iOS (acima),
+  // e `clip` cria caixa de corte no próprio root: o fundo da página para de pintar fora dela
+  // e as barras do sistema caem na cor padrão do SO (preta no Android, branca no iPhone).
+  // Deixando o root `visible`, o overflow do body propaga pra viewport e resolve os dois.
+  it('html não declara overflow-x — nem hidden, nem clip', () => {
+    expect(ruleBody(globalCss, 'html')).not.toMatch(/overflow-x\s*:/);
   });
 
   // `viewport-fit=cover` é o que faz o PWA instalado desenhar até as bordas físicas. Quem pede

@@ -2,6 +2,25 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-08 — fix(ios): `clip` sai do `html` e fica só no `body` (barra do sistema preta)
+
+Correção da correção logo abaixo, algumas horas depois. Ao trocar `overflow-x: hidden` por
+`clip`, mexi em **dois** seletores quando só um precisava — e o `html` era justamente o que não
+podia.
+
+- **A diferença entre os dois valores no root**: `hidden` no `html` **propaga pra viewport** e o
+  root em si passa a computar `visible` (sem caixa de corte). `clip` **não** — ele corta o próprio
+  root. Com isso o fundo da página para de pintar fora daquela caixa, e as barras do sistema caem
+  na cor padrão do SO: **preta no Android** (print do dono, faixa preta com o risco de gestos
+  embaixo da nav) e **branca no iPhone**.
+- **Agora o corte mora só no `body`.** Com o root em `visible`, o `overflow-x` do body propaga pra
+  viewport e o body passa a computar `visible`. Ganha as três de uma vez: corta o transbordo
+  lateral, não vira scroll container (o `position: fixed` do iOS continua firme) e o fundo volta a
+  pintar a tela inteira. Verificado no navegador com um elemento de 3000px forçando transbordo:
+  `scrollX` fica 0, documento não alarga, `body.overflow-y` fica `visible`.
+- O teste passou a exigir que o `html` **não declare `overflow-x` nenhum** — nem `hidden` (quebra
+  o iOS) nem `clip` (apaga o fundo). Os dois erros já foram cometidos no mesmo dia.
+
 ## 2026-08-08 — fix(ios): bottom nav congelando no meio da tela no PWA instalado
 
 Print de uma usuária (iPhone 16, PWA instalado via Safari): a bottom nav travada no meio da tela,

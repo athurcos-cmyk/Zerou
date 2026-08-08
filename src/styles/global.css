@@ -20,14 +20,21 @@ textarea {
 }
 
 html {
-  /* clip (não hidden) — mesma regra que o .app-main já segue lá embaixo, e que faltava aqui.
-     `overflow-x: hidden` força o overflow-y a computar `auto`, então o <body> vira um
-     SCROLL CONTAINER de verdade. No Safari do iOS (PWA instalado) isso descola o
-     `position: fixed`: a bottom nav congela no meio da tela enquanto o conteúdo rola por
-     baixo — foi o print da usuária do iPhone 16 em 08/08/2026. `clip` corta o transbordo
-     horizontal do mesmo jeito, mas deixa o overflow-y `visible`, então quem rola volta a
-     ser a viewport e a nav fica presa no rodapé. */
-  overflow-x: clip;
+  /* ⚠️ NÃO ponha `overflow-x` aqui — nem `hidden`, nem `clip`. O corte do transbordo
+     horizontal mora no `body` (ver lá embaixo) e sobe pra cá sozinho.
+
+     `hidden` no root força o overflow-y a computar `auto` e transforma o <body> em SCROLL
+     CONTAINER; no Safari do iOS isso descola o `position: fixed` e a bottom nav congela no
+     meio da tela (print da usuária do iPhone 16, 08/08/2026).
+
+     E `clip` no root troca um bug por outro: `hidden` no root **propaga pra viewport** e o
+     root em si fica `visible`, mas `clip` cria caixa de corte no PRÓPRIO root — o fundo da
+     página para de pintar fora dela e as barras do sistema caem na cor padrão do SO (preta
+     no Android, branca no iPhone). Foi o que aconteceu no mesmo dia, algumas horas depois.
+
+     Com o root em `visible`, o `overflow-x` do body propaga pra viewport e o body passa a
+     computar `visible` — corta o transbordo, não vira scroll container, e o fundo continua
+     pintando a tela inteira. As três coisas de uma vez. */
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   background: var(--bg-page);
@@ -52,7 +59,8 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
-  /* clip pelo mesmo motivo do html acima — ver comentário lá. */
+  /* Único lugar que corta o transbordo horizontal. `clip` e não `hidden`: `hidden` forçaria
+     o overflow-y a `auto` e faria o body virar scroll container (ver o porquê no `html`). */
   overflow-x: clip;
   background: var(--bg-page);
   color: var(--text-primary);
