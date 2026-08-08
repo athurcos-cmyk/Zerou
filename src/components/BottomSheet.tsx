@@ -13,6 +13,25 @@ interface BottomSheetProps {
   bare?: boolean;
 }
 
+// Trava de rolagem COMPARTILHADA entre todas as sheets. As sheets empilham (SelectField,
+// CategoryField e ConfirmDialog abrem por cima de outra sheet), e salvar/restaurar o
+// overflow por instância vaza: a de cima captura o 'hidden' que a de baixo pôs e devolve
+// esse mesmo 'hidden' ao fechar. O body fica travado pra sempre — a página não rola mais e,
+// no iOS, a nav fixa descola do rodapé e aparece no meio da tela.
+//
+// Um contador é a única fonte da verdade: nenhuma sheet decide sozinha se pode destravar.
+// Restaura pra '' (e não pro valor anterior) porque este é o único lugar do app que escreve
+// em `document.body.style.overflow`.
+let openSheetCount = 0;
+
+function lockBodyScroll() {
+  if (openSheetCount++ === 0) document.body.style.overflow = 'hidden';
+  return () => {
+    openSheetCount = Math.max(0, openSheetCount - 1);
+    if (openSheetCount === 0) document.body.style.overflow = '';
+  };
+}
+
 // Swipe-to-dismiss: além do threshold de distância, um flick rápido (velocidade
 // alta com deslocamento menor) também fecha — é o que o dedo espera de sheet nativa.
 const DRAG_ACTIVATE_PX = 8;
@@ -29,18 +48,21 @@ export function BottomSheet({ open, onClose, title, subtitle, children, bare = f
 
   useFocusTrap(open, panelRef);
 
+  // Separado do ESC de propósito: `onClose` costuma ser arrow inline (ConfirmDialog,
+  // AppShell), então muda de identidade a cada render. Junto, a trava soltaria e voltaria
+  // a cada render — churn à toa em cima de um estado global.
+  useEffect(() => {
+    if (!open) return;
+    return lockBodyScroll();
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     function handleKey(event: KeyboardEvent) {
       if (event.key === 'Escape') onClose();
     }
     document.addEventListener('keydown', handleKey);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', handleKey);
-      document.body.style.overflow = previousOverflow;
-    };
+    return () => document.removeEventListener('keydown', handleKey);
   }, [open, onClose]);
 
   // Folha longa não avisava que rolava (achado pelo dono no sheet "Nova conta" de Contas e
