@@ -2,6 +2,56 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-07 (5) — fix(pwa): tela branca era lixo de localStorage que nenhum caminho apagava
+
+Investigacao do PWA instalado que parou de abrir (tela branca, com e sem internet, sobrevivendo a
+fechar/reabrir o app). **Causa raiz confirmada por teste no aparelho do dono**: aba anonima abre
+normal, aba normal fica branca — ou seja, estado local, nao rede nem build. Detalhes em
+`docs/history/2026-08.md`.
+
+- **Causa raiz: chaves `firestore_*` acumuladas ate estourar a quota do `localStorage`.** Ate
+  24/07/2026 o app usava `persistentMultipleTabManager`, que grava `firestore_clients_*` /
+  `firestore_targets_*` pra coordenar abas. Elas so se limpam num fechamento de aba limpo — que um
+  PWA mobile nunca dispara. A correcao de 24/07 trocou pro `persistentSingleTabManager` e parou de
+  criar chaves novas, **mas nao apagou nenhuma das antigas, e nenhum outro caminho apaga**
+  (`clearAccountLocalCaches` so mexe em `zerou.*`). Quem instalou antes daquela data seguia
+  carregando o lixo ate a quota estourar, o SDK cair com `INTERNAL ASSERTION FAILED` e a tela ficar
+  branca. Anonima abre porque o `localStorage` dela esta vazio.
+- **Correcao**: `src/firebase/legacyStorageCleanup.ts` apaga essas chaves no boot, chamado de dentro
+  do `getFirebaseServices()` **imediatamente antes do `initializeApp`** — ali a ordem e garantida por
+  construcao, e nao por quem lembra de chamar primeiro. Sob single-tab elas nao tem leitor nenhum. O
+  cache offline de verdade (IndexedDB) nao e tocado, e a sessao do Auth (`firebase:authUser:*`)
+  tambem nao — tem teste afirmando os dois.
+
+Alem da causa raiz, 4 defeitos reais de producao achados no caminho, todos confirmados ao vivo:
+
+- **O hash do CSP nunca bateu com producao.** `vercel.json` liberava `sha256-jGB0f0cvbl+...`, mas o
+  script inline servido hasheia `sha256-fcfPa8XTbRDfoNCe/...`. O hash foi gerado da copia de trabalho
+  no **Windows (CRLF, 1242 bytes)**; o git guarda **LF (1219 bytes)** e e isso que a Vercel serve.
+  Bytes diferentes, hash diferente: o bootstrap de tema estava **bloqueado desde o commit `61bad23`**,
+  e so o console acusava. Corrigido + `.gitattributes` fixando `index.html` em LF (copia local agora e
+  byte-identica a producao) + teste `src/test/cspInlineScriptHash.test.ts` que recalcula o hash como a
+  Vercel ve. **O teste falha com o hash antigo e passa com o novo** — verificado nos dois sentidos.
+- **Fontes do Google bloqueadas** pelo mesmo commit: `style-src` sem `fonts.googleapis.com` e
+  `font-src` sem `fonts.gstatic.com`. Liberados.
+- **Chunk que sumiu virava HTML com status 200, nao 404.** O catch-all `"/(.*)"` do SPA engolia
+  `/assets/`: pedi `/assets/index-DEADBEEF.js` em producao e recebi `200 text/html`. Modulo JS que
+  recebe HTML falha ao parsear **sem erro util** — tela branca. Rewrite virou `"/((?!assets/).*)"`,
+  entao arquivo que sumiu agora e 404 honesto.
+- **A recuperacao automatica do Firestore nao alcancava o proprio erro pra que foi feita.** Ela so
+  roda no `componentDidCatch` do `AppErrorBoundary`, e o `INTERNAL ASSERTION FAILED` do SDK nasce
+  **assincrono** — boundary do React nao ve erro assincrono. Nao havia `window.onerror` nem
+  `unhandledrejection` em lugar nenhum do `src/` (0 ocorrencias). Novo
+  `src/utils/globalErrorHandler.ts`, primeiro import do `main.tsx` de proposito, com 6 testes.
+- **`AppErrorBoundary` subiu pra cima do `AuthProvider`.** Estava embaixo, entao nao via nada do que
+  o provider lancasse — justo o provider que mexe com Firebase Auth e IndexedDB.
+- **Regra nova**: erro assincrono e rejeicao de promise **nunca** pintam tela de falha — este app
+  grava fire-and-forget de proposito, rejeicao solta e rotina offline. So boot que nao montou pinta.
+
+Validado: `npm run typecheck` limpo, **662 testes passando** (58 arquivos, +9), `npm run build` ok.
+Lint segue com os mesmos 52 problemas pre-existentes do `HEAD` (confirmado com stash), nenhum nos
+arquivos tocados. **Nao deployado** — falta autorizacao do dono.
+
 ## 2026-08-07 (4) — design(cartao/fatura): a lista de faturas virou grafico, e o gradiente virou so-dado
 
 Passada de `/frontend-design` nas duas telas de cartao, a segunda sob a direcao do dono: *"deixar o

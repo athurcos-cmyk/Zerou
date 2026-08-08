@@ -160,6 +160,91 @@ Apaguei tokens FCM residuais direto no Firestore via script (fora do fluxo do ap
 
 **Regra**: qualquer cache local (`localStorage`, `sessionStorage`, cache em memória) que existe só pra **evitar reescrever algo que já está certo no servidor** precisa, cedo ou tarde, verificar a suposição — não confiar cegamente que "já escrevi isso antes" ainda vale. Se uma limpeza manual no banco (script, console do Firebase, correção ad-hoc) é sequer remotamente possível no ciclo de vida de um dado, o código que lê o cache precisa de uma forma de perceber que o servidor mudou por fora, ou vai se autoconvencer de que está tudo certo enquanto o servidor está vazio. No caso do push, a correção foi um `getDoc` extra (1 leitura, só no caminho "cache diz que não mudou") confirmando que o documento existe antes de pular a escrita — barato, e fecha essa classe de bug pra sempre, não só pra este incidente.
 
+## ⚠️ Trocar o produtor NÃO apaga o acervo: dado que já vazou continua no aparelho de todo mundo (2026-08-07)
+
+O PWA instalado do dono passou a abrir em **tela branca** — com internet e sem internet, sobrevivendo
+a fechar e reabrir o app. A causa raiz foi uma correção **anterior, correta, e mesmo assim incompleta**.
+
+Em 24/07/2026, `persistentMultipleTabManager` foi trocado por `persistentSingleTabManager` porque as
+chaves `firestore_clients_*`/`firestore_targets_*` que ele grava no `localStorage` só se limpam num
+fechamento de aba limpo (`beforeunload`) — evento que um PWA mobile nunca dispara — e acumulam até
+estourar a quota, derrubando o SDK com `INTERNAL ASSERTION FAILED`.
+
+A troca parou de **criar** chaves novas. **Não apagou nenhuma das já existentes**, e nenhum outro
+caminho do app apaga (`clearAccountLocalCaches`, do logout, filtra só `zerou.*`). Ou seja: todo
+aparelho que rodou a versão anterior continuou carregando o acervo até estourar. Duas semanas depois,
+estourou. Diagnosticado sem cabo USB pelo teste **aba normal (branca) × aba anônima (abre)** — a
+anônima tem `localStorage` vazio, o que isola estado local de rede/CSP/build de uma vez só.
+
+**Regra**: quando o bug for da forma *"isto acumula e nunca é removido"*, trocar o produtor **não
+fecha o caso**. A correção precisa das **duas metades no mesmo commit**:
+
+1. Parar de produzir (a parte que todo mundo lembra).
+2. **Apagar o que já existe**, num caminho que roda no **boot de todo aparelho** — não no logout, não
+   numa tela específica, não atrás de um erro que precisa ser capturado primeiro.
+
+E onde colocar a limpeza importa: `purgeLegacyFirestoreTabMarkers` (`src/firebase/legacyStorageCleanup.ts`)
+é chamada **de dentro do `getFirebaseServices()`, imediatamente antes do `initializeApp`** — ali a
+ordem é garantida **por construção**, não por quem lembra de chamar primeiro no `main.tsx`. Mesma
+filosofia do `ledgerPayload` derivando `idempotencyKey` do próprio `id`.
+
+Num app offline-first isso é pior do que parece: não há erro na tela, não há log no servidor, e o
+aparelho afetado é justamente o de quem usa há mais tempo.
+
+## ⚠️ Error boundary do React NÃO pega erro assíncrono — e era onde a autorrecuperação morava (2026-08-07)
+
+Achado na mesma investigação. O `firestoreRecovery.ts`, criado em 24/07 exatamente pro
+`INTERNAL ASSERTION FAILED`, só era acionado pelo `componentDidCatch` do `AppErrorBoundary`. Mas esse
+erro **nasce assíncrono** dentro do SDK (entrega de snapshot, callback de IndexedDB), e error boundary
+do React só enxerga erro de render/lifecycle. A rede de segurança estava **inalcançável no caminho
+mais provável** — e `rg` por `window.onerror`/`unhandledrejection` no `src/` inteiro dava **0
+ocorrências**. Resultado: `#root` vazio, tela branca, muda, permanente.
+
+Somava-se a isso o `AppErrorBoundary` estar **abaixo** do `AuthProvider` na árvore — justo o provider
+que mexe com Firebase Auth, Firestore e IndexedDB. Provider quebrando acima do boundary = árvore
+inteira sem montar.
+
+**Regra**: erro que nasce assíncrono precisa de handler global (`src/utils/globalErrorHandler.ts`,
+primeiro import do `main.tsx` de propósito — imports estáticos avaliam na ordem em que aparecem).
+Boundary de React cobre render; **não** cobre callback de SDK, `setTimeout` nem promise.
+
+⚠️ **E o inverso é regra também: erro assíncrono NUNCA pode pintar tela de falha neste app.** Duas
+armadilhas reais encontradas ao escrever o handler, as duas quebrariam o uso **offline**, que aqui é
+operação normal e não erro:
+
+- O `<link>` de fonte do Google falha **sempre** que o aparelho está sem rede. Handler que trate
+  qualquer recurso como fatal cobriria com tela de erro um app que está funcionando. Só conta
+  `HTMLScriptElement` com `src` **da própria origem**.
+- Promise rejeitada é **rotina**: a REGRA PRINCIPAL offline-first manda gravar fire-and-forget. Por
+  isso `unhandledrejection` só faz log e checa o caso auto-recuperável — **nunca** pinta tela. Só boot
+  que não montou (`#root` vazio) pinta.
+
+## ⚠️ Hash no `vercel.json` é calculado sobre BYTES — CRLF do Windows ≠ LF do git (2026-08-07)
+
+O `script-src` do CSP libera o script inline do `index.html` por hash SHA-256. O hash foi gerado a
+partir da **cópia de trabalho no Windows** (CRLF, 1242 bytes), mas o git guarda o arquivo em **LF**
+(1219 bytes) e é isso que a Vercel serve. Os dois **nunca bateram**: o bootstrap de tema esteve
+**bloqueado em produção desde o commit que introduziu o CSP** (`61bad23`), e nada acusava — build,
+typecheck e testes passam, e o único sinal era um erro no console.
+
+Mesma família dos outros incidentes deste arquivo: **uma invariante entre dois arquivos que nenhuma
+ferramenta verificava**. Fechado pelos dois lados, seguindo a lição de tornar a invariante impossível
+de violar em vez de só testável:
+
+- `.gitattributes` fixa `index.html` em `text eol=lf` — a cópia local passa a ser **byte-idêntica** à
+  que a Vercel serve, então recalcular o hash à mão no Windows não erra mais.
+- `src/test/cspInlineScriptHash.test.ts` recalcula o hash de **todo** script inline normalizando pra
+  LF e afirma que o `script-src` libera cada um (+ trava `'unsafe-inline'` de voltar escondido).
+
+**Regra**: mexeu no script inline do `index.html`, rode `npm test` — o teste acima falha sozinho. E
+qualquer hash/assinatura calculado sobre conteúdo de arquivo neste repo precisa normalizar line
+ending antes, ou fixar o arquivo em LF no `.gitattributes`.
+
+**Corolário separado, do mesmo dia**: o rewrite catch-all do SPA (`"/(.*)"` no `vercel.json`) engolia
+`/assets/`, então um chunk que sumiu do servidor voltava **`200 text/html`** em vez de 404. Módulo JS
+que recebe HTML falha ao parsear **sem erro acionável** — outra fonte de tela branca. Agora é
+`"/((?!assets/).*)"`. Rewrite de SPA nunca deve cobrir o diretório de assets com hash no nome.
+
 ## ⚠️ Notificação push chegando em dobro — NÃO RESOLVIDO apesar de 3 tentativas (2026-07-31)
 
 A documentação do Firebase Messaging dá a entender que `onBackgroundMessage` (service worker) e `onMessage` (página) são mutuamente exclusivos: com o app em foco, quem recebe é `onMessage`, e o SDK não mostra notificação sozinho; sem foco, quem recebe é o SW. Num Android real (PWA instalado) isso não se sustentou, e **nenhuma das 3 correções tentadas na mesma sessão eliminou a duplicação**, cada uma descartada só depois de testada ao vivo contra a function real de produção (`gcloud scheduler jobs run`, não um script à parte):
