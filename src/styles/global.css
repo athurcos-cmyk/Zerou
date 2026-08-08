@@ -74,9 +74,16 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
-  /* Único lugar que corta o transbordo horizontal. `clip` e não `hidden`: `hidden` forçaria
-     o overflow-y a `auto` e faria o body virar scroll container (ver o porquê no `html`). */
-  overflow-x: clip;
+  /* ⚠️ NÃO declare `overflow-x` aqui — vale o mesmo aviso do `html` acima, e mais um motivo.
+     Quem corta o transbordo horizontal é o `.app-main` (e o `.lp` na landing), cada um no seu
+     próprio contêiner. Provado no navegador: com html/body em `visible` e um elemento de 3000px
+     dentro do `.app-main`, o documento fica em 375px e o `scrollX` não sai do zero.
+
+     Qualquer `overflow-x` aqui PROPAGA pra viewport e deixa a página inteira com uma caixa de
+     corte que ela não tinha. Com `hidden` o body ainda vira scroll container e quebra o
+     `position: fixed` do iOS; com `clip` some a tira preta do iOS mas o PWA do Android passou a
+     pintar de preto a faixa da navegação por gestos (08/08/2026, print do dono). Deixar os dois
+     no padrão do navegador resolve os dois casos e é menos CSS. */
   background: var(--bg-page);
   color: var(--text-primary);
 }

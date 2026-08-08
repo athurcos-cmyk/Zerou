@@ -19,7 +19,8 @@ function ruleBody(css: string, selector: string, mustContain = ''): string {
   const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, '');
   // Todas as regras com esse seletor, não só a primeira: `.mobile-nav` aparece em mais de uma
   // (uma delas dividida com `.sidebar-nav`), e sem o filtro o teste mede a regra errada.
-  const bodies = [...withoutComments.matchAll(new RegExp(`^${selector}\\s*\\{([^}]*)\\}`, 'gm'))]
+  // `[ \t]*` no começo porque regra dentro de @media vem indentada (é o caso do `.app-main`).
+  const bodies = [...withoutComments.matchAll(new RegExp(`^[ \\t]*${selector}\\s*\\{([^}]*)\\}`, 'gm'))]
     .map((match) => match[1])
     .filter((body) => body.includes(mustContain));
   if (bodies.length === 0) {
@@ -29,21 +30,18 @@ function ruleBody(css: string, selector: string, mustContain = ''): string {
 }
 
 describe('viewport no iOS', () => {
-  // O corte do transbordo mora SÓ no body e propaga pra viewport. `hidden` está proibido nos
-  // dois: força o overflow-y a computar `auto`, o body vira scroll container e o Safari do
-  // iOS descola os `position: fixed` — a bottom nav congela no meio da tela.
-  it('body corta o transbordo com clip, nunca com hidden', () => {
-    const body = ruleBody(globalCss, 'body');
-    expect(body).toMatch(/overflow-x:\s*clip/);
-    expect(body).not.toMatch(/overflow-x:\s*hidden/);
+  // Nem o root nem o body podem declarar overflow-x. Qualquer valor ali propaga pra viewport:
+  // `hidden` força o overflow-y a `auto`, o body vira scroll container e o Safari do iOS descola
+  // os `position: fixed` (a bottom nav congela no meio da tela); `clip` conserta isso mas deixa
+  // uma caixa de corte na viewport, e aí o PWA do Android pinta de preto a faixa da navegação
+  // por gestos. Os dois erros aconteceram em 08/08/2026, com poucas horas de diferença.
+  // Quem corta o transbordo é o contêiner de cada zona (`.app-main`, `.lp`), não a página.
+  it.each(['html', 'body'])('%s não declara overflow-x — nem hidden, nem clip', (selector) => {
+    expect(ruleBody(globalCss, selector)).not.toMatch(/overflow-x\s*:/);
   });
 
-  // E o root não pode ter overflow-x NENHUM. `hidden` quebra o position:fixed do iOS (acima),
-  // e `clip` cria caixa de corte no próprio root: o fundo da página para de pintar fora dela
-  // e as barras do sistema caem na cor padrão do SO (preta no Android, branca no iPhone).
-  // Deixando o root `visible`, o overflow do body propaga pra viewport e resolve os dois.
-  it('html não declara overflow-x — nem hidden, nem clip', () => {
-    expect(ruleBody(globalCss, 'html')).not.toMatch(/overflow-x\s*:/);
+  it('o corte do transbordo mora no contêiner da zona, não no body', () => {
+    expect(ruleBody(globalCss, '\\.app-main', 'overflow-x')).toMatch(/overflow-x:\s*clip/);
   });
 
   // `viewport-fit=cover` é o que faz o PWA instalado desenhar até as bordas físicas. Quem pede

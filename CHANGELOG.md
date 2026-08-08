@@ -2,6 +2,25 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-08 — fix(css): `overflow-x` sai do `html` e do `body` de vez
+
+O dono cortou minha conclusão errada: **a faixa preta não existia antes**, e o manifesto não
+mudou. Ou seja, era regressão minha, não comportamento pré-existente do Android como eu tinha
+afirmado.
+
+- **A viewport ficou com uma caixa de corte que ela não tinha.** Qualquer `overflow-x` em
+  `html`/`body` propaga pra viewport. Com `hidden` (o original) o body virava scroll container e
+  quebrava o `position: fixed` do iOS; com `clip` (minha correção) isso sumiu, mas o PWA do
+  Android passou a pintar de preto a faixa da navegação por gestos. Os dois valores erram, cada
+  um do seu jeito.
+- **O corte era redundante.** `.app-main` (app) e `.lp` (landing) já cortam o transbordo no
+  próprio contêiner desde sempre. Medido: com `html`/`body` em `visible` e um elemento de 3000px
+  dentro do `.app-main`, o documento fica em 375px e o `scrollX` não sai do zero.
+- Sobrou **menos CSS** que no começo do dia, e as duas plataformas atendidas: body não é scroll
+  container (iOS ok) e a viewport não tem caixa de corte (Android ok).
+- O teste passou a exigir `overflow-x` ausente nos **dois** e presente no `.app-main`, com o nome
+  dos dois incidentes no comentário.
+
 ## 2026-08-08 — fix(android): faixa preta embaixo da bottom nav no PWA (inset dinâmico vs estático)
 
 Bug **antigo**, não regressão das correções de hoje — só ficou visível porque passamos a sessão
