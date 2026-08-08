@@ -1,1 +1,7 @@
 graphify-out/graph.json merge=graphify
+
+# O hash CSP do script inline mora em vercel.json e é calculado sobre os BYTES do arquivo.
+# Com core.autocrlf=true a cópia de trabalho no Windows fica CRLF enquanto o git (e a Vercel)
+# guardam LF — bytes diferentes, hash diferente, script bloqueado em produção e ninguém vê.
+# Forçar LF aqui faz a cópia local ser byte-idêntica à que a Vercel serve.
+index.html text eol=lf
