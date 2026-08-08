@@ -19,7 +19,6 @@ import {
   type Unsubscribe
 } from 'firebase/firestore';
 import { addHours } from 'date-fns';
-import { getBillingEntitlementsForUser } from '../billing/billingService';
 import { httpsCallable } from 'firebase/functions';
 import { getFirebaseDb, getFirebaseFunctions } from '../firebase/config';
 import { fireWrite } from '../firebase/fireWrite';
@@ -269,17 +268,15 @@ async function getActiveCoupleRefForUser(userId: string) {
     .find((item) => item.type === 'couple' && item.status === 'active');
 }
 
+// A checagem de entitlement de billing saiu em 08/08/2026 junto com o Stripe (tag
+// `billing-stripe-v0`): era uma leitura de rede a mais, neste caminho, pra perguntar uma flag
+// que valia `true` nos três planos do catálogo. O único limite real é o de baixo — uma pessoa,
+// um espaço a dois. A regra do Firestore continua liberando por padrão (ver `firestore.rules`).
 export async function canCreateCoupleWorkspace(userId: string) {
   const existingCouple = await getActiveCoupleRefForUser(userId);
 
   if (existingCouple) {
     return { allowed: false, reason: 'Você já possui um espaço compartilhado ativo.' };
-  }
-
-  const entitlements = await getBillingEntitlementsForUser(userId);
-
-  if (!entitlements.canCreateCoupleWorkspace) {
-    return { allowed: false, reason: 'Não foi possível liberar o espaço compartilhado gratuito para esta conta agora.' };
   }
 
   return { allowed: true };

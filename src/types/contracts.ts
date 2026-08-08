@@ -7,9 +7,6 @@ export type WorkspaceRole = 'owner' | 'partner' | 'viewer';
 export type MembershipStatus = 'active' | 'invited' | 'removed';
 export type SyncStatus = 'synced' | 'pending' | 'failed';
 export type MoneyCents = number;
-export type PlanId = 'free' | 'duo' | 'premium';
-export type BillingInterval = 'monthly' | 'annual';
-export type SubscriptionStatus = 'free' | 'trialing' | 'active' | 'past_due' | 'paused' | 'cancelled' | 'expired';
 
 export type AccountType = 'checking' | 'savings' | 'wallet' | 'investment' | 'digital_wallet' | 'cash' | 'shared';
 
@@ -503,59 +500,8 @@ export interface AuditLog {
   createdAt?: Timestamp;
 }
 
-export interface Entitlements {
-  canCreateCoupleWorkspace: boolean;
-  canUseAdvancedReports: boolean;
-  canUseAutomationRules: boolean;
-  canImportStatements: boolean;
-  canExportXlsx: boolean;
-  canExportPdf: boolean;
-  canUploadReceipts: boolean;
-  canUseOcr: boolean;
-  canUseAdvancedReconciliation: boolean;
-  maxTransactionsPerMonth: number;
-  maxReceiptStorageMb: number;
-  maxAutomationRules: number;
-}
-
-export interface PlanCatalogItem {
-  id: PlanId;
-  name: string;
-  description: string;
-  active: boolean;
-  monthlyPriceCents: MoneyCents;
-  annualPriceCents: MoneyCents;
-  stripeMonthlyPriceId?: string;
-  stripeAnnualPriceId?: string;
-  entitlements: Entitlements;
-  updatedAt?: Timestamp;
-}
-
-export interface BillingAccount {
-  id: string;
-  ownerUserId: string;
-  stripeCustomerId?: string;
-  currentPlanId: PlanId;
-  subscriptionStatus: SubscriptionStatus;
-  currentSubscriptionId?: string;
-  currentPeriodEnd?: Timestamp;
-  entitlements: Entitlements;
-  updatedAt?: Timestamp;
-}
-
-export interface SubscriptionRecord {
-  id: string;
-  billingAccountId: string;
-  stripeSubscriptionId: string;
-  stripeCustomerId: string;
-  planId: PlanId;
-  stripePriceId: string;
-  status: SubscriptionStatus;
-  currentPeriodStart?: Timestamp;
-  currentPeriodEnd?: Timestamp;
-  cancelAtPeriodEnd: boolean;
-  updatedAt?: Timestamp;
-}
+// Entitlements, PlanCatalogItem, BillingAccount e SubscriptionRecord saíram em 08/08/2026
+// junto com o Stripe (tag `billing-stripe-v0`). O produto é gratuito e não tem checkout.
 
 export type PrivacyRequestType = 'correction' | 'export' | 'deletion' | 'marketing_revocation' | 'cache_help';
 

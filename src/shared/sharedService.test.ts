@@ -25,10 +25,6 @@ vi.mock('../firebase/config', () => ({
   getFirebaseDb: vi.fn().mockReturnValue({})
 }));
 
-vi.mock('../billing/billingService', () => ({
-  getBillingEntitlementsForUser: vi.fn()
-}));
-
 const { acceptSettlement } = await import('./sharedService');
 
 describe('acceptSettlement', () => {

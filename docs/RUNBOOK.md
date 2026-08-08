@@ -57,9 +57,17 @@ npx firebase deploy --only functions:billing --project zerou-26757
 
 **Qualquer mudança em `functions/src/` reimplanta o CODEBASE INTEIRO — e isso pode estourar a quota de CPU do Cloud Run.** O Firebase empacota todo o codebase junto: mudar um arquivo (ex.: um template de email) bumpa o bundle e faz TODAS as ~25 functions de `billing` tentarem criar revisão nova ao mesmo tempo. O pico de CPU simultâneo passa do teto da região e algumas falham com `Quota exceeded for total allowable CPU per project per region` / `Container Healthcheck failed` (`southamerica-east1`, aconteceu em 2026-07-21). As que passam ficam atualizadas; as que falham **mantêm a revisão anterior rodando** ("Skipping deletes"), então **nada quebra** — mas ficam fora do bundle novo. **Contorno:** reimplantar só as que falharam, em lote menor (menos revisões simultâneas = menos pico):
 ```bash
-npx firebase deploy --only functions:billing:forceLogoutAllDevices,functions:billing:sendDailyLogReminder,functions:billing:stripeWebhook --project zerou-26757
+npx firebase deploy --only functions:billing:forceLogoutAllDevices,functions:billing:sendDailyLogReminder,functions:billing:sendGoodbyeEmail --project zerou-26757
 ```
 Se persistir, pedir aumento da quota de CPU do Cloud Run no GCP Console (a região acumula CPU reservada por function, ainda mais as com `--no-cpu-throttling`).
+
+**Pra REMOVER function da nuvem, use `functions:delete` — não deploy.** Quando uma function sai do `index.ts`, o instinto é deployar o codebase pra que o Firebase note a ausência e apague. Isso funciona, mas paga o preço inteiro do parágrafo acima: reimplanta as ~20 que ficaram, todas criando revisão ao mesmo tempo, pra apagar as que saíram. `functions:delete` apaga pelo nome sem encostar em nenhuma outra:
+
+```bash
+npx firebase functions:delete nomeA nomeB --region southamerica-east1 --project zerou-26757 --force
+```
+
+Usado em 2026-08-08 pra remover as 5 functions de billing (`createCheckoutSession`, `createCustomerPortalSession`, `stripeWebhook`, `processBillingEvent`, `retryFailedBillingEvents`) quando o código do Stripe saiu do repo: 26 → 21 functions, zero revisão nova, zero risco de quota. `--force` é obrigatório fora de terminal interativo (senão fica esperando confirmação). Conferir antes e depois com `npx firebase functions:list --project zerou-26757`.
 
 Depois de todo deploy que toca `whatsappWebhook`, reaplicar (Cloud Run reseta a cada deploy):
 
@@ -153,7 +161,7 @@ podem estar 100% verdes com o push completamente morto**.
 
 ## Billing Event Reprocess
 
-Billing Functions are scaffolded but not active in free launch mode. When Blaze, Stripe secrets and webhook are enabled, failed billing events can be retried by the scheduled Function or by updating the event status under the server-only billing event document.
+Nao se aplica mais: o codigo de billing saiu do repo em 2026-08-08 e as 5 functions foram apagadas da nuvem (`functions:delete`). Nao ha webhook, nem fila de eventos, nem retry agendado. As regras de `billingAccounts`/`planCatalog` ficaram no `firestore.rules`, mas as colecoes estao vazias. Recuperacao do codigo e contexto: `docs/BILLING.md` (tag `billing-stripe-v0`).
 
 ## Privacy Requests
 

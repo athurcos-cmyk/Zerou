@@ -6,6 +6,41 @@ Itens acionáveis. Fechou? Move para "Concluído" ou remove. Detalhe histórico 
 
 ## Abertas
 
+### ~~Deploy das functions pra sumir com o billing da nuvem~~ — FEITO e verificado (2026-08-08)
+
+- [x] ~~Conferir o estado real~~ — **as 5 estavam mesmo implantadas**, incluindo o
+  `retryFailedBillingEvents` disparando a cada 15 min e o `stripeWebhook` como endpoint HTTP público.
+- [x] ~~Removê-las~~ — feito com **`functions:delete`, não com deploy do codebase**. Ver a lição nova
+  no `../RUNBOOK.md`: apagar as 5 pelo nome não encosta nas outras e não passa nem perto da quota de
+  CPU do Cloud Run. Verificado depois: 26 → 21 functions, nenhuma das outras tocada.
+- [x] ~~`firestore.rules`~~ — não mudou, não precisou de deploy.
+
+### ~~Teste vermelho pré-existente nas functions~~ — CORRIGIDO (2026-08-08)
+
+`messageFormat.test.ts` esperava `*Contas a Pagar*`/`*Contas a Receber*`; as abas reais são
+`*Contas e assinaturas*`/`*Dinheiro a receber*` desde 02/08 (fonte da verdade: `src/layout/AppShell.tsx`).
+**O teste estava errado, não o produto** — a mensagem do WhatsApp já apontava a aba certa. Asserções
+alinhadas e comentário no teste apontando pro `AppShell.tsx`, que este pacote não consegue importar.
+
+### Sobras da auditoria de over-engineering (2026-08-08) — não aplicadas
+
+Achados do `/ponytail-audit` que o dono não mandou mexer. Nenhum é urgente; todos são corte puro, sem
+mudança de comportamento.
+
+- [ ] **6 tour stores byte-a-byte iguais** (`src/onboarding/*Tour.store.ts`, 219 linhas). Só muda a
+  `SEEN_KEY`. Um `createTourStore('zerou.analysisTourSeen')` + 6 chamadas de 1 linha corta ~160.
+  É o corte mais seguro da lista: zero risco, nenhuma regra do Firestore envolvida.
+- [ ] **20 arquivos com try/catch próprio em volta do `localStorage`** (`theme.storage`,
+  `pushTokenCache`, `pendingInvite`, `profileCache`, `cookieConsent`, `dashboardViewCache`, os 6 tours,
+  +8). Um `safeStorage.get/set` de ~15 linhas. ⚠️ Ao fazer, não engolir o caso que o `CLAUDE.md`
+  documenta: cache local que evita reescrever no servidor precisa saber quando o servidor mudou por fora.
+- [ ] **5 componentes de tour com corpo idêntico** (mesmo `useEffect`, mesmo gate de `welcomeTourSeen`).
+  Os slides ficam; só o corpo vira `createScreenTour(store, slides, label)`. ~35 linhas.
+- [ ] **4 deps de React dentro das functions só pra montar HTML de email** (`react`, `react-dom`,
+  `@react-email/components`, `@react-email/render`). Tradeoff real — react-email resolve compatibilidade
+  de cliente de email, e template string à mão volta a ser tabela HTML manual. O item mais discutível
+  da auditoria; só mexer se o cold start das functions de email virar problema medido.
+
 ### ~~PWA do dono abrindo em tela branca~~ — RESOLVIDO e verificado ao vivo (2026-08-07)
 
 Causa raiz: chaves `firestore_*` acumuladas no `localStorage` desde antes de 24/07 estouravam a quota

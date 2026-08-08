@@ -2,6 +2,44 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-08 — chore(billing): Stripe removido do repo, preservado na tag `billing-stripe-v0`
+
+Auditoria de over-engineering (`/ponytail-audit`) no repo inteiro. O maior achado foi o subsistema de
+billing: ~1.200 linhas de Stripe escritas antes de existir qualquer decisao de preco, para um produto
+que e gratuito e nao vende nada. Decisao do dono: remover. Detalhes em `docs/history/2026-08.md`.
+
+- **Removido**: `functions/src/billing/` (11 arquivos), as 5 functions do `index.ts`
+  (`createCheckoutSession`, `createCustomerPortalSession`, `stripeWebhook`, `processBillingEvent` e o
+  `retryFailedBillingEvents` **agendado a cada 15 min**), a dep `stripe`, `functions/scripts/seedPlanCatalog.mjs`,
+  `src/billing/billingService.ts` e os tipos de billing do `src/types/contracts.ts`.
+- **Tag `billing-stripe-v0`** marca o commit anterior. Recuperar e um comando — o `docs/BILLING.md`
+  abre com ele. As decisoes de arquitetura continuam documentadas la; so o codigo saiu.
+- **`canCreateCoupleWorkspace` ficou mais curta**: a checagem de entitlement era uma leitura de rede
+  no caminho de criar o espaco do casal pra perguntar uma flag que valia `true` nos tres planos do
+  catalogo. O unico limite real (uma pessoa, um espaco a dois) continua.
+- **`firestore.rules` NAO mudou** e nao precisa de deploy. As regras de `billingAccounts`/`planCatalog`
+  ja liberam por padrao quando nao existe documento, e a cobertura delas em `tests/firestore.rules.test.ts`
+  ficou. Remove-las seria risco sem ganho.
+- ⚠️ **O codebase de functions continua se chamando `billing`** no `firebase.json`. Nome historico,
+  **nao renomear** — ja causou conflito de deploy antes.
+- **As 5 functions foram APAGADAS da nuvem e verificadas** (26 → 21). Estavam mesmo implantadas: o
+  `retryFailedBillingEvents` disparava a cada 15 min e o `stripeWebhook` era endpoint HTTP publico,
+  os dois pra uma fila que nunca recebeu evento. Feito com **`functions:delete`, nao com deploy do
+  codebase** — apagar pelo nome nao encosta nas outras 21 e nao chega perto da quota de CPU do Cloud
+  Run que o `RUNBOOK.md` avisa. Licao nova documentada la.
+- **`firestore.rules` nao mudou e nao precisou de deploy.**
+- Validado: `typecheck`, `build` (app e functions), **662 testes do cliente e 117/117 das functions**.
+
+## 2026-08-08 (2) — fix(test): o teste do WhatsApp apontava aba que nao existe mais
+
+O `messageFormat.test.ts` esperava `*Contas a Pagar*` e `*Contas a Receber*`. As abas se chamam
+`*Contas e assinaturas*` e `*Dinheiro a receber*` desde 02/08 (fonte da verdade: `src/layout/AppShell.tsx`).
+
+- **O teste estava errado, o produto nao.** A mensagem do WhatsApp ja apontava a aba certa desde a
+  renomeacao — quem ficou pra tras foi a assercao, e o teste seguia vermelho havia 6 dias.
+- Comentario novo no teste aponta o `AppShell.tsx` como fonte da verdade e explica por que a
+  duplicacao existe: `functions/` e `src/` sao codebases separados e um nao importa do outro.
+
 ## 2026-08-07 (5) — fix(pwa): tela branca era lixo de localStorage que nenhum caminho apagava
 
 Investigacao do PWA instalado que parou de abrir (tela branca, com e sem internet, sobrevivendo a

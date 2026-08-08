@@ -18,7 +18,7 @@ Use este arquivo como mapa antes de abrir documentos grandes. Regra: leia o meno
 | Segurança / privacidade | `docs/SECURITY.md`, `docs/PRIVACY.md` | Regras, LGPD |
 | Operação / deploy | `docs/RUNBOOK.md`, `docs/PRODUCTION_CHECKLIST.md` | Rotina e checklist |
 | Custos Firebase (leituras/gravações, limites grátis, break-even) | `docs/COSTS.md` | Quantos usuários no grátis, quanto cobrar |
-| Billing futuro (inativo) | `docs/BILLING.md`, `docs/BOOTSTRAP_FIREBASE_STRIPE.md` | Não ativar sem pedido |
+| Billing futuro (código REMOVIDO em 2026-08-08) | `docs/BILLING.md`, `docs/BOOTSTRAP_FIREBASE_STRIPE.md` | Não procure `src/billing/` nem `functions/src/billing/` — não existem mais. Está na tag `billing-stripe-v0` (comando de recuperação no topo do `BILLING.md`). As **regras** de `billingAccounts`/`planCatalog` ficaram no `firestore.rules`. ⚠️ O codebase de functions ainda se chama `billing` (`functions:billing:*`) — nome histórico, não renomear |
 | Setup de infra manual | `docs/MANUAL_SETUP_REQUIRED.md` | Passos fora do código |
 | Instruções pra agentes | `CLAUDE.md` | Regra de docs e restrições |
 | Contas de teste (login p/ navegador) | `TEST_ACCOUNTS.local.md` (raiz, local, fora do git) | Só existe se criado na máquina |
