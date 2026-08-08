@@ -50,7 +50,12 @@ Alem da causa raiz, 4 defeitos reais de producao achados no caminho, todos confi
 
 Validado: `npm run typecheck` limpo, **662 testes passando** (58 arquivos, +9), `npm run build` ok.
 Lint segue com os mesmos 52 problemas pre-existentes do `HEAD` (confirmado com stash), nenhum nos
-arquivos tocados. **Nao deployado** — falta autorizacao do dono.
+arquivos tocados.
+
+**Deployado e verificado ao vivo**: o dono confirmou que o PWA voltou a abrir normal **sem limpar
+dados e sem reinstalar** — o que tambem descarta a hipotese do service worker pra este incidente. Em
+producao: `/assets/index-DEADBEEF.js` agora da `404 text/plain` (era `200 text/html`), deep link
+`/app/dashboard` segue 200, e uma aba limpa registra **zero** violacao de CSP (eram 2 por load).
 
 ## 2026-08-07 (4) — design(cartao/fatura): a lista de faturas virou grafico, e o gradiente virou so-dado
 

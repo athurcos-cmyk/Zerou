@@ -6,26 +6,24 @@ Itens acionáveis. Fechou? Move para "Concluído" ou remove. Detalhe histórico 
 
 ## Abertas
 
-### PWA do dono abrindo em tela branca — causa confirmada e corrigida, falta validar no aparelho
+### ~~PWA do dono abrindo em tela branca~~ — RESOLVIDO e verificado ao vivo (2026-08-07)
 
-Aberto e diagnosticado em 2026-08-07. Causa raiz: chaves `firestore_*` acumuladas no `localStorage`
-desde antes de 24/07 estouravam a quota e derrubavam o SDK do Firestore (ver `../history/2026-08.md`).
-Confirmado pelo teste aba normal (branca) × aba anônima (abre). Corrigido em
+Causa raiz: chaves `firestore_*` acumuladas no `localStorage` desde antes de 24/07 estouravam a quota
+e derrubavam o SDK do Firestore (ver `../history/2026-08.md`). Corrigido em
 `src/firebase/legacyStorageCleanup.ts`.
 
-- [x] ~~Medir antes de limpar (aba normal × anônima)~~ — **feito, e foi o que fechou o diagnóstico.**
-- [ ] **Depois do deploy**: abrir o app **duas vezes** (a 1ª atualiza o service worker, a 2ª carrega o
-  código novo e roda a limpeza no boot). Confirmar que voltou sem precisar limpar dados nem
-  reinstalar. **Se ainda ficar branco, a hipótese do service worker servindo HTML velho volta pra
-  mesa** — nesse caso limpar dados do site destrava na hora.
-- [ ] Se voltar a acontecer depois disso, o `globalErrorHandler` novo mostra a mensagem na tela em vez
-  de branco — o diagnóstico não depende mais de cabo.
+- [x] ~~Medir antes de limpar (aba normal × anônima)~~ — foi o que fechou o diagnóstico.
+- [x] ~~Validar no aparelho depois do deploy~~ — **o dono confirmou: o app voltou a abrir normal, sem
+  limpar dados e sem reinstalar.** Isso prova a cadeia inteira: a limpeza no boot foi o suficiente, e a
+  hipótese do service worker servindo HTML velho fica descartada pra este incidente.
+- [x] ~~Deploy do `vercel.json` (hash do CSP, fontes, rewrite)~~ — no ar e **medido em produção**:
+  `/assets/index-DEADBEEF.js` agora dá **404 `text/plain`** (era `200 text/html`), deep link
+  `/app/dashboard` segue **200**, header CSP serve o hash `sha256-fcfPa8XTbRDfoNCe/…` e uma aba limpa
+  não registra **nenhuma** violação de CSP. O `rel` do `#font-preload` chega em `stylesheet`, o que só
+  acontece dentro do `onload` do script inline — prova de que ele voltou a executar.
 
-### Deploy pendente das correções de CSP/rewrite (2026-08-07)
-
-- [ ] `vercel.json` mudou (hash do CSP, fontes liberadas, rewrite excluindo `/assets/`). Vai junto no
-  `git push` — **mas o rewrite `"/((?!assets/).*)"` só dá pra validar em produção**. Depois do deploy,
-  conferir que deep link (`/app/dashboard`) ainda carrega e que `/assets/naoexiste.js` agora dá 404.
+Se voltar a acontecer, o `globalErrorHandler` novo mostra a mensagem na tela em vez de branco — o
+diagnóstico não depende mais de cabo USB.
 
 ### Auditar as outras listas que usam `.list-row` pelo bug de quebra do valor
 
