@@ -86,12 +86,17 @@ describe('pendingChoicePrompt', () => {
 });
 
 describe('outOfScopeMessage', () => {
+  // ⚠️ A fonte da verdade destes nomes é a navegação do app (`src/layout/AppShell.tsx`), que este
+  // pacote não consegue importar (codebases separados). Renomeou aba lá? Atualize aqui também.
+  // Foi o que faltou em 02/08/2026, quando "Contas a Pagar" virou "Contas e assinaturas" e
+  // "Contas a Receber" virou "Dinheiro a receber": a mensagem foi atualizada, o teste não, e ele
+  // ficou vermelho até 08/08 — o teste estava errado, não o produto.
   it('aponta a aba certa por tela', () => {
     expect(outOfScopeMessage('transacoes')).toContain('*Transações*');
     expect(outOfScopeMessage('categorias')).toContain('*Editar categorias*');
     expect(outOfScopeMessage('contas')).toContain('*Contas*');
-    expect(outOfScopeMessage('contas_a_pagar')).toContain('*Contas a Pagar*');
-    expect(outOfScopeMessage('contas_a_receber')).toContain('*Contas a Receber*');
+    expect(outOfScopeMessage('contas_a_pagar')).toContain('*Contas e assinaturas*');
+    expect(outOfScopeMessage('contas_a_receber')).toContain('*Dinheiro a receber*');
     expect(outOfScopeMessage('cartoes')).toContain('*Cartões*');
     expect(outOfScopeMessage('metas')).toContain('*Metas*');
     expect(outOfScopeMessage('analise')).toContain('*Análise*');
