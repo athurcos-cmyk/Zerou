@@ -11,6 +11,7 @@ import {
 import { getStorage, connectStorageEmulator, type FirebaseStorage } from 'firebase/storage';
 import { connectFunctionsEmulator, getFunctions, type Functions } from 'firebase/functions';
 import { hasAnalyticsConsent } from '../privacy/cookieConsent';
+import { purgeLegacyFirestoreTabMarkers } from './legacyStorageCleanup';
 
 interface FirebaseServices {
   app: FirebaseApp;
@@ -70,6 +71,13 @@ export function getFirebaseServices() {
   }
 
   try {
+    // Antes de QUALQUER coisa do Firebase: apaga o lixo de coordenação multi-aba que ficou no
+    // localStorage de quem instalou o PWA antes de 24/07/2026. Acumulado, ele estoura a quota e
+    // derruba o SDK com "INTERNAL ASSERTION FAILED" — tela branca sem mensagem. Fica aqui, e não
+    // no main.tsx, porque aqui a ordem é garantida por construção: é impossível o Firestore subir
+    // antes da limpeza, independente de quem chamar getFirebaseServices() primeiro.
+    purgeLegacyFirestoreTabMarkers();
+
     const app = initializeApp(firebaseConfig);
     let dbInstance: Firestore;
 
