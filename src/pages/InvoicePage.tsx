@@ -12,14 +12,16 @@ import { SelectField } from '../components/SelectField';
 import { useConfirm } from '../components/ConfirmDialog';
 import { FormMessage } from '../components/FormMessage';
 import { invoiceStatusLabels, ledgerTypeLabels } from '../cards/cardLabels';
-import { anticipatedAwayEntryIds, groupAnticipatablePurchases } from '../cards/anticipation';
+import { anticipatedAwayEntryIds, groupAnticipatablePurchases, invoiceHasVisibleActivity } from '../cards/anticipation';
 import {
   anticipateInstallments,
   recordInvoiceCredit,
   recordInvoiceFee,
   recordInvoicePayment
 } from '../cards/cardService';
-import { mergeInvoicesWithLedger, useInvoiceLedger } from '../cards/useInvoiceLedger';
+import { invoiceLedgerKey, mergeInvoicesWithLedger, useInvoiceLedger } from '../cards/useInvoiceLedger';
+import { InvoiceStrip } from '../cards/InvoiceStrip';
+import { invoiceValueCents } from '../domain/invoices/calculateInvoice';
 
 import { formatFriendlyDate, formatFriendlyMonth, fromDateInputValue, todayInputValue } from '../finance/financeDates';
 import { formatMoney, parseMoneyToCents } from '../finance/money';
@@ -57,6 +59,29 @@ export function InvoicePage() {
   );
   const invoice = cardInvoicesWithLedger.find((item) => item.id === invoiceId);
   const { confirm, dialog: confirmDialog } = useConfirm();
+
+  /**
+   * Faturas que viram coluna na faixa do topo (`.invoice-strip`) — o gráfico É o seletor de mês.
+   *
+   * ⚠️ Mesma regra de visibilidade da lista em `CardDetailPage.tsx` — fatura futura que ficou vazia
+   * (única parcela antecipada pra cá) some de lá de propósito, e a coluna não pode ser um atalho
+   * pra uma tela que a lista esconde. `!loadedInvoiceKeys.has(...)` mantém no caminho a fatura cujo
+   * ledger ainda não chegou: sem isso, no cache frio TODAS somem e a faixa fica vazia (foi o "só
+   * aparece a fatura atual" de 07/08/2026).
+   *
+   * `cardsData.invoices` já vem ordenado por `referenceMonth asc` (`useCardsData.ts:184`) e o
+   * filtro preserva a ordem, então a faixa sai do mês mais velho pro mais novo sem reordenar nada.
+   */
+  const stripInvoices = useMemo(
+    () =>
+      cardInvoicesWithLedger.filter(
+        (item) =>
+          !loadedInvoiceKeys.has(invoiceLedgerKey(item.cardId, item.id)) ||
+          invoiceHasVisibleActivity(item.ledgerEntries)
+      ),
+    [cardInvoicesWithLedger, loadedInvoiceKeys]
+  );
+
 
   const [paySheetOpen, setPaySheetOpen] = useState(false);
   /** Explicação do "antecipar" — vive numa folha, não no corpo da tela. Ver `.invoice-explain-link`. */
@@ -339,6 +364,27 @@ export function InvoicePage() {
     (invoice?.feesTotalCents ?? 0) > 0 ||
     (invoice?.paymentsTotalCents ?? 0) > 0;
 
+  /**
+   * Numa fatura já quitada o hero mostra **quanto foi gasto**, não o saldo.
+   *
+   * Pedido do dono (08/08/2026): abrir a fatura de agosto e ver "Fatura paga · R$ 0,00" com o valor
+   * real escondido na linha "Compras" logo abaixo — *"clico em agosto e quero ver de cara quanto
+   * gastei"*. "Quanto ainda devo" é uma pergunta que só existe enquanto há dívida; respondê-la com
+   * zero num mês encerrado gasta o maior número da tela pra não dizer nada.
+   *
+   * Usa os totais de EXIBIÇÃO (já sem o par parcela↔crédito antecipado) e não os crus: o hero fica
+   * em cima da lista de Compras, e os dois têm que fechar a conta na mesma tela. Mesma fórmula da
+   * altura da coluna no gráfico — o número do hero é literalmente o tamanho da coluna acesa.
+   */
+  const heroAmountCents =
+    isPaid && invoice
+      ? invoiceValueCents({
+          purchasesTotalCents: displayPurchasesTotalCents,
+          feesTotalCents: invoice.feesTotalCents,
+          creditsTotalCents: displayCreditsTotalCents
+        })
+      : (invoice?.outstandingBalanceCents ?? 0);
+
   return (
     <section className="page-content page-content--narrow invoice-page">
       <div className="page-heading-row page-heading-row--icon-trailing">
@@ -356,6 +402,10 @@ export function InvoicePage() {
         <div className="notice notice--danger" role="alert" style={{ marginBottom: '0.75rem' }}>{ledgerError}</div>
       )}
 
+      {/* Fica ANTES do hero de propósito: primeiro a pessoa escolhe de que mês está falando, aí lê
+          o valor. Ver `InvoiceStrip.tsx` — o componente é compartilhado com a tela do Cartão. */}
+      <InvoiceStrip invoices={stripInvoices} activeInvoiceId={invoiceId} cardId={cardId ?? ''} />
+
       {invoice ? (
         <>
           {/* Hero — SÓ DADO. Decisão do dono (07/08/2026): o gradiente da marca é pra número e
@@ -369,10 +419,10 @@ export function InvoicePage() {
             <div className="invoice-hero-top">
               <div className="invoice-hero-main">
                 <p className="eyebrow">
-                  {isPaid ? 'Fatura paga' : 'Valor a pagar'}
+                  {isPaid ? 'Total gasto' : 'Valor a pagar'}
                 </p>
                 <span className="invoice-hero-amount">
-                  {formatMoney(invoice.outstandingBalanceCents)}
+                  {formatMoney(heroAmountCents)}
                 </span>
                 <p className="text-secondary invoice-hero-due">
                   Vence {formatFriendlyDate(invoice.dueDate)}

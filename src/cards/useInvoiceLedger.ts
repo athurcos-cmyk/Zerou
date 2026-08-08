@@ -3,7 +3,7 @@ import { subscribeWithTransientRetry } from '../firebase/firestoreRetry';
 import { fetchDeletedTransactionIds, subscribeInvoiceLedger, type LocalCardSynced } from './cardService';
 import { calculateInvoice } from '../domain/invoices/calculateInvoice';
 import type { TransactionDeletionIndex } from '../finance/useFinanceData';
-import type { Invoice, InvoiceLedgerEntry } from '../types/contracts';
+import type { Invoice, InvoiceLedgerEntry, InvoiceStatus } from '../types/contracts';
 
 export interface InvoiceLedgerRef {
   id: string;
@@ -274,7 +274,20 @@ export function useInvoiceLedger(
  * Parâmetro obrigatório de propósito (mesmo motivo de `excludedAccountIds` em `spendingAnalysis`):
  * uma tela nova tem que DECIDIR o que passar, em vez de herdar o comportamento errado em silêncio.
  */
-export function mergeInvoicesWithLedger<T extends Invoice>(
+/**
+ * Estado do ciclo: `lifecycle` quando o chamador o preservou (`useCardsData` o carrega junto do
+ * status fino), senão deduzido do documento cru.
+ *
+ * ⚠️ O fallback é só pra quem passa o documento como veio do Firestore. **Não** confie nele quando
+ * o `status` já foi derivado: `resolveInvoiceStatus` devolve `'overpaid'` antes de olhar o
+ * lifecycle, então uma fatura ABERTA e antecipada a maior seria lida como fechada — e recalculada
+ * do ledger viraria `'paid'`, com a tela dizendo que um mês que nem fechou está pago.
+ */
+function lifecycleOf(invoice: { status: InvoiceStatus; lifecycle?: 'open' | 'closed' }): 'open' | 'closed' {
+  return invoice.lifecycle ?? (invoice.status === 'open' ? 'open' : 'closed');
+}
+
+export function mergeInvoicesWithLedger<T extends Invoice & { lifecycle?: 'open' | 'closed' }>(
   invoices: T[],
   ledgerEntries: Array<LocalCardSynced<InvoiceLedgerEntry>>,
   loadedInvoiceKeys: ReadonlySet<string>
@@ -294,7 +307,7 @@ export function mergeInvoicesWithLedger<T extends Invoice>(
         effectiveAt: entry.effectiveAt.toDate(),
         idempotencyKey: entry.idempotencyKey
       })),
-      invoice.status === 'open' ? 'open' : 'closed',
+      lifecycleOf(invoice),
       invoice.dueDate?.toDate()
     );
 

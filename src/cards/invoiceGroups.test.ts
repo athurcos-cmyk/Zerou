@@ -1,8 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { groupInvoicesForDisplay } from './invoiceGroups';
 
-function inv(referenceMonth: string, outstandingBalanceCents: number, paymentsTotalCents = 0) {
-  return { referenceMonth, outstandingBalanceCents, paymentsTotalCents };
+/** `lifecycle` default `'closed'`: a maioria dos casos aqui é fatura de ciclo encerrado, e deixar o
+ *  default aberto faria os testes antigos mudarem de assunto sem querer. Quem testa o ciclo ABERTO
+ *  passa explícito — é justamente a distinção que o bug de 08/08/2026 revelou. */
+function inv(
+  referenceMonth: string,
+  outstandingBalanceCents: number,
+  paymentsTotalCents = 0,
+  lifecycle: 'open' | 'closed' = 'closed'
+) {
+  return { referenceMonth, outstandingBalanceCents, paymentsTotalCents, lifecycle };
 }
 
 const AGORA = '2026-08';
@@ -33,14 +41,35 @@ describe('groupInvoicesForDisplay', () => {
     expect(toPay.map((i) => i.referenceMonth)).toEqual(['2026-09']);
   });
 
-  it('fatura corrente ANTECIPADA conta como paga (antecipar é pagar antes de fechar)', () => {
+  it('fatura do mês corrente JÁ FECHADA e antecipada conta como paga', () => {
     // `recordInvoicePayment(..., advance: true)` grava pagamento de verdade no ledger, então
     // `paymentsTotalCents > 0`. A fatura continua aparecendo no topo da tela como "Fatura atual"
     // (`pickCurrentInvoice`, que olha o ciclo, não este agrupamento) — só sai da LISTA.
-    const { toPay, settled } = groupInvoicesForDisplay([inv('2026-08', 0, 50000)], AGORA);
+    const { toPay, settled } = groupInvoicesForDisplay([inv('2026-08', 0, 50000, 'closed')], AGORA);
 
     expect(toPay).toEqual([]);
     expect(settled).toHaveLength(1);
+  });
+
+  // ⚠️ TESTE DE REGRESSÃO do bug de 08/08/2026, e o par exato do teste acima — mesma antecipação,
+  // mesmo saldo zero, só muda o ciclo. O dono antecipou a fatura de SETEMBRO (que fecha em 2/09)
+  // ainda em agosto e ela pulou pra "Pagas": *"ela nem sequer fechou"*. Fatura aberta ainda vai
+  // receber compra, então zerar o saldo hoje não a encerra. Falha se alguém tirar o `lifecycle` do
+  // critério achando que saldo + pagamento bastam.
+  it('fatura AINDA ABERTA e antecipada continua em "a pagar"', () => {
+    const { toPay, settled } = groupInvoicesForDisplay([inv('2026-09', 0, 50000, 'open')], AGORA);
+
+    expect(toPay.map((i) => i.referenceMonth)).toEqual(['2026-09']);
+    expect(settled).toEqual([]);
+  });
+
+  // Antecipar A MAIS é o caminho que o `status` derivado erra: `resolveInvoiceStatus` devolve
+  // 'overpaid' ANTES de olhar o ciclo, então um critério baseado em status leria esta como fechada.
+  it('fatura aberta paga A MAIOR também continua em "a pagar"', () => {
+    const { toPay, settled } = groupInvoicesForDisplay([inv('2026-09', 0, 90000, 'open')], AGORA);
+
+    expect(toPay).toHaveLength(1);
+    expect(settled).toEqual([]);
   });
 
   it('pagamento PARCIAL não tira a fatura da lista — ainda tem saldo', () => {

@@ -2,6 +2,57 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-08 — feat(fatura): gráfico de colunas como seletor de mês + espaçamento da tela do Cartão
+
+Prints da fatura da Nubank como referência (pedido do dono), com `/frontend-design`. Detalhes em
+`docs/history/2026-08.md`.
+
+- **`.invoice-strip`** (`InvoicePage.tsx` + `global.css`): uma coluna por fatura no topo da tela, o
+  gráfico **é** o seletor de mês. Trocar de mês custava 3 toques (voltar → achar na lista → abrir);
+  agora é 1, com a curva do parcelamento visível de uma vez. **Nenhuma leitura nova** —
+  `cardInvoicesWithLedger` já traz todas as faturas do cartão com os totais do ledger.
+- **A coluna mede o VALOR da fatura, não o saldo em aberto** — `invoiceValueCents()`
+  (`calculateInvoice.ts`): compras + tarifas − créditos. Com saldo puro, todo mês já pago viraria
+  coluna zerada — o histórico achatado, justo o que se abre o gráfico pra comparar. Nasceu como
+  `outstanding + payments` e **isso estava errado**: numa fatura paga a maior o saldo trava em 0 e a
+  soma devolve o que foi *pago*, não o *gasto* (R$ 150 numa fatura de R$ 100 = coluna de 150). Dois
+  testes travam os dois casos.
+- **Tela do Cartão em 3 blocos** (aprovado pelo dono a partir de 3 mockups): faixa fundida ao card
+  "Fatura atual" e lista de faturas de **12 → 3 linhas**. Página **1876 → 1209px**, e a fatura atual
+  agora **termina em 686px** de uma tela de 812 — antes a primeira linha de fatura só aparecia
+  inteira depois de rolar 91px. As abas "A pagar/Pagas" ficaram: a "Pagas" também abriga o
+  "Ver mais faturas", e removê-la apagaria o único caminho pras faturas antigas.
+- **Fatura ainda ABERTA não é "paga"** (bug achado pelo dono): antecipar a fatura de setembro, que
+  só fecha em 2/09, jogava ela pra aba "Pagas" com R$ 0,00 ainda em agosto. `groupInvoicesForDisplay`
+  decidia por saldo + pagamento e ignorava o ciclo — enquanto `resolveInvoiceStatus`, ao lado, já
+  dizia desde sempre que "fatura aberta permanece aberta até o fechamento". Passou a exigir
+  `lifecycle === 'closed'`, o campo que o **servidor persiste** (e não o status derivado, que vira
+  `'overpaid'` antes de olhar o ciclo justamente quando se antecipa a mais). A correção de 07/08
+  continua valendo: a fatura de agosto já estava fechada quando foi paga.
+- **Fatura paga mostra o gasto, não o zero** — no hero (`Fatura paga · R$ 0,00` →
+  `Total gasto · R$ 1.238,98`) e na **aba "Pagas"** do Cartão, que era uma coluna de `R$ 0,00` sem
+  nada distinguindo um mês de R$ 1.238 de um de R$ 40. Na lista o critério é o **grupo**, não
+  `status === 'paid'`: fatura antiga zerada sem pagamento registrado resolve pra `'closed'` e
+  continuaria em zero. Fatura em aberto não muda em nenhum dos dois.
+- **`lifecycle` deixou de se perder**: `useCardsData` sobrescrevia `status` com o status fino e o
+  estado persistido do ciclo sumia do objeto; quem precisava dele reconstruía por
+  `status === 'open'`, que erra em fatura aberta paga a maior. Agora viaja junto, e
+  `mergeInvoicesWithLedger` parou de deduzi-lo por string.
+- **Análise não foi afetada**: ela não consome nada do que mudou — tem seu próprio `signedCharge`,
+  e o teste que trava a sincronia dele com `calculateInvoice` segue verde.
+- **Sem `<canvas>` e sem lib**: cada coluna é um `<a>` com mês e valor no `aria-label`, então o
+  gráfico é tocável, focável e legível por leitor de tela de graça. Opacidade 42% nas não
+  selecionadas reusa a regra do `.invoice-row-bar` (DESIGN.md). A coluna ativa entra centralizada
+  mexendo só no `scrollLeft` da faixa — `scrollIntoView` levaria a página junto.
+- **Substituiu as setas `‹ mês ›`** entregues mais cedo hoje: mesma navegação em 1 toque, mais a
+  comparação entre meses. Manter as duas seria controle duplicado no mesmo cabeçalho.
+- **Espaçamento da tela do Cartão** (medido ao vivo): "Fatura atual" e "Faturas do cartão" tinham
+  **0px** entre si — dois cards brancos encostados leem como um card só com divisor, e a fatura
+  atual virava cabeçalho da lista. O espaço grande estava antes dela, separando justo o par que anda
+  junto (hero + fatura atual = "o cartão agora"). Agora é 0.75rem acima e 1.75rem abaixo.
+- **O carrossel do hero (print 2) não foi copiado**: a Nubank precisa dele porque agrega todos os
+  cartões num hero só. O do Granativa já mostra limite disponível *e* usado na mesma tela, sem gesto.
+
 ## 2026-08-08 — chore(billing): Stripe removido do repo, preservado na tag `billing-stripe-v0`
 
 Auditoria de over-engineering (`/ponytail-audit`) no repo inteiro. O maior achado foi o subsistema de

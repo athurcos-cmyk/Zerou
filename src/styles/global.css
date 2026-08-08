@@ -1966,9 +1966,14 @@ span.service-mark--brand {
   margin-bottom: 1.25rem;
 }
 
+/* ⚠️ Este card e o de "Faturas do cartão" logo abaixo tinham **0px** entre eles (medido ao vivo em
+   08/08/2026): dois cards brancos encostados leem como UM card com um divisor no meio, e a fatura
+   atual — que é o número da tela — virava o cabeçalho da lista. O espaço maior estava no lugar
+   errado, ANTES dele (1.25rem depois do hero), separando justo o par que anda junto. */
 .card-invoice-current {
   display: grid;
   gap: 0.75rem;
+  margin-bottom: 1.75rem;
 }
 
 .card-invoice-current-top {
@@ -2152,6 +2157,89 @@ span.service-mark--brand {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   line-height: 1;
+}
+
+/* --- Faixa de faturas (InvoicePage) — o GRÁFICO É O SELETOR DE MÊS ---------------------------
+   Uma coluna por fatura do cartão, altura pelo valor da fatura, tocável. Substituiu as setas
+   `‹ mês ›`: mesma navegação em 1 toque, mas acrescenta o que a seta não dá — a comparação entre
+   meses, que é justamente o motivo de existir um gráfico. Sem `<canvas>` e sem lib: são `<a>` de
+   verdade, então o gráfico responde a toque, teclado e leitor de tela de graça.
+
+   ⚠️ 42% de opacidade nas não selecionadas é a MESMA decisão do `.invoice-row-bar` (DESIGN.md) —
+   14 barras cheias competiriam com o hero tangerina e com o FAB. A vívida é sempre a fatura aberta.
+   `align-items: flex-end` faz as colunas crescerem do chão pra cima; sem isso a barra baixa
+   flutuaria no meio da faixa. */
+.invoice-strip {
+  margin-bottom: 1.25rem;
+  /* ⚠️ `min-width: 0` NÃO é enfeite: as colunas são `flex: none`, então o min-content da faixa é a
+     soma das 14 (~590px). Como item de grid/flex o padrão é `min-width: auto`, e a faixa esticava
+     o CARD inteiro pra 590px — a 375px isso jogou os botões "Antecipar"/"Detalhes" pra fora da tela
+     e fez o texto de apoio parar de quebrar linha. `overflow-x: auto` sozinho não encolhe abaixo do
+     min-content. Mesma família do bug de `.list-row`/`.entry-row` no DESIGN.md. */
+  min-width: 0;
+}
+
+/* Dentro do card de fatura atual a separação já vem do `gap` do grid; a margem própria somaria. */
+.card-invoice-current .invoice-strip {
+  margin-bottom: 0;
+}
+
+.invoice-strip-track {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.3rem;
+  overflow-x: auto;
+  /* A faixa é um seletor, não um painel de rolagem: a barra do sistema por cima das colunas
+     roubaria a leitura da curva. O gesto continua, e a coluna ativa entra centralizada por JS. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.invoice-strip-track::-webkit-scrollbar {
+  display: none;
+}
+
+.invoice-strip-col {
+  display: grid;
+  flex: none;
+  gap: 0.4rem;
+  width: 2.5rem;
+  justify-items: center;
+}
+
+.invoice-strip-bar {
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+  height: 3.5rem;
+}
+
+.invoice-strip-bar > span {
+  width: 100%;
+  border-radius: 0.35rem 0.35rem 0.2rem 0.2rem;
+  background: var(--action-primary);
+  opacity: 0.42;
+  transition: opacity var(--duration-fast) ease;
+}
+
+.invoice-strip-col:hover .invoice-strip-bar > span {
+  opacity: 0.7;
+}
+
+.invoice-strip-col[aria-current='page'] .invoice-strip-bar > span {
+  opacity: 1;
+}
+
+.invoice-strip-month {
+  font-size: 0.66rem;
+  line-height: 1;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.invoice-strip-col[aria-current='page'] .invoice-strip-month {
+  font-weight: 700;
+  color: var(--text-primary);
 }
 
 /* ⚠️ O gradiente da marca é pra DADO — nunca pra ação nem pra explicação (decisão do dono,
@@ -5209,7 +5297,10 @@ span.service-mark--brand {
   border-radius: 1.1rem;
   background: var(--gradient-brand);
   box-shadow: var(--shadow-card-limit);
-  margin-bottom: 1.25rem;
+  /* Colado no "Fatura atual" de propósito: os dois são O CARTÃO AGORA (quanto sobra × quanto se
+     deve neste ciclo) e devem ler como um bloco só. O espaço grande vem DEPOIS deles, separando
+     desse par a lista de faturas, que é outro assunto — ver `.card-invoice-current`. */
+  margin-bottom: 0.75rem;
 }
 
 .card-limit-hero-display-top {

@@ -33,6 +33,10 @@ export interface GroupableInvoice {
   /** Quanto já foi pago desta fatura. É o campo que faz a fatura do MÊS CORRENTE poder sair da
    *  lista principal — ver o bug de 07/08/2026 no topo do arquivo. */
   paymentsTotalCents?: number;
+  /** Estado PERSISTIDO do ciclo (o servidor só grava `'open'`/`'closed'`), não o status fino
+   *  derivado. É o que impede fatura ainda aberta de ser chamada de paga — ver bug de 08/08/2026
+   *  logo abaixo. Ausente ⇒ tratada como fechada, que é o comportamento anterior. */
+  lifecycle?: 'open' | 'closed';
 }
 
 export interface InvoiceGroups<T> {
@@ -44,7 +48,27 @@ export interface InvoiceGroups<T> {
 }
 
 /**
- * `settled` = saldo zerado **e** (foi paga **ou** é de mês passado).
+ * ## ⚠️ Fatura AINDA ABERTA nunca é "paga" — o bug de 08/08/2026
+ *
+ * O dono antecipou a fatura de setembro (que só fecha dia 2/09) e ela pulou pra aba "Pagas" com
+ * R$ 0,00, ainda em agosto: *"ela nem sequer fechou"*. E estava certo — fatura aberta ainda vai
+ * receber compra até fechar, então zerar o saldo hoje não a encerra; ela está **em dia**, não paga.
+ *
+ * O domínio já sabia disso e era só este arquivo que discordava: `resolveInvoiceStatus`
+ * (`calculateInvoice.ts`) tem, desde sempre, *"fatura aberta permanece aberta até o fechamento,
+ * independente de pagamentos antecipados"*. O agrupamento não olhava status nenhum — só saldo e
+ * pagamento — então chegava sozinho a uma conclusão que a função ao lado já rejeitava.
+ *
+ * Por que `lifecycle` e não `status !== 'open'`: com pagamento MAIOR que o saldo,
+ * `resolveInvoiceStatus` devolve `'overpaid'` **antes** de checar o lifecycle — e antecipar a mais
+ * é exatamente o caminho que produziu o bug. `lifecycle` é o campo que o servidor persiste, imune
+ * às duas derivações de status que o projeto mantém (`useCardsData` e `mergeInvoicesWithLedger`) —
+ * a mesma razão de o critério nunca ter sido `status === 'paid'`, logo abaixo.
+ *
+ * Isto **não** desfaz a correção de 07/08: aquela era a fatura de agosto paga **em agosto**, e ela
+ * fecha dia 2 — já estava `closed` quando foi paga, então continua saindo da lista na hora.
+ *
+ * `settled` = saldo zerado **e já fechada** **e** (foi paga **ou** é de mês passado).
  *
  * O "ou" no segundo termo é o que mantém uma fatura **vencida e não paga** na lista principal, por
  * antiga que seja: ela é dívida, não histórico. E o `paymentsTotalCents` é o que faz a fatura sair da
@@ -65,7 +89,8 @@ export function groupInvoicesForDisplay<T extends GroupableInvoice>(
   for (const invoice of invoices) {
     const zeroed = invoice.outstandingBalanceCents <= 0;
     const paid = (invoice.paymentsTotalCents ?? 0) > 0;
-    if (zeroed && (paid || invoice.referenceMonth < currentMonth)) settled.push(invoice);
+    const stillOpen = invoice.lifecycle === 'open';
+    if (!stillOpen && zeroed && (paid || invoice.referenceMonth < currentMonth)) settled.push(invoice);
     else toPay.push(invoice);
   }
 

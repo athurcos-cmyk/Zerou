@@ -188,7 +188,7 @@ export function useCardsData(workspaceId?: string) {
       // documento — mantidos incrementalmente por invoiceLedgerEntryTrigger.ts. Só o status
       // fino ('paid'/'partial'/'overdue'/'overpaid') continua calculado no client, porque
       // nunca foi persistido — ver comentário em invoiceLedgerEntryTrigger.ts.
-      const lifecycle = invoice.status === 'open' ? 'open' : 'closed';
+      const lifecycle: 'open' | 'closed' = invoice.status === 'open' ? 'open' : 'closed';
       const status = resolveInvoiceStatus({
         lifecycle,
         outstandingBalanceCents: invoice.outstandingBalanceCents ?? 0,
@@ -199,7 +199,13 @@ export function useCardsData(workspaceId?: string) {
         dueDate: invoice.dueDate?.toDate()
       });
 
-      return { ...invoice, status };
+      // `lifecycle` viaja junto do status derivado de propósito. `invoice.status` é sobrescrito
+      // logo abaixo pelo status FINO ('paid'/'partial'/'overdue'/'overpaid'), e com isso o único
+      // campo que o servidor realmente persiste — já fechou ou não — sumia do objeto. Quem
+      // precisava dele depois reconstruía por `status === 'open'`, o que erra no caso
+      // aberta-e-paga-a-maior: `resolveInvoiceStatus` devolve 'overpaid' antes de olhar o
+      // lifecycle, e a fatura do mês corrente passava por fechada.
+      return { ...invoice, status, lifecycle };
     });
   }, [state.invoicesByWindow, activeCards]);
 

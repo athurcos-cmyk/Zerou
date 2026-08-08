@@ -15,6 +15,8 @@ import { invoiceStatusLabels } from '../cards/cardLabels';
 import { deleteCard, loadMoreInvoices, recordInvoicePayment, updateCard, type LocalCardSynced } from '../cards/cardService';
 import { pickCurrentInvoice } from '../cards/cardDates';
 import { invoiceLedgerKey, mergeInvoicesWithLedger, useInvoiceLedger } from '../cards/useInvoiceLedger';
+import { InvoiceStrip } from '../cards/InvoiceStrip';
+import { invoiceValueCents } from '../domain/invoices/calculateInvoice';
 
 import { formatFriendlyDate, formatFriendlyMonth, monthKeyFromDate } from '../finance/financeDates';
 import { centsToInputValue, formatMoney, parseMoneyToCents } from '../finance/money';
@@ -86,7 +88,16 @@ export function CardDetailPage() {
 
   const visibleInvoices = useMemo(() => {
     const byId = new Map<string, (typeof subscribedVisible)[number]>();
-    for (const invoice of olderInvoices) byId.set(invoice.id, { ...invoice, ledgerEntries: [] });
+    // `lifecycle` derivado aqui e não em `useCardsData`: estas vieram do "Ver mais faturas", que lê
+    // o documento CRU do Firestore — nele `status` ainda é só `'open'`/`'closed'` (o campo
+    // persistido), então a leitura é exata. São faturas antigas já quitadas; nenhuma vem aberta.
+    for (const invoice of olderInvoices) {
+      byId.set(invoice.id, {
+        ...invoice,
+        lifecycle: invoice.status === 'open' ? 'open' : 'closed',
+        ledgerEntries: []
+      });
+    }
     for (const invoice of subscribedVisible) byId.set(invoice.id, invoice);
     return [...byId.values()].sort((a, b) => a.referenceMonth.localeCompare(b.referenceMonth));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -96,8 +107,16 @@ export function CardDetailPage() {
     () => groupInvoicesForDisplay(visibleInvoices, currentMonth),
     [visibleInvoices, currentMonth]
   );
-  /** Quantas faturas "a pagar" mostrar antes de recolher — 12 meses ("de agosto a agosto"). */
-  const TO_PAY_COLLAPSE = 12;
+  /**
+   * Quantas faturas "a pagar" mostrar antes de recolher.
+   *
+   * Era 12 ("de agosto a agosto"), e sozinhas ocupavam **1096px — 58% de uma página de 1876px**,
+   * empurrando pra baixo justamente a fatura que exige ação. Virou **3** quando a faixa de colunas
+   * (`InvoiceStrip`) entrou logo acima: a visão do ano inteiro passou a caber em 110px ali, então a
+   * lista não precisa mais ser o panorama — ela é a **fila do que vence primeiro**, com vencimento
+   * e status, que é o que a coluna não sabe dizer. "Ver todas as N" continua abrindo o resto.
+   */
+  const TO_PAY_COLLAPSE = 3;
   const shownToPay = showAllToPay ? invoicesToPay : invoicesToPay.slice(0, TO_PAY_COLLAPSE);
   // Escala das barras da lista. Sai de TODAS as faturas a pagar, não das visíveis: usar as visíveis
   // faria as barras já na tela mudarem de tamanho ao tocar em "Ver todas", como se o valor tivesse
@@ -269,9 +288,21 @@ export function CardDetailPage() {
    *  a exceção — fechada, vencida, parcial. Mesmo motivo de o valor não ser mais vermelho por
    *  padrão; vermelho em 13 de 13 linhas não distinguia nada, e agora marca só o que venceu.
    */
-  function invoiceRow(invoice: (typeof visibleInvoices)[number], maxCents: number) {
+  function invoiceRow(invoice: (typeof visibleInvoices)[number], maxCents: number, settled = false) {
     const isPaid = invoice.status === 'paid' || invoice.status === 'overpaid';
     const isCurrent = invoice.id === openInvoice?.id;
+    /**
+     * Na aba "Pagas" a linha mostra **quanto foi gasto**; na "A pagar", quanto ainda se deve.
+     *
+     * Mesma regra do hero da `InvoicePage` (DESIGN.md, "o maior número da tela responde a pergunta
+     * que ainda está de pé"): numa fatura quitada, "quanto falta" é sempre zero, então a aba inteira
+     * era uma coluna de `R$ 0,00` — nenhuma linha distinguia um mês de R$ 1.238 de um de R$ 40.
+     *
+     * O critério é `settled` (o grupo em que a linha está), não `isPaid`: `groupInvoicesForDisplay`
+     * também manda pra cá fatura antiga zerada **sem pagamento registrado** (dado legado), que
+     * resolve pra `'closed'` e não pra `'paid'` — por status ela continuaria mostrando zero.
+     */
+    const amountCents = settled ? invoiceValueCents(invoice) : invoice.outstandingBalanceCents;
     // Mínimo de 2% pra fatura de valor baixo não virar uma barra invisível (mesma guarda do
     // hero de limite logo acima).
     const barPercent =
@@ -288,12 +319,14 @@ export function CardDetailPage() {
             className={`invoice-row-amount${
               invoice.status === 'overdue'
                 ? ' invoice-row-amount--overdue'
-                : invoice.outstandingBalanceCents === 0
+                : // `--zero` (mudo) pelo valor EXIBIDO, não pelo saldo: na aba "Pagas" o saldo é
+                  // sempre zero, e amarrar a cor a ele apagaria justamente os números que voltaram.
+                  amountCents === 0
                   ? ' invoice-row-amount--zero'
                   : ''
             }`}
           >
-            {formatMoney(invoice.outstandingBalanceCents)}
+            {formatMoney(amountCents)}
           </span>
         </div>
         {maxCents > 0 && (
@@ -398,6 +431,21 @@ export function CardDetailPage() {
 
           {openInvoice ? (
             <div className="surface surface-pad card-invoice-current">
+              {/* Faixa e fatura atual são UM bloco: a coluna acesa É a fatura atual, e o número
+                  logo abaixo é a legenda dela — separá-los faria a tela mostrar o mesmo mês duas
+                  vezes, sem dizer que é o mesmo. Mesma composição do print 3 da Nubank (gráfico em
+                  cima, fatura selecionada embaixo), e o motivo de a faixa NÃO entrar no card de
+                  "Faturas do cartão": lá embaixo as abas cortam o tempo em pago/a pagar, e uma
+                  curva contínua desenhada em cima desse corte se contradiz. Aqui ela é panorama.
+
+                  ⚠️ Recebe `visibleInvoices` (todas), não `invoicesToPay`: a faixa atravessa o que
+                  as abas separam — é justamente por ela que se chega numa fatura já paga agora que
+                  a lista abre com 3. */}
+              <InvoiceStrip
+                invoices={visibleInvoices}
+                activeInvoiceId={openInvoice.id}
+                cardId={card.id}
+              />
               <div className="card-invoice-current-top">
                 <div className="card-invoice-current-main">
                   <p className="eyebrow">Fatura atual</p>
@@ -526,7 +574,7 @@ export function CardDetailPage() {
               </div>
             ) : (
               <div className="item-list" id="faturas-painel-pagas" role="tabpanel" aria-labelledby="faturas-tab-pagas">
-                {invoicesSettled.map((invoice) => invoiceRow(invoice, 0))}
+                {invoicesSettled.map((invoice) => invoiceRow(invoice, 0, true))}
                 {invoicesSettled.length === 0 && (
                   <p className="text-secondary" style={{ margin: '0.5rem 0 0' }}>
                     Nenhuma fatura paga ainda.
