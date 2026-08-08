@@ -20,7 +20,14 @@ textarea {
 }
 
 html {
-  overflow-x: hidden;
+  /* clip (não hidden) — mesma regra que o .app-main já segue lá embaixo, e que faltava aqui.
+     `overflow-x: hidden` força o overflow-y a computar `auto`, então o <body> vira um
+     SCROLL CONTAINER de verdade. No Safari do iOS (PWA instalado) isso descola o
+     `position: fixed`: a bottom nav congela no meio da tela enquanto o conteúdo rola por
+     baixo — foi o print da usuária do iPhone 16 em 08/08/2026. `clip` corta o transbordo
+     horizontal do mesmo jeito, mas deixa o overflow-y `visible`, então quem rola volta a
+     ser a viewport e a nav fica presa no rodapé. */
+  overflow-x: clip;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   background: var(--bg-page);
@@ -45,7 +52,8 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
-  overflow-x: hidden;
+  /* clip pelo mesmo motivo do html acima — ver comentário lá. */
+  overflow-x: clip;
   background: var(--bg-page);
   color: var(--text-primary);
 }
@@ -3500,6 +3508,14 @@ span.service-mark--brand {
 
   .app-layout {
     grid-template-columns: 1fr;
+    /* O index.html pede `viewport-fit=cover`, então no PWA instalado o conteúdo vai até a
+       borda de cima e passa POR BAIXO do relógio/bateria (visível no print da usuária:
+       o card roxo cortado atrás da status bar). O rodapé já era tratado
+       (`--bottom-nav-space` e `.mobile-nav`); o topo nunca foi — `env(safe-area-inset-top)`
+       não existia em lugar nenhum do projeto. Fica no .app-layout, e não no .app-main,
+       pra valer também no modo foco (onboarding), que zera o padding-top do main.
+       Em navegador sem entalhe o env() é 0, então não muda nada no desktop. */
+    padding-top: env(safe-area-inset-top);
   }
 
   .sidebar {

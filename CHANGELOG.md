@@ -2,6 +2,51 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-08 — fix(ios): bottom nav congelando no meio da tela no PWA instalado
+
+Print de uma usuária (iPhone 16, PWA instalado via Safari): a bottom nav travada no meio da tela,
+tapando as compras, com a página rolando normal por baixo. **Dois bugs independentes**, os dois
+visíveis no mesmo print.
+
+- **`html` e `body` usavam `overflow-x: hidden`** (`global.css`). `overflow-x: hidden` força o
+  `overflow-y` a computar **`auto`** — ninguém escreveu isso, o CSS deriva sozinho — e aí o
+  `<body>` vira **scroll container**. Body rolando é a causa clássica de o Safari do iOS descolar
+  `position: fixed`: a nav congela onde estava. Trocado por **`clip`**, que corta o transbordo
+  horizontal igual mas deixa o `overflow-y` em `visible`, devolvendo a rolagem pra viewport.
+  Medido no console: com `hidden` → `overflow-y: auto`; com `clip` → `overflow-y: visible`.
+  **A regra já era conhecida neste arquivo** — o comentário do `.app-main` diz "clip (não hidden):
+  hidden viraria scroll container" desde sempre. Foi aplicada no filho e nunca no pai.
+- **`env(safe-area-inset-top)` não existia em lugar nenhum do projeto**, apesar do
+  `viewport-fit=cover` no `index.html`. Quem pede `cover` assume a conta dos dois lados: o rodapé
+  era tratado (`--bottom-nav-space`, `.mobile-nav`), o topo não — por isso o card roxo aparece
+  cortado por baixo do relógio/bateria no print. Entrou no `.app-layout` (e não no `.app-main`,
+  pra valer também no modo foco do onboarding). Em tela sem entalhe o `env()` é 0, nada muda.
+- **`src/test/iosViewportSafety.test.ts`** trava as duas invariantes: `html`/`body` nunca voltarem
+  pra `hidden`, e `viewport-fit=cover` andar junto com inset de topo e de rodapé. São coisas que só
+  quebram no iPhone e em silêncio — build, typecheck e testes passavam iguais com o bug.
+- ⚠️ **Falta a usuária confirmar** depois do deploy. O navegador de preview é Chromium e não
+  reproduz o `position: fixed` do Safari iOS.
+
+## 2026-08-08 — fix(sheet): trava de rolagem vazava e deixava o app travado pra sempre
+
+Achado no caminho da investigação acima. **Não era a causa do print** (ela confirmou que a página
+rolava), mas é bug real e independente.
+
+- **`BottomSheet` deixava `document.body` com `overflow: hidden` pra sempre** quando as sheets
+  empilham (`SelectField`, `CategoryField` e `ConfirmDialog` abrem por cima de outra sheet). Cada
+  instância salvava o overflow anterior e restaurava o que **ela** tinha visto: a de cima captura o
+  `'hidden'` que a de baixo pôs e devolve esse `'hidden'` ao fechar. Página não rola mais, e só
+  volta com F5. Trocado por um **contador compartilhado** (`lockBodyScroll`) — nenhuma sheet decide
+  sozinha se pode destravar.
+- **O gatilho é o `onClose` arrow inline** (43 ocorrências no `src/`, incluindo o próprio
+  `SelectField`/`CategoryField`/`ConfirmDialog`): muda de identidade a cada render, o efeito
+  re-roda, e o "valor anterior" da sheet de baixo é reescrito como `'hidden'` enquanto a de cima
+  está aberta. A trava saiu do efeito do ESC justamente por isso.
+- **5 testes novos** (`BottomSheet.scrollLock.test.tsx`) cobrindo cada ordem de abrir/fechar —
+  4 falhavam antes. Inclui desmontar com sheet aberta (navegar durante a sheet também vazava).
+- `src/test/setup.ts` ganhou stub de `ResizeObserver` (jsdom não tem; qualquer teste que abra uma
+  sheet quebrava nele).
+
 ## 2026-08-08 — feat(fatura): gráfico de colunas como seletor de mês + espaçamento da tela do Cartão
 
 Prints da fatura da Nubank como referência (pedido do dono), com `/frontend-design`. Detalhes em

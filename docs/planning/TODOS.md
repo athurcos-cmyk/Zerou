@@ -6,6 +6,23 @@ Itens acionáveis. Fechou? Move para "Concluído" ou remove. Detalhe histórico 
 
 ## Abertas
 
+### Confirmar com a usuária do iPhone 16 se a nav parou de congelar (2026-08-08)
+
+Print dela: bottom nav congelada no meio da tela, tapando as compras, no **PWA instalado via
+Safari**. Ela confirmou que **a página rolava normalmente** — o que descartou a primeira suspeita
+(trava de rolagem vazada do `BottomSheet`, que era bug de verdade e foi corrigido no mesmo dia, mas
+não era este) e apontou pra causa real: `html`/`body` com `overflow-x: hidden`, que força
+`overflow-y: auto` e transforma o `<body>` em scroll container — configuração clássica de
+`position: fixed` descolar no Safari do iOS. Trocado por `clip`. Detalhe no `CHANGELOG.md`.
+
+No mesmo print, o card roxo passava por baixo do relógio/bateria: `viewport-fit=cover` sem
+`env(safe-area-inset-top)` em lugar nenhum do projeto. Corrigido junto.
+
+**Falta**: ela reabrir o app depois do deploy e dizer se a barra ainda congela. Não dá pra fechar
+daqui — o navegador de preview é Chromium e não reproduz o `position: fixed` do Safari iOS. O que
+deu pra provar em Chromium está no `src/test/iosViewportSafety.test.ts` e no console: com `hidden`
+o `overflow-y` computa `auto`, com `clip` fica `visible`.
+
 ### ~~Deploy das functions pra sumir com o billing da nuvem~~ — FEITO e verificado (2026-08-08)
 
 - [x] ~~Conferir o estado real~~ — **as 5 estavam mesmo implantadas**, incluindo o
