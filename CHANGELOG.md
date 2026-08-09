@@ -2,6 +2,17 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-08 — fix(mobile): arrasto emperrado na faixa de faturas (`touch-action: pan-x`)
+
+Print de usuária: arrastar a `.invoice-strip` (faixa-gráfico de faturas, adicionada hoje) com o
+dedo parecia pouco responsivo no celular.
+
+- Sem `touch-action`, o navegador espera alguns frames no primeiro `touchmove` pra decidir se o
+  gesto é rolar a FAIXA (horizontal) ou a PÁGINA (vertical) — essa espera é o "emperrado".
+  `touch-action: pan-x` avisa de cara que ali só rola de lado, destravando o arrasto instantâneo.
+- Adicionado `-webkit-overflow-scrolling: touch` junto, mesmo padrão já usado em
+  `.chip-row--scroll`.
+
 ## 2026-08-08 — fix(css): `overflow-x` sai do `html` e do `body` de vez
 
 O dono cortou minha conclusão errada: **a faixa preta não existia antes**, e o manifesto não

@@ -2227,6 +2227,12 @@ span.service-mark--brand {
   align-items: flex-end;
   gap: 0.3rem;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  /* Sem isso o navegador espera uns frames pra decidir se o dedo quer rolar a FAIXA (horizontal)
+     ou a PÁGINA (vertical) — nessa espera o arrasto parece emperrado. `pan-x` já avisa de cara
+     que aqui só rola de lado, e destrava o arrasto instantâneo mesmo dentro de uma página que rola
+     na vertical. */
+  touch-action: pan-x;
   /* A faixa é um seletor, não um painel de rolagem: a barra do sistema por cima das colunas
      roubaria a leitura da curva. O gesto continua, e a coluna ativa entra centralizada por JS. */
   scrollbar-width: none;
