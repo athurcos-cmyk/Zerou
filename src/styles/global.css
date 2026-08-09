@@ -2233,6 +2233,11 @@ span.service-mark--brand {
      que aqui só rola de lado, e destrava o arrasto instantâneo mesmo dentro de uma página que rola
      na vertical. */
   touch-action: pan-x;
+  /* Área de arrasto maior sem mexer no desenho: o padding engorda a zona de toque em 0.75rem de
+     cada lado e a margem negativa devolve o espaço ao layout. Sem isso a faixa tem ~73px de altura
+     e o dedo precisa ser certeiro — errar por pouco rola a PÁGINA em vez da faixa. */
+  padding: 0.75rem 0;
+  margin: -0.75rem 0;
   /* A faixa é um seletor, não um painel de rolagem: a barra do sistema por cima das colunas
      roubaria a leitura da curva. O gesto continua, e a coluna ativa entra centralizada por JS. */
   scrollbar-width: none;

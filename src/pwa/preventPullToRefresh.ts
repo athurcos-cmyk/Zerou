@@ -15,12 +15,16 @@
 export function preventPullToRefresh() {
   if (typeof window === 'undefined' || !('ontouchstart' in window)) return;
 
+  let startX = 0;
   let startY = 0;
 
   window.addEventListener(
     'touchstart',
     (event) => {
-      if (event.touches.length === 1) startY = event.touches[0].clientY;
+      if (event.touches.length === 1) {
+        startX = event.touches[0].clientX;
+        startY = event.touches[0].clientY;
+      }
     },
     { passive: true }
   );
@@ -30,7 +34,14 @@ export function preventPullToRefresh() {
     (event) => {
       // Ignora multi-toque (pinça/zoom) — não é o gesto de refresh.
       if (event.touches.length !== 1) return;
-      const pullingDown = event.touches[0].clientY > startY;
+      const deltaX = event.touches[0].clientX - startX;
+      const deltaY = event.touches[0].clientY - startY;
+      // ⚠️ Gesto HORIZONTAL nunca é pull-to-refresh — e `preventDefault` aqui não "não faz nada":
+      // ele cancela o gesto inteiro, matando o arrasto de qualquer faixa que rola de lado
+      // (`.invoice-strip-track`, `.chip-row--scroll`). Como o dedo desce um pouco ao arrastar de
+      // lado, o `clientY > startY` sozinho dava esse falso positivo — daí o "não dá pra arrastar".
+      if (Math.abs(deltaX) > Math.abs(deltaY)) return;
+      const pullingDown = deltaY > 0;
       if (!pullingDown || window.scrollY > 0) return;
       // No topo do documento e puxando pra baixo: só é refresh se nada sob o dedo puder consumir.
       if (!pullCanBeConsumed(event.target) && event.cancelable) {

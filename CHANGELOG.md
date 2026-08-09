@@ -2,6 +2,21 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-09 — fix(mobile): guard de pull-to-refresh matava o arrasto da faixa de faturas
+
+O `touch-action: pan-x` de ontem era metade da história: quem cancelava o gesto era **JS nosso**.
+
+- `preventPullToRefresh` (`src/pwa/preventPullToRefresh.ts`) chamava `preventDefault()` sempre que
+  o dedo descia **1px** com o documento no topo — e `preventDefault` num `touchmove` não "não faz
+  nada": cancela o gesto inteiro, inclusive a rolagem horizontal da faixa. Como todo arrasto de
+  lado feito com o polegar desce um pouco, a faixa simplesmente não andava.
+- Agora o guard ignora gesto predominantemente horizontal (`|Δx| > |Δy|`). Vale pra **toda** faixa
+  que rola de lado (`.invoice-strip-track`, `.chip-row--scroll`), não só a de faturas.
+- `src/pwa/preventPullToRefresh.test.ts`: puxão vertical continua cancelado, arrasto horizontal com
+  descida leve não. O 2º teste falha contra o código antigo (verificado).
+- Área de arrasto da faixa: **73px → 97px** de altura (`padding: 0.75rem 0` + `margin: -0.75rem 0`
+  no `.invoice-strip-track`) — engorda só a zona de toque, o layout não anda 1px (medido ao vivo).
+
 ## 2026-08-08 — fix(mobile): arrasto emperrado na faixa de faturas (`touch-action: pan-x`)
 
 Print de usuária: arrastar a `.invoice-strip` (faixa-gráfico de faturas, adicionada hoje) com o
