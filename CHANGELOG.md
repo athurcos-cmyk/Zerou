@@ -2,6 +2,70 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-09 — fix(cartão): compra excluída continuava oferecida em "Antecipar parcelas"
+
+Achado pelo dono na tela da fatura: a lista mostrava compras que ele já tinha excluído, e justamente
+essas apareciam sem nome, como "Compra parcelada" — impossível saber qual era. **Um bug só, dois
+sintomas.** É a 4ª ocorrência da família registrada no `CLAUDE.md`: excluir uma compra de cartão não
+apaga os `purchase` das faturas futuras — a Cloud Function `reverseCardPurchaseOnDelete` só grava um
+estorno **ao lado**. Quem filtra por `type === 'purchase'` e não desconta o estorno segue enxergando
+a compra pra sempre. Mesma correção que a Análise já tinha recebido em 28/07 (`ongoingInstallmentPurchases`).
+
+- `collectFutureInstallments` (`src/cards/anticipation.ts`) passa a descartar toda compra em
+  `reversedSourceIds` — a definição de "compra excluída" foi **reusada**, não recriada: a assinatura
+  em `spendingAnalysis.ts` foi relaxada pro shape mínimo (`{ type, sourceTransactionId }`) pra
+  aceitar os dois ledgers. Duplicar a lista de tipos de estorno num segundo arquivo é exatamente o
+  drift que causou os bugs anteriores.
+- O nome sumia porque `txnDescriptions` (`InvoicePage.tsx`) filtra transação excluída — com o fix
+  acima, essas linhas nem aparecem mais. Sobrou o caso legítimo: compra fora das **300** transações
+  do boot (`subscribeTransactions`). O fallback deixou de ser "Compra parcelada" genérico e passou a
+  identificar pelo que já está em mãos — `Parcelada de R$ 147,00 · 12x`. Zero leitura nova.
+- Teste em `anticipation.test.ts` com o caso difícil: estorno em **uma** fatura só, `purchase` cru
+  nas outras — antes do fix uma parcela sozinha mantinha o grupo inteiro vivo. Confirmado que falha
+  contra o código antigo.
+- `npm run typecheck` · `npm test` (690) · `npm run build` verdes. Nenhum payload novo → `firestore.rules` intacto.
+- **Verificado ao vivo na conta real do dono** (leitura apenas, nada gravado), com A/B do próprio fix
+  ligado e desligado contra os mesmos dados: **14 grupos → 8**. Os 6 que sumiram eram compras
+  excluídas, cada uma emparelhada com a versão recadastrada que ficou ao lado dela na lista —
+  R$ 154,78·8x ↔ "Limite convertido - 8", R$ 109,23·12x ↔ "Limite convertido - 12", R$ 66,69·5x ↔
+  "Grupo MD", R$ 39,90·6x ↔ "Dr Consulta", R$ 4,31·12x ↔ "Mercado Livre", + R$ 10,00·3x. As mesmas
+  compras que o fix de 28/07 já tinha encontrado lingering na Análise. Depois do fix, os 8 grupos
+  restantes têm nome real — nenhum fallback aparece.
+- Varredura das **12 faturas futuras** do cartão: nenhuma compra com duas parcelas na mesma fatura,
+  então o dono **não foi atingido** pela colisão de id abaixo — lá, a correção é preventiva.
+
+Mais dois achados da mesma reavaliação, corrigidos no mesmo commit:
+
+- **Antecipar 2 parcelas irmãs gravava 1.** `anticipateInstallments` montava o id do lançamento com
+  `${sourceTransactionId}_${invoiceId}` — "esta compra nesta fatura", não "esta parcela". Duas
+  parcelas da mesma compra na mesma fatura caíam no **mesmo documento**: a segunda sobrescrevia a
+  primeira, o app antecipava uma só e o total gravado ficava menor que o confirmado no diálogo, sem
+  erro na tela. Não é hipotético: até 09/07/2026 uma compra 4x em 31/jan num cartão que fecha dia 28
+  gerava `['2026-02','2026-02','2026-04','2026-05']` (`resolveInstallmentCycle`, corrigido desde —
+  mas o dado de quem já tinha ficou como estava). A **leitura** já tratava parcelas irmãs por
+  ocorrência desde 07/2026; só a escrita ficou pra trás. Agora a chave é o `entryId` da parcela,
+  obrigatório no schema. Teste novo em `cardService.test.ts` — falha com 2 ids em vez de 4 contra o
+  código antigo (verificado). Antecipações já gravadas não mudam; sem migração.
+- **Resíduo de uma compra antecipada e depois excluída.** Achado conferindo a conta real antes do
+  commit: o dono antecipou a parcela 3/3 de uma compra de R$ 10 e depois excluiu a compra. Saldo
+  certo nas duas faturas, ruído nas duas — e em **direções opostas**, o que é o detalhe interessante:
+  na fatura de **destino** sobrava uma linha "Antecipação · R$ 10,00" de uma compra que não existia
+  mais (rotulada com o tipo genérico, porque o nome sumiu junto com a transação); na de **origem**,
+  `anticipation_credit_reversal` somava R$ 10 em `purchasesTotalCents` e **nunca virava linha** — o
+  cabeçalho dizia "Compras R$ 684,83" e a lista somava R$ 674,83. Um ruído a mais, um a menos.
+  `anticipatedAwayEntryIds` só considerava `purchase` como débito anulável; agora considera os três
+  (`nettableDebitTypes`), exportado e reusado pelo `hiddenPurchaseCents` do hero para as duas listas
+  não divergirem. **Antecipação normal segue visível** — o crédito que a anularia mora na outra
+  fatura, então não há par e nada é escondido; há teste afirmando os dois lados. Verificado ao vivo:
+  valor a pagar **idêntico** antes e depois (set R$ 180,00, nov R$ 674,83), e em novembro o
+  cabeçalho passou a bater exatamente com a soma das 7 linhas.
+- **Nome da compra cortado na lista.** `.anticipation-group-head` punha nome e "8 parcelas futuras"
+  lado a lado: num card de **315px** (o real num celular de 375px) sobravam ~200px e todo nome de
+  verdade virava reticências — "Notebook Dell Inspiron 15 3000 8GB placa …" — enquanto a contagem
+  quebrava em duas linhas. Agora empilha: nome com a largura inteira, até 2 linhas
+  (`-webkit-line-clamp`, mesmo padrão de `.metric-card`), contagem embaixo. Medido a 315px numa
+  página de comparação antes/depois, não ajustado no olho — a lição dos 5 commits cegos de 08/08.
+
 ## 2026-08-09 — fix(mobile): guard de pull-to-refresh matava o arrasto da faixa de faturas
 
 O `touch-action: pan-x` de ontem era metade da história: quem cancelava o gesto era **JS nosso**.

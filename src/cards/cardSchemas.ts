@@ -88,6 +88,10 @@ export const anticipateInstallmentsSchema = z.object({
   cardId: z.string().trim().min(1),
   currentInvoiceId: z.string().trim().min(1),
   credits: z.array(z.object({
+    // Id do lançamento da PARCELA que está sendo antecipada. É o que identifica a antecipação de
+    // forma única — ver a chave em `anticipateInstallments`. Obrigatório de propósito: era a
+    // ausência dele que deixava duas parcelas irmãs colidirem no mesmo documento.
+    entryId: z.string().trim().min(1),
     invoiceId: z.string().trim().min(1),
     amountCents: moneyCentsSchema,
     sourceTransactionId: z.string().trim(),

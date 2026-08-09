@@ -12,7 +12,7 @@ import { SelectField } from '../components/SelectField';
 import { useConfirm } from '../components/ConfirmDialog';
 import { FormMessage } from '../components/FormMessage';
 import { invoiceStatusLabels, ledgerTypeLabels } from '../cards/cardLabels';
-import { anticipatedAwayEntryIds, groupAnticipatablePurchases, invoiceHasVisibleActivity } from '../cards/anticipation';
+import { anticipatedAwayEntryIds, groupAnticipatablePurchases, invoiceHasVisibleActivity, nettableDebitTypes } from '../cards/anticipation';
 import {
   anticipateInstallments,
   recordInvoiceCredit,
@@ -124,7 +124,12 @@ export function InvoicePage() {
   const anticipatableGroups = invoice
     ? groupAnticipatablePurchases(cardInvoicesWithLedger, invoice).map((group) => ({
         ...group,
-        description: txnDescriptions.get(group.sourceTransactionId) ?? 'Compra parcelada'
+        // Sem nome quando a compra está fora das 300 transações do boot (`subscribeTransactions`).
+        // "Compra parcelada" seco não identifica nada quando há duas na lista; valor da parcela +
+        // total de parcelas identifica sem precisar de leitura nova.
+        description:
+          txnDescriptions.get(group.sourceTransactionId) ??
+          `Parcelada de ${formatMoney(group.installments[0].amountCents)}${group.installmentTotal ? ` · ${group.installmentTotal}x` : ''}`
       }))
     : [];
 
@@ -236,6 +241,7 @@ export function InvoicePage() {
     if (!ok) return;
 
     const credits = selected.map((inst) => ({
+      entryId: inst.entryId,
       invoiceId: inst.invoiceId,
       amountCents: inst.amountCents,
       sourceTransactionId: inst.sourceTransactionId,
@@ -346,7 +352,7 @@ export function InvoicePage() {
   // Números do resumo (hero) descontando o par antecipado/anulado — senão "Compras: R$300"
   // ficaria contradizendo a lista logo abaixo, que não mostra mais essa parcela.
   const hiddenPurchaseCents =
-    invoice?.ledgerEntries.filter((e) => e.type === 'purchase' && hiddenEntryIds.has(e.id)).reduce((s, e) => s + e.amountCents, 0) ?? 0;
+    invoice?.ledgerEntries.filter((e) => nettableDebitTypes.has(e.type) && hiddenEntryIds.has(e.id)).reduce((s, e) => s + e.amountCents, 0) ?? 0;
   // 'purchase_reversal' entra aqui de propósito: é o estorno de uma compra excluída no
   // Extrato (reverseCardPurchaseOnDelete) — soma em `creditsTotalCents` igual a uma
   // antecipação, e sem contar aqui o par escondido ficava com "Créditos" inflado pra sempre.
@@ -592,7 +598,7 @@ export function InvoicePage() {
                       <div key={group.sourceTransactionId} className="anticipation-group">
                         <div className="anticipation-group-head">
                           <strong className="anticipation-group-name">{group.description}</strong>
-                          <span className="text-secondary" style={{ fontSize: '0.82rem' }}>
+                          <span className="text-secondary anticipation-group-count">
                             {available} {available === 1 ? 'parcela futura' : 'parcelas futuras'}
                           </span>
                         </div>

@@ -679,7 +679,17 @@ export async function anticipateInstallments(workspaceId: string, userId: string
   // lançamentos com `sourceTransactionId` apontando pra uma transação excluída, e um
   // débito somado sem esse vínculo nunca seria limpo.
   parsed.credits.forEach((credit, index) => {
-    const creditKey = `anticipation_credit_${credit.sourceTransactionId}_${credit.invoiceId}`;
+    // ⚠️ A chave é a PARCELA (`entryId`), não a compra na fatura. Era
+    // `${sourceTransactionId}_${invoiceId}` — que identifica "esta compra nesta fatura", e uma
+    // compra pode ter DUAS parcelas na mesma fatura: até 09/07/2026 uma compra 4x em 31/jan num
+    // cartão que fecha dia 28 caía em `['2026-02','2026-02','2026-04','2026-05']`
+    // (`resolveInstallmentCycle`, corrigido desde, mas o dado de quem já tinha ficou como estava).
+    // Nesse caso os dois `batch.set` do mesmo commit apontavam pro MESMO documento: a segunda
+    // parcela sobrescrevia a primeira, o app antecipava uma só e o total gravado ficava menor que
+    // o confirmado no diálogo — sem erro na tela, porque `fireWrite` engole. A leitura já tratava
+    // parcelas irmãs por ocorrência desde 07/2026 (`collectFutureInstallments`); só a escrita
+    // ficou pra trás. Mesma família dos ids determinísticos de 23/07 e 07/08 no `CLAUDE.md`.
+    const creditKey = `anticipation_credit_${credit.entryId}`;
     const creditEntryId = idempotentEntryId(creditKey);
     batch.set(
       ledgerDocRef(workspaceId, parsed.cardId, credit.invoiceId, creditEntryId),
@@ -698,7 +708,7 @@ export async function anticipateInstallments(workspaceId: string, userId: string
       })
     );
 
-    const debitKey = `anticipation_debit_${credit.sourceTransactionId}_${credit.invoiceId}`;
+    const debitKey = `anticipation_debit_${credit.entryId}`;
     const debitEntryId = idempotentEntryId(debitKey);
     batch.set(
       ledgerDocRef(workspaceId, parsed.cardId, parsed.currentInvoiceId, debitEntryId),

@@ -269,7 +269,12 @@ export function installmentShiftBySource(
  * (`functions/src/cards/reverseCardPurchaseOnDelete.ts`), então não há como ancorá-lo no mesmo
  * mês do lançamento que ele cancela. Casando por compra, some tudo junto e a conta fecha.
  */
-export function reversedSourceIds(invoices: InvoiceForSpending[]): Set<string> {
+export function reversedSourceIds(
+  // Shape mínimo de propósito: a tela da fatura (`anticipation.ts`) precisa da MESMA definição de
+  // "compra excluída" e trabalha com um ledger mais frouxo. Duplicar a lista de tipos de estorno
+  // num segundo arquivo é exatamente o drift que já custou os bugs de 28/07.
+  invoices: ReadonlyArray<{ ledgerEntries: ReadonlyArray<{ type: string; sourceTransactionId?: string }> }>
+): Set<string> {
   const reversed = new Set<string>();
   for (const invoice of invoices) {
     for (const entry of invoice.ledgerEntries) {

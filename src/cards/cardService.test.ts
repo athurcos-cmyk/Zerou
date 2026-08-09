@@ -33,7 +33,7 @@ vi.mock('../firebase/config', () => ({
   getFirebaseDb: vi.fn().mockReturnValue({})
 }));
 
-const { addCardPurchaseToBatch, invoicePaymentTransactionId, markClosedInvoices, registerOngoingInstallments, subscribeInvoiceLedger, updateCardPurchase } = await import('./cardService');
+const { addCardPurchaseToBatch, anticipateInstallments, invoicePaymentTransactionId, markClosedInvoices, registerOngoingInstallments, subscribeInvoiceLedger, updateCardPurchase } = await import('./cardService');
 
 function invoice(id: string, status: 'open' | 'closed' | 'paid', referenceMonth: string) {
   return { id, cardId: 'card-1', status, referenceMonth };
@@ -316,5 +316,38 @@ describe('ledger: idempotencyKey é sempre o id do documento', () => {
     expect(id.startsWith(`${cardId}_${cardId}`)).toBe(false);
     expect(id.startsWith(invoiceId)).toBe(true);
     expect(`${id}_payment`.length).toBeLessThanOrEqual(140);
+  });
+});
+
+describe('anticipateInstallments', () => {
+  // Duas parcelas da MESMA compra na MESMA fatura existem em dado real: até 09/07/2026,
+  // `resolveInstallmentCycle` mandava uma compra 4x de 31/jan (cartão fechando dia 28) pra
+  // `['2026-02','2026-02','2026-04','2026-05']`. A chave da antecipação era
+  // `${sourceTransactionId}_${invoiceId}` — igual pras duas —, então os dois `set` do mesmo commit
+  // caíam no mesmo documento: uma parcela era gravada, a outra sumia sem erro.
+  it('grava lançamentos distintos para parcelas irmãs na mesma fatura', async () => {
+    firestoreMocks.batch.set.mockClear();
+
+    const sibling = (entryId: string, installmentNumber: number) => ({
+      entryId,
+      invoiceId: 'card-1_2026-02',
+      amountCents: 10000,
+      sourceTransactionId: 'txn-1',
+      installmentNumber,
+      installmentTotal: 4
+    });
+
+    await anticipateInstallments('ws-1', 'user-1', {
+      cardId: 'card-1',
+      currentInvoiceId: 'card-1_2026-08',
+      credits: [sibling('entry-parcela-1', 1), sibling('entry-parcela-2', 2)],
+      effectiveAt: new Date(2026, 7, 9)
+    });
+
+    const ids = firestoreMocks.batch.set.mock.calls.map(([, payload]) => (payload as { id: string }).id);
+
+    // 2 créditos (fatura de origem) + 2 débitos (fatura atual), todos em documentos próprios.
+    expect(ids).toHaveLength(4);
+    expect(new Set(ids).size).toBe(4);
   });
 });

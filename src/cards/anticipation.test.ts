@@ -168,6 +168,43 @@ describe('groupAnticipatablePurchases', () => {
 
     expect(groups).toEqual([]);
   });
+
+  // Bug real (09/08/2026), mesma família do fix de 28/07 em `ongoingInstallmentPurchases`: excluir
+  // a compra no Extrato NÃO apaga os `purchase` das faturas futuras — a Cloud Function só grava um
+  // estorno ao lado. A lista continuava oferecendo pra antecipar parcelas de uma compra que já não
+  // existe (e sem nome, porque a transação excluída não entra no mapa de descrições da tela).
+  it('drops purchases deleted in the Extrato, even when only one installment was reversed', () => {
+    const groups = groupAnticipatablePurchases(
+      [
+        invoice({
+          id: 'inv-08',
+          referenceMonth: '2026-08',
+          ledgerEntries: [
+            purchase('e-1', 10000, { sourceTransactionId: 'txn-deleted', installmentNumber: 1, installmentTotal: 3 }),
+            purchaseReversal('r-1', 10000, 'txn-deleted')
+          ]
+        }),
+        // Estorno só na fatura de agosto: setembro segue com o `purchase` cru. Antes do fix, esta
+        // parcela sozinha mantinha o grupo inteiro vivo na lista.
+        invoice({
+          id: 'inv-09',
+          referenceMonth: '2026-09',
+          ledgerEntries: [
+            purchase('e-2', 10000, { sourceTransactionId: 'txn-deleted', installmentNumber: 2, installmentTotal: 3 }),
+            purchase('e-9', 5000, { sourceTransactionId: 'txn-alive', installmentNumber: 2, installmentTotal: 3 })
+          ]
+        }),
+        invoice({
+          id: 'inv-10',
+          referenceMonth: '2026-10',
+          ledgerEntries: [purchase('e-10', 5000, { sourceTransactionId: 'txn-alive', installmentNumber: 3, installmentTotal: 3 })]
+        })
+      ],
+      current
+    );
+
+    expect(groups.map((group) => group.sourceTransactionId)).toEqual(['txn-alive']);
+  });
 });
 
 // Nubank esconde a parcela antecipada da fatura futura — não deixa "compra R$300 / crédito
@@ -212,6 +249,39 @@ describe('anticipatedAwayEntryIds', () => {
     const hidden = anticipatedAwayEntryIds(entries);
     expect(hidden.has('p1')).toBe(true);
     expect(hidden.has('r1')).toBe(true);
+  });
+
+  // Os dois casos abaixo saíram da conta real do dono (09/08/2026): ele antecipou a parcela 3/3 de
+  // uma compra de R$ 10 e depois excluiu a compra. Saldo das duas faturas certo; sobrou ruído.
+
+  // Fatura de DESTINO: o débito da antecipação continuava listado como se fosse uma compra viva.
+  it('esconde o débito da antecipação quando a compra foi excluída depois', () => {
+    const entries = [
+      { id: 'a1', type: 'installment_anticipation', amountCents: 1000, sourceTransactionId: 'txn-1' },
+      purchaseReversal('r1', 1000)
+    ];
+    expect(anticipatedAwayEntryIds(entries)).toEqual(new Set(['a1', 'r1']));
+  });
+
+  // ⚠️ O inverso, e é o que separa "compra excluída" de "antecipação normal": numa antecipação
+  // legítima o crédito que anularia o débito está na OUTRA fatura. Sem par aqui, o débito TEM que
+  // continuar visível — é dinheiro pesando nesta fatura agora.
+  it('NÃO esconde o débito de uma antecipação normal (crédito mora na outra fatura)', () => {
+    const entries = [{ id: 'a1', type: 'installment_anticipation', amountCents: 1000, sourceTransactionId: 'txn-1' }];
+    expect(anticipatedAwayEntryIds(entries)).toEqual(new Set());
+  });
+
+  // Fatura de ORIGEM: os 4 lançamentos se anulam, mas `anticipation_credit_reversal` somava em
+  // "Compras" sem nunca virar linha — o cabeçalho ficava R$ 10 acima da soma da lista.
+  it('zera a fatura de origem de uma parcela antecipada cuja compra foi excluída', () => {
+    const entries = [
+      purchase('p1', 1000),
+      anticipationCredit('c1', 1000),
+      { id: 'cr1', type: 'anticipation_credit_reversal', amountCents: 1000, sourceTransactionId: 'txn-1' },
+      purchaseReversal('r1', 1000)
+    ];
+    expect(anticipatedAwayEntryIds(entries)).toEqual(new Set(['p1', 'c1', 'cr1', 'r1']));
+    expect(invoiceHasVisibleActivity(entries)).toBe(false);
   });
 });
 

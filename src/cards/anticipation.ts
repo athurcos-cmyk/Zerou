@@ -1,3 +1,5 @@
+import { reversedSourceIds } from '../finance/spendingAnalysis';
+
 export interface AnticipatableLedgerEntry {
   id: string;
   type: string;
@@ -50,6 +52,12 @@ export interface AnticipatablePurchaseGroup {
  *    transação `card_purchase` só). O "já antecipado" é contado por ocorrência, não num
  *    Set: se duas parcelas irmãs caírem na mesma fatura, antecipar uma não pode esconder a
  *    outra.
+ *
+ * 3. Compra EXCLUÍDA no Extrato não é antecipável — suas parcelas futuras não existem mais.
+ *    Mesmo bug (e mesma correção) de 28/07/2026 em `ongoingInstallmentPurchases`: o ledger da
+ *    fatura futura mantém o `purchase` original e ganha um estorno ao lado, então quem só olha
+ *    o `type === 'purchase'` continua oferecendo pra antecipar uma compra que já não existe.
+ *    Definição de "excluída" reusada de `reversedSourceIds` — uma fonte só.
  */
 function collectFutureInstallments(
   invoices: AnticipatableInvoice[],
@@ -60,6 +68,8 @@ function collectFutureInstallments(
   // campo installmentTotal existir — sempre tem mais de uma ocorrência do mesmo
   // sourceTransactionId, uma por fatura. Sem essa checagem, uma compra à vista que só rolou
   // pra fatura seguinte porque a atual já fechou virava candidata a "antecipar".
+  const reversed = reversedSourceIds(invoices);
+
   const purchaseOccurrences = new Map<string, number>();
   for (const invoice of invoices) {
     if (invoice.cardId !== currentInvoice.cardId) continue;
@@ -90,6 +100,7 @@ function collectFutureInstallments(
       return invoice.ledgerEntries
         .filter((entry) => {
           if (entry.type !== 'purchase' || !entry.sourceTransactionId) return false;
+          if (reversed.has(entry.sourceTransactionId)) return false;
           const isInstallmentPurchase =
             (entry.installmentTotal ?? 0) > 1 || (purchaseOccurrences.get(entry.sourceTransactionId) ?? 0) > 1;
           if (!isInstallmentPurchase) return false;
@@ -180,9 +191,20 @@ export interface NettableLedgerEntry {
  * excluída no Extrato (ver `reverseCardPurchaseOnDelete`) anula a parcela original do mesmo
  * jeito; esconder o par evita o mesmo ruído contábil de uma compra que já não existe mais.
  *
- * Não confundir com `installment_anticipation` (o débito que pousa na fatura ATUAL/origem
- * quando se antecipa): esse é visível de propósito — é dinheiro pesando agora, correto.
+ * `installment_anticipation` (o débito que pousa na fatura ATUAL) e `anticipation_credit_reversal`
+ * entram na mesma regra, e **só** por ela: numa antecipação normal o crédito que os anularia mora
+ * na OUTRA fatura, então não há par aqui e os dois seguem visíveis — que é o certo, é dinheiro
+ * pesando agora. Eles só somem quando a compra foi excluída e o estorno caiu ao lado, na mesma
+ * fatura. Sem isso sobrava, na conta real do dono (09/08/2026): uma linha "Antecipação R$ 10,00"
+ * de uma compra que já não existia, e — na fatura de origem — R$ 10,00 contando no total "Compras"
+ * sem linha nenhuma na lista (`anticipation_credit_reversal` soma em `purchasesTotalCents` mas
+ * nunca foi listado). Saldo certo nas duas, ruído nas duas.
  */
+/** Exportado porque o hero da fatura precisa descontar EXATAMENTE estes tipos do total "Compras"
+ *  quando eles somem da lista (`hiddenPurchaseCents`, InvoicePage) — duas listas separadas
+ *  divergiriam, e a conta do cabeçalho pararia de fechar com as linhas de baixo. */
+export const nettableDebitTypes = new Set(['purchase', 'installment_anticipation', 'anticipation_credit_reversal']);
+
 export function anticipatedAwayEntryIds(entries: NettableLedgerEntry[]): Set<string> {
   const availableCredits = new Map<string, string[]>();
   for (const entry of entries) {
@@ -196,7 +218,7 @@ export function anticipatedAwayEntryIds(entries: NettableLedgerEntry[]): Set<str
 
   const hidden = new Set<string>();
   for (const entry of entries) {
-    if (entry.type !== 'purchase' || !entry.sourceTransactionId) continue;
+    if (!nettableDebitTypes.has(entry.type) || !entry.sourceTransactionId) continue;
     const key = `${entry.sourceTransactionId}_${entry.amountCents}`;
     const list = availableCredits.get(key);
     if (list && list.length > 0) {

@@ -2549,18 +2549,27 @@ span.service-mark--brand {
   padding: 0.8rem 0.9rem;
 }
 
+/* Empilhado, não lado a lado. Com "8 parcelas futuras" na mesma linha sobravam ~200px pro nome num
+   celular de 375px, e todo nome real ("Airbnb aniversário vitoria", "Notebook Dell Inspiron 15
+   3000") virava reticências. Medido a 315px (largura real do card no aparelho), não no olho. */
 .anticipation-group-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.75rem;
+  display: grid;
+  gap: 0.15rem;
 }
 
+/* Largura inteira do card, e até 2 linhas antes de cortar — mesmo padrão de `.metric-card` acima. */
 .anticipation-group-name {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+}
+
+.anticipation-group-count {
+  font-size: 0.82rem;
 }
 
 .anticipation-stepper {
