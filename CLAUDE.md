@@ -257,6 +257,62 @@ A documentação do Firebase Messaging dá a entender que `onBackgroundMessage` 
 
 ---
 
+## ⚠️ Faixa embaixo da bottom nav no Android instalado: bug do PRÓPRIO Chrome, não do nosso CSS (2026-08-08)
+
+Print de uma usuária (iPhone 16, PWA instalado) mostrou a bottom nav congelada no meio da tela.
+Consertar isso virou uma sessão de **6 commits** no mesmo trecho, os 5 primeiros cegos (CSS
+plausível, nunca medido no aparelho real), até medir de verdade e achar que a causa nem era nossa:
+
+1. `54395ae` — `overflow-x: hidden` no `html`/`body` forçava o `<body>` a virar scroll container;
+   no Safari iOS isso descola `position: fixed` (a nav "flutuava" no meio da tela rolando). Trocado
+   por `clip`.
+2. `348721d` — `clip` no `html` corta a caixa do próprio root: o fundo da página parava de pintar
+   fora dela e as barras do sistema caíam na cor padrão do SO (preta no Android, branca no iPhone).
+   `clip` saiu do `html`, ficou só no `body`.
+3. `4da2e12` — a faixa preta foi diagnosticada (errado, ver commit 4) como `env(safe-area-inset-bottom)`
+   sendo **dinâmico** no Chrome 135+ Android (zera com o "chin" de gestos visível). Nav passou a
+   usar `--safe-area-max-inset-bottom` (estático, com fallback pro iOS) + o truque
+   `bottom: calc(dinâmico - estático)` recomendado pelo Chrome.
+4. `d27ea04` — o dono corrigiu a conclusão do commit 3: a faixa preta era regressão do PRÓPRIO
+   commit 2, não bug antigo do Android. `overflow-x` saiu de vez do `html` e do `body`.
+5. `ad1e839` — como a faixa **continuou** depois do commit 4 (confirmado ao vivo, reinstalando o
+   PWA pra descartar WebAPK com manifest desatualizado), entrou um diagnóstico temporário
+   (`?debugSafeArea=1`, gravando em `localStorage` porque o PWA instalado não tem barra de endereço
+   pra digitar query string) medindo ao vivo `--safe-area-max-inset-bottom`, `env(safe-area-inset-bottom)`
+   cru e a posição real da `.mobile-nav`.
+
+**O print do diagnóstico no aparelho real mudou tudo**: `env(safe-area-inset-bottom)` e
+`--safe-area-max-inset-bottom` vinham **0px** tanto numa aba comum quanto no PWA instalado
+(`display-mode: standalone`), e a `.mobile-nav` já terminava exatamente em cima de `window.innerHeight`
+nos dois casos (gap ≈ 0). Ou seja: a nossa nav já pintava até o último pixel que o navegador
+disponibiliza — não sobrava CSS nenhum pra escrever. A faixa preta existia **fora** da área que
+`window.innerHeight` mede, em qualquer contexto — é a barra de navegação do próprio Android, numa
+faixa separada, fora do alcance de qualquer CSS/JS da página.
+
+Confirmado com uma pesquisa (não achado no código): existe um bug do Chromium aberto desde março de
+2025 — PWA **instalado** no Android (WebAPK, via "Adicionar à tela inicial") não recebe renderização
+edge-to-edge mesmo com `viewport-fit=cover` implementado certinho, embora uma ABA comum do mesmo
+Chrome funcione. Um engenheiro do Chrome confirmou publicamente em 24/03/2026: "*this is a known
+shortcoming*", bug "assigned" mas **sem previsão de lançamento**. Fonte:
+https://tech-ish.com/2026/07/15/google-chrome-for-android-pwa-edge-to-edge/ (a implementação de
+"short-edges cutout mode" ainda nem saiu do Canary/Beta em jul/2026).
+
+**Regra**: se aparecer de novo um relato de "faixa/barra estranha embaixo da bottom nav" no PWA
+instalado Android — **não tente mais CSS**. É esse bug do Chrome, confirmado e sem fix disponível.
+Confirmar rápido sem escrever nada: alternar o tema claro/escuro do **sistema operacional** (não do
+app) — se a faixa mudar de cor junto, é o SO pintando aquela área, não a nossa página. Mitigação
+possível hoje (não é fix, é paliativo): deixar o modo de tema do app em "Sistema" pra ele acompanhar
+o tema do celular — a faixa continua lá, mas para de destoar visualmente porque as duas cores batem.
+
+**Lição maior, pra qualquer bug de CSS/layout que sobreviva a mais de 2 tentativas**: parar de
+ajustar CSS às cegas e **medir o valor real no aparelho** (um diagnóstico temporário rápido,
+removido depois, como o `?debugSafeArea=1` acima) é mais barato que outra rodada de tentativa e
+erro — principalmente quando a "correção" de uma vez já criou regressão nova duas vezes seguidas no
+mesmo dia (commits 1→2 e 2→3 acima). Mesmo padrão já registrado na seção de push em dobro, logo
+abaixo.
+
+---
+
 ## Regras de código
 
 - **Dinheiro sempre em centavos inteiros** (`amountCents`); exibir via `formatMoney()`.
