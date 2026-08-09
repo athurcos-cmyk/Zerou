@@ -36,6 +36,73 @@ function getTileClass({ isActive }: { isActive: boolean }) {
   return `menu-tile${isActive ? ' active' : ''}`;
 }
 
+// O PWA instalado não tem barra de endereço pra digitar ?debugSafeArea=1 -- por isso a flag
+// também grava em localStorage (mesma origem) na primeira visita via aba normal, e o app
+// instalado lê o storage. ?debugSafeArea=0 desliga de novo.
+function readSafeAreaDebugFlag(): boolean {
+  const param = new URLSearchParams(window.location.search).get('debugSafeArea');
+  if (param === '1') localStorage.setItem('zerou.debugSafeArea', '1');
+  if (param === '0') localStorage.removeItem('zerou.debugSafeArea');
+  return param === '1' || (param === null && localStorage.getItem('zerou.debugSafeArea') === '1');
+}
+
+// ponytail: diagnóstico temporário pra medir ao vivo, no aparelho, se a faixa embaixo da
+// bottom nav no PWA instalado é --safe-area-max-inset-bottom não resolvendo (bug de CSS) ou
+// se o valor está certo e o problema é a barra do sistema Android não ficando transparente
+// (fora do alcance do CSS). Remover assim que o print no aparelho responder isso.
+function SafeAreaDebug() {
+  const [info, setInfo] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const probe = document.createElement('div');
+    probe.style.position = 'fixed';
+    probe.style.visibility = 'hidden';
+    probe.style.paddingBottom = 'var(--safe-area-max-inset-bottom)';
+    document.body.appendChild(probe);
+    const maxInset = getComputedStyle(probe).paddingBottom;
+    probe.style.paddingBottom = 'env(safe-area-inset-bottom)';
+    const rawInset = getComputedStyle(probe).paddingBottom;
+    document.body.removeChild(probe);
+
+    const nav = document.querySelector('.mobile-nav');
+    const rect = nav?.getBoundingClientRect();
+
+    setInfo({
+      maxInset,
+      rawInset,
+      navBottom: rect ? `${rect.bottom.toFixed(1)}px` : 'sem .mobile-nav',
+      innerHeight: `${window.innerHeight}px`,
+      gap: rect ? `${(window.innerHeight - rect.bottom).toFixed(1)}px` : '—',
+      displayMode: window.matchMedia('(display-mode: standalone)').matches ? 'standalone' : 'browser'
+    });
+  }, []);
+
+  return (
+    <pre
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        zIndex: 9999,
+        margin: 0,
+        padding: '6px 8px',
+        background: '#000',
+        color: '#0f0',
+        fontSize: '11px',
+        lineHeight: 1.4,
+        whiteSpace: 'pre-wrap'
+      }}
+    >
+      {`--safe-area-max-inset-bottom: ${info.maxInset ?? '...'}
+env(safe-area-inset-bottom): ${info.rawInset ?? '...'}
+.mobile-nav bottom: ${info.navBottom ?? '...'}
+window.innerHeight: ${info.innerHeight ?? '...'}
+gap (nav -> fim da tela): ${info.gap ?? '...'}
+display-mode: ${info.displayMode ?? '...'}`}
+    </pre>
+  );
+}
+
 export function AppShell() {
   const { user, profile, authFromCache } = useAuth();
   const location = useLocation();
@@ -75,6 +142,7 @@ export function AppShell() {
 
   return (
     <div className={`app-layout${isFoundationPending ? ' app-layout--focus' : ''}`}>
+      {readSafeAreaDebugFlag() ? <SafeAreaDebug /> : null}
       {!isFoundationPending ? (
         <nav className="sidebar" aria-label="Navegação principal">
         <div>
