@@ -2,6 +2,13 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-10 (7) — Title/OG/Twitter voltam a ter mini-descrição
+
+Dono notou no resultado de busca do Google que o título tinha virado só "Granativa", sem dizer o
+que o app faz. `<title>`, `og:title` e `twitter:title` (`index.html`) passam a
+"Granativa — veja pra onde vai seu dinheiro", ecoando a tagline atual. `description`/`og:description`
+não mudaram.
+
 ## 2026-08-10 (6) — Hero da landing: 4 badges flutuantes viram "extrato de verdade" + bug de Z corrigido
 
 Inspirado numa referência de concorrente (Pierre). Trocado por rodadas com o dono até fechar em 4.
