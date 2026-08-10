@@ -23,7 +23,7 @@ export function AuthLayout({ eyebrow, title, description, children }: AuthLayout
             <p className="subtitle">{description}</p>
           </div>
           <p className="notice">
-            Controle individual. Organização a dois. Seu espaço pessoal nasce privado; o que for compartilhado fica
+            Veja pra onde vai seu dinheiro. Sozinho ou a dois. Seu espaço pessoal nasce privado; o que for compartilhado fica
             claro quando chegar a hora.
           </p>
         </aside>

@@ -11,7 +11,15 @@ interface LandingShellProps {
 export function LandingShell({ hero, children }: LandingShellProps) {
   return (
     <main className="lp" data-theme="paper">
-      <Seo title="Granativa — finanças simples de entender" description="Organize suas finanças pessoais e do casal, sem misturar o que é seu com o que é compartilhado." path="/" />
+      {/* SEO: o título vira "Controle financeiro pessoal e do casal | Granativa" (49 chars, cabe
+          inteiro no resultado do Google) — termo de busca na frente, marca no fim. A descrição tem
+          154 chars de propósito: acima de ~155 o Google corta com reticências. Ver
+          `.agents/product-marketing.md`. */}
+      <Seo
+        title="Controle financeiro pessoal e do casal"
+        description="Registre um gasto em 3 toques e veja pra onde vai seu dinheiro. Cartões, contas e metas num lugar só — com um espaço do casal onde o seu continua privado."
+        path="/"
+      />
 
       <header className="lp-nav">
         <div className="lp-nav-inner">

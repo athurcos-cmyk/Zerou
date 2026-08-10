@@ -1,6 +1,6 @@
 # Zerou
 
-Controle individual. Organizacao a dois.
+Veja pra onde vai seu dinheiro. Sozinho ou a dois.
 
 App React/TypeScript/Firebase do Zerou v12.2 com Fases 1 a 6 implementadas em modo de lancamento gratuito.
 

@@ -246,3 +246,7 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
 ## Landing (`src/landing/`)
 
 Zona de marketing, identidade Sol clara, com liberdade de cor literal (exceção do teste). Hero com mockup do app em CSS (`AppMockup`) num phone 3D, bento de recursos, faixa do casal (cofrinho), FAQ, CTA. Voz de copy: dor + reframe (PAS), CTA em 1ª pessoa.
+
+## ⚠️ Armadilha de especificidade dentro de `.public-section`
+
+`.public-section h1|h2|h3|p { margin-top: 0 }` tem especificidade (0,1,1) e **vence qualquer classe solta** (0,1,0). Classe nova ali dentro que precise de `margin-top` precisa levar o nome do elemento no seletor (`h1.minha-classe`, `p.minha-classe`) pra empatar a especificidade e ganhar pela ordem. Sem isso o espaçamento some **sem erro nenhum** — só um layout apertado que ninguém associa à causa. Custou uma depuração em 2026-08-09.

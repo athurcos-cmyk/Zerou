@@ -94,7 +94,7 @@ export default defineConfig(({ mode }) => {
         manifest: {
           name: 'Granativa',
           short_name: 'Granativa',
-          description: 'Controle individual. Organização a dois.',
+          description: 'Veja pra onde vai seu dinheiro. Sozinho ou a dois.',
           lang: 'pt-BR',
           theme_color: '#EE5524',
           // Branco, não o Paper (#FAF8F5): os ícones do manifest passaram a ter fundo BRANCO

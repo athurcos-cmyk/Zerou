@@ -33,7 +33,7 @@ export function PublicLayout({ children }: PublicLayoutProps) {
       <footer className="public-footer">
         <div>
           <BrandLockup />
-          <p className="text-secondary">Controle individual. Organização a dois.</p>
+          <p className="text-secondary">Veja pra onde vai seu dinheiro. Sozinho ou a dois.</p>
         </div>
         <div className="public-footer-links" aria-label="Links institucionais">
           <Link to="/security">Segurança</Link>

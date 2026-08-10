@@ -79,7 +79,7 @@ export function LandingSections() {
           <div className="lp-stat-divider" />
           <div className="lp-stat">
             <strong>R$ 0</strong>
-            <span>pra sempre</span>
+            <span>sem cartão</span>
           </div>
         </div>
       </RevealSection>

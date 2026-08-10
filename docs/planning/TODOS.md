@@ -6,6 +6,23 @@ Itens acionáveis. Fechou? Move para "Concluído" ou remove. Detalhe histórico 
 
 ## Abertas
 
+### Blog/conteúdo de SEO — TENTADO E REMOVIDO no mesmo dia (2026-08-09)
+
+Cheguei a criar `/blog` com duas páginas de texto (conta conjunta × separada; organizar sem juntar)
+pra entrar na busca do Google. **O dono mandou remover, e a decisão está certa**: SEO leva 3 a 6
+meses pra dar sinal, e com 5 usuários — todos amigos e família — ainda não se sabe se um estranho
+quer o produto. Investir num canal lento antes disso é escalar algo que não se provou.
+
+Tudo removido: rota, componente, CSS, entradas do sitemap e os rascunhos. Restou só a lição de CSS
+no `docs/design/DESIGN.md` (armadilha de especificidade dentro de `.public-section`), que é
+independente do assunto.
+
+**Se um dia voltar**, o que já foi apurado e não precisa ser refeito está em
+`.agents/product-marketing.md` (seção SEO): os termos genéricos são de C6/PagBank, o nicho de casal
+já tem concorrente direto (ZapGastos), e o único ângulo livre é "organizar a dois sem juntar tudo".
+**Antes de escrever qualquer coisa**: falar com os 5 usuários e conseguir os primeiros estranhos na
+mão — é mais rápido e diz se existe demanda.
+
 ### Confirmar com a usuária do iPhone 16 se a nav parou de congelar (2026-08-08)
 
 Print dela: bottom nav congelada no meio da tela, tapando as compras, no **PWA instalado via

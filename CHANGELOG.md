@@ -2,6 +2,64 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-09 — branding: tagline nova + contexto de marketing + fim do "grátis pra sempre"
+
+Início da frente de marketing/branding, via `/marketing-skills:product-marketing`.
+
+- **Tagline nova: "Veja pra onde vai seu dinheiro. Sozinho ou a dois."** Substitui "Controle
+  individual. Organização a dois." por dois motivos do dono: falava demais do casal (metade da
+  frase, afastando quem ia usar sozinho) e não dizia o que o app faz. A nova abre com a função
+  literal e repete o CTA que já está no site ("Quero ver meus gastos").
+- **Aplicada nos 8 lugares onde a tagline vive**: `index.html` (og:description), `README.md`,
+  `package.json`, `vite.config.ts` (manifest do PWA), `BrandLogo.tsx` (×2, inclusive o `alt`),
+  `AuthLayout.tsx`, `PublicLayout.tsx` e `EmailLayout.tsx` (rodapé de todo e-mail) — mais a
+  citação no `CLAUDE.md`.
+- **⚠️ "R$ 0 pra sempre" saiu da landing** (virou "R$ 0 · sem cartão"). O dono confirmou que o app
+  **vai ser cobrado no futuro**, então a faixa de stats prometia algo que o produto quebraria — e
+  prometia justamente aos 5 primeiros usuários, que são amigos e família. Regra que fica no
+  `CLAUDE.md`: nenhuma peça pode dizer "sempre"/"pra sempre" enquanto não houver preço definido.
+- **Novo `.agents/product-marketing.md` (v3)**: documento canônico de posicionamento que as demais
+  skills de marketing leem — categoria, personas, dores, concorrentes, diferenciais, objeções,
+  glossário, voz da marca e provas. Inclui a leitura honesta do estágio: **5 usuários, todos
+  amigos e família, é cortesia e não tração**; o objetivo da fase proposto é retenção de um
+  estranho na semana 2, não volume de cadastro.
+- Lacunas registradas no doc: zero depoimento coletado (os 5 usuários são 5 entrevistas
+  disponíveis hoje), concorrentes mapeados sem pesquisa de campo, e nenhuma métrica de retenção
+  existindo ainda.
+- **SEO da landing reescrito.** O título indexado era "Granativa — finanças simples de entender",
+  que não contém nenhum termo que alguém digita no Google; virou **"Controle financeiro pessoal e
+  do casal | Granativa"** (49 chars, termo de busca na frente, marca no fim). A descrição virou
+  "Registre um gasto em 3 toques e veja pra onde vai seu dinheiro. Cartões, contas e metas num
+  lugar só — com um espaço do casal onde o seu continua privado." (**154 chars de propósito** —
+  acima de ~155 o Google corta). A cópia estática do `index.html`, que robôs sem JavaScript leem,
+  ficou idêntica.
+- ⚠️ **`/pricing` removido do `sitemap.xml`**: a rota só faz `Navigate to="/"` desde a remoção do
+  billing, e apontar o Google pra um redirecionamento gasta rastreio à toa.
+- Nota registrada no doc de marketing: título e descrição melhoram o **clique**, não a posição.
+  Site novo sem links não disputa "app de controle financeiro" (Mobills/Organizze); a aposta
+  realista é a cauda longa do nicho de casal, e falta conteúdo — hoje o site só tem landing e
+  páginas institucionais.
+- **Novo `.agents/content-strategy.md` (v1)**: plano de 6 páginas de conteúdo, priorizadas por
+  chance de vitória e não por volume de busca. Começa por uma **calculadora de divisão de contas
+  do casal** (ferramenta ranqueia sem a autoridade que artigo exige, e nenhum blog de banco
+  calcula — só explica em texto).
+- ⚠️ **Correção factual de uma suposição minha, achada na pesquisa**: eu tinha escrito que o nicho
+  de casal quase não tinha concorrente. É falso. **ZapGastos** é concorrente direto (registra
+  gasto por WhatsApp, igual à Vic) e já ranqueia nos termos de app-para-casal; os termos genéricos
+  são de C6 Bank, PagBank e meutudo. `product-marketing.md` corrigido pra v5.
+- **Território redefinido: "organizar a dois sem juntar tudo".** Todo concorrente vende fusão
+  ("mesclem suas contas"); ninguém escreve pra quem NÃO quer fundir — que é exatamente o que o
+  isolamento por Security Rules do Granativa entrega.
+- ⚠️ **Um blog de SEO chegou a ser criado nesta sessão e foi REMOVIDO por decisão do dono**, antes
+  de qualquer commit. Motivo, e ele está certo: SEO leva 3 a 6 meses, e com 5 usuários (todos
+  amigos e família) ainda não se sabe se um estranho quer o produto — investir num canal lento
+  antes disso é escalar o que não se provou. Rota, componente, CSS e sitemap voltaram ao estado
+  anterior. Ficou só a lição de CSS no `docs/design/DESIGN.md`, que independe do assunto. Contexto
+  em `docs/planning/TODOS.md`.
+- Sem mudança de comportamento, regra ou function. 693 testes, typecheck e build verdes;
+  tagline e SEO conferidos renderizando no navegador (título "Controle financeiro pessoal e do
+  casal | Granativa", 50 chars; descrição de 154).
+
 ## 2026-08-09 — fix(cartão): compra excluída continuava oferecida em "Antecipar parcelas"
 
 Achado pelo dono na tela da fatura: a lista mostrava compras que ele já tinha excluído, e justamente

@@ -19,7 +19,7 @@ export function BrandLogo({ compact = false }: BrandLogoProps) {
     <img
       className="brand-mark"
       src="/brand/granativa-logo-primary.png"
-      alt="Granativa - Controle individual. Organização a dois."
+      alt="Granativa - Veja pra onde vai seu dinheiro. Sozinho ou a dois."
     />
   );
 }
@@ -30,7 +30,7 @@ export function BrandLockup() {
       <img src="/brand/granativa-icon-master-1024.png" alt="" width="48" height="48" aria-hidden="true" />
       <div>
         <strong>Granativa</strong>
-        <span>Controle individual. Organização a dois.</span>
+        <span>Veja pra onde vai seu dinheiro. Sozinho ou a dois.</span>
       </div>
     </div>
   );

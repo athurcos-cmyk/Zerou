@@ -32,7 +32,7 @@ O Java desta máquina estava quebrado: dois JDK 25 sem a pasta `bin/` e um stub 
 
 ## Projeto
 
-SaaS/PWA financeiro mobile-first. Duas frentes: **controle individual** das finanças e **organização a dois** (casal). Tagline: "Controle individual. Organização a dois." Produção: https://granativa.com.br (domínio próprio; `zerou-five.vercel.app` continua funcionando como URL legada do Vercel) · Repo: `athurcos-cmyk/Zerou` · Branch: `main` (direto, sem PR, por pedido do dono).
+SaaS/PWA financeiro mobile-first. Duas frentes: **controle individual** das finanças e **organização a dois** (casal). Tagline: **"Veja pra onde vai seu dinheiro. Sozinho ou a dois."** (2026-08-09; substituiu "Controle individual. Organização a dois.", que falava demais do casal e não dizia o que o app faz). Contexto de marketing e posicionamento vive em `.agents/product-marketing.md`. ⚠️ **O app vai ser pago no futuro — nenhuma peça pode prometer "grátis pra sempre".** Produção: https://granativa.com.br (domínio próprio; `zerou-five.vercel.app` continua funcionando como URL legada do Vercel) · Repo: `athurcos-cmyk/Zerou` · Branch: `main` (direto, sem PR, por pedido do dono).
 
 ## Stack
 

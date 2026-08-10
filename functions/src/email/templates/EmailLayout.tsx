@@ -40,7 +40,7 @@ export function EmailLayout({ preview, title, accent, children }: EmailLayoutPro
           <Section style={content}>{children}</Section>
 
           <Section style={footer}>
-            <Text style={footerBrand}>Granativa — Controle individual. Organização a dois.</Text>
+            <Text style={footerBrand}>Granativa — Veja pra onde vai seu dinheiro. Sozinho ou a dois.</Text>
             <Text style={footerMuted}>
               Você recebeu este email porque tem (ou teve) uma conta na Granativa.
             </Text>
