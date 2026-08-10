@@ -286,9 +286,16 @@ html[data-reduce-motion='true'] *::after {
   color: var(--success);
 }
 
+.public-page-inner {
+  display: grid;
+  justify-items: center;
+  gap: 1rem;
+  width: min(100%, 68rem);
+}
+
 .public-shell {
   display: grid;
-  width: min(100%, 68rem);
+  width: 100%;
   min-height: min(46rem, calc(100vh - 4rem));
   grid-template-columns: 1.05fr 0.95fr;
   overflow: hidden;
@@ -296,6 +303,16 @@ html[data-reduce-motion='true'] *::after {
   border-radius: 1.5rem;
   background: var(--bg-surface);
   box-shadow: var(--shadow-md);
+}
+
+.public-page-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem 1.25rem;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
 }
 
 .public-panel {
@@ -2929,12 +2946,6 @@ span.service-mark--brand {
 }
 
 
-.pricing-hero {
-  display: grid;
-  max-width: 52rem;
-  gap: 0.8rem;
-}
-
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -3358,18 +3369,6 @@ span.service-mark--brand {
   line-height: 1.7;
 }
 
-.split-section {
-  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
-  align-items: start;
-}
-
-.split-section > p,
-.split-section .contact-list {
-  color: var(--text-secondary);
-  font-size: 1.08rem;
-  line-height: 1.75;
-}
-
 .feature-grid,
 .privacy-action-grid {
   display: grid;
@@ -3406,11 +3405,6 @@ span.service-mark--brand {
   padding: clamp(1.25rem, 4vw, 2rem);
 }
 
-.faq-grid {
-  grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr);
-  align-items: start;
-}
-
 .faq-list {
   display: grid;
   gap: 0.75rem;
@@ -3432,7 +3426,10 @@ span.service-mark--brand {
    layout do hero em vez de um ícone de cadeado genérico. */
 .sec-hero { max-width: 44rem; }
 
-.sec-boundary {
+.sec-boundary-intro { max-width: 34rem; }
+
+.sec-boundary-grid {
+  display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: stretch;
   gap: 0;
@@ -3484,6 +3481,46 @@ span.service-mark--brand {
   border-radius: 999px;
   background: var(--action-primary);
 }
+
+/* ── Ajuda — mesma vitrine de tópicos do Features (`.feat-group`), reaproveitada de propósito
+   pros dois catálogos lerem como a mesma família visual. Assinatura própria: nav de atalho por
+   tópico, útil aqui e não lá porque só a Ajuda tem pergunta suficiente pra precisar de atalho. ── */
+.help-hero { max-width: 40rem; }
+
+.help-jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+
+.help-jump-chip {
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--bg-surface);
+  padding: 0.5rem 0.9rem;
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.help-jump-chip:hover,
+.help-jump-chip:focus-visible {
+  color: var(--text-primary);
+  border-color: var(--action-primary);
+}
+
+/* Sem isso, o `#id` do clique tucaria o título embaixo da `.public-nav` sticky. */
+.help-group { scroll-margin-top: 5rem; }
+
+/* ── Contato — dois canais como cartão de ação, não uma lista de emails soltos. ── */
+.contact-hero { max-width: 42rem; }
+
+.contact-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.contact-cards .button { justify-self: start; }
 
 /* ── Features page — a Vic no WhatsApp como abertura, catálogo agrupado por tarefa (não por
    menu do app) abaixo. ── */
@@ -3607,7 +3644,7 @@ h2.sec-layers-title {
 .sec-trust p { color: var(--text-secondary); line-height: 1.6; }
 
 @media (max-width: 700px) {
-  .sec-boundary { grid-template-columns: 1fr; }
+  .sec-boundary-grid { grid-template-columns: 1fr; }
   .sec-boundary-rule { width: auto; height: 2px; }
   .sec-trust { grid-template-columns: 1fr; }
 }
@@ -3677,18 +3714,6 @@ h2.sec-layers-title {
   max-width: 76rem;
 }
 
-.contact-list {
-  display: grid;
-  gap: 1rem;
-}
-
-.contact-list p {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-}
-
 @media (max-width: 900px) {
   /* Folga que o conteúdo precisa pra não ficar atrás da bottom nav fixa.
      Única fonte da medida — usada no padding do .app-main e no offset do
@@ -3744,11 +3769,9 @@ h2.sec-layers-title {
     transform: rotateX(5deg) rotateY(-7deg) rotateZ(1deg);
   }
 
-  .split-section,
   .feature-grid,
   .privacy-action-grid,
-  .pricing-strip,
-  .faq-grid {
+  .pricing-strip {
     grid-template-columns: 1fr;
   }
 

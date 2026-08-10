@@ -1,5 +1,5 @@
 ﻿import { Link } from 'react-router-dom';
-import { ArrowRight, HelpCircle, Mail, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Mail, ShieldCheck } from 'lucide-react';
 import { Seo } from '../components/Seo';
 import { PublicLayout } from './PublicLayout';
 
@@ -121,52 +121,32 @@ export function SecurityPage() {
     <PublicLayout>
       <Seo
         title="Segurança"
-        description="Como a Granativa separa os dados de cada pessoa, sem prometer segurança absoluta."
+        description="Login protegido e dados isolados por conta — no seu espaço pessoal e, se você abrir, também no do casal."
         path="/security"
       />
       <section className="public-section sec-hero">
         <p className="eyebrow">Segurança</p>
-        <h1 className="marketing-title">Duas contas, uma fronteira que não se move.</h1>
+        <h1 className="marketing-title">O que é seu, continua seu.</h1>
         <p className="marketing-copy">
-          Isso não é uma configuração que dá pra esquecer de marcar — é o servidor decidindo o que cada pessoa vê.
-          Segurança é prática contínua, não promessa absoluta.
+          Sua conta só abre com o seu login. O que você registra fica isolado do de qualquer outra pessoa — inclusive
+          dentro do espaço do casal, se um dia você abrir um.
         </p>
       </section>
 
-      <section className="public-section sec-boundary" aria-label="O que é privado e o que é compartilhado">
-        <div className="sec-boundary-side">
-          <p className="sec-boundary-label">O que é seu</p>
-          <ul>
-            <li>Contas e saldos</li>
-            <li>Cartões e faturas</li>
-            <li>Todo o seu histórico pessoal</li>
-          </ul>
-        </div>
-        <div className="sec-boundary-rule" aria-hidden="true" />
-        <div className="sec-boundary-side">
-          <p className="sec-boundary-label">O que vocês decidem dividir</p>
-          <ul>
-            <li>Despesas marcadas como compartilhadas</li>
-            <li>Acertos entre o casal</li>
-            <li>O cofrinho em comum</li>
-          </ul>
-        </div>
-      </section>
-
       <section className="public-section sec-layers">
-        <p className="eyebrow">Em camadas</p>
-        <h2 className="sec-layers-title">Do perímetro até o dado.</h2>
+        <p className="eyebrow">Como protegemos sua conta</p>
+        <h2 className="sec-layers-title">Três camadas, sempre ativas.</h2>
         <div className="sec-layers-list">
-          <SecLayer n={1} title="Acesso com login" text="O app privado só abre depois de entrar na sua conta." />
+          <SecLayer n={1} title="Acesso com login" text="O app privado só abre depois de entrar na sua conta, com senha ou Google." />
           <SecLayer
             n={2}
-            title="Dados separados"
-            text="A regra que isola seus dados roda no servidor — não é uma opção que dá pra esquecer de marcar."
+            title="Dados isolados por conta"
+            text="Cada conta enxerga só os próprios dados. A regra roda no servidor — o aplicativo não decide isso sozinho."
           />
           <SecLayer
             n={3}
-            title="Auditoria do casal"
-            text="Ações do espaço compartilhado registram resumo sem salvar código puro de convite."
+            title="Conexão criptografada"
+            text="Tudo que sai do seu aparelho viaja criptografado até o servidor, o mesmo padrão usado por bancos."
           />
         </div>
       </section>
@@ -177,6 +157,36 @@ export function SecurityPage() {
           <h2>Não pedimos a senha do seu banco.</h2>
           <p>a Granativa não conecta a contas bancárias nem pede suas credenciais. Você registra o que quiser mostrar — o resto continua só seu.</p>
         </div>
+      </section>
+
+      <section className="public-section sec-boundary" aria-label="O que é privado e o que é compartilhado">
+        <div>
+          <p className="eyebrow">Se for usar com alguém</p>
+          <h2 className="sec-layers-title">O espaço do casal não muda a regra.</h2>
+          <p className="marketing-copy sec-boundary-intro">
+            O espaço a dois é opcional, e só existe se você criar um. Dentro dele, a mesma fronteira continua de pé:
+          </p>
+        </div>
+        <div className="sec-boundary-grid">
+          <div className="sec-boundary-side">
+            <p className="sec-boundary-label">O que é seu</p>
+            <ul>
+              <li>Contas e saldos</li>
+              <li>Cartões e faturas</li>
+              <li>Todo o seu histórico pessoal</li>
+            </ul>
+          </div>
+          <div className="sec-boundary-rule" aria-hidden="true" />
+          <div className="sec-boundary-side">
+            <p className="sec-boundary-label">O que vocês decidem dividir</p>
+            <ul>
+              <li>Despesas marcadas como compartilhadas</li>
+              <li>Acertos entre o casal</li>
+              <li>O cofrinho em comum</li>
+            </ul>
+          </div>
+        </div>
+        <p className="text-secondary">Ações do espaço compartilhado registram um resumo — nunca o código do convite.</p>
       </section>
 
       <section className="public-section final-cta">
@@ -202,36 +212,146 @@ function SecLayer({ n, title, text }: { n: number; title: string; text: string }
   );
 }
 
+interface HelpFaqItem {
+  q: string;
+  a: string;
+  linkTo?: string;
+  linkLabel?: string;
+}
+
+const helpFaqGroups: { topic: string; id: string; items: HelpFaqItem[] }[] = [
+  {
+    topic: 'Começando',
+    id: 'comecando',
+    items: [
+      {
+        q: 'Preciso conectar minha conta do banco?',
+        a: 'Não. a Granativa não conecta a bancos nem pede suas credenciais — você registra o que quiser mostrar, direto no app ou mandando mensagem pra Vic no WhatsApp.'
+      },
+      { q: 'É de graça?', a: 'Hoje sim: R$ 0, sem cartão de crédito.' },
+      {
+        q: 'Dá pra usar só pelo celular?',
+        a: 'Sim — é assim que a Granativa foi pensada. Abra pelo navegador do celular e adicione o atalho na tela inicial; não precisa de loja de aplicativos.'
+      }
+    ]
+  },
+  {
+    topic: 'Espaço do casal',
+    id: 'espaco-do-casal',
+    items: [
+      {
+        q: 'Meu parceiro vai ver meus gastos?',
+        a: 'Só o que vocês decidirem colocar no espaço do casal. Contas, cartões e lançamentos do seu espaço pessoal continuam invisíveis pra ele — regra aplicada no servidor, não uma configuração sua.'
+      },
+      {
+        q: 'Como convidar meu parceiro?',
+        a: 'Entre em Compartilhado, crie o espaço, gere o convite e envie o código ou link para a outra pessoa.'
+      },
+      {
+        q: 'Dá pra sair do espaço do casal depois?',
+        a: 'Sim, a qualquer momento. Sair não cancela nada — cofrinho, despesas e acertos continuam intactos, só o vínculo entre as contas é desfeito.'
+      }
+    ]
+  },
+  {
+    topic: 'Cartões e faturas',
+    id: 'cartoes-e-faturas',
+    items: [
+      {
+        q: 'Como registro um cartão?',
+        a: 'Use Cartões, crie o cartão e registre as compras. O saldo da conta só muda quando você marca a fatura como paga — a compra fica na fatura até lá.'
+      },
+      {
+        q: 'Uma compra parcelada conta o valor todo de uma vez?',
+        a: 'Não — cada parcela conta só no mês da fatura em que ela cai, então o total nunca aparece duas vezes.'
+      }
+    ]
+  },
+  {
+    topic: 'Conta e privacidade',
+    id: 'conta-e-privacidade',
+    items: [
+      {
+        q: 'Como excluo minha conta e meus dados?',
+        a: 'Direto pelo app, em Configurações > Segurança > Métodos de login, sem precisar escrever pra ninguém.',
+        linkTo: '/legal/data-deletion',
+        linkLabel: 'Ver o passo a passo'
+      },
+      {
+        q: 'Meus dados são privados?',
+        a: 'Sim — cada conta só enxerga os próprios dados, mesmo dentro do espaço do casal.',
+        linkTo: '/security',
+        linkLabel: 'Ver como protegemos sua conta'
+      }
+    ]
+  }
+];
+
+const helpFaqSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: helpFaqGroups.flatMap((group) =>
+    group.items.map((item) => ({
+      '@type': 'Question',
+      name: item.q,
+      acceptedAnswer: { '@type': 'Answer', text: item.a }
+    }))
+  )
+};
+
 export function HelpPage() {
   return (
     <PublicLayout>
-      <Seo title="Ajuda" description="Ajuda inicial da Granativa para começar, organizar cartões e usar o espaço compartilhado." path="/help" />
-      <section className="public-section pricing-hero">
+      <Seo
+        title="Ajuda"
+        description="Como começar, convidar o parceiro pro espaço do casal, registrar cartão e excluir sua conta na Granativa."
+        path="/help"
+      />
+      <section className="public-section help-hero">
         <p className="eyebrow">Ajuda</p>
         <h1 className="marketing-title">Comece pelo seu espaço pessoal.</h1>
         <p className="marketing-copy">
-          Crie a conta, conclua o onboarding, cadastre uma conta financeira e registre suas primeiras movimentações.
+          Crie a conta, cadastre uma conta financeira e registre suas primeiras movimentações. O espaço do casal é
+          opcional, pra quando você quiser.
         </p>
+        <nav className="help-jump" aria-label="Ir para um tópico">
+          {helpFaqGroups.map((group) => (
+            <a key={group.id} className="help-jump-chip" href={`#${group.id}`}>
+              {group.topic}
+            </a>
+          ))}
+        </nav>
       </section>
-      <section className="public-section faq-grid">
-        <div>
-          <HelpCircle size={28} aria-hidden="true" />
-          <h2>Perguntas rápidas</h2>
-        </div>
-        <div className="faq-list">
-          <details className="surface surface-pad faq-item" open>
-            <summary>Como convidar outra pessoa?</summary>
-            <p>Entre em Compartilhado, crie o espaço, gere o convite e envie o código ou link para a outra pessoa.</p>
-          </details>
-          <details className="surface surface-pad faq-item">
-            <summary>Como registrar cartão?</summary>
-            <p>Use Cartões, crie um cartão e registre compras. Pagamentos de fatura saem de uma conta financeira.</p>
-          </details>
-          <details className="surface surface-pad faq-item">
-            <summary>Posso usar pelo celular?</summary>
-            <p>Sim. a Granativa foi pensada primeiro para celular. Abra pelo navegador e adicione o atalho na tela inicial se quiser.</p>
-          </details>
-        </div>
+
+      {helpFaqGroups.map((group) => (
+        <section className="public-section help-group feat-group" id={group.id} key={group.topic}>
+          <div className="feat-group-head">
+            <h2 className="feat-group-title">{group.topic}</h2>
+          </div>
+          <div className="faq-list">
+            {group.items.map((item) => (
+              <details className="surface surface-pad faq-item" key={item.q}>
+                <summary>{item.q}</summary>
+                <p>{item.a}</p>
+                {item.linkTo ? (
+                  <Link className="inline-link" to={item.linkTo}>
+                    {item.linkLabel}
+                  </Link>
+                ) : null}
+              </details>
+            ))}
+          </div>
+        </section>
+      ))}
+      {/* Schema derivado do mesmo array que renderiza a lista visível — impossível desalinhar. */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(helpFaqSchema) }} />
+
+      <section className="public-section final-cta">
+        <h2>Ainda com dúvida?</h2>
+        <p>Escreva pro suporte — a gente lê tudo.</p>
+        <Link className="button button--primary" to="/contact">
+          Falar com a gente <ArrowRight size={18} aria-hidden="true" />
+        </Link>
       </section>
     </PublicLayout>
   );
@@ -240,23 +360,45 @@ export function HelpPage() {
 export function ContactPage() {
   return (
     <PublicLayout>
-      <Seo title="Contato" description="Canais de contato da Granativa para suporte e privacidade." path="/contact" />
-      <section className="public-section split-section">
-        <div>
-          <p className="eyebrow">Contato</p>
-          <h1 className="marketing-title">Fale com a Granativa.</h1>
-        </div>
-        <div className="contact-list">
-          <p>
-            <Mail size={18} aria-hidden="true" /> Suporte: <a className="inline-link" href="mailto:suporte@granativa.com.br">suporte@granativa.com.br</a>
-          </p>
-          <p>
-            <Mail size={18} aria-hidden="true" /> Privacidade: <a className="inline-link" href="mailto:privacidade@granativa.com.br">privacidade@granativa.com.br</a>
-          </p>
-          <Link className="button button--primary" to="/legal/privacy">
-            Ver política de privacidade <ArrowRight size={18} aria-hidden="true" />
-          </Link>
-        </div>
+      <Seo title="Contato" description="Fale com o suporte da Granativa ou tire dúvidas sobre privacidade e seus dados." path="/contact" />
+      <section className="public-section contact-hero">
+        <p className="eyebrow">Contato</p>
+        <h1 className="marketing-title">Fale com a gente.</h1>
+        <p className="marketing-copy">
+          Dúvida, erro no app ou pedido sobre os seus dados — escreva direto pro canal certo, sem formulário
+          escondendo o que você quer perguntar.
+        </p>
+      </section>
+
+      <section className="public-section privacy-action-grid contact-cards">
+        <article className="surface surface-pad privacy-action-card">
+          <span className="empty-icon">
+            <Mail size={22} aria-hidden="true" />
+          </span>
+          <h2>Suporte</h2>
+          <p>Erro no app, dúvida sobre como algo funciona ou sugestão de melhoria.</p>
+          <a className="button button--secondary" href="mailto:suporte@granativa.com.br">
+            suporte@granativa.com.br
+          </a>
+        </article>
+        <article className="surface surface-pad privacy-action-card">
+          <span className="empty-icon">
+            <ShieldCheck size={22} aria-hidden="true" />
+          </span>
+          <h2>Privacidade e dados</h2>
+          <p>Pedido de exclusão de conta, dúvida sobre LGPD ou como usamos suas informações.</p>
+          <a className="button button--secondary" href="mailto:privacidade@granativa.com.br">
+            privacidade@granativa.com.br
+          </a>
+        </article>
+      </section>
+
+      <section className="public-section final-cta">
+        <h2>Sua dúvida já pode estar respondida</h2>
+        <p>Como convidar alguém, registrar cartão ou usar pelo celular — veja a Ajuda antes de escrever.</p>
+        <Link className="button button--primary" to="/help">
+          Ver Ajuda <ArrowRight size={18} aria-hidden="true" />
+        </Link>
       </section>
     </PublicLayout>
   );
