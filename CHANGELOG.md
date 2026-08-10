@@ -2,6 +2,25 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-10 (9) — Imagem de compartilhamento trocada: logo horizontal (3:1) era grande demais em proporção
+
+Dono reportou que a imagem não aparecia ao compartilhar o link. `og:image`/`twitter:image` apontavam
+pra `granativa-logo-horizontal.png` (2172×724px, proporção ~3:1) — bem fora da faixa que WhatsApp,
+Telegram, Discord e afins renderizam de forma confiável (praticamente todos esperam algo entre 1:1
+e ~1.91:1; muito mais largo que isso, alguns simplesmente não mostram nada em vez de cortar torto).
+Confirmado que o arquivo carrega certinho em produção (`curl` → `200 image/png`), então não era 404
+nem CSP — era a forma da imagem.
+
+Trocado pro `granativa-logo-stacked.png` (1024×1024, quadrado — proporção seguramente aceita em
+qualquer plataforma) + `og:image:width`/`og:image:height` novos, nos dois lugares (`index.html` e
+`src/components/Seo.tsx`, que sobrescreve os mesmos meta tags em runtime — mesma sincronia das
+entradas (7)/(8) de hoje). Sem essas dimensões, alguns crawlers de preview precisam baixar a imagem
+só pra medir antes de decidir se mostram, o que pode estourar timeout.
+
+**Se ainda não aparecer depois de recarregar**: WhatsApp cacheia preview por URL, então pode ser
+preciso testar num link diferente (com `?v=2` no fim, por exemplo) ou esperar o cache expirar —
+compartilhar o mesmo link de novo não força um recrawl.
+
 ## 2026-08-10 (8) — Description do Google/compartilhamento reescrita + bug de sincronia com o título corrigido
 
 Pedido do dono, usando as skills `seo-audit` e `copywriting`. Ao investigar, achamos que
