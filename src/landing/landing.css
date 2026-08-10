@@ -356,8 +356,44 @@
   flex-shrink: 0;
 }
 .lp-float--a { top: 8%; left: -8%; }
+.lp-float--b { bottom: 14%; left: -4%; }
 .lp-float--c { top: 20%; right: -6%; }
 .lp-float--d { bottom: 8%; right: 0%; }
+
+/* Badges no formato "linha de transação" (ícone + nome/categoria + valor), inspirado em
+   concorrente — troca a pílula genérica por algo que lê como extrato de verdade. */
+.lp-float--tx {
+  white-space: normal;
+  gap: 0.6rem;
+  padding: 0.55rem 0.8rem 0.55rem 0.55rem;
+  min-width: 190px;
+}
+.lp-float-tx-text { display: grid; gap: 0.1rem; line-height: 1.2; }
+.lp-float-tx-text strong { font-size: 0.82rem; font-weight: 800; }
+.lp-float-tx-text span { font-size: 0.68rem; font-weight: 600; opacity: 0.62; }
+.lp-float-tx-amount { font-size: 0.82rem; font-weight: 800; margin-left: auto; white-space: nowrap; }
+
+/* Badges de orçamento/meta (ícone + nome + % + barrinha) — layout em coluna, ao contrário da
+   linha única das badges de transação acima. */
+.lp-float--budget {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.4rem;
+  min-width: 150px;
+  padding: 0.6rem 0.7rem;
+}
+.lp-float-budget-head { display: inline-flex; align-items: center; gap: 0.45rem; }
+.lp-float-budget-head strong { font-size: 0.8rem; font-weight: 800; }
+.lp-float-budget-pct { margin-left: auto; font-size: 0.78rem; font-weight: 800; }
+.lp-float-budget-bar {
+  display: block;
+  width: 100%;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(28, 24, 20, 0.08);
+  overflow: hidden;
+}
+.lp-float-budget-bar i { display: block; height: 100%; border-radius: 999px; }
 
 /* ── Typography ── */
 .lp-h1 {
@@ -575,8 +611,16 @@
   .lp-steps { grid-template-columns: 1fr; }
   .lp-hc { width: 90vw; height: 90vw; }
   .lp-float--a { left: 0; top: -5%; }
+  .lp-float--b { left: 0; bottom: 20%; }
   .lp-float--c { right: 0; }
   .lp-float--d { right: 0; bottom: -3%; }
+  .lp-float--tx { min-width: 156px; padding: 0.5rem 0.65rem 0.5rem 0.45rem; }
+  .lp-float-tx-text strong { font-size: 0.74rem; }
+  .lp-float-tx-text span { font-size: 0.6rem; }
+  .lp-float-tx-amount { font-size: 0.74rem; }
+  .lp-float--budget { min-width: 124px; padding: 0.5rem 0.6rem; }
+  .lp-float-budget-head strong { font-size: 0.72rem; }
+  .lp-float-budget-pct { font-size: 0.7rem; }
 }
 
 @media (max-width: 520px) {

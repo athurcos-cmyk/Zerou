@@ -1,9 +1,90 @@
-﻿import { useRef } from 'react';
+﻿import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useInView } from 'framer-motion';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import {
   ArrowRight, BarChart3, CreditCard, LockKeyhole, MessageCircle, PiggyBank, Target, TrendingUp, Wallet
 } from 'lucide-react';
+
+gsap.registerPlugin(ScrollTrigger);
+
+const steps = [
+  { n: '1', h: 'Crie em 2 minutos', p: 'Responda 2 perguntas e a Granativa monta seu espaço privado na hora.' },
+  { n: '2', h: 'Veja a verdade', p: 'Jogue gastos, contas e cartões pra dentro. Descubra pra onde foi cada real.' },
+  { n: '3', h: 'Pare de terminar no zero', p: 'Corte o que não faz sentido e junte pro que importa — sozinho ou a dois.' }
+];
+
+/* Único momento "GSAP de verdade" da landing (o resto é Framer Motion, que já cobria fade/stagger
+   bem). Pin + scrub só em telas largas (mesmo breakpoint de `.lp-steps` em `landing.css`, 901px) —
+   em mobile, onde mora a maioria de quem usa a Granativa, o efeito de prender a seção na tela
+   atrapalha mais do que ajuda, então ali cada etapa só aparece com um fade simples ao rolar. */
+function StepsSection() {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const ctx = gsap.context(() => {
+      const stepEls = gsap.utils.toArray<HTMLElement>('.lp-step', container);
+      const mm = gsap.matchMedia();
+
+      mm.add('(min-width: 901px)', () => {
+        gsap.set(stepEls.slice(1), { opacity: 0.3, y: 24 });
+        const tl = gsap.timeline({
+          scrollTrigger: {
+            trigger: container,
+            start: 'top top+=88',
+            end: '+=' + stepEls.length * 420,
+            pin: true,
+            scrub: 0.6
+          }
+        });
+        stepEls.forEach((step, i) => {
+          if (i === 0) return;
+          tl.to(stepEls[i - 1], { opacity: 0.3, y: -12, scale: 0.96, duration: 0.5 }, `s${i}`);
+          tl.to(step, { opacity: 1, y: 0, scale: 1, duration: 0.5 }, `s${i}`);
+        });
+        return () => gsap.set(stepEls, { clearProps: 'all' });
+      });
+
+      mm.add('(max-width: 900px)', () => {
+        gsap.set(stepEls, { opacity: 0, y: 32 });
+        stepEls.forEach((step) => {
+          gsap.to(step, {
+            opacity: 1,
+            y: 0,
+            duration: 0.6,
+            ease: 'power2.out',
+            scrollTrigger: { trigger: step, start: 'top 85%' }
+          });
+        });
+        return () => gsap.set(stepEls, { clearProps: 'all' });
+      });
+    }, container);
+
+    return () => ctx.revert();
+  }, []);
+
+  return (
+    <section className="lp-section" id="como" ref={containerRef}>
+      <div className="lp-section-head">
+        <p className="lp-kicker">Como funciona</p>
+        <h2 className="lp-h2">Do caos ao controle em 2 minutos.</h2>
+      </div>
+      <div className="lp-steps">
+        {steps.map((step) => (
+          <article className="lp-step" key={step.n}>
+            <span className="lp-step-num">{step.n}</span>
+            <h3>{step.h}</h3>
+            <p>{step.p}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
@@ -181,33 +262,8 @@ export function LandingSections() {
         </div>
       </RevealSection>
 
-      {/* Steps */}
-      <RevealSection id="como">
-        <div className="lp-section-head">
-          <p className="lp-kicker">Como funciona</p>
-          <h2 className="lp-h2">Do caos ao controle em 2 minutos.</h2>
-        </div>
-        <div className="lp-steps">
-          {[
-            { n: '1', h: 'Crie em 2 minutos', p: 'Responda 2 perguntas e a Granativa monta seu espaço privado na hora.' },
-            { n: '2', h: 'Veja a verdade', p: 'Jogue gastos, contas e cartões pra dentro. Descubra pra onde foi cada real.' },
-            { n: '3', h: 'Pare de terminar no zero', p: 'Corte o que não faz sentido e junte pro que importa — sozinho ou a dois.' },
-          ].map((step, i) => (
-            <motion.article
-              key={step.n}
-              className="lp-step"
-              initial={{ opacity: 0, y: 32 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: '-60px' }}
-              transition={{ duration: 0.6, delay: i * 0.1, ease }}
-            >
-              <span className="lp-step-num">{step.n}</span>
-              <h3>{step.h}</h3>
-              <p>{step.p}</p>
-            </motion.article>
-          ))}
-        </div>
-      </RevealSection>
+      {/* Steps — pin + scrub GSAP, componente próprio (ver StepsSection acima) */}
+      <StepsSection />
 
       {/* FAQ */}
       <RevealSection>

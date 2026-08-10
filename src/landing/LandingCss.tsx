@@ -10,10 +10,11 @@ import {
   useReducedMotion,
   MotionConfig,
 } from 'framer-motion';
-import { ArrowRight, CheckCircle2, CreditCard, PiggyBank, TrendingUp } from 'lucide-react';
+import { ArrowRight, Car, CheckCircle2, Film, Plane, ShoppingBag } from 'lucide-react';
 import { AppMockup } from './AppMockup';
 import { LandingSections } from './LandingSections';
 import { LandingShell } from './LandingShell';
+import { useLenisScroll } from './useLenisScroll';
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
@@ -28,6 +29,7 @@ const fadeUp = {
 };
 
 export function LandingCss() {
+  useLenisScroll();
   const heroRef = useRef<HTMLElement>(null);
   const reduceMotion = useReducedMotion();
   /* só dispara tilt quando o dispositivo tem cursor (não-touch) */
@@ -142,37 +144,70 @@ export function LandingCss() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 1, delay: 0.3, ease }}
               >
-                {/* Badge mais próxima do viewer (Z alto) — move mais no tilt */}
+                {/* Badge mais próxima do viewer (Z alto) — move mais no tilt.
+                    Formato "linha de transação" (ícone + nome/categoria + valor), com as cores
+                    reais de categoria (`src/theme/palette.ts`), pra ler como extrato de verdade
+                    em vez de badge genérica. */}
                 <motion.div
-                  className="lp-float lp-float--a lp-float--light"
+                  className="lp-float lp-float--a lp-float--tx lp-float--light"
                   style={{ z: 60 }}
                   animate={reduceMotion ? {} : { y: [0, -10, 0] }}
                   transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut' }}
                 >
-                  <span className="ico" style={{ background: '#1f9e6e' }}><TrendingUp size={15} /></span>
-                  + R$ 5.200
+                  <span className="ico" style={{ background: '#EE5524' }}><ShoppingBag size={15} /></span>
+                  <span className="lp-float-tx-text">
+                    <strong>Mercado</strong>
+                    <span>Alimentação · 28 jun</span>
+                  </span>
+                  <strong className="lp-float-tx-amount">R$ 89,90</strong>
                 </motion.div>
 
                 {/* Badge camada média */}
                 <motion.div
-                  className="lp-float lp-float--c lp-float--light"
+                  className="lp-float lp-float--c lp-float--tx lp-float--light"
                   style={{ z: 30 }}
                   animate={reduceMotion ? {} : { y: [0, -8, 0] }}
                   transition={{ duration: 5.2, repeat: Infinity, ease: 'easeInOut', delay: 0.6 }}
                 >
-                  <span className="ico" style={{ background: '#6366c9' }}><CreditCard size={15} /></span>
-                  Fatura R$ 1.120
+                  <span className="ico" style={{ background: '#9B5DE5' }}><Film size={15} /></span>
+                  <span className="lp-float-tx-text">
+                    <strong>Cinema</strong>
+                    <span>Lazer · 21 jun</span>
+                  </span>
+                  <strong className="lp-float-tx-amount">R$ 42,00</strong>
                 </motion.div>
 
-                {/* Badge atrás do phone (Z negativo) */}
+                {/* Cartão de orçamento — Z sempre positivo (na frente do phone, que está em Z=0).
+                    A badge "Meta 42%" antiga usava Z negativo e ficava atrás do celular — sem
+                    o tilt do mouse (que não existe em touch) pra revelar o deslocamento, ela
+                    ficava parcialmente escondida no mobile. Corrigido nas duas badges novas. */}
                 <motion.div
-                  className="lp-float lp-float--d lp-float--light"
-                  style={{ z: -15 }}
-                  animate={reduceMotion ? {} : { y: [0, -12, 0] }}
-                  transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut', delay: 1.2 }}
+                  className="lp-float lp-float--d lp-float--budget lp-float--light"
+                  style={{ z: 20 }}
+                  animate={reduceMotion ? {} : { y: [0, -9, 0] }}
+                  transition={{ duration: 4.8, repeat: Infinity, ease: 'easeInOut', delay: 0.9 }}
                 >
-                  <span className="ico" style={{ background: '#e8911c' }}><PiggyBank size={15} /></span>
-                  Meta 42%
+                  <span className="lp-float-budget-head">
+                    <span className="ico" style={{ background: '#6366C9' }}><Car size={14} /></span>
+                    <strong>Transporte</strong>
+                    <span className="lp-float-budget-pct">72%</span>
+                  </span>
+                  <span className="lp-float-budget-bar"><i style={{ width: '72%', background: '#6366C9' }} /></span>
+                </motion.div>
+
+                {/* 3º gasto (linha de transação), não card de meta — pedido do dono */}
+                <motion.div
+                  className="lp-float lp-float--b lp-float--tx lp-float--light"
+                  style={{ z: 40 }}
+                  animate={reduceMotion ? {} : { y: [0, -11, 0] }}
+                  transition={{ duration: 5.6, repeat: Infinity, ease: 'easeInOut', delay: 0.3 }}
+                >
+                  <span className="ico" style={{ background: '#3B82C4' }}><Plane size={15} /></span>
+                  <span className="lp-float-tx-text">
+                    <strong>Hospedagem</strong>
+                    <span>Viagens · 24 jun</span>
+                  </span>
+                  <strong className="lp-float-tx-amount">R$ 120,00</strong>
                 </motion.div>
 
                 {/* Phone no Z=0 + bob + gloss de luz */}
