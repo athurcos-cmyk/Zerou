@@ -245,7 +245,13 @@ Claro, quente e direto. O número (dinheiro) é o herói. Mobile-first, com cara
 
 ## Landing (`src/landing/`)
 
-Zona de marketing, identidade Sol clara, com liberdade de cor literal (exceção do teste). Hero com mockup do app em CSS (`AppMockup`) num phone 3D, bento de recursos, faixa do casal (cofrinho), FAQ, CTA. Voz de copy: dor + reframe (PAS), CTA em 1ª pessoa.
+Zona de marketing, identidade Sol clara, com liberdade de cor literal (exceção do teste). Hero com mockup do app em CSS (`AppMockup`) num phone 3D, bento de recursos, faixa do casal (cofrinho), FAQ, CTA. Voz de copy: dor + reframe (PAS), CTA em 1ª pessoa. **Gradiente decorativo (glow, blob, texto em gradiente) evitado de propósito desde 2026-08-10** — mesma regra do app (`--gradient-brand` é pra DADO), removida da landing por pedido do dono ("menos cara de IA"); exceção mantida só nos números 1/2/3 dos steps, por preferência dele.
+
+## Páginas públicas secundárias (`/security`, `/features`, `/help`, `/contact`)
+
+`PublicLayout.tsx` + `PublicPages.tsx`. Até 2026-08-10 todas usavam o mesmo template genérico (`.feature-grid`, ícone+título+texto) — sem identidade própria, indistinguíveis entre si. `/security` e `/features` já foram redesenhadas com `/frontend-design` (assinatura própria por página: a fronteira pessoal/casal como layout do hero em Segurança; a bolha de chat da Vic como abertura em Funcionalidades); `/help` e `/contact` **ainda estão no template antigo**, pendente.
+
+**Rodapé é um componente único** (`src/components/SiteFooter.tsx`), usado pela landing e por todas as páginas públicas — antes eram dois rodapés divergentes (`.lp-footer`/`.public-footer`), cada um com um subconjunto diferente de links, e nenhum listava `/features`. Rota pública nova precisa entrar em `footerColumns` (`SiteFooter.tsx`) pra não repetir o problema.
 
 ## ⚠️ Armadilha de especificidade dentro de `.public-section`
 

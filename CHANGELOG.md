@@ -2,6 +2,27 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-10 — marketing: landing, cadastro, SEO técnico e páginas públicas redesenhadas
+
+Sessão longa pelas skills de `marketing-skills` + `/frontend-design`. Detalhe completo em
+`docs/history/2026-08.md`.
+
+- **Landing**: CTA unificado (era 3 textos diferentes), hero mais claro sobre ser um app, FAQ
+  com objeção de status-quo bias, card novo do WhatsApp/Vic no bento, schema.org
+  (Organization/WebSite/FAQPage). Gradientes decorativos e CSS morta removidos ("menos cara de
+  IA", pedido do dono) — mantido só o gradiente dos números 1/2/3, por preferência dele.
+- **Cadastro/login/onboarding**: copy sem "espaço pessoal" (termo reservado pro casal no
+  glossário do produto), toggle de mostrar senha, requisito de senha sempre visível.
+- **SEO técnico**: zero schema.org antes de hoje (achado motivado por um print mostrando o
+  Google confundindo "Granativa" com "Granactive Retinoide"); sitemap corrigido (tirou redirects
+  mortos, incluiu páginas reais); `/legal/data-deletion` era página órfã. Conteúdo/blog **segue
+  pausado** — decisão de 09/08 não mudou.
+- **`/security` e `/features` redesenhadas** com `/frontend-design`: saíram do template genérico
+  de 3 ícones, ganharam identidade própria. `/features` foi atualizada pra refletir o app de
+  hoje (subcategorias, WhatsApp, metas, investimentos), que não estava lá.
+- **Rodapé único** (`SiteFooter.tsx`) compartilhado entre landing e páginas públicas — causa raiz
+  de rotas "que ninguém sabia que existiam" era ter dois rodapés divergentes.
+
 ## 2026-08-09 — branding: tagline nova + contexto de marketing + fim do "grátis pra sempre"
 
 Início da frente de marketing/branding, via `/marketing-skills:product-marketing`.
