@@ -1,7 +1,7 @@
 # Product Marketing Context
 
-**Document version:** v6
-**Last updated:** 2026-08-09
+**Document version:** v7
+**Last updated:** 2026-08-10
 
 > Rascunho V1 gerado a partir do repositório (landing, README, SESSAO.md, meta tags, docs).
 > Itens marcados `[CONFIRMAR]` precisam da sua correção — são coisas que o código não sabe.
@@ -180,11 +180,11 @@ A anterior — *"Controle individual. Organização a dois."* — saiu por dois 
 
 ## SEO — como aparecemos no Google
 
-**Título indexado (`/`):** `Controle financeiro pessoal e do casal | Granativa` (49 caracteres — cabe inteiro, o Google corta perto de 60). Termo de busca na frente, marca no fim: quem procura não conhece a marca ainda, procura a categoria.
+**Título indexado (`/`):** `Granativa — veja pra onde vai seu dinheiro` (43 caracteres, cabe inteiro). Marca na frente, benefício logo depois — mudou de "termo de busca primeiro" (v4) pra "marca + mini-descrição" em 2026-08-10, pedido do dono depois de ver o resultado real no Google mostrando só "Granativa" sem contexto.
 
-**Descrição (`/`):** *"Registre um gasto em 3 toques e veja pra onde vai seu dinheiro. Cartões, contas e metas num lugar só — com um espaço do casal onde o seu continua privado."* (154 caracteres — acima de ~155 o Google corta com reticências.)
+**Descrição (`/`):** *"Registre um gasto em 3 toques e veja pra onde foi seu dinheiro. Funciona sem internet, é grátis, com modo casal opcional — o que é seu continua só seu."* (151 caracteres.) Troca o "num lugar só" genérico (clichê de concorrente, já sinalizado acima) pelos diferenciais reais — offline, grátis, privacidade — e deixa claro que o modo casal é opcional, não algo que todo mundo já tem.
 
-Fica em [LandingShell.tsx:14](../src/landing/LandingShell.tsx:14), e a cópia estática em `index.html` (a que robôs que não executam JavaScript enxergam) está igual, de propósito.
+Fica em [LandingShell.tsx:20](../src/landing/LandingShell.tsx:20) — mesmo texto pras três tags (`description`, `og:description`, `twitter:description`), porque `Seo.tsx` usa uma description só pras três. A cópia estática em `index.html` (a que robôs sem JavaScript enxergam) é mantida idêntica à dinâmica, de propósito: as duas já haviam divergido silenciosamente uma vez (título estático virou só "Granativa" num commit anterior, sem tocar no `Seo.tsx` — só um crawler sem JS ou uma leitura ao vivo do Google revelava isso).
 
 **⚠️ A descrição não faz o site subir no Google — ela faz a pessoa clicar.** Quem decide a posição é o título, o conteúdo da página e quem aponta links pra você. A descrição é o texto de venda embaixo do link; escrever bem aumenta o clique, não o ranking.
 
@@ -243,6 +243,7 @@ Por quê: gastar em aquisição antes dessa resposta escala algo que ainda não 
 
 ## Changelog
 *Newest first. One line per revision: what changed and why.*
+- v7 (2026-08-10) — Título e descrição de `/` reescritos (dono pediu depois de ver "Granativa" pelado no Google) e sincronizados entre `index.html` (estático) e `LandingShell.tsx`/`Seo.tsx` (dinâmico) — os dois haviam divergido em silêncio. `Seo.tsx` ganhou um bypass pra título já-com-marca não duplicar "| Granativa". Description trocou "num lugar só" (clichê) por diferenciais reais e por "modo casal opcional" (não dar a entender que todo mundo já tem espaço de casal).
 - v6 (2026-08-09) — Conteúdo de SEO **tentado e revertido no mesmo dia** por decisão do dono: canal lento demais pra quem ainda não sabe se um estranho quer o produto. O mapa de concorrentes foi absorvido aqui (o doc `content-strategy.md` deixou de existir); ordem correta registrada — falar com os 5 usuários, conseguir estranhos na mão, e só depois canal de longo prazo.
 - v5 (2026-08-09) — **Correção factual:** o nicho de casal não está vazio (ZapGastos, Couple Finance, Junto$ + blogs de banco nos termos genéricos). Território redefinido para "organizar a dois sem juntar tudo", o único ângulo que nenhum concorrente ocupa.
 - v4 (2026-08-09) — Seção **SEO** nova: título e descrição do Google reescritos (a antiga não trazia termo de busca nenhum e era pesada de casal), com a expectativa honesta de posição e a aposta na cauda longa do nicho de casal. `/pricing` removido do sitemap.

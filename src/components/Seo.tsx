@@ -34,7 +34,7 @@ export function Seo({ title, description, path = '/', robots = 'index,follow' }:
   useEffect(() => {
     const origin = window.location.origin;
     const canonicalUrl = `${origin}${path}`;
-    const fullTitle = title === 'Granativa' ? 'Granativa' : `${title} | Granativa`;
+    const fullTitle = title.includes('Granativa') ? title : `${title} | Granativa`;
 
     document.title = fullTitle;
     upsertMeta('meta[name="description"]', { name: 'description', content: description });

@@ -2,12 +2,33 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-10 (8) — Description do Google/compartilhamento reescrita + bug de sincronia com o título corrigido
+
+Pedido do dono, usando as skills `seo-audit` e `copywriting`. Ao investigar, achamos que
+`src/components/Seo.tsx` reescreve `title`/`description`/og/twitter em runtime assim que o React
+monta — ou seja, o fix do title na entrada (7) só valia pro `index.html` estático, não pro que
+usuário real e Googlebot (que executa JS) realmente veem. `LandingShell.tsx` ainda mandava o título
+antigo pro `Seo.tsx`.
+
+- **Nova description** (151 chars, igual em `description`/`og:description`/`twitter:description`,
+  estático e dinâmico): "Registre um gasto em 3 toques e veja pra onde foi seu dinheiro. Funciona
+  sem internet, é grátis, com modo casal opcional — o que é seu continua só seu." Troca "Cartões,
+  contas e metas num lugar só" (clichê já sinalizado no doc de marketing) pelos diferenciais reais,
+  e usa "modo casal opcional" em vez de "espaço do casal" pra não sugerir que todo mundo já tem um
+  (correção pedida ao vivo pelo dono).
+- **`Seo.tsx`**: `fullTitle` agora só ignora o sufixo "| Granativa" quando o título já contém a
+  marca (era `=== 'Granativa'` exato) — permite `LandingShell.tsx` mandar o título completo
+  "Granativa — veja pra onde vai seu dinheiro" sem duplicar a marca.
+- `index.html` e `LandingShell.tsx` (`Seo` da home) sincronizados; `.agents/product-marketing.md`
+  atualizado (v7) com o texto novo e o registro do bug de sincronia.
+
 ## 2026-08-10 (7) — Title/OG/Twitter voltam a ter mini-descrição
 
 Dono notou no resultado de busca do Google que o título tinha virado só "Granativa", sem dizer o
 que o app faz. `<title>`, `og:title` e `twitter:title` (`index.html`) passam a
 "Granativa — veja pra onde vai seu dinheiro", ecoando a tagline atual. `description`/`og:description`
-não mudaram.
+não mudaram. **Corrigido na entrada (8):** essa mudança só valia pro HTML estático — o componente
+`Seo.tsx` reescrevia tudo de novo assim que o React montava.
 
 ## 2026-08-10 (6) — Hero da landing: 4 badges flutuantes viram "extrato de verdade" + bug de Z corrigido
 

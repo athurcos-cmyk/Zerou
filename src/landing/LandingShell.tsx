@@ -13,13 +13,12 @@ interface LandingShellProps {
 export function LandingShell({ hero, children }: LandingShellProps) {
   return (
     <main className="lp" data-theme="paper">
-      {/* SEO: o título vira "Controle financeiro pessoal e do casal | Granativa" (49 chars, cabe
-          inteiro no resultado do Google) — termo de busca na frente, marca no fim. A descrição tem
-          154 chars de propósito: acima de ~155 o Google corta com reticências. Ver
+      {/* SEO: title/description precisam bater com a cópia estática em `index.html` (a que robôs
+          que não executam JavaScript enxergam) — os dois já divergiram uma vez em silêncio. Ver
           `.agents/product-marketing.md`. */}
       <Seo
-        title="Controle financeiro pessoal e do casal"
-        description="Registre um gasto em 3 toques e veja pra onde vai seu dinheiro. Cartões, contas e metas num lugar só — com um espaço do casal onde o seu continua privado."
+        title="Granativa — veja pra onde vai seu dinheiro"
+        description="Registre um gasto em 3 toques e veja pra onde foi seu dinheiro. Funciona sem internet, é grátis, com modo casal opcional — o que é seu continua só seu."
         path="/"
       />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }} />
