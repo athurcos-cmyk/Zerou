@@ -50,10 +50,6 @@ export function LandingCss() {
   const stageRotateY = useTransform(springX, [-0.5, 0.5], [-10, 10]);
   const stageRotateX = useTransform(springY, [-0.5, 0.5], [5, -5]);
 
-  /* glow laranja segue cursor */
-  const glowX = useTransform(springX, [-0.5, 0.5], ['-50px', '50px']);
-  const glowY = useTransform(springY, [-0.5, 0.5], ['-28px', '28px']);
-
   /* gloss de luz na tela do phone — efeito reflexo */
   const glossXpct = useTransform(springX, [-0.5, 0.5], [22, 78]);
   const glossYpct = useTransform(springY, [-0.5, 0.5], [18, 72]);
@@ -80,9 +76,6 @@ export function LandingCss() {
       {/* Grade perspectiva recuando para o fundo */}
       <div className="lp-grid-bg" aria-hidden="true" />
 
-      {/* Glow laranja — segue cursor suavemente */}
-      <motion.div className="lp-glow" aria-hidden="true" style={{ x: glowX, y: glowY }} />
-
       <div className="lp-wrap" style={{ position: 'relative', zIndex: 2 }}>
         <div className="lp-hero-dark-grid">
 
@@ -93,9 +86,9 @@ export function LandingCss() {
             initial="hidden"
             animate="show"
           >
-            <motion.span className="lp-pill" variants={fadeUp}>
-              <i /> A real que ninguém te conta
-            </motion.span>
+            <motion.p className="lp-kicker" variants={fadeUp}>
+              O app que mostra a real que ninguém te conta
+            </motion.p>
 
             <motion.h1 className="lp-h1" variants={fadeUp}>
               Seu salário{' '}
@@ -115,7 +108,7 @@ export function LandingCss() {
 
             <motion.div className="lp-hero-actions" variants={fadeUp}>
               <Link className="lp-btn lp-btn--primary lp-btn--lg" to="/register">
-                Quero ver pra onde vai meu dinheiro <ArrowRight size={18} />
+                Quero ver meus gastos <ArrowRight size={18} />
               </Link>
               <a className="lp-btn lp-btn--ghost lp-btn--lg" href="#como">
                 Como funciona

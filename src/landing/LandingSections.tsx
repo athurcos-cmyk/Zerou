@@ -2,7 +2,7 @@
 import { Link } from 'react-router-dom';
 import { motion, useInView } from 'framer-motion';
 import {
-  ArrowRight, BarChart3, CreditCard, LockKeyhole, PiggyBank, Target, TrendingUp, Wallet
+  ArrowRight, BarChart3, CreditCard, LockKeyhole, MessageCircle, PiggyBank, Target, TrendingUp, Wallet
 } from 'lucide-react';
 
 const ease = [0.16, 1, 0.3, 1] as const;
@@ -55,7 +55,8 @@ const faqs = [
   { q: 'Posso usar sozinho?', a: 'Sim. a Granativa funciona muito bem para a sua vida financeira individual. O modo casal entra só quando você quiser.' },
   { q: 'O que a outra pessoa vê?', a: 'Apenas o que está no espaço do casal: despesas compartilhadas, divisões e acertos. Suas contas, cartões e lançamentos pessoais continuam privados.' },
   { q: 'Cartão entra no saldo duas vezes?', a: 'Não. Compras ficam na fatura, e o saldo da conta só muda quando você registra o pagamento.' },
-  { q: 'Preciso instalar pela loja?', a: 'Não. a Granativa é um app web: abra pelo navegador do celular e adicione o atalho na tela inicial.' }
+  { q: 'Preciso instalar pela loja?', a: 'Não. a Granativa é um app web: abra pelo navegador do celular e adicione o atalho na tela inicial.' },
+  { q: 'Já tentei outros apps e desisti.', a: 'Por isso a primeira tela pede 2 respostas, não 20. Se em 2 minutos não fizer sentido, não custou nada.' }
 ];
 
 export function LandingSections() {
@@ -106,7 +107,7 @@ export function LandingSections() {
           >
             <span className="lp-cell-ico" style={{ background: '#ee5524' }}><Wallet size={22} /></span>
             <h3>Anote antes de esquecer</h3>
-            <p>O gasto que some é o que você esquece. Aqui você lança em 3 toques — o valor é o herói.</p>
+            <p>O gasto que some é o que você esquece. Aqui, o único campo obrigatório é o valor — 3 toques e pronto.</p>
             <div className="lp-demo-hero">
               <span>Valor</span>
               <strong>R$ 318,00</strong>
@@ -114,6 +115,16 @@ export function LandingSections() {
           </motion.div>
 
           <TiltCard className="lp-cell--tall">
+            <span className="lp-cell-ico" style={{ background: '#25a06e' }}><MessageCircle size={22} /></span>
+            <h3>Nem precisa abrir o app</h3>
+            <p>Manda "gastei 40 no mercado" pro WhatsApp e a Vic lança sozinha.</p>
+            <div className="feat-chat">
+              <span className="feat-chat-bubble feat-chat-bubble--out">gastei 40 no mercado</span>
+              <span className="feat-chat-bubble feat-chat-bubble--in">✅ Lançado: Mercado · R$ 40,00</span>
+            </div>
+          </TiltCard>
+
+          <TiltCard className="lp-cell--third">
             <span className="lp-cell-ico" style={{ background: '#6366c9' }}><BarChart3 size={22} /></span>
             <h3>Veja o vilão do mês</h3>
             <p>Descubra qual categoria está comendo seu salário — antes do dia 15.</p>
@@ -137,12 +148,6 @@ export function LandingSections() {
             <h3>Finalmente sobra</h3>
             <p>Guarde pra um objetivo ou quite uma dívida, com progresso que cresce na sua frente.</p>
             <div className="lp-demo-bar"><i style={{ width: '42%' }} /></div>
-          </TiltCard>
-
-          <TiltCard className="lp-cell--third lp-cell--dark-card">
-            <span className="lp-cell-ico" style={{ background: 'rgba(255,255,255,0.12)' }}><LockKeyhole size={22} /></span>
-            <h3>O que é seu, é só seu</h3>
-            <p>Seu pessoal nunca aparece pro outro. Só o que vocês decidem dividir fica em comum.</p>
           </TiltCard>
         </motion.div>
       </RevealSection>
@@ -218,15 +223,26 @@ export function LandingSections() {
             </details>
           ))}
         </div>
+        {/* Schema derivado do próprio array faqs acima — impossível desalinhar do que a pessoa vê. */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'FAQPage',
+              mainEntity: faqs.map((faq) => ({
+                '@type': 'Question',
+                name: faq.q,
+                acceptedAnswer: { '@type': 'Answer', text: faq.a }
+              }))
+            })
+          }}
+        />
       </RevealSection>
 
       {/* Final CTA */}
       <RevealSection>
         <div className="lp-cta lp-cta--dark">
-          <div className="lp-cta-circles" aria-hidden="true">
-            <span className="lp-cta-c lp-cta-c--1" />
-            <span className="lp-cta-c lp-cta-c--2" />
-          </div>
           <p className="lp-kicker lp-kicker--light">Chega de terminar o mês no zero</p>
           <h2 className="lp-h2 lp-h2--light">Descubra pra onde vai<br />seu dinheiro hoje.</h2>
           <Link className="lp-btn lp-btn--primary lp-btn--lg" to="/register">
