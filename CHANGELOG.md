@@ -2,6 +2,105 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-10 (6) — Hero da landing: 4 badges flutuantes viram "extrato de verdade" + bug de Z corrigido
+
+Inspirado numa referência de concorrente (Pierre). Trocado por rodadas com o dono até fechar em 4.
+
+- **3 badges de transação** (ícone + nome + categoria·data + valor, cores reais de
+  `src/theme/palette.ts`): Mercado/Alimentação, Cinema/Lazer, Hospedagem/Viagens — formato novo
+  `.lp-float--tx`.
+- **1 badge de orçamento** (Transporte · 72%, com barrinha) — formato novo `.lp-float--budget`.
+  Uma primeira versão tinha 2 badges de orçamento/meta; o dono corrigiu — "mais um" era pra ser
+  gasto, não categoria, então virou 3 transação + 1 orçamento.
+- **Bug real corrigido no caminho**: a badge antiga "Meta 42%" usava `z: -15` (atrás do plano do
+  celular, que está em Z=0 no stage 3D) — no desktop o tilt do mouse revelava o deslocamento, mas
+  no mobile (sem hover, sem tilt) ela ficava parcialmente escondida atrás do celular. Achado pelo
+  próprio dono, testando ao vivo. As 4 badges novas usam Z sempre positivo (20 a 60).
+- **Segundo achado do dono, também só visível no mobile**: Hospedagem e Transporte (as duas badges
+  de baixo) ficavam próximas demais uma da outra no mobile — `.lp-float--b` subiu de `bottom: -3%`
+  pra `bottom: 20%` só no breakpoint mobile.
+
+## 2026-08-10 (5) — GSAP + Lenis na landing (etapas "Como funciona" com pin+scrub)
+
+Pedido do dono depois de ver a landing de um concorrente (Pierre, feita em Webflow com GSAP+Lenis).
+`gsap` e `lenis` novos em `package.json` — só usados em `src/landing/`, zona já isenta do teste de
+cor literal e já isolada num chunk lazy próprio (`LandingCss`), então o app principal (PWA) não
+carrega nem 1 byte disso.
+
+- **`useLenisScroll.ts`**: scroll suave/amortecido em toda a landing, sincronizado com o ticker do
+  GSAP (`lenis.raf` dentro de `gsap.ticker.add`, `lenis.on('scroll', ScrollTrigger.update)`) — sem
+  isso o pin/scrub abaixo desalinha do dedo/mouse. Desliga sozinho se `prefers-reduced-motion:
+  reduce`, e desmonta (limpa o listener do ticker + destrói o Lenis) ao sair da rota — testado
+  navegando landing → `/login` via React Router (client-side, não reload) sem sobra de listener nem
+  erro no console.
+- **Seção "Como funciona" reescrita com pin + scrub GSAP** (`StepsSection` em
+  `LandingSections.tsx`) — a seção prende na tela e as 3 etapas se revezam em destaque conforme
+  rola, só em telas ≥901px (mesmo breakpoint de `.lp-steps` no `landing.css`). **Em mobile, onde
+  está a maioria de quem usa a Granativa, o pin não roda** — cada etapa só aparece com um fade
+  simples, via `gsap.matchMedia` (dois branches, não é responsivo por CSS, é comportamento
+  diferente por largura). Framer Motion continua exatamente como estava no resto da página (hero
+  com parallax/tilt/gloss já existente, bento, FAQ, CTA) — as duas libs não disputam propriedade
+  nenhuma no mesmo elemento.
+- **Custo real, medido no build**: o chunk `LandingCss` foi de 152 KB (48,7 KB gzip) pra 285 KB
+  (98,5 KB gzip) — só ali, isolado; `index` (bundle do app) não mudou de tamanho.
+
+## 2026-08-10 (4) — schema de marca em toda página pública + nav de atalho na Ajuda + Twitter Card
+
+Pedido do dono depois de ver o print da busca "granativa" no Google (Visão Geral por IA acertou a
+descrição, mas o vídeo de "Granactive Retinoide" ainda aparece do lado — confirma por que o schema
+de identidade importa).
+
+- **`organizationSchema` (Organization/WebSite/SoftwareApplication) extraído pra
+  `src/components/organizationSchema.ts`** e passou a rodar em **toda página pública**
+  (`PublicLayout.tsx`), não só na landing — um crawler pode entrar direto por `/security` ou `/help`
+  sem nunca passar pela home.
+- **Twitter Card** (`twitter:card`/`title`/`description`/`image`) no `Seo.tsx` (dinâmico, toda página)
+  e no `index.html` (estático, pra bot que não roda JS) — não existia antes.
+- **`/help` ganhou nav de atalho por tópico** (chips "Começando" / "Espaço do casal" / "Cartões e
+  faturas" / "Conta e privacidade", `#id` por seção) — assinatura própria da página, útil só ali
+  porque é a única com pergunta suficiente pra precisar de atalho.
+- **`sameAs` (perfis sociais) ficou de fora de propósito** — sem perfil oficial ativo ainda, schema
+  com link fantasma erra mais do que ajuda.
+- Explicado ao dono: subdomínio (`blog.granativa.com.br`) seria contraproducente agora — fragmenta a
+  pouca autoridade que o domínio tem; site pequeno sem backlink quer tudo empilhado num domínio só.
+  Ranquear pra termos genéricos ("app de gestão financeira") continua exigindo conteúdo + tempo +
+  links, não schema — decisão de reverter o `/blog` (09/08) segue de pé.
+
+## 2026-08-10 (3) — `/help` redesenhada com FAQPage schema (última página pública no template antigo)
+
+`/frontend-design` + `marketing-skills:schema`. Fecha o item que `docs/design/DESIGN.md` já apontava
+como pendente desde a sessão anterior.
+
+- **FAQ agrupado por tópico** (Começando / Espaço do casal / Cartões e faturas / Conta e privacidade),
+  10 perguntas reais tiradas do produto (glossário, objeções, funcionalidades existentes) — nada
+  inventado. Reaproveita `.feat-group`/`.feat-group-title` de Funcionalidades, então ganhou a mesma
+  identidade visual sem CSS novo.
+- **`FAQPage` (schema.org/JSON-LD)** derivado do mesmo array que renderiza a lista visível — mesmo
+  padrão já usado no FAQ da landing, schema não pode desalinhar do conteúdo. Perguntas sobre exclusão
+  de conta e privacidade linkam de volta pra `/legal/data-deletion` e `/security`.
+- CSS morta removida no caminho (`.faq-grid`, `.pricing-hero` — únicos usos eram o template antigo do
+  Help).
+
+## 2026-08-10 (2) — menos "casal" nas páginas públicas, `/contact` redesenhada, `/security` reescrita
+
+Pedido do dono: as páginas públicas soavam como se o app fosse só pra casal. Fechado com `/frontend-design` +
+`marketing-skills:copywriting`.
+
+- **`/security` reescrita**: hero trocou "Duas contas, uma fronteira que não se move" (abria falando de
+  casal) por "O que é seu, continua seu" — privacidade individual primeiro, sem a linguagem hedgy
+  ("não é uma opção que dá pra esquecer de marcar"). A camada 3 ("Auditoria do casal", que misturava
+  casal com segurança de conta) virou "Conexão criptografada"; o bloco de fronteira pessoal/casal
+  desceu pra depois do bloco de confiança universal ("Não pedimos a senha do seu banco"), reframed como
+  "O espaço do casal não muda a regra" — opcional, não a moldura da página inteira.
+- **`/contact` saiu do template genérico** (lista nua de emails) — ganhou hero, dois cartões de ação
+  (Suporte / Privacidade e dados, reaproveitando `.privacy-action-card`) e CTA pra `/help`.
+- **Login/Registro/Esqueci senha/Verificar email/Aceitar convite** (todos usam `AuthLayout.tsx`): o
+  aviso fixo repetia a tagline do casal em toda tela, mas só aparecia no desktop (mobile já escondia) —
+  virou uma linha de privacidade individual ("Cada conta só vê os próprios dados, sempre"). Ganhou um
+  rodapé de links (Ajuda / Segurança) pra preencher o vazio que sobrava embaixo do card no mobile.
+- CSS morta removida no caminho (`.split-section`, `.contact-list`, únicos usos eram o template antigo
+  do Contato).
+
 ## 2026-08-10 — marketing: landing, cadastro, SEO técnico e páginas públicas redesenhadas
 
 Sessão longa pelas skills de `marketing-skills` + `/frontend-design`. Detalhe completo em
