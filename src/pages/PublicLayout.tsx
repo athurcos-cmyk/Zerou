@@ -1,5 +1,6 @@
 ﻿import { Link } from 'react-router-dom';
 import { BrandLockup } from '../components/BrandLogo';
+import { SiteFooter } from '../components/SiteFooter';
 import type { ReactNode } from 'react';
 
 interface PublicLayoutProps {
@@ -30,19 +31,7 @@ export function PublicLayout({ children }: PublicLayoutProps) {
 
       {children}
 
-      <footer className="public-footer">
-        <div>
-          <BrandLockup />
-          <p className="text-secondary">Veja pra onde vai seu dinheiro. Sozinho ou a dois.</p>
-        </div>
-        <div className="public-footer-links" aria-label="Links institucionais">
-          <Link to="/security">Segurança</Link>
-          <Link to="/help">Ajuda</Link>
-          <Link to="/contact">Contato</Link>
-          <Link to="/legal/terms">Termos</Link>
-          <Link to="/legal/privacy">Privacidade</Link>
-        </div>
-      </footer>
+      <SiteFooter />
     </main>
   );
 }

@@ -3303,8 +3303,7 @@ span.service-mark--brand {
 }
 
 .public-nav,
-.public-section,
-.public-footer {
+.public-section {
   width: min(100%, 76rem);
   margin: 0 auto;
 }
@@ -3320,8 +3319,7 @@ span.service-mark--brand {
   padding: 0.75rem;
 }
 
-.public-nav-links,
-.public-footer-links {
+.public-nav-links {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -3330,8 +3328,7 @@ span.service-mark--brand {
   font-weight: 800;
 }
 
-.public-nav-links a:hover,
-.public-footer-links a:hover {
+.public-nav-links a:hover {
   color: var(--text-primary);
 }
 
@@ -3430,13 +3427,241 @@ span.service-mark--brand {
   text-align: left;
 }
 
-.public-footer {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+/* ── Security page — a fronteira que não se move ──
+   Assinatura da página: a divisão pessoal/casal, que hoje é regra de servidor, vira o próprio
+   layout do hero em vez de um ícone de cadeado genérico. */
+.sec-hero { max-width: 44rem; }
+
+.sec-boundary {
+  grid-template-columns: 1fr auto 1fr;
+  align-items: stretch;
+  gap: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 1.25rem;
+  background: var(--bg-surface);
+  overflow: hidden;
+}
+
+.sec-boundary-side {
+  padding: clamp(1.5rem, 4vw, 2.5rem);
+  display: grid;
+  gap: 0.85rem;
+  align-content: start;
+}
+
+.sec-boundary-label {
+  margin: 0;
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.dot-list,
+.sec-boundary-side ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.dot-list li,
+.sec-boundary-side li {
+  padding-left: 1rem;
+  position: relative;
+}
+
+.dot-list li::before,
+.sec-boundary-side li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--action-primary);
+}
+
+/* ── Features page — a Vic no WhatsApp como abertura, catálogo agrupado por tarefa (não por
+   menu do app) abaixo. ── */
+.feat-hero { max-width: 46rem; }
+
+.feat-chat {
+  display: grid;
+  gap: 0.6rem;
+  max-width: 22rem;
+  margin-top: 1.75rem;
+}
+
+.feat-chat-bubble {
+  padding: 0.7rem 1rem;
+  border-radius: 1.1rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.feat-chat-bubble--out {
+  justify-self: end;
+  background: var(--action-primary);
+  color: #fff;
+  border-bottom-right-radius: 0.3rem;
+}
+
+.feat-chat-bubble--in {
+  justify-self: start;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  border-bottom-left-radius: 0.3rem;
+}
+
+.feat-group {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: clamp(1.75rem, 4vw, 2.5rem);
+}
+
+.feat-group-head { max-width: 34rem; }
+
+h2.feat-group-title {
+  margin: 0.4rem 0 0.5rem;
+  font-size: clamp(1.4rem, 3vw, 1.9rem);
+}
+
+.feat-group-intro {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.feat-group-list {
+  margin-top: 1.25rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem 2rem;
+  max-width: 52rem;
+}
+
+@media (max-width: 700px) {
+  .feat-group-list { grid-template-columns: 1fr; }
+}
+
+/* A fronteira: uma régua sólida que não muda de lugar, nunca gradiente (regra do DESIGN.md —
+   gradiente é pra dado, não pra explicação). */
+.sec-boundary-rule {
+  width: 2px;
+  background: var(--action-primary);
+  align-self: stretch;
+}
+
+h2.sec-layers-title {
+  margin: 0.5rem 0 1.5rem;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+}
+
+.sec-layers-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.sec-layer {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 1rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 1rem;
+  background: var(--bg-surface);
+}
+
+.sec-layer-num {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  background: var(--action-primary);
+  color: #fff;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 1rem;
+}
+
+.sec-layer h3 { margin: 0 0 0.35rem; font-size: 1.05rem; }
+.sec-layer p { margin: 0; color: var(--text-secondary); line-height: 1.55; font-size: 0.92rem; }
+
+.sec-trust {
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 1.25rem;
+  padding: clamp(1.5rem, 4vw, 2rem);
+  border: 1px solid var(--action-primary-soft);
+  border-radius: 1.25rem;
+  background: var(--action-primary-soft);
+}
+
+.sec-trust svg { color: var(--action-primary); margin-top: 0.2rem; }
+.sec-trust h2 { margin: 0 0 0.5rem; font-size: 1.25rem; }
+.sec-trust p { color: var(--text-secondary); line-height: 1.6; }
+
+@media (max-width: 700px) {
+  .sec-boundary { grid-template-columns: 1fr; }
+  .sec-boundary-rule { width: auto; height: 2px; }
+  .sec-trust { grid-template-columns: 1fr; }
+}
+
+/* ── Rodapé compartilhado (`SiteFooter.tsx`) — landing e páginas públicas usam o mesmo,
+   pra rota nova nunca mais ficar de fora sem ninguém notar. ── */
+.site-footer {
+  width: min(100%, 76rem);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) repeat(3, minmax(0, 1fr));
   gap: 2rem;
   border-top: 1px solid var(--border-subtle);
-  padding: 2rem 0;
+  padding: 2rem 1.25rem;
+}
+
+.site-footer-brand { text-decoration: none; }
+
+.site-footer-col {
+  display: grid;
+  gap: 0.6rem;
+  align-content: start;
+}
+
+.site-footer-heading {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.site-footer-col a {
+  color: var(--text-secondary);
+  font-weight: 700;
+  font-size: 0.92rem;
+  text-decoration: none;
+}
+
+.site-footer-col a:hover {
+  color: var(--text-primary);
+}
+
+@media (max-width: 640px) {
+  .site-footer {
+    grid-template-columns: 1fr 1fr;
+    gap: 1.75rem 1rem;
+    padding: 2rem 0;
+  }
+
+  .site-footer-brand {
+    grid-column: 1 / -1;
+  }
 }
 
 .legal-document {
@@ -3523,14 +3748,12 @@ span.service-mark--brand {
   .feature-grid,
   .privacy-action-grid,
   .pricing-strip,
-  .faq-grid,
-  .public-footer {
+  .faq-grid {
     grid-template-columns: 1fr;
   }
 
   .feature-grid,
-  .privacy-action-grid,
-  .public-footer {
+  .privacy-action-grid {
     display: grid;
   }
 
