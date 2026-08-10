@@ -2,7 +2,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useNavigate } from 'react-router-dom';
-import { CircleUserRound } from 'lucide-react';
+import { CircleUserRound, Eye, EyeOff } from 'lucide-react';
 import { z } from 'zod';
 import { AuthLayout } from '../components/AuthLayout';
 import { FormMessage } from '../components/FormMessage';
@@ -25,6 +25,7 @@ export function RegisterPage() {
   const { firebaseError } = useAuth();
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const form = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
     defaultValues: { name: '', email: '', password: '', terms: false }
@@ -61,8 +62,8 @@ export function RegisterPage() {
   return (
     <AuthLayout
       eyebrow="Criar conta"
-      title="Comece com seu espaço pessoal."
-      description="a Granativa separa o que é individual do que pode ser compartilhado depois."
+      title="Você está a 2 minutos de ver pra onde vai seu dinheiro."
+      description="Tudo que você registrar aqui é só seu — dá pra abrir um espaço do casal depois, se quiser."
     >
       <form className="form-stack" onSubmit={form.handleSubmit(onSubmit)}>
         <FormMessage>{firebaseError}</FormMessage>
@@ -79,15 +80,25 @@ export function RegisterPage() {
         </div>
         <div className="field">
           <label htmlFor="password">Senha</label>
-          <input
-            className="input"
-            id="password"
-            type="password"
-            autoComplete="new-password"
-            aria-describedby={form.formState.errors.password ? 'password-error' : undefined}
-            {...form.register('password')}
-          />
-          <span className="text-muted" id="password-error">{form.formState.errors.password?.message}</span>
+          <div className="input-with-toggle">
+            <input
+              className="input"
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="new-password"
+              aria-describedby="password-error"
+              {...form.register('password')}
+            />
+            <button
+              type="button"
+              className="input-toggle-btn"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+            >
+              {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+            </button>
+          </div>
+          <span className="text-muted" id="password-error">{form.formState.errors.password?.message ?? 'Mínimo de 8 caracteres.'}</span>
         </div>
         <label className="checkbox-row">
           <input id="terms" type="checkbox" aria-describedby={form.formState.errors.terms ? 'terms-error' : undefined} {...form.register('terms')} />
@@ -97,6 +108,7 @@ export function RegisterPage() {
           </span>
         </label>
         <span className="text-muted" id="terms-error">{form.formState.errors.terms?.message}</span>
+        <p className="text-secondary">Leva menos de 2 minutos · sem cartão de crédito.</p>
         <button className="button button--primary" type="submit" disabled={busy || Boolean(firebaseError)}>
           Criar conta Granativa
         </button>

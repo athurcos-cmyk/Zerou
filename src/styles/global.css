@@ -375,6 +375,24 @@ html[data-reduce-motion='true'] *::after {
   transition: border-color var(--duration-normal) ease, box-shadow var(--duration-normal) ease;
 }
 
+.input-with-toggle { position: relative; }
+.input-with-toggle .input { padding-right: 2.75rem; }
+.input-toggle-btn {
+  position: absolute;
+  top: 50%;
+  right: 0.55rem;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
 .input:focus,
 .input:focus-visible,
 .select:focus,

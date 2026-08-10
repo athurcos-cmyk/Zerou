@@ -2,7 +2,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { CircleUserRound } from 'lucide-react';
+import { CircleUserRound, Eye, EyeOff } from 'lucide-react';
 import { z } from 'zod';
 import { AuthLayout } from '../components/AuthLayout';
 import { FormMessage } from '../components/FormMessage';
@@ -23,6 +23,7 @@ export function LoginPage() {
   const { firebaseError } = useAuth();
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const returnTo = (location.state as { returnTo?: string } | null)?.returnTo ?? '/app';
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -60,8 +61,8 @@ export function LoginPage() {
   return (
     <AuthLayout
       eyebrow="Entrar"
-      title="Volte para o seu espaço Granativa."
-      description="Acesse seu espaço pessoal e continue do ponto em que parou."
+      title="De volta pra ver seus gastos."
+      description="Entre e veja o que mudou desde a última vez."
     >
       <form className="form-stack" onSubmit={form.handleSubmit(onSubmit)}>
         <FormMessage>{firebaseError}</FormMessage>
@@ -73,14 +74,24 @@ export function LoginPage() {
         </div>
         <div className="field">
           <label htmlFor="password">Senha</label>
-          <input
-            className="input"
-            id="password"
-            type="password"
-            autoComplete="current-password"
-            aria-describedby={form.formState.errors.password ? 'password-error' : undefined}
-            {...form.register('password')}
-          />
+          <div className="input-with-toggle">
+            <input
+              className="input"
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              aria-describedby={form.formState.errors.password ? 'password-error' : undefined}
+              {...form.register('password')}
+            />
+            <button
+              type="button"
+              className="input-toggle-btn"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+            >
+              {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+            </button>
+          </div>
           <span className="text-muted" id="password-error">{form.formState.errors.password?.message}</span>
         </div>
         <button className="button button--primary" type="submit" disabled={busy || Boolean(firebaseError)}>

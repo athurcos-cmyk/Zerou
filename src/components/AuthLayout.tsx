@@ -23,8 +23,8 @@ export function AuthLayout({ eyebrow, title, description, children }: AuthLayout
             <p className="subtitle">{description}</p>
           </div>
           <p className="notice">
-            Veja pra onde vai seu dinheiro. Sozinho ou a dois. Seu espaço pessoal nasce privado; o que for compartilhado fica
-            claro quando chegar a hora.
+            Veja pra onde vai seu dinheiro. Sozinho ou a dois. O que você registra é seu; o que for compartilhado com o
+            casal, você decide quando.
           </p>
         </aside>
         <div className="form-card">{children}</div>

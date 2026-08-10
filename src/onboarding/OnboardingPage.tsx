@@ -64,7 +64,7 @@ export function OnboardingPage() {
       });
       navigate(pendingInvite ? `/join/${pendingInvite}` : '/app', { replace: true });
     } catch (error) {
-      setMessage(getUserFacingErrorMessage(error, 'Não foi possível preparar seu espaço agora. Tente novamente.'));
+      setMessage(getUserFacingErrorMessage(error, 'Não foi possível preparar sua conta agora. Tente novamente.'));
     } finally {
       setBusy(false);
     }
@@ -84,7 +84,7 @@ export function OnboardingPage() {
       {step === 0 && (
         <div className="onboard-step">
           <h1 className="onboard-title">Vamos preparar sua Granativa.</h1>
-          <p className="onboard-subtitle">Seu espaço pessoal começa privado. Conte como você se chama para começar.</p>
+          <p className="onboard-subtitle">Tudo que você registrar aqui é só seu. Conte como você se chama pra começar.</p>
 
           {pendingInvite ? (
             <p className="notice">Convite preservado: {pendingInvite}. O vínculo compartilhado será tratado depois.</p>
@@ -128,7 +128,7 @@ export function OnboardingPage() {
           </div>
           <div className="onboard-finish-hint">
             <Sparkles size={18} aria-hidden="true" />
-            <span>Pronto! a Granativa vai montar seu espaço com base nessas respostas.</span>
+            <span>Pronto! Sua tela já abre pronta pra você começar a registrar.</span>
           </div>
         </div>
       )}
