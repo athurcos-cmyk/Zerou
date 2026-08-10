@@ -16,15 +16,18 @@
     <loc>https://granativa.com.br/contact</loc>
   </url>
   <url>
+    <loc>https://granativa.com.br/login</loc>
+  </url>
+  <url>
+    <loc>https://granativa.com.br/register</loc>
+  </url>
+  <url>
     <loc>https://granativa.com.br/legal/terms</loc>
   </url>
   <url>
     <loc>https://granativa.com.br/legal/privacy</loc>
   </url>
   <url>
-    <loc>https://granativa.com.br/legal/cookies</loc>
-  </url>
-  <url>
-    <loc>https://granativa.com.br/legal/subprocessors</loc>
+    <loc>https://granativa.com.br/legal/data-deletion</loc>
   </url>
 </urlset>
