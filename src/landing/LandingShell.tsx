@@ -2,49 +2,13 @@
 import type { ReactNode } from 'react';
 import { Seo } from '../components/Seo';
 import { SiteFooter } from '../components/SiteFooter';
+import { organizationSchema } from '../components/organizationSchema';
 import './landing.css';
 
 interface LandingShellProps {
   hero: ReactNode;
   children: ReactNode;
 }
-
-/* Schema.org: sinal explícito de identidade da marca pro Google/IA — "Granativa" é este site,
-   este app, não uma variação de "Granactive Retinoide" (ativo de skincare que domina a busca
-   desse nome). Sem isso não há garantia de desambiguação, mas é o sinal técnico mais forte
-   que existe pra isso. */
-const organizationSchema = {
-  '@context': 'https://schema.org',
-  '@graph': [
-    {
-      '@type': 'Organization',
-      '@id': 'https://granativa.com.br/#organization',
-      name: 'Granativa',
-      url: 'https://granativa.com.br/',
-      logo: 'https://granativa.com.br/brand/granativa-logo-horizontal.png',
-      description:
-        'App financeiro pessoal e de casal. Registre gastos, contas e cartões em poucos toques e veja pra onde vai seu dinheiro — sozinho ou a dois.'
-    },
-    {
-      '@type': 'WebSite',
-      '@id': 'https://granativa.com.br/#website',
-      url: 'https://granativa.com.br/',
-      name: 'Granativa',
-      inLanguage: 'pt-BR',
-      publisher: { '@id': 'https://granativa.com.br/#organization' }
-    },
-    {
-      '@type': 'SoftwareApplication',
-      name: 'Granativa',
-      url: 'https://granativa.com.br/',
-      applicationCategory: 'FinanceApplication',
-      operatingSystem: 'Web',
-      description:
-        'Registre um gasto em 3 toques e veja pra onde vai seu dinheiro. Cartões, contas e metas num lugar só — com um espaço do casal onde o seu continua privado.',
-      offers: { '@type': 'Offer', price: '0', priceCurrency: 'BRL' }
-    }
-  ]
-};
 
 export function LandingShell({ hero, children }: LandingShellProps) {
   return (

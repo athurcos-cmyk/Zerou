@@ -44,6 +44,10 @@ export function Seo({ title, description, path = '/', robots = 'index,follow' }:
     upsertMeta('meta[property="og:type"]', { property: 'og:type', content: 'website' });
     upsertMeta('meta[property="og:url"]', { property: 'og:url', content: canonicalUrl });
     upsertMeta('meta[property="og:image"]', { property: 'og:image', content: `${origin}/brand/granativa-logo-horizontal.png` });
+    upsertMeta('meta[name="twitter:card"]', { name: 'twitter:card', content: 'summary_large_image' });
+    upsertMeta('meta[name="twitter:title"]', { name: 'twitter:title', content: fullTitle });
+    upsertMeta('meta[name="twitter:description"]', { name: 'twitter:description', content: description });
+    upsertMeta('meta[name="twitter:image"]', { name: 'twitter:image', content: `${origin}/brand/granativa-logo-horizontal.png` });
     upsertCanonical(canonicalUrl);
   }, [description, path, robots, title]);
 
