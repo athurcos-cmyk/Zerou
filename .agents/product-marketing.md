@@ -198,7 +198,7 @@ Fica em [LandingShell.tsx:14](../src/landing/LandingShell.tsx:14), e a cópia es
 | **Couple Finance** | App "100% focado em relacionamentos", proposta de **mesclar as contas**. | Média — proposta oposta à nossa |
 | **Junto$** (juntos.life) | Blog + produto de finanças de casal. | Média |
 | **C6 Bank, PagBank, meutudo** | Blogs de banco ocupando "como dividir as contas do casal". Autoridade altíssima. | **Alta nos termos genéricos** |
-| **casalquesoma.com.br, remindoo.com.br** | Blogs de nicho com listas "melhores apps para casal". | Baixa como concorrente, **alta como oportunidade**: são listas onde o Granativa deveria estar |
+| ~~casalquesoma.com.br, remindoo.com.br~~ | **⚠️ Refutado em 2026-08-10, verificado pelo dono ao vivo**: `casalquesoma.com.br` nem existe (domínio fora do ar) e `remindoo.com.br` é ele mesmo um app financeiro, não um blog com lista "melhores apps para casal". A pesquisa de 2026-08-09 estava errada nesses dois — não são oportunidade de link/menção, não citar de novo sem reverificar ao vivo primeiro. | — |
 
 O território que sobra, e que é defensável, é mais estreito e mais nosso: **quem quer organizar a dois sem juntar tudo**. Todo concorrente vende fusão ("mesclem suas contas"); ninguém escreve pra quem não quer fundir. É por isso que o título carrega "e do casal" mesmo depois de a tagline ter sido enxugada.
 
