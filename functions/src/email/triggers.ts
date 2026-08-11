@@ -90,6 +90,72 @@ export const send3DayFollowUp = onSchedule(
   }
 );
 
+// ─── Check-in de 7 dias: mensagem muda conforme a pessoa já lançou algo ─────────
+export const send7DayCheckin = onSchedule(
+  {
+    schedule: '58 13 * * *',
+    region: REGION,
+    maxInstances: 1,
+    secrets: [resendApiKey],
+    timeZone: 'America/Sao_Paulo',
+  },
+  async () => {
+    const brtNow = new Date(new Date().toLocaleString('en-CA', { timeZone: 'America/Sao_Paulo' }));
+    brtNow.setDate(brtNow.getDate() - 7);
+    const brtDateStr = brtNow.toISOString().slice(0, 10);
+
+    const start = Timestamp.fromDate(new Date(`${brtDateStr}T00:00:00-03:00`));
+    const end = Timestamp.fromDate(new Date(`${brtDateStr}T23:59:59-03:00`));
+
+    const db = getFirestore();
+    let sent = 0;
+    let skipped = 0;
+
+    try {
+      const snapshot = await db
+        .collection('users')
+        .where('createdAt', '>=', start)
+        .where('createdAt', '<=', end)
+        .get();
+
+      for (const doc of snapshot.docs) {
+        const user = doc.data() as UserProfile;
+        if (!user.email) {
+          skipped++;
+          continue;
+        }
+
+        const activated = user.defaultWorkspaceId
+          ? !(
+              await db
+                .collection('workspaces')
+                .doc(user.defaultWorkspaceId)
+                .collection('transactions')
+                .limit(1)
+                .get()
+            ).empty
+          : false;
+
+        const name = user.name || user.email.split('@')[0];
+        const result = await sendOperationalEmail({
+          kind: 'activation_checkin',
+          to: user.email,
+          subject: activated ? 'Uma dica pra ir além na Granativa' : 'Posso te ajudar a começar?',
+          data: { name, activated: String(activated) },
+        });
+
+        if (result.sent) {
+          sent++;
+        }
+      }
+
+      logger.info(`send7DayCheckin: ${sent} sent, ${skipped} skipped (no email), ${snapshot.size} total`);
+    } catch (err) {
+      logger.error('send7DayCheckin: query failed', err);
+    }
+  }
+);
+
 // ─── Goodbye email: chamado pelo cliente durante exclusão de conta ──────────────
 export const sendGoodbyeEmail = onCall(
   {

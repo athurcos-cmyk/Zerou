@@ -6,6 +6,7 @@ export type EmailKind =
   | 'cancellation'
   | 'privacy_request'
   | 'follow_up'
+  | 'activation_checkin'
   | 'admin_message';
 
 export interface EmailInput {
@@ -23,7 +24,7 @@ export interface EmailResult {
 
 export const emailTemplates: Record<EmailKind, { subject: string; purpose: string }> = {
   welcome: {
-    subject: 'Bem-vindo a Granativa',
+    subject: 'Bem-vindo à Granativa',
     purpose: 'Recepcionar a conta e orientar primeiros passos.'
   },
   security: {
@@ -49,6 +50,10 @@ export const emailTemplates: Record<EmailKind, { subject: string; purpose: strin
   follow_up: {
     subject: 'Já deu uma olhada na Granativa?',
     purpose: 'Lembrete 3 dias após cadastro para incentivar o uso do app.'
+  },
+  activation_checkin: {
+    subject: 'Como está indo na Granativa?',
+    purpose: 'Checkpoint 7 dias após cadastro — muda a mensagem conforme a pessoa já lançou algo ou não.'
   },
   admin_message: {
     subject: 'Mensagem da Granativa',
