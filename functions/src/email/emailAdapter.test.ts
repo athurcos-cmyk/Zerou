@@ -11,6 +11,7 @@ describe('email adapter', () => {
       'follow_up',
       'invite',
       'privacy_request',
+      'reengagement',
       'security',
       'welcome'
     ]);

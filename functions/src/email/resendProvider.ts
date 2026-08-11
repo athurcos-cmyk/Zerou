@@ -8,6 +8,7 @@ import { WelcomeEmail } from './templates/WelcomeEmail.js';
 import { GoodbyeEmail } from './templates/GoodbyeEmail.js';
 import { FollowUpEmail } from './templates/FollowUpEmail.js';
 import { Day7CheckinEmail } from './templates/Day7CheckinEmail.js';
+import { ReengagementEmail } from './templates/ReengagementEmail.js';
 import { GenericEmail } from './templates/GenericEmail.js';
 import { AdminMessageEmail } from './templates/AdminMessageEmail.js';
 
@@ -30,6 +31,8 @@ function pickTemplate(input: EmailInput): React.ReactElement | null {
       return FollowUpEmail({ name });
     case 'activation_checkin':
       return Day7CheckinEmail({ name, activated: input.data?.activated === 'true' });
+    case 'reengagement':
+      return ReengagementEmail({ name });
     case 'cancellation':
       return GoodbyeEmail({ name });
     case 'admin_message':

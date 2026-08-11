@@ -7,6 +7,7 @@ export type EmailKind =
   | 'privacy_request'
   | 'follow_up'
   | 'activation_checkin'
+  | 'reengagement'
   | 'admin_message';
 
 export interface EmailInput {
@@ -54,6 +55,10 @@ export const emailTemplates: Record<EmailKind, { subject: string; purpose: strin
   activation_checkin: {
     subject: 'Como está indo na Granativa?',
     purpose: 'Checkpoint 7 dias após cadastro — muda a mensagem conforme a pessoa já lançou algo ou não.'
+  },
+  reengagement: {
+    subject: 'Sentimos sua falta na Granativa',
+    purpose: 'Quem já usou e ficou 14 dias sem lançar nada — diferente do checkin de ativação, roda pra qualquer conta, a qualquer momento.'
   },
   admin_message: {
     subject: 'Mensagem da Granativa',

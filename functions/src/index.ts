@@ -23,7 +23,7 @@ export { onInvoiceLedgerEntryCreated } from './cards/invoiceLedgerEntryTrigger.j
 export { reverseCardPurchaseOnDelete } from './cards/reverseCardPurchaseOnDelete.js';
 
 // ─── Emails transacionais (Resend) ──────────────────────────────────────────────
-export { onUserCreated, send3DayFollowUp, send7DayCheckin, sendGoodbyeEmail } from './email/triggers.js';
+export { onUserCreated, send3DayFollowUp, send7DayCheckin, sendReengagement, sendGoodbyeEmail } from './email/triggers.js';
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 export { forceLogoutAllDevices } from './forceLogoutAllDevices.js';

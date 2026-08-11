@@ -156,6 +156,74 @@ export const send7DayCheckin = onSchedule(
   }
 );
 
+// ─── Reengajamento: quem já usou e ficou 14 dias sem lançar nada ────────────────
+// Diferente do checkin de dia 7 (que olha só pra quem acabou de cadastrar), este roda
+// contra QUALQUER conta com workspace, todo dia, ancorado na data do último lançamento —
+// então dispara uma vez só por período de inatividade (a data do último lançamento não
+// muda enquanto a pessoa não lança de novo, então "dias desde o último lançamento" só
+// bate com REENGAGEMENT_DAYS num único dia).
+const REENGAGEMENT_DAYS = 14;
+
+export const sendReengagement = onSchedule(
+  {
+    schedule: '59 13 * * *',
+    region: REGION,
+    maxInstances: 1,
+    secrets: [resendApiKey],
+    timeZone: 'America/Sao_Paulo',
+  },
+  async () => {
+    const brtNow = new Date(new Date().toLocaleString('en-CA', { timeZone: 'America/Sao_Paulo' }));
+    brtNow.setDate(brtNow.getDate() - REENGAGEMENT_DAYS);
+    const targetBrtDateStr = brtNow.toISOString().slice(0, 10);
+
+    const db = getFirestore();
+    let sent = 0;
+    let checked = 0;
+
+    try {
+      const snapshot = await db.collection('users').get();
+
+      for (const doc of snapshot.docs) {
+        const user = doc.data() as UserProfile;
+        if (!user.email || !user.defaultWorkspaceId) continue;
+        checked++;
+
+        const lastTxSnap = await db
+          .collection('workspaces')
+          .doc(user.defaultWorkspaceId)
+          .collection('transactions')
+          .orderBy('date', 'desc')
+          .limit(1)
+          .get();
+
+        if (lastTxSnap.empty) continue; // nunca lançou nada — é caso do checkin de ativação, não deste
+
+        const lastTxDate = lastTxSnap.docs[0].data().date as FirebaseFirestore.Timestamp;
+        const lastTxBrtDateStr = new Date(
+          lastTxDate.toDate().toLocaleString('en-CA', { timeZone: 'America/Sao_Paulo' })
+        )
+          .toISOString()
+          .slice(0, 10);
+
+        if (lastTxBrtDateStr !== targetBrtDateStr) continue;
+
+        const result = await sendOperationalEmail({
+          kind: 'reengagement',
+          to: user.email,
+          data: { name: user.name || user.email.split('@')[0] },
+        });
+
+        if (result.sent) sent++;
+      }
+
+      logger.info(`sendReengagement: ${sent} sent, ${checked} checked, ${snapshot.size} total users`);
+    } catch (err) {
+      logger.error('sendReengagement: query failed', err);
+    }
+  }
+);
+
 // ─── Goodbye email: chamado pelo cliente durante exclusão de conta ──────────────
 export const sendGoodbyeEmail = onCall(
   {
