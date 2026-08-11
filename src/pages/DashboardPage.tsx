@@ -439,7 +439,7 @@ export function DashboardPage() {
           </span>
           <div className="projection-card-title">
             <p className="eyebrow">Projeção do próximo mês</p>
-            <h2>{effectiveNextMonthProjection ? (effectiveNextMonthProjection.leftoverCents >= 0 ? 'Sobra prevista' : 'Rombo previsto') : 'Quanto sobraria mês que vem?'}</h2>
+            <h2>{effectiveNextMonthProjection ? (effectiveNextMonthProjection.leftoverCents >= 0 ? 'Sobra prevista' : 'Déficit previsto') : 'Quanto sobraria mês que vem?'}</h2>
           </div>
           {effectiveNextMonthProjection ? (
             <button

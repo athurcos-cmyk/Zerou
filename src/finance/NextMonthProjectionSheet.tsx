@@ -114,7 +114,7 @@ export function NextMonthProjectionSheet({
               {livePreviewCents >= 0 ? <TrendingUp size={18} aria-hidden="true" /> : <TrendingDown size={18} aria-hidden="true" />}
             </span>
             <div className="projection-result-body">
-              <span className="projection-result-label">{livePreviewCents >= 0 ? 'Sobra prevista' : 'Rombo previsto'}</span>
+              <span className="projection-result-label">{livePreviewCents >= 0 ? 'Sobra prevista' : 'Déficit previsto'}</span>
               <strong className="projection-result-amount">{formatMoney(livePreviewCents)}</strong>
             </div>
           </div>
