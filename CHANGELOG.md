@@ -2,6 +2,28 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-11 (2) — Fatura de cartão: push de fechamento movido pra 8h (o fechamento em si continua correto)
+
+`closeInvoicesDue` mandava o push "Fatura fechada" à meia-noite — acordando gente. Antes de mexer,
+verifiquei se isso arriscava alguma compra cair na fatura errada (dúvida legítima do dono): não
+arrisca. O roteamento de compra pra fatura (`resolveInstallmentCycle`, `src/cards/cardDates.ts`) é
+matemática pura de data (`purchaseDay >= closingDay`) e nunca olha o status do documento; e o status
+"aberta/fechada" que aparece na tela já se autocorrige no cliente a cada snapshot
+(`markClosedInvoices`, `src/cards/cardService.ts`), construído de propósito pra não depender do
+scheduler ter rodado. O scheduler é só o backup pra quem não abre o app naquele dia, e quem dispara
+o push. Mudança de uma linha: `'0 0 * * *'` → `'0 8 * * *'`. Deployado
+(`functions:billing:closeInvoicesDue`).
+
+## 2026-08-11 (1) — Email de reengajamento: 14 dias sem lançar nada, em qualquer conta
+
+Fechada a sequência de ativação (boas-vindas, follow-up, check-in de dia 7 — ver entrada de ontem);
+faltava cobrir quem já usou e sumiu, independente de quando cadastrou. Novo `sendReengagement`
+(`functions/src/email/triggers.ts`) roda todo dia, olha qualquer conta com workspace, pega a data do
+último lançamento e dispara só se ela bateu exatamente há 14 dias — como essa data não muda enquanto
+a pessoa não lança de novo, o email sai uma vez só por período de inatividade, sem precisar guardar
+"já mandei" em lugar nenhum. Ignora quem nunca lançou nada (isso já é coberto pelo check-in de
+ativação). Deployado (`functions:billing:sendReengagement`).
+
 ## 2026-08-10 (10) — Email de check-in de dia 7 + copy "não conta duas vezes" removida de todo lugar
 
 Sequência de ativação por email tinha só boas-vindas (dia 0) e follow-up (dia 3). Novo

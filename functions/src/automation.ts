@@ -32,11 +32,12 @@ function brtDayMonth(d: Date): string {
 }
 
 // ─── closeInvoicesDue ─────────────────────────────────────────────────────────
-// Roda todo dia à meia-noite (BRT). Fecha as faturas de cartões cujo
-// dia de fechamento é hoje. Sem isso, o fechamento depende do usuário
-// abrir o app e clicar manualmente.
+// Roda todo dia às 8h (BRT) — antes rodava à meia-noite, mas o push "fatura fechada"
+// acordava gente de madrugada. `closingDay` compara só o dia do mês (nowInBRT().getDate()),
+// não a hora, então rodar às 8h ainda fecha exatamente as faturas do dia certo. Sem isso,
+// o fechamento depende do usuário abrir o app e clicar manualmente.
 export const closeInvoicesDue = onSchedule(
-  { schedule: '0 0 * * *', timeZone: 'America/Sao_Paulo', region, maxInstances: 1 },
+  { schedule: '0 8 * * *', timeZone: 'America/Sao_Paulo', region, maxInstances: 1 },
   async () => {
     const db = getFirestore();
     const isActiveMember = createActiveMemberCheck();
