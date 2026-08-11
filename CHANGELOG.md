@@ -2,6 +2,22 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-10 (10) — Email de check-in de dia 7 + copy "não conta duas vezes" removida de todo lugar
+
+Sequência de ativação por email tinha só boas-vindas (dia 0) e follow-up (dia 3). Novo
+`send7DayCheckin` (`functions/src/email/triggers.ts`) roda todo dia às 13:58 BRT, olha quem
+criou conta há 7 dias e checa se já existe alguma transação no workspace da pessoa — manda uma
+de duas mensagens: quem não lançou nada recebe um pedido de resposta perguntando o que travou
+(vira conversa real com os primeiros usuários); quem já lançou recebe uma dica pra cadastrar o
+cartão. Precisa de `npx firebase deploy --only functions` pra ir pro ar — `git push` não
+reimplanta functions.
+
+Revisando o novo email, o dono notou que a copy explicava "a fatura não conta duas vezes" como
+se fosse um benefício — mas isso nasceu de um bug interno já corrigido, e reassegurar o usuário
+sobre algo que ele nunca desconfiou só confunde. Removida essa framing de reassurance em todo
+lugar que ela aparecia (email, landing, `/features`, central de ajuda, dashboard, doc de
+marketing) e trocada por descrição direta do mecanismo ("fatura separada do saldo").
+
 ## 2026-08-10 (9) — Imagem de compartilhamento trocada: logo horizontal (3:1) era grande demais em proporção
 
 Dono reportou que a imagem não aparecia ao compartilhar o link. `og:image`/`twitter:image` apontavam

@@ -564,7 +564,7 @@ export function DashboardPage() {
             </Link>
             <Link to="/app/cards">
               <strong>3. Adicionar cartão</strong>
-              <span>Faturas entram sem duplicar saldo.</span>
+              <span>Fatura fica separada do saldo da conta.</span>
             </Link>
           </div>
         </article>

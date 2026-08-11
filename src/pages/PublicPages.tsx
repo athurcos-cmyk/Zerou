@@ -8,7 +8,7 @@ export function FeaturesPage() {
     <PublicLayout>
       <Seo
         title="Funcionalidades"
-        description="Registre pelo app ou pelo WhatsApp com a Vic. Cartões sem contar duas vezes, metas, investimentos, análise por categoria e um espaço do casal com privacidade de verdade."
+        description="Registre pelo app ou pelo WhatsApp com a Vic. Cartões com fatura separada do saldo, metas, investimentos, análise por categoria e um espaço do casal com privacidade de verdade."
         path="/features"
       />
 
@@ -50,12 +50,12 @@ export function FeaturesPage() {
 
       <FeatureGroup
         kicker="Cartões e contas"
-        title="A fatura nunca conta duas vezes."
+        title="A fatura fica separada do saldo."
         items={[
           'Compra fica na fatura; o saldo da conta só muda quando você paga',
           'Parcelamento com antecipação de parcelas quando quiser adiantar',
           'Contas e assinaturas recorrentes, com aviso antes do vencimento',
-          'Dinheiro a receber, separado do resto pra nunca contar duas vezes'
+          'Dinheiro a receber, separado do resto da sua conta'
         ]}
       />
 
@@ -263,7 +263,7 @@ const helpFaqGroups: { topic: string; id: string; items: HelpFaqItem[] }[] = [
       },
       {
         q: 'Uma compra parcelada conta o valor todo de uma vez?',
-        a: 'Não — cada parcela conta só no mês da fatura em que ela cai, então o total nunca aparece duas vezes.'
+        a: 'Não — cada parcela entra só no mês da fatura em que ela cai.'
       }
     ]
   },

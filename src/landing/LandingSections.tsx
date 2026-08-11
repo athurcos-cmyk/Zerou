@@ -135,7 +135,7 @@ function CountUp({ to, prefix = '', suffix = '' }: { to: number; prefix?: string
 const faqs = [
   { q: 'Posso usar sozinho?', a: 'Sim. a Granativa funciona muito bem para a sua vida financeira individual. O modo casal entra só quando você quiser.' },
   { q: 'O que a outra pessoa vê?', a: 'Apenas o que está no espaço do casal: despesas compartilhadas, divisões e acertos. Suas contas, cartões e lançamentos pessoais continuam privados.' },
-  { q: 'Cartão entra no saldo duas vezes?', a: 'Não. Compras ficam na fatura, e o saldo da conta só muda quando você registra o pagamento.' },
+  { q: 'Como funciona o cartão de crédito?', a: 'Compra fica na fatura; o saldo da sua conta só muda quando você registra o pagamento.' },
   { q: 'Preciso instalar pela loja?', a: 'Não. a Granativa é um app web: abra pelo navegador do celular e adicione o atalho na tela inicial.' },
   { q: 'Já tentei outros apps e desisti.', a: 'Por isso a primeira tela pede 2 respostas, não 20. Se em 2 minutos não fizer sentido, não custou nada.' }
 ];
@@ -220,7 +220,7 @@ export function LandingSections() {
           <TiltCard className="lp-cell--third">
             <span className="lp-cell-ico" style={{ background: '#1f9e6e' }}><CreditCard size={22} /></span>
             <h3>Cartão sem susto</h3>
-            <p>Limite usado e o quanto ainda dá, sem contar a fatura duas vezes.</p>
+            <p>Limite usado e o quanto ainda dá, sem abrir o extrato do banco.</p>
             <div className="lp-demo-bar"><i style={{ width: '64%' }} /></div>
           </TiltCard>
 

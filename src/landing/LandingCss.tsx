@@ -124,7 +124,7 @@ export function LandingCss() {
             <motion.div className="lp-proof" variants={fadeUp}>
               <span><CheckCircle2 size={16} /> Feito pro celular</span>
               <span><CheckCircle2 size={16} /> Pessoal e casal, separados</span>
-              <span><CheckCircle2 size={16} /> Fatura sem contar duas vezes</span>
+              <span><CheckCircle2 size={16} /> Fatura separada do saldo</span>
             </motion.div>
           </motion.div>
 

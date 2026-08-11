@@ -39,7 +39,7 @@
 
 **Use cases:**
 - Substituir a planilha do Excel/Google Sheets que ninguém mantém depois do segundo mês.
-- Saber quanto do limite do cartão ainda dá pra usar, sem contar a fatura duas vezes no saldo.
+- Saber quanto do limite do cartão ainda dá pra usar, com a fatura separada do saldo da conta.
 - Dividir contas da casa entre o casal e acertar o saldo sem virar cobrança constante.
 - Juntar pra um objetivo comum (viagem, mudança) vendo quanto cada um colocou.
 - Registrar gasto pelo WhatsApp, falando com a Vic, sem abrir o app.
@@ -88,7 +88,7 @@ B2C — sem cadeia de compra. Mas há dois papéis distintos no modo casal:
 ## Differentiation
 **Key differentiators:**
 1. **Privacidade por desenho no modo casal.** As finanças pessoais nunca vazam pro espaço compartilhado — é regra de segurança no servidor, não uma configuração que dá pra errar.
-2. **Cartão que não mente.** Compra fica na fatura; o saldo da conta só muda quando o pagamento é registrado. Não conta o mesmo dinheiro duas vezes.
+2. **Cartão que não mente.** Compra fica na fatura; o saldo da conta só muda quando o pagamento é registrado.
 3. **Funciona sem internet.** Registra offline e sincroniza depois — o app responde na hora, não fica esperando servidor.
 4. **Registro pelo WhatsApp (Vic).** Manda "gastei 40 no mercado" e está lançado, sem abrir o app.
 5. **Sem loja de aplicativos, sem cartão de crédito, em 2 minutos.** Abre no navegador e adiciona na tela inicial.
@@ -222,7 +222,7 @@ Leitura honesta: isso **não é tração, é cortesia**. Amigo e família usam p
 |---|---|
 | Privacidade no casal | Isolamento garantido por Security Rules no servidor; o pessoal nunca entra no espaço compartilhado |
 | Funciona no mundo real | Offline-first: registra sem internet e sincroniza depois |
-| Cartão sem susto | Fatura separada do saldo; nada é contado duas vezes |
+| Cartão sem susto | Fatura separada do saldo da conta |
 | Começa em 2 minutos | Onboarding de 3 passos, 2 perguntas, sem cartão de crédito |
 | Sem fricção pra registrar | 3 toques no app, ou uma mensagem no WhatsApp |
 
