@@ -2,6 +2,17 @@
 
 Resumo das mudancas recentes. O historico detalhado por mes fica em `docs/history/`.
 
+## 2026-08-16 — Reduzido o travessão na Landing e nas páginas públicas
+
+O dono notou que o excesso de travessão ("frase — clarificação") na Landing dava cara de texto
+gerado por IA. Reescrita a copy da Landing (`LandingCss.tsx`, `LandingSections.tsx`,
+`LandingShell.tsx`) e das páginas públicas em voz de marketing (`PublicPages.tsx` — Funcionalidades,
+Segurança, Ajuda, Contato — mais `RegisterPage.tsx`, `AuthLayout.tsx` e as descriptions do
+schema.org em `organizationSchema.ts`), trocando o travessão por pontuação variada (ponto, vírgula,
+dois-pontos, ponto e vírgula) conforme cada frase pedia. Fora do escopo, de propósito:
+`LegalPages.tsx` (Termos/Privacidade — reescrever texto legal sem pedido específico é risco
+desnecessário) e comentários de código (não são lidos por usuário).
+
 ## 2026-08-11 (2) — Fatura de cartão: push de fechamento movido pra 8h (o fechamento em si continua correto)
 
 `closeInvoicesDue` mandava o push "Fatura fechada" à meia-noite — acordando gente. Antes de mexer,
