@@ -16,7 +16,7 @@ export function FeaturesPage() {
         <p className="eyebrow">Funcionalidades</p>
         <h1 className="marketing-title">Manda uma mensagem no WhatsApp. A Vic lança pra você.</h1>
         <p className="marketing-copy">
-          Fora do WhatsApp, dá pra fazer tudo direto no app — cartões, contas, metas, investimentos e um espaço só do
+          Fora do WhatsApp, dá pra fazer tudo direto no app: cartões, contas, metas, investimentos e um espaço só do
           casal, cada real exatamente onde deveria estar.
         </p>
         <div className="feat-chat" aria-hidden="true">
@@ -28,12 +28,12 @@ export function FeaturesPage() {
       <FeatureGroup
         kicker="Registrar"
         title="Lança em segundos, do jeito que for mais rápido."
-        intro="3 toques no app ou uma mensagem no WhatsApp — o valor sempre em primeiro lugar."
+        intro="3 toques no app ou uma mensagem no WhatsApp: o valor sempre em primeiro lugar."
         items={[
           'Categoria e subcategoria: separa "Mercado" de "Mercado > Farmácia" sem perder a visão geral',
           'Tags pra achar depois ("viagem", "reembolsável"...)',
           'Vic no WhatsApp: manda o gasto por mensagem, sem abrir o app',
-          'Campo obrigatório é só o valor — o resto você completa se quiser'
+          'Campo obrigatório é só o valor, o resto você completa se quiser'
         ]}
       />
 
@@ -42,7 +42,7 @@ export function FeaturesPage() {
         title="Cada real, rastreado até a categoria certa."
         items={[
           'Extrato com o saldo do dia, não só a lista de lançamentos',
-          'Análise por categoria — o gráfico mostra quem está comendo seu salário',
+          'Análise por categoria: o gráfico mostra quem está comendo seu salário',
           'Orçamento por categoria, com barra de limite',
           'Resumo anual: os 12 meses lado a lado'
         ]}
@@ -74,7 +74,7 @@ export function FeaturesPage() {
         items={[
           'Despesas divididas viram um acerto automático: quem deve, quanto',
           'Cofrinho do casal, mostrando quanto cada um guardou',
-          'Seu pessoal nunca aparece pro outro — é regra do servidor, não configuração'
+          'Seu pessoal nunca aparece pro outro: é regra do servidor, não configuração'
         ]}
       />
 
@@ -83,7 +83,7 @@ export function FeaturesPage() {
         title="Funciona onde você já está."
         items={[
           'Web app: sem loja, adiciona um atalho na tela inicial',
-          'Funciona offline — registra na hora e sincroniza depois',
+          'Funciona offline: registra na hora e sincroniza depois',
           '6 temas visuais, cada pessoa com o seu'
         ]}
       />
@@ -121,14 +121,14 @@ export function SecurityPage() {
     <PublicLayout>
       <Seo
         title="Segurança"
-        description="Login protegido e dados isolados por conta — no seu espaço pessoal e, se você abrir, também no do casal."
+        description="Login protegido e dados isolados por conta: no seu espaço pessoal e, se você abrir, também no do casal."
         path="/security"
       />
       <section className="public-section sec-hero">
         <p className="eyebrow">Segurança</p>
         <h1 className="marketing-title">O que é seu, continua seu.</h1>
         <p className="marketing-copy">
-          Sua conta só abre com o seu login. O que você registra fica isolado do de qualquer outra pessoa — inclusive
+          Sua conta só abre com o seu login. O que você registra fica isolado do de qualquer outra pessoa, inclusive
           dentro do espaço do casal, se um dia você abrir um.
         </p>
       </section>
@@ -141,7 +141,7 @@ export function SecurityPage() {
           <SecLayer
             n={2}
             title="Dados isolados por conta"
-            text="Cada conta enxerga só os próprios dados. A regra roda no servidor — o aplicativo não decide isso sozinho."
+            text="Cada conta enxerga só os próprios dados. A regra roda no servidor. O aplicativo não decide isso sozinho."
           />
           <SecLayer
             n={3}
@@ -155,7 +155,7 @@ export function SecurityPage() {
         <ShieldCheck size={26} aria-hidden="true" />
         <div>
           <h2>Não pedimos a senha do seu banco.</h2>
-          <p>a Granativa não conecta a contas bancárias nem pede suas credenciais. Você registra o que quiser mostrar — o resto continua só seu.</p>
+          <p>a Granativa não conecta a contas bancárias nem pede suas credenciais. Você registra o que quiser mostrar. O resto continua só seu.</p>
         </div>
       </section>
 
@@ -186,7 +186,7 @@ export function SecurityPage() {
             </ul>
           </div>
         </div>
-        <p className="text-secondary">Ações do espaço compartilhado registram um resumo — nunca o código do convite.</p>
+        <p className="text-secondary">Ações do espaço compartilhado registram um resumo, nunca o código do convite.</p>
       </section>
 
       <section className="public-section final-cta">
@@ -226,12 +226,12 @@ const helpFaqGroups: { topic: string; id: string; items: HelpFaqItem[] }[] = [
     items: [
       {
         q: 'Preciso conectar minha conta do banco?',
-        a: 'Não. a Granativa não conecta a bancos nem pede suas credenciais — você registra o que quiser mostrar, direto no app ou mandando mensagem pra Vic no WhatsApp.'
+        a: 'Não. a Granativa não conecta a bancos nem pede suas credenciais: você registra o que quiser mostrar, direto no app ou mandando mensagem pra Vic no WhatsApp.'
       },
       { q: 'É de graça?', a: 'Hoje sim: R$ 0, sem cartão de crédito.' },
       {
         q: 'Dá pra usar só pelo celular?',
-        a: 'Sim — é assim que a Granativa foi pensada. Abra pelo navegador do celular e adicione o atalho na tela inicial; não precisa de loja de aplicativos.'
+        a: 'Sim, é assim que a Granativa foi pensada. Abra pelo navegador do celular e adicione o atalho na tela inicial; não precisa de loja de aplicativos.'
       }
     ]
   },
@@ -241,7 +241,7 @@ const helpFaqGroups: { topic: string; id: string; items: HelpFaqItem[] }[] = [
     items: [
       {
         q: 'Meu parceiro vai ver meus gastos?',
-        a: 'Só o que vocês decidirem colocar no espaço do casal. Contas, cartões e lançamentos do seu espaço pessoal continuam invisíveis pra ele — regra aplicada no servidor, não uma configuração sua.'
+        a: 'Só o que vocês decidirem colocar no espaço do casal. Contas, cartões e lançamentos do seu espaço pessoal continuam invisíveis pra ele. É regra aplicada no servidor, não uma configuração sua.'
       },
       {
         q: 'Como convidar meu parceiro?',
@@ -249,7 +249,7 @@ const helpFaqGroups: { topic: string; id: string; items: HelpFaqItem[] }[] = [
       },
       {
         q: 'Dá pra sair do espaço do casal depois?',
-        a: 'Sim, a qualquer momento. Sair não cancela nada — cofrinho, despesas e acertos continuam intactos, só o vínculo entre as contas é desfeito.'
+        a: 'Sim, a qualquer momento. Sair não cancela nada: cofrinho, despesas e acertos continuam intactos, só o vínculo entre as contas é desfeito.'
       }
     ]
   },
@@ -259,11 +259,11 @@ const helpFaqGroups: { topic: string; id: string; items: HelpFaqItem[] }[] = [
     items: [
       {
         q: 'Como registro um cartão?',
-        a: 'Use Cartões, crie o cartão e registre as compras. O saldo da conta só muda quando você marca a fatura como paga — a compra fica na fatura até lá.'
+        a: 'Use Cartões, crie o cartão e registre as compras. O saldo da conta só muda quando você marca a fatura como paga. A compra fica na fatura até lá.'
       },
       {
         q: 'Uma compra parcelada conta o valor todo de uma vez?',
-        a: 'Não — cada parcela entra só no mês da fatura em que ela cai.'
+        a: 'Não, cada parcela entra só no mês da fatura em que ela cai.'
       }
     ]
   },
@@ -279,7 +279,7 @@ const helpFaqGroups: { topic: string; id: string; items: HelpFaqItem[] }[] = [
       },
       {
         q: 'Meus dados são privados?',
-        a: 'Sim — cada conta só enxerga os próprios dados, mesmo dentro do espaço do casal.',
+        a: 'Sim, cada conta só enxerga os próprios dados, mesmo dentro do espaço do casal.',
         linkTo: '/security',
         linkLabel: 'Ver como protegemos sua conta'
       }
@@ -348,7 +348,7 @@ export function HelpPage() {
 
       <section className="public-section final-cta">
         <h2>Ainda com dúvida?</h2>
-        <p>Escreva pro suporte — a gente lê tudo.</p>
+        <p>Escreva pro suporte. A gente lê tudo.</p>
         <Link className="button button--primary" to="/contact">
           Falar com a gente <ArrowRight size={18} aria-hidden="true" />
         </Link>
@@ -365,7 +365,7 @@ export function ContactPage() {
         <p className="eyebrow">Contato</p>
         <h1 className="marketing-title">Fale com a gente.</h1>
         <p className="marketing-copy">
-          Dúvida, erro no app ou pedido sobre os seus dados — escreva direto pro canal certo, sem formulário
+          Dúvida, erro no app ou pedido sobre os seus dados: escreva direto pro canal certo, sem formulário
           escondendo o que você quer perguntar.
         </p>
       </section>
@@ -395,7 +395,7 @@ export function ContactPage() {
 
       <section className="public-section final-cta">
         <h2>Sua dúvida já pode estar respondida</h2>
-        <p>Como convidar alguém, registrar cartão ou usar pelo celular — veja a Ajuda antes de escrever.</p>
+        <p>Como convidar alguém, registrar cartão ou usar pelo celular: veja a Ajuda antes de escrever.</p>
         <Link className="button button--primary" to="/help">
           Ver Ajuda <ArrowRight size={18} aria-hidden="true" />
         </Link>

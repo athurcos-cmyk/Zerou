@@ -12,7 +12,7 @@ gsap.registerPlugin(ScrollTrigger);
 const steps = [
   { n: '1', h: 'Crie em 2 minutos', p: 'Responda 2 perguntas e a Granativa monta seu espaço privado na hora.' },
   { n: '2', h: 'Veja a verdade', p: 'Jogue gastos, contas e cartões pra dentro. Descubra pra onde foi cada real.' },
-  { n: '3', h: 'Pare de terminar no zero', p: 'Corte o que não faz sentido e junte pro que importa — sozinho ou a dois.' }
+  { n: '3', h: 'Pare de terminar no zero', p: 'Corte o que não faz sentido e junte pro que importa, sozinho ou a dois.' }
 ];
 
 /* Único momento "GSAP de verdade" da landing (o resto é Framer Motion, que já cobria fade/stagger
@@ -171,7 +171,7 @@ export function LandingSections() {
         <div className="lp-section-head">
           <p className="lp-kicker">O que a Granativa faz por você</p>
           <h2 className="lp-h2">Tudo o que some no mês, num lugar só.</h2>
-          <p>Sem planilha e sem complicação. Você vê pra onde vai cada real e corta o que não faz sentido — antes de ficar sem.</p>
+          <p>Sem planilha e sem complicação. Você vê pra onde vai cada real e corta o que não faz sentido antes de ficar sem.</p>
         </div>
 
         <motion.div
@@ -188,7 +188,7 @@ export function LandingSections() {
           >
             <span className="lp-cell-ico" style={{ background: '#ee5524' }}><Wallet size={22} /></span>
             <h3>Anote antes de esquecer</h3>
-            <p>O gasto que some é o que você esquece. Aqui, o único campo obrigatório é o valor — 3 toques e pronto.</p>
+            <p>O gasto que some é o que você esquece. Aqui, o único campo obrigatório é o valor: 3 toques e pronto.</p>
             <div className="lp-demo-hero">
               <span>Valor</span>
               <strong>R$ 318,00</strong>
@@ -208,7 +208,7 @@ export function LandingSections() {
           <TiltCard className="lp-cell--third">
             <span className="lp-cell-ico" style={{ background: '#6366c9' }}><BarChart3 size={22} /></span>
             <h3>Veja o vilão do mês</h3>
-            <p>Descubra qual categoria está comendo seu salário — antes do dia 15.</p>
+            <p>Descubra qual categoria está comendo seu salário antes do dia 15.</p>
             <div className="lp-demo-cats">
               <span className="lp-demo-cat"><i style={{ background: '#ee5524' }} /> Mercado</span>
               <span className="lp-demo-cat"><i style={{ background: '#3b82c4' }} /> Casa</span>
@@ -239,11 +239,11 @@ export function LandingSections() {
           <div>
             <p className="lp-kicker" style={{ color: '#f8a07a' }}>Modo casal</p>
             <h2 className="lp-h2">A viagem dos sonhos some todo mês nas pequenas contas.</h2>
-            <p>Vocês querem juntar, mas o dinheiro escorre entre os dois e o sonho nunca sai do papel. Com o cofrinho do casal, cada real guardado aparece — e o objetivo finalmente cresce.</p>
+            <p>Vocês querem juntar, mas o dinheiro escorre entre os dois e o sonho nunca sai do papel. Com o cofrinho do casal, cada real guardado aparece, e o objetivo finalmente cresce.</p>
             <ul className="lp-couple-points">
               <li><span className="lp-cp-ico"><PiggyBank size={16} /></span> Guardem juntos: o dinheiro sai da sua conta e entra no cofrinho do casal</li>
               <li><span className="lp-cp-ico"><TrendingUp size={16} /></span> Vejam quanto cada um contribuiu e quanto juntaram no mês</li>
-              <li><span className="lp-cp-ico"><LockKeyhole size={16} /></span> Seu pessoal continua 100% privado — o outro só vê o cofrinho em comum</li>
+              <li><span className="lp-cp-ico"><LockKeyhole size={16} /></span> Seu pessoal continua 100% privado; o outro só vê o cofrinho em comum</li>
             </ul>
           </div>
           <motion.div

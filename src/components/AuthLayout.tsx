@@ -24,7 +24,7 @@ export function AuthLayout({ eyebrow, title, description, children }: AuthLayout
               <p className="subtitle">{description}</p>
             </div>
             <p className="notice">
-              Cada conta só vê os próprios dados, sempre — inclusive dentro do espaço do casal, se você abrir um.
+              Cada conta só vê os próprios dados, sempre, inclusive dentro do espaço do casal, se você abrir um.
             </p>
           </aside>
           <div className="form-card">{children}</div>

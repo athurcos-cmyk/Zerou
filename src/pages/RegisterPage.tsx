@@ -63,7 +63,7 @@ export function RegisterPage() {
     <AuthLayout
       eyebrow="Criar conta"
       title="Você está a 2 minutos de ver pra onde vai seu dinheiro."
-      description="Tudo que você registrar aqui é só seu — dá pra abrir um espaço do casal depois, se quiser."
+      description="Tudo que você registrar aqui é só seu. Dá pra abrir um espaço do casal depois, se quiser."
     >
       <form className="form-stack" onSubmit={form.handleSubmit(onSubmit)}>
         <FormMessage>{firebaseError}</FormMessage>

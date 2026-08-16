@@ -14,7 +14,7 @@ export const organizationSchema = {
       url: 'https://granativa.com.br/',
       logo: 'https://granativa.com.br/brand/granativa-logo-horizontal.png',
       description:
-        'App financeiro pessoal e de casal. Registre gastos, contas e cartões em poucos toques e veja pra onde vai seu dinheiro — sozinho ou a dois.'
+        'App financeiro pessoal e de casal. Registre gastos, contas e cartões em poucos toques e veja pra onde vai seu dinheiro, sozinho ou a dois.'
     },
     {
       '@type': 'WebSite',
@@ -31,7 +31,7 @@ export const organizationSchema = {
       applicationCategory: 'FinanceApplication',
       operatingSystem: 'Web',
       description:
-        'Registre um gasto em 3 toques e veja pra onde vai seu dinheiro. Cartões, contas e metas num lugar só — com um espaço do casal onde o seu continua privado.',
+        'Registre um gasto em 3 toques e veja pra onde vai seu dinheiro. Cartões, contas e metas num lugar só, com um espaço do casal onde o seu continua privado.',
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'BRL' }
     },
     /* SiteNavigationElement: sinal fraco pro Google sobre a navegação principal do site — não

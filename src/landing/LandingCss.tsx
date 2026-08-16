@@ -104,7 +104,7 @@ export function LandingCss() {
             <motion.p className="lp-lead" variants={fadeUp}>
               Dia 5 cai, dia 15 já era. Aí vem a fatura, o "tinha
               esquecido dessa", o boleto que dobrou.{' '}
-              <strong>Você não é ruim com dinheiro</strong> — você só
+              <strong>Você não é ruim com dinheiro.</strong> Você só
               nunca viu pra onde ele foge.
             </motion.p>
 

@@ -18,7 +18,7 @@ export function LandingShell({ hero, children }: LandingShellProps) {
           `.agents/product-marketing.md`. */}
       <Seo
         title="Granativa — veja pra onde vai seu dinheiro"
-        description="Registre um gasto em 3 toques e veja pra onde foi seu dinheiro. Funciona sem internet, é grátis, com modo casal opcional — o que é seu continua só seu."
+        description="Registre um gasto em 3 toques e veja pra onde foi seu dinheiro. Funciona sem internet, é grátis, com modo casal opcional. O que é seu continua só seu."
         path="/"
       />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }} />
